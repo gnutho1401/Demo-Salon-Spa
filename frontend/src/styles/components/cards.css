@@ -1,0 +1,157 @@
+.service-card,
+.testimonial,
+.auth-card,
+.dashboard-card,
+.card {
+  background: var(--white);
+  border: 1px solid #f4e5ea;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+.card {
+  padding: 24px;
+  margin: 30px;
+}
+
+/* =========================
+   SERVICES
+========================= */
+
+.service-card img {
+  width: 100%;
+  height: 210px;
+  object-fit: cover;
+}
+
+.service-body {
+  padding: 16px;
+}
+
+.service-body h3 {
+  margin: 0 0 10px;
+}
+
+/* =========================
+   TECHNICIANS
+========================= */
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+}
+
+.tech-card {
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #f1d8df;
+  box-shadow: 0 10px 25px rgba(239, 79, 131, 0.08);
+}
+
+.tech-img-box {
+  width: 100%;
+  height: 280px;
+  overflow: hidden;
+  background: #f7f1f3;
+}
+
+.tech-img-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tech-info {
+  padding: 18px;
+  text-align: center;
+  background: #fff;
+}
+
+.tech-info h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #111;
+}
+
+.tech-info p {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.tech-info .exp {
+  display: block;
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 14px;
+}
+
+.tech-info .social {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.tech-info .social span {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f6f6f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* =========================
+   TESTIMONIAL
+========================= */
+
+.testimonial {
+  padding: 28px;
+}
+
+.stars {
+  color: #ffb300;
+  letter-spacing: 4px;
+}
+
+/* =========================
+   DASHBOARD
+========================= */
+
+.dashboard-card {
+  padding: 24px;
+}
+
+.dashboard-card h3 {
+  margin: 0;
+  color: #777;
+  font-size: 14px;
+}
+
+.dashboard-card strong {
+  font-size: 30px;
+  color: var(--pink);
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 992px) {
+  .tech-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 576px) {
+  .tech-grid {
+    grid-template-columns: 1fr;
+  }
+}

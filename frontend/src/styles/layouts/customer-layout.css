@@ -1,0 +1,29 @@
+.customer-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: calc(100vh - 126px);
+}
+
+.sidebar {
+  background: var(--white);
+  border-right: 1px solid #f3e4ea;
+  padding: 28px;
+}
+
+.sidebar a {
+  display: block;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  color: #555;
+}
+
+.sidebar a:hover {
+  background: #fff0f5;
+  color: var(--pink);
+}
+
+.dashboard {
+  padding: 35px;
+  background: #fff9fc;
+}
