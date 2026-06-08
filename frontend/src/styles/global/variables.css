@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --pink: #ef4f83;
+  --pink-2: #ff7aa6;
+  --light-pink: #fff4f8;
+  --text: #222;
+  --muted: #777;
+  --border: #f6dbe5;
+  --white: #fff;
+  --shadow-soft: 0 8px 30px rgba(0, 0, 0, .05);
+  --shadow-pink: 0 10px 25px rgba(239, 79, 131, .22);
+  --font-heading: 'Playfair Display', serif;
+  --font-body: Inter, Arial, sans-serif;
+}

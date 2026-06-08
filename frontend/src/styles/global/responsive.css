@@ -1,0 +1,27 @@
+@media (max-width: 900px) {
+  .topbar { display: none; }
+  .navbar { padding: 0 20px; }
+  .nav-links { gap: 12px; font-size: 12px; }
+  .hero-inner,
+  .customer-layout { grid-template-columns: 1fr; }
+  .hero h1 { font-size: 44px; }
+  .search-box { grid-template-columns: 1fr; }
+  .why-grid,
+  .stats,
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .hero-img { height: 360px; }
+  .newsletter,
+  .banner { display: block; }
+  .discount { font-size: 60px; }
+  .sidebar { display: none; }
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .nav-links { display: none; }
+  .why-grid,
+  .stats,
+  .footer-grid { grid-template-columns: 1fr; }
+  .newsletter input { width: 100%; margin-bottom: 12px; }
+  .section-head { display: block; }
+}

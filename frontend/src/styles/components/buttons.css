@@ -1,0 +1,28 @@
+.btn {
+  border: 0;
+  border-radius: 9px;
+  background: var(--pink);
+  color: var(--white);
+  padding: 13px 24px;
+  font-weight: 700;
+  box-shadow: var(--shadow-pink);
+  display: inline-block;
+}
+
+.btn-outline {
+  background: var(--white);
+  color: var(--pink);
+  border: 1px solid var(--pink);
+  box-shadow: none;
+}
+
+.card-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--pink);
+  background: #fff7fb;
+  color: var(--pink);
+  font-weight: 700;
+  margin-top: 12px;
+}

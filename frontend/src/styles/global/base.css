@@ -1,0 +1,35 @@
+body {
+  font-family: var(--font-body);
+  color: var(--text);
+  background: linear-gradient(90deg, #fff 0%, #fff7fb 100%);
+}
+
+h1, h2, .section-title { font-family: var(--font-heading); }
+
+.container {
+  max-width: 1210px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.section { padding: 76px 0; }
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-bottom: 28px;
+}
+
+.section-title {
+  font-size: 34px;
+  margin: 7px 0;
+}
+
+.eyebrow {
+  color: var(--pink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+}

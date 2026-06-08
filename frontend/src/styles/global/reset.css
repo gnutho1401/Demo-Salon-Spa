@@ -1,0 +1,9 @@
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; }
+a { text-decoration: none; color: inherit; }
+button, input, select, textarea { font-family: inherit; }
+button { cursor: pointer; }
+ul { padding: 0; }
+li { list-style: none; }
+img { max-width: 100%; display: block; }

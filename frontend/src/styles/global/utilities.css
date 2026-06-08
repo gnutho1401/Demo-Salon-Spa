@@ -1,0 +1,20 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.price {
+  color: var(--pink);
+  font-weight: 800;
+}
+
+.see-all {
+  color: var(--pink);
+  font-weight: 700;
+}
