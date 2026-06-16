@@ -1,6 +1,12 @@
 const { sql, connectDB } = require("../../config/db");
 const crypto = require("crypto");
 const qs = require("qs");
+const { notifyCustomer } = require("../../utils/notifyUser");
+const {
+  getCustomerDiscountPercent,
+  calcMembershipDiscount,
+  addLoyaltyPoints,
+} = require("../../utils/membershipDiscount");
 
 function formatVnpDate(date = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -32,9 +38,6 @@ function createVnpHash(params) {
     .update(Buffer.from(signData, "utf-8"))
     .digest("hex");
 
-  console.log("SIGN DATA =", signData);
-  console.log("HASH =", hash);
-
   return hash;
 }
 
@@ -47,8 +50,6 @@ function buildVnpayUrl(vnpUrl, params) {
   const paymentUrl =
     vnpUrl + "?" + qs.stringify(sortedParams, { encode: false });
 
-  console.log("VNPAY URL =", paymentUrl);
-
   return paymentUrl;
 }
 
@@ -60,9 +61,6 @@ function verifyVnpParams(query) {
   delete params.vnp_SecureHashType;
 
   const checkHash = createVnpHash(params);
-
-  console.log("RETURN HASH =", secureHash);
-  console.log("CHECK HASH =", checkHash);
 
   return checkHash === secureHash;
 }
@@ -129,6 +127,7 @@ async function getMine(userId) {
       p.PaymentMethod,
       p.Status,
       p.TransactionCode,
+      p.CreatedAt,
       p.PaidAt,
       STRING_AGG(s.ServiceName, N', ') AS ServiceNames
     FROM Payments p
@@ -146,6 +145,7 @@ async function getMine(userId) {
       p.PaymentMethod,
       p.Status,
       p.TransactionCode,
+      p.CreatedAt,
       p.PaidAt
     ORDER BY p.PaymentId DESC
   `);
@@ -208,25 +208,33 @@ async function getPayableAppointment(userId, appointmentId, voucherId = null) {
       .input("VoucherId", sql.Int, voucherId)
       .input("CustomerId", sql.Int, item.CustomerId)
       .input("TotalAmount", sql.Decimal(18, 2), totalAmount).query(`
-        SELECT TOP 1
-          v.VoucherId,
-          v.Code,
-          v.DiscountType,
-          v.DiscountValue,
-          v.MinOrderAmount,
-          v.MaxDiscountAmount,
-          cv.UsedStatus
-        FROM Vouchers v
-        JOIN CustomerVouchers cv ON v.VoucherId = cv.VoucherId
-        WHERE v.VoucherId = @VoucherId
-          AND cv.CustomerId = @CustomerId
-          AND v.Status = 'ACTIVE'
-          AND v.Quantity >= 0
-          AND ISNULL(cv.UsedStatus, 0) = 0
-          AND ISNULL(v.MinOrderAmount, 0) <= @TotalAmount
-          AND (v.StartDate IS NULL OR v.StartDate <= CAST(GETDATE() AS DATE))
-          AND (v.EndDate IS NULL OR v.EndDate >= CAST(GETDATE() AS DATE))
-      `);
+    SELECT TOP 1
+      v.VoucherId,
+      v.Code,
+      v.DiscountType,
+      v.DiscountValue,
+      v.MinOrderAmount,
+      v.MaxDiscountAmount,
+      cv.UsedStatus
+    FROM Vouchers v
+    JOIN CustomerVouchers cv ON v.VoucherId = cv.VoucherId
+    WHERE v.VoucherId = @VoucherId
+      AND cv.CustomerId = @CustomerId
+      AND v.Status = 'ACTIVE'
+      AND ISNULL(cv.UsedStatus, 0) = 0
+      AND ISNULL(v.MinOrderAmount, 0) <= @TotalAmount
+      AND (v.StartDate IS NULL OR v.StartDate <= CAST(GETDATE() AS DATE))
+      AND (v.EndDate IS NULL OR v.EndDate >= CAST(GETDATE() AS DATE))
+      AND NOT EXISTS (
+        SELECT 1
+        FROM Payments p
+        JOIN Invoices i ON p.InvoiceId = i.InvoiceId
+        JOIN Appointments a2 ON i.AppointmentId = a2.AppointmentId
+        WHERE i.VoucherId = v.VoucherId
+          AND a2.CustomerId = @CustomerId
+          AND p.Status = 'PAID'
+      )
+  `);
 
     const voucher = voucherResult.recordset[0];
 
@@ -392,16 +400,21 @@ async function payAppointment(userId, appointmentId, payload = {}) {
     }
 
     if (item.voucherId && paymentStatus === "PAID") {
-      await new sql.Request(transaction)
+      const usedResult = await new sql.Request(transaction)
         .input("CustomerId", sql.Int, item.CustomerId)
         .input("VoucherId", sql.Int, item.voucherId).query(`
-          UPDATE CustomerVouchers
-          SET 
-            UsedStatus = 1,
-            UsedAt = GETDATE()
-          WHERE CustomerId = @CustomerId
-            AND VoucherId = @VoucherId
-        `);
+    UPDATE CustomerVouchers
+    SET 
+      UsedStatus = 1,
+      UsedAt = GETDATE()
+    WHERE CustomerId = @CustomerId
+      AND VoucherId = @VoucherId
+      AND ISNULL(UsedStatus, 0) = 0
+  `);
+
+      if (usedResult.rowsAffected[0] === 0) {
+        throw new Error("Voucher này đã được sử dụng rồi");
+      }
     }
 
     await transaction.commit();
@@ -603,16 +616,21 @@ async function processVnpayCallback(query) {
         `);
 
       if (payment.VoucherId) {
-        await new sql.Request(transaction)
+        const usedResult = await new sql.Request(transaction)
           .input("CustomerId", sql.Int, payment.CustomerId)
           .input("VoucherId", sql.Int, payment.VoucherId).query(`
-            UPDATE CustomerVouchers
-            SET
-              UsedStatus = 1,
-              UsedAt = GETDATE()
-            WHERE CustomerId = @CustomerId
-              AND VoucherId = @VoucherId
-          `);
+    UPDATE CustomerVouchers
+    SET
+      UsedStatus = 1,
+      UsedAt = GETDATE()
+    WHERE CustomerId = @CustomerId
+      AND VoucherId = @VoucherId
+      AND ISNULL(UsedStatus, 0) = 0
+  `);
+
+        if (usedResult.rowsAffected[0] === 0) {
+          throw new Error("Voucher này đã được sử dụng rồi");
+        }
       }
 
       await new sql.Request(transaction)

@@ -1,11 +1,47 @@
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
 import CustomerLayout from "../../components/layout/CustomerLayout";
+import axiosClient from "../../api/axiosClient";
+
+function readStoredAppointment() {
+  try {
+    const raw = sessionStorage.getItem("lastAppointment");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function AppointmentSuccess() {
+  const { appointmentId } = useParams();
   const location = useLocation();
-  const appointment =
-    location.state?.appointment ||
-    JSON.parse(sessionStorage.getItem("lastAppointment"));
+  const [appointment, setAppointment] = useState(
+    () => location.state?.appointment || readStoredAppointment(),
+  );
+  const [loading, setLoading] = useState(
+    () => !(location.state?.appointment || readStoredAppointment()),
+  );
+
+  useEffect(() => {
+    if (appointment || !appointmentId) return;
+
+    setLoading(true);
+    axiosClient
+      .get(`/appointments/${appointmentId}`)
+      .then((res) => setAppointment(res.data.data || res.data))
+      .catch(() => setAppointment(null))
+      .finally(() => setLoading(false));
+  }, [appointmentId, appointment]);
+
+  if (loading) {
+    return (
+      <CustomerLayout>
+        <div style={{ padding: 40 }}>
+          <p>Đang tải thông tin lịch hẹn...</p>
+        </div>
+      </CustomerLayout>
+    );
+  }
 
   if (!appointment) {
     return (
@@ -80,106 +116,45 @@ export default function AppointmentSuccess() {
           line-height: 1.6;
         }
 
-        .success-code {
-          margin: 24px auto 0;
-          width: fit-content;
-          padding: 12px 22px;
-          border-radius: 999px;
-          background: #fff0f6;
-          color: #ff3f86;
-          font-weight: 900;
-          border: 1px solid #ffd7e6;
-          letter-spacing: 1px;
-        }
-
         .success-body {
           padding: 28px 38px 38px;
         }
 
-        .info-grid {
+        .success-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
           gap: 16px;
-          margin-bottom: 24px;
         }
 
-        .info-box {
-          border: 1px solid #f2dbe5;
-          border-radius: 20px;
-          padding: 18px;
-          background: #fff;
+        .success-item {
+          background: #fff8fb;
+          border: 1px solid #f5d8e4;
+          border-radius: 18px;
+          padding: 16px;
         }
 
-        .info-box span {
+        .success-item span {
           display: block;
-          font-size: 13px;
           color: #888;
-          margin-bottom: 8px;
+          font-size: 13px;
+          margin-bottom: 6px;
         }
 
-        .info-box strong {
+        .success-item strong {
           color: #222;
           font-size: 16px;
         }
 
-        .status-badge {
-          display: inline-block;
-          padding: 8px 14px;
-          border-radius: 999px;
-          background: #fff4df;
-          color: #b36b00;
-          font-weight: 900;
-          font-size: 13px;
-        }
-
-        .notice-box {
-          border-radius: 22px;
-          padding: 18px 20px;
-          background: #fff7fb;
-          border: 1px solid #ffd7e6;
-          color: #8a4b62;
-          line-height: 1.7;
-          margin-bottom: 26px;
-        }
-
         .success-actions {
           display: flex;
-          justify-content: center;
-          gap: 14px;
+          gap: 12px;
+          margin-top: 28px;
           flex-wrap: wrap;
         }
 
-        .btn-main,
-        .btn-sub {
-          text-decoration: none;
-          border-radius: 16px;
-          padding: 15px 26px;
-          font-weight: 900;
-        }
-
-        .btn-main {
-          color: white;
-          background: linear-gradient(135deg, #ff3f86, #ff7aad);
-          box-shadow: 0 14px 30px rgba(255, 63, 134, 0.25);
-        }
-
-        .btn-sub {
-          color: #ff3f86;
-          background: #fff0f6;
-          border: 1px solid #ffd7e6;
-        }
-
-        @media (max-width: 760px) {
-          .success-card {
-            border-radius: 24px;
-          }
-
-          .info-grid {
+        @media (max-width: 768px) {
+          .success-grid {
             grid-template-columns: 1fr;
-          }
-
-          .success-title {
-            font-size: 28px;
           }
         }
       `}</style>
@@ -188,43 +163,37 @@ export default function AppointmentSuccess() {
         <div className="success-card">
           <div className="success-top">
             <div className="success-icon">✓</div>
-
-            <h1 className="success-title">Lịch hẹn đã được xác nhận</h1>
-
+            <h1 className="success-title">Đặt lịch thành công!</h1>
             <p className="success-subtitle">
-              Cảm ơn bạn đã đặt lịch. Lịch hẹn của bạn đã được xác nhận và sẵn
-              sàng phục vụ.
+              Lịch hẹn của bạn đã được ghi nhận. Vui lòng đến đúng giờ hoặc
+              kiểm tra lại thông tin bên dưới.
             </p>
-
-            <div className="success-code">{appointmentCode}</div>
           </div>
 
           <div className="success-body">
-            <div className="info-grid">
-              <div className="info-box">
-                <span>Dịch vụ</span>
-                <strong>
-                  {appointment.ServiceName ||
-                    appointment.serviceName ||
-                    "Dịch vụ đã đặt"}
-                </strong>
+            <div className="success-grid">
+              <div className="success-item">
+                <span>Mã lịch hẹn</span>
+                <strong>{appointmentCode}</strong>
               </div>
-
-              <div className="info-box">
+              <div className="success-item">
                 <span>Trạng thái</span>
-                <strong className="status-badge">
-                  {appointment.status || "PENDING"}
+                <strong>
+                  {appointment.Status || appointment.status || "PENDING"}
                 </strong>
               </div>
-
-              <div className="info-box">
+              <div className="success-item">
                 <span>Ngày hẹn</span>
                 <strong>
-                  {appointment.AppointmentDate || appointment.appointmentDate}
+                  {appointment.AppointmentDate || appointment.appointmentDate
+                    ? new Date(
+                        appointment.AppointmentDate ||
+                          appointment.appointmentDate,
+                      ).toLocaleDateString("vi-VN")
+                    : "Chưa có"}
                 </strong>
               </div>
-
-              <div className="info-box">
+              <div className="success-item">
                 <span>Giờ hẹn</span>
                 <strong>
                   {String(
@@ -232,28 +201,34 @@ export default function AppointmentSuccess() {
                   ).slice(0, 5)}
                 </strong>
               </div>
-            </div>
-
-            <div className="notice-box">
-              <strong>Lưu ý:</strong>
-              <br />
-              • Vui lòng đến trước giờ hẹn khoảng 10–15 phút.
-              <br />
-              • Lịch hẹn hiện đã được xác nhận sau khi thanh toán thành công.
-              <br />• Bạn có thể xem lại lịch hẹn trong mục “Lịch hẹn của tôi”.
+              <div className="success-item">
+                <span>Kỹ thuật viên</span>
+                <strong>
+                  {appointment.EmployeeName ||
+                    appointment.employeeName ||
+                    "Đang cập nhật"}
+                </strong>
+              </div>
+              <div className="success-item">
+                <span>Dịch vụ</span>
+                <strong>
+                  {appointment.ServiceName ||
+                    appointment.serviceName ||
+                    appointment.ServiceNames ||
+                    "Đang cập nhật"}
+                </strong>
+              </div>
             </div>
 
             <div className="success-actions">
-              <Link className="btn-main" to="/customer/appointments">
-                Xem lịch hẹn
+              <Link className="btn" to={`/customer/appointments/${id}`}>
+                Xem chi tiết lịch hẹn
               </Link>
-
-              <Link className="btn-sub" to="/customer/booking">
-                Đặt thêm lịch khác
+              <Link className="btn btn-outline" to="/customer/appointments">
+                Danh sách lịch hẹn
               </Link>
-
-              <Link className="btn-sub" to="/">
-                Quay về trang chủ
+              <Link className="btn btn-outline" to="/customer">
+                Về trang chủ
               </Link>
             </div>
           </div>

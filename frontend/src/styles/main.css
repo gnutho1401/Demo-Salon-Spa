@@ -2,6 +2,7 @@
 @import './global/reset.css';
 @import './global/base.css';
 @import './global/utilities.css';
+@import './pages/receptionist.css';
 
 @import './components/buttons.css';
 @import './components/cards.css';

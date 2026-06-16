@@ -58,6 +58,38 @@ async function update(req, res) {
   }
 }
 
+async function getRescheduleInfo(req, res) {
+  try {
+    return success(res, await service.getRescheduleInfo(req.params.id, req.user));
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function reschedule(req, res) {
+  try {
+    return success(
+      res,
+      await service.reschedule(req.params.id, req.body, req.user),
+      "Đổi lịch thành công",
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function markNoShow(req, res) {
+  try {
+    return success(
+      res,
+      await service.markNoShow(req.params.id, req.body || {}, req.user),
+      "Đã đánh dấu vắng mặt",
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 async function remove(req, res) {
   try {
     return success(
@@ -75,6 +107,9 @@ module.exports = {
   getById,
   getMyAppointments,
   getAvailableSlots,
+  getRescheduleInfo,
+  reschedule,
+  markNoShow,
   create,
   update,
   remove,

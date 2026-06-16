@@ -89,6 +89,20 @@ export default function CustomerPackages() {
                     <span className="status">{p.Status}</span>
                     <span>{p.PaymentStatus ? `Thanh toán: ${p.PaymentStatus}` : ''}</span>
                   </div>
+                  {p.Status === 'ACTIVE' && Number(p.RemainingSessions || 0) > 0 && (
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ marginTop: 12 }}
+                      onClick={() =>
+                        navigate(
+                          `/customer/booking?customerPackageId=${p.CustomerPackageId}`,
+                        )
+                      }
+                    >
+                      Đặt buổi từ combo
+                    </button>
+                  )}
                 </div>
               </article>
             );

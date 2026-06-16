@@ -72,7 +72,7 @@ async function checkEmployeeBusy(
       FROM Appointments
       WHERE EmployeeId = @EmployeeId
         AND AppointmentDate = @AppointmentDate
-        AND Status NOT IN ('CANCELLED')
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW')
         AND (@StartTime < EndTime AND @EndTime > StartTime)
         AND (@ExcludeAppointmentId IS NULL OR AppointmentId <> @ExcludeAppointmentId)
     `);
@@ -119,6 +119,21 @@ function ensureNotTooClose(appointmentDate, startTime, actionText) {
   }
 }
 
+function isStaffUser(user) {
+  const role = String(user?.role || "").toUpperCase();
+  return ["ADMIN", "MANAGER", "RECEPTIONIST"].includes(role);
+}
+
+function isFinalAppointmentStatus(status) {
+  return [
+    "COMPLETED",
+    "CANCELLED",
+    "REFUND_PENDING",
+    "REFUNDED",
+    "NO_SHOW",
+  ].includes(String(status || "").toUpperCase());
+}
+
 function ensureFutureAppointment(appointmentDate, startTime) {
   const dateText = normalizeDateOnly(appointmentDate);
   const timeText = String(startTime || "").slice(0, 5) || "00:00";
@@ -162,7 +177,12 @@ function addMinutesToTime(time, minutes) {
   return date.toTimeString().slice(0, 8);
 }
 
-async function getAvailableSlots({ employeeId, serviceId, appointmentDate }) {
+async function getAvailableSlots({
+  employeeId,
+  serviceId,
+  appointmentDate,
+  excludeAppointmentId = null,
+}) {
   if (!employeeId) throw new Error("Vui lòng chọn kỹ thuật viên");
   if (!serviceId) throw new Error("Vui lòng chọn dịch vụ");
   if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn");
@@ -176,7 +196,10 @@ async function getAvailableSlots({ employeeId, serviceId, appointmentDate }) {
     .request()
     .input("EmployeeId", sql.Int, Number(employeeId))
     .input("AppointmentDate", sql.Date, appointmentDate).query(`
-      SELECT TOP 1 StartTime, EndTime, IsDayOff
+      SELECT TOP 1
+        CONVERT(VARCHAR(8), StartTime, 108) AS StartTime,
+        CONVERT(VARCHAR(8), EndTime, 108) AS EndTime,
+        IsDayOff
       FROM WorkShifts
       WHERE EmployeeId = @EmployeeId
         AND ShiftDate = @AppointmentDate
@@ -187,28 +210,34 @@ async function getAvailableSlots({ employeeId, serviceId, appointmentDate }) {
   let shiftEnd = "18:00:00";
 
   if (shiftResult.recordset[0]) {
-    if (shiftResult.recordset[0].IsDayOff) {
-      return [];
-    }
+    if (shiftResult.recordset[0].IsDayOff) return [];
 
-    shiftStart = String(shiftResult.recordset[0].StartTime).slice(0, 8);
-    shiftEnd = String(shiftResult.recordset[0].EndTime).slice(0, 8);
+    shiftStart = shiftResult.recordset[0].StartTime;
+    shiftEnd = shiftResult.recordset[0].EndTime;
   }
 
   const bookedResult = await pool
     .request()
     .input("EmployeeId", sql.Int, Number(employeeId))
-    .input("AppointmentDate", sql.Date, appointmentDate).query(`
-      SELECT StartTime, EndTime
+    .input("AppointmentDate", sql.Date, appointmentDate)
+    .input(
+      "ExcludeAppointmentId",
+      sql.Int,
+      excludeAppointmentId ? Number(excludeAppointmentId) : null,
+    ).query(`
+      SELECT
+        CONVERT(VARCHAR(8), StartTime, 108) AS StartTime,
+        CONVERT(VARCHAR(8), EndTime, 108) AS EndTime
       FROM Appointments
       WHERE EmployeeId = @EmployeeId
         AND AppointmentDate = @AppointmentDate
-        AND Status NOT IN ('CANCELLED')
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED')
+        AND (@ExcludeAppointmentId IS NULL OR AppointmentId <> @ExcludeAppointmentId)
     `);
 
   const booked = bookedResult.recordset.map((item) => ({
-    start: String(item.StartTime).slice(0, 8),
-    end: String(item.EndTime).slice(0, 8),
+    start: item.StartTime,
+    end: item.EndTime,
   }));
 
   const slots = [];
@@ -226,7 +255,7 @@ async function getAvailableSlots({ employeeId, serviceId, appointmentDate }) {
 
       if (!isBusy) {
         slots.push({
-          startTime: current,
+          startTime: slotStart.slice(0, 5),
           endTime: slotEnd.slice(0, 5),
         });
       }
@@ -236,6 +265,146 @@ async function getAvailableSlots({ employeeId, serviceId, appointmentDate }) {
   }
 
   return slots;
+}
+
+async function ensureSlotAvailableForReschedule({
+  appointmentId,
+  employeeId,
+  serviceId,
+  appointmentDate,
+  startTime,
+}) {
+  const slots = await getAvailableSlots({
+    employeeId,
+    serviceId,
+    appointmentDate,
+    excludeAppointmentId: appointmentId,
+  });
+
+  const normalizedStartTime = String(startTime || "").slice(0, 5);
+
+  const found = slots.some(
+    (slot) => String(slot.startTime).slice(0, 5) === normalizedStartTime,
+  );
+
+  if (!found) {
+    throw new Error("Giờ hẹn mới không hợp lệ hoặc kỹ thuật viên đã có lịch");
+  }
+}
+
+async function getRescheduleInfo(id, user = null) {
+  const appointment = await getById(id, user);
+  const currentStatus = String(appointment.Status || "").toUpperCase();
+
+  if (isFinalAppointmentStatus(currentStatus)) {
+    throw new Error("Lịch hẹn này không thể đổi lịch");
+  }
+
+  return {
+    AppointmentId: appointment.AppointmentId,
+    ServiceId: appointment.ServiceId,
+    ServiceName: appointment.ServiceNames,
+    EmployeeId: appointment.EmployeeId,
+    EmployeeName: appointment.EmployeeName,
+    AppointmentDate: appointment.AppointmentDate,
+    StartTime: appointment.StartTime,
+    EndTime: appointment.EndTime,
+    Status: appointment.Status,
+  };
+}
+
+async function reschedule(id, data = {}, user = null) {
+  const appointment = await getById(id, user);
+
+  const currentStatus = String(appointment.Status || "").toUpperCase();
+  if (isFinalAppointmentStatus(currentStatus)) {
+    throw new Error("Lịch hẹn này không thể đổi lịch");
+  }
+  if (!user || String(user.role).toUpperCase() !== "CUSTOMER") {
+    throw new Error("Chỉ customer mới được đổi lịch");
+  }
+
+  const customerId = await getCustomerIdByUserId(user.userId);
+  if (appointment.CustomerId !== customerId) {
+    throw new Error("Bạn không được đổi lịch hẹn này");
+  }
+
+  const appointmentDate = data.appointmentDate || data.AppointmentDate;
+  const employeeId = Number(
+    data.employeeId || data.EmployeeId || appointment.EmployeeId,
+  );
+  const serviceId = Number(
+    data.serviceId || data.ServiceId || appointment.ServiceId,
+  );
+  let startTime = data.startTime || data.StartTime;
+  if (startTime && String(startTime).length === 5) startTime += ":00";
+
+  if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn mới");
+  if (!employeeId) throw new Error("Vui lòng chọn kỹ thuật viên");
+  if (!serviceId) throw new Error("Vui lòng chọn dịch vụ");
+  if (!startTime) throw new Error("Vui lòng chọn giờ hẹn mới");
+
+  ensureFutureAppointment(appointmentDate, startTime);
+
+  await checkEmployeeCanDoService(employeeId, serviceId);
+  await ensureSlotAvailableForReschedule({
+    appointmentId: Number(id),
+    employeeId,
+    serviceId,
+    appointmentDate,
+    startTime,
+  });
+
+  const serviceInfo = await getServiceById(serviceId);
+  const endTime = addMinutesToTime(startTime, serviceInfo.DurationMinutes);
+
+  await checkEmployeeBusy(
+    employeeId,
+    appointmentDate,
+    startTime,
+    endTime,
+    Number(id),
+  );
+
+  const pool = await connectDB();
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
+
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, id)
+      .input("AppointmentDate", sql.Date, appointmentDate)
+      .input("StartTime", sql.VarChar, startTime)
+      .input("EndTime", sql.VarChar, endTime)
+      .input("EmployeeId", sql.Int, employeeId)
+      .input("ServiceId", sql.Int, serviceId).query(`
+        UPDATE Appointments
+        SET AppointmentDate = @AppointmentDate,
+            StartTime = @StartTime,
+            EndTime = @EndTime,
+            EmployeeId = @EmployeeId,
+            UpdatedAt = GETDATE()
+        WHERE AppointmentId = @AppointmentId
+      `);
+
+    await addStatusHistory(
+      transaction,
+      Number(id),
+      appointment.Status,
+      appointment.Status,
+      user?.userId,
+      "Customer rescheduled appointment",
+    );
+
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
+
+  return await getById(id, user);
 }
 
 async function create(userId, data) {
@@ -263,6 +432,22 @@ async function create(userId, data) {
   const selectedService = await getServiceById(serviceId);
 
   await checkEmployeeCanDoService(employeeId, serviceId);
+
+  const availableSlots = await getAvailableSlots({
+    employeeId,
+    serviceId,
+    appointmentDate,
+  });
+
+  const normalizedStartTime = String(startTime).slice(0, 5);
+
+  const isValidSlot = availableSlots.some(
+    (slot) => String(slot.startTime).slice(0, 5) === normalizedStartTime,
+  );
+
+  if (!isValidSlot) {
+    throw new Error("Giờ hẹn không hợp lệ hoặc đã được người khác đặt");
+  }
 
   const endTime = addMinutesToTime(startTime, selectedService.DurationMinutes);
 
@@ -328,7 +513,7 @@ async function create(userId, data) {
           SET RemainingSessions = RemainingSessions - 1,
               UsedSessions = UsedSessions + 1,
               Status = CASE
-                WHEN RemainingSessions - 1 = 0 THEN 'COMPLETED'
+                WHEN RemainingSessions - 1 = 0 THEN 'USED_UP'
                 ELSE Status
               END,
               UpdatedAt = GETDATE()
@@ -448,6 +633,7 @@ async function getMyAppointments(userId) {
         a.EndTime,
         a.Status,
         a.Notes,
+        a.CancelReason,
         a.CustomerPackageId,
         aps.ServiceId,
         a.EmployeeId,
@@ -458,15 +644,53 @@ async function getMyAppointments(userId) {
         ISNULL(i.FinalAmount, aps.Price) AS FinalAmount,
         u.FullName AS EmployeeName,
         p.PaymentMethod,
-        ISNULL(p.Status, 'UNPAID') AS PaymentStatus
+p.TransactionCode,
+p.PaidAt,
+ISNULL(p.Status, 'UNPAID') AS PaymentStatus,
+r.RefundStatus,
+r.RefundReason,
+r.RefundAmount,
+r.RefundedAt
       FROM Appointments a
       JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
       JOIN Services s ON aps.ServiceId = s.ServiceId
       JOIN Employees e ON a.EmployeeId = e.EmployeeId
       JOIN Users u ON e.UserId = u.UserId
-      LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
-      LEFT JOIN Payments p ON i.InvoiceId = p.InvoiceId
-      WHERE a.CustomerId = @CustomerId
+      LEFT JOIN Invoices i
+  ON a.AppointmentId = i.AppointmentId
+
+OUTER APPLY (
+  SELECT TOP 1
+    p2.PaymentId,
+    p2.PaymentMethod,
+    p2.Status,
+    p2.TransactionCode,
+    p2.PaidAt
+  FROM Payments p2
+  WHERE p2.InvoiceId = i.InvoiceId
+  ORDER BY
+    CASE
+      WHEN p2.Status = 'PAID' THEN 1
+      WHEN p2.Status = 'PENDING' THEN 2
+      WHEN p2.Status = 'FAILED' THEN 3
+      ELSE 4
+    END,
+    p2.PaymentId DESC
+) p
+
+OUTER APPLY (
+  SELECT TOP 1
+    rf.Status AS RefundStatus,
+    rf.Reason AS RefundReason,
+    rf.RefundAmount,
+    rf.RefundedAt
+  FROM Refunds rf
+  JOIN Payments rp ON rf.PaymentId = rp.PaymentId
+  WHERE rp.InvoiceId = i.InvoiceId
+  ORDER BY rf.RefundId DESC
+) r
+
+WHERE a.CustomerId = @CustomerId
       ORDER BY a.AppointmentDate DESC, a.StartTime DESC
     `);
 
@@ -516,8 +740,13 @@ async function getById(id, user = null) {
 
         b.BranchName,
 
-        svc.ServiceNames,
+        svc.ServiceId,
+        svc.ServiceName,
+        svcagg.ServiceNames,
+        ISNULL(svcagg.ServiceCount, 0) AS ServiceCount,
         ISNULL(svc.TotalAmount, 0) AS TotalAmount,
+        ISNULL(i.TotalAmount, ISNULL(svc.TotalAmount, 0)) AS InvoiceTotalAmount,
+        ISNULL(i.FinalAmount, ISNULL(svc.TotalAmount, 0)) AS InvoiceFinalAmount,
 
         i.InvoiceId,
         i.VoucherId,
@@ -535,7 +764,12 @@ async function getById(id, user = null) {
         p.PaidAt,
 
         ISNULL(rv.ReviewCount, 0) AS ReviewCount,
-        ISNULL(svc.ServiceCount, 0) AS ServiceCount
+        ISNULL(rv.HasReviewedPrimaryService, 0) AS HasReviewedPrimaryService,
+        rf.RefundStatus,
+        rf.RefundReason,
+        rf.RefundAmount AS RefundAmount,
+        rf.RefundedAt AS RefundDate,
+        hist.StatusHistoryJson
       FROM Appointments a
       JOIN Customers c ON a.CustomerId = c.CustomerId
       JOIN Users cu ON c.UserId = cu.UserId
@@ -544,15 +778,23 @@ async function getById(id, user = null) {
       LEFT JOIN Branches b ON a.BranchId = b.BranchId
 
       OUTER APPLY (
-        SELECT
-          MIN(aps.ServiceId) AS ServiceId,
-          COUNT(*) AS ServiceCount,
-          STRING_AGG(s.ServiceName, N', ') AS ServiceNames,
-          SUM(aps.Price) AS TotalAmount
+        SELECT TOP 1
+          aps.ServiceId,
+          s.ServiceName,
+          s.Price AS TotalAmount
         FROM AppointmentServices aps
         JOIN Services s ON aps.ServiceId = s.ServiceId
         WHERE aps.AppointmentId = a.AppointmentId
+        ORDER BY aps.AppointmentServiceId ASC
       ) svc
+
+      OUTER APPLY (
+        SELECT COUNT(*) AS ServiceCount,
+          STRING_AGG(s2.ServiceName, N', ') AS ServiceNames
+        FROM AppointmentServices aps2
+        JOIN Services s2 ON aps2.ServiceId = s2.ServiceId
+        WHERE aps2.AppointmentId = a.AppointmentId
+      ) svcagg
 
       LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
       LEFT JOIN Vouchers v ON i.VoucherId = v.VoucherId
@@ -581,10 +823,45 @@ async function getById(id, user = null) {
       ) p
 
       OUTER APPLY (
-        SELECT COUNT(*) AS ReviewCount
+        SELECT COUNT(*) AS ReviewCount,
+          CASE WHEN EXISTS (
+            SELECT 1
+            FROM Reviews r1
+            WHERE r1.AppointmentId = a.AppointmentId
+              AND r1.ServiceId = svc.ServiceId
+          ) THEN 1 ELSE 0 END AS HasReviewedPrimaryService
         FROM Reviews r
         WHERE r.AppointmentId = a.AppointmentId
       ) rv
+
+      OUTER APPLY (
+        SELECT TOP 1
+          r2.Status AS RefundStatus,
+          r2.Reason AS RefundReason,
+          r2.RefundAmount,
+          r2.RefundedAt
+        FROM Refunds r2
+        JOIN Payments p3 ON r2.PaymentId = p3.PaymentId
+        WHERE p3.InvoiceId = i.InvoiceId
+        ORDER BY r2.RefundId DESC
+      ) rf
+
+      OUTER APPLY (
+        SELECT (
+          SELECT
+            h.HistoryId,
+            h.OldStatus,
+            h.NewStatus,
+            h.Reason,
+            h.ChangedAt,
+            u2.FullName AS ChangedByName
+          FROM AppointmentStatusHistory h
+          LEFT JOIN Users u2 ON h.ChangedBy = u2.UserId
+          WHERE h.AppointmentId = a.AppointmentId
+          ORDER BY h.ChangedAt ASC, h.HistoryId ASC
+          FOR JSON PATH
+        ) AS StatusHistoryJson
+      ) hist
 
       WHERE a.AppointmentId = @AppointmentId
     `);
@@ -608,7 +885,7 @@ async function getById(id, user = null) {
 
 async function update(id, data, user = null) {
   const pool = await connectDB();
-  const current = await getById(id);
+  const current = await getById(id, user);
 
   if (!current) {
     throw new Error("Không tìm thấy lịch hẹn");
@@ -621,17 +898,60 @@ async function update(id, data, user = null) {
       throw new Error("Bạn không được sửa lịch hẹn này");
     }
 
+    const currentStatus = String(current.Status || "").toUpperCase();
     if (
-      !["PENDING_PAYMENT", "CONFIRMED"].includes(
-        String(current.Status).toUpperCase(),
-      )
+      [
+        "COMPLETED",
+        "CANCELLED",
+        "REFUND_PENDING",
+        "REFUNDED",
+        "NO_SHOW",
+      ].includes(currentStatus)
     ) {
-      throw new Error("Chỉ được đổi lịch khi lịch đang chờ hoặc đã xác nhận");
+      throw new Error("Lịch hẹn này không thể đổi lịch");
+    }
+
+    if (!["PENDING_PAYMENT", "CONFIRMED"].includes(currentStatus)) {
+      throw new Error(
+        "Chỉ được đổi lịch khi lịch đang chờ thanh toán hoặc đã xác nhận",
+      );
     }
     ensureNotTooClose(current.AppointmentDate, current.StartTime, "đổi");
   }
 
-  const status = data.status || data.Status || current.Status;
+  const isCustomer = user && String(user.role).toUpperCase() === "CUSTOMER";
+
+  if (isCustomer && (data.status !== undefined || data.Status !== undefined)) {
+    throw new Error("Customer không được tự thay đổi trạng thái lịch hẹn");
+  }
+
+  const requestedStatus = data.status || data.Status || current.Status;
+  const status = isCustomer ? current.Status : requestedStatus;
+  const normalizedStatus = String(status || "").toUpperCase();
+
+  const allowedStatuses = new Set([
+    "PENDING_PAYMENT",
+    "PENDING",
+    "PAID",
+    "CONFIRMED",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "CANCELLED",
+    "REFUND_PENDING",
+    "NO_SHOW",
+  ]);
+
+  if (!allowedStatuses.has(normalizedStatus)) {
+    throw new Error("Trạng thái lịch hẹn không hợp lệ");
+  }
+
+  if (!isCustomer && normalizedStatus === "NO_SHOW" && !isStaffUser(user)) {
+    throw new Error("Chỉ admin, manager hoặc lễ tân mới được chuyển NO_SHOW");
+  }
+
+  if (isCustomer && normalizedStatus === "NO_SHOW") {
+    throw new Error("Customer không được chuyển lịch hẹn sang NO_SHOW");
+  }
   const appointmentDate =
     data.appointmentDate || data.AppointmentDate || current.AppointmentDate;
 
@@ -642,19 +962,41 @@ async function update(id, data, user = null) {
 
   let endTime = current.EndTime;
 
-  if (data.appointmentDate || data.startTime || data.StartTime) {
+  const hasRescheduleData =
+    data.appointmentDate !== undefined ||
+    data.AppointmentDate !== undefined ||
+    data.startTime !== undefined ||
+    data.StartTime !== undefined;
+
+  if (hasRescheduleData) {
     const serviceInfo = await pool.request().input("AppointmentId", sql.Int, id)
       .query(`
-        SELECT TOP 1 s.DurationMinutes
-        FROM AppointmentServices aps
-        JOIN Services s ON aps.ServiceId = s.ServiceId
-        WHERE aps.AppointmentId = @AppointmentId
-      `);
+      SELECT TOP 1 
+        s.ServiceId,
+        s.DurationMinutes
+      FROM AppointmentServices aps
+      JOIN Services s ON aps.ServiceId = s.ServiceId
+      WHERE aps.AppointmentId = @AppointmentId
+    `);
 
+    const serviceId = serviceInfo.recordset[0]?.ServiceId;
     const minutes = serviceInfo.recordset[0]?.DurationMinutes || 60;
+
+    if (!serviceId) {
+      throw new Error("Không tìm thấy dịch vụ của lịch hẹn");
+    }
+
     endTime = addMinutesToTime(String(startTime).slice(0, 5), minutes);
 
     ensureFutureAppointment(appointmentDate, startTime);
+
+    await ensureSlotAvailableForReschedule({
+      appointmentId: Number(id),
+      employeeId: current.EmployeeId,
+      serviceId,
+      appointmentDate,
+      startTime,
+    });
 
     await checkEmployeeBusy(
       current.EmployeeId,
@@ -696,7 +1038,7 @@ async function update(id, data, user = null) {
         user?.userId,
         "Update appointment status",
       );
-    } else if (data.appointmentDate || data.startTime || data.StartTime) {
+    } else if (hasRescheduleData) {
       await addStatusHistory(
         transaction,
         Number(id),
@@ -718,9 +1060,65 @@ async function update(id, data, user = null) {
   return await getById(id);
 }
 
+async function markNoShow(id, data = {}, user = null) {
+  if (!isStaffUser(user)) {
+    throw new Error(
+      "Chỉ admin, manager hoặc lễ tân mới được đánh dấu vắng mặt",
+    );
+  }
+
+  const pool = await connectDB();
+  const current = await getById(id, user);
+  const currentStatus = String(current.Status || "").toUpperCase();
+
+  if (currentStatus !== "CONFIRMED" && currentStatus !== "IN_PROGRESS") {
+    throw new Error(
+      "Chỉ lịch đã xác nhận hoặc đang thực hiện mới được đánh dấu vắng mặt",
+    );
+  }
+
+  const reason = String(
+    data.reason || data.cancelReason || data.note || "Khách không đến",
+  ).trim();
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, id)
+      .input("NewStatus", sql.NVarChar, "NO_SHOW")
+      .input("Reason", sql.NVarChar, reason).query(`
+        UPDATE Appointments
+        SET Status = @NewStatus,
+            CancelReason = COALESCE(CancelReason, @Reason),
+            UpdatedAt = GETDATE()
+        WHERE AppointmentId = @AppointmentId
+      `);
+
+    await addStatusHistory(
+      transaction,
+      Number(id),
+      current.Status,
+      "NO_SHOW",
+      user?.userId,
+      reason,
+    );
+
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
+
+  return await getById(id, user);
+}
+
 async function remove(id, data = {}, user = null) {
   const pool = await connectDB();
-  const current = await getById(id);
+  const current = await getById(id, user);
 
   if (!current) {
     throw new Error("Không tìm thấy lịch hẹn");
@@ -746,7 +1144,7 @@ async function remove(id, data = {}, user = null) {
 
   const reason = String(data.reason || data.cancelReason || "").trim();
 
-  if (!reason && user && String(user.role).toUpperCase() === "CUSTOMER") {
+  if (user && String(user.role).toUpperCase() === "CUSTOMER" && !reason) {
     throw new Error("Vui lòng nhập lý do hủy lịch");
   }
 
@@ -756,6 +1154,7 @@ async function remove(id, data = {}, user = null) {
   const hasPaid = paymentStatus === "PAID" && paymentMethod !== "PACKAGE";
 
   const newAppointmentStatus = hasPaid ? "REFUND_PENDING" : "CANCELLED";
+  const refundStatus = hasPaid ? "PENDING" : null;
 
   const transaction = new sql.Transaction(pool);
 
@@ -770,11 +1169,6 @@ async function remove(id, data = {}, user = null) {
         SET 
           Status = @NewStatus,
           CancelReason = @Reason,
-          Notes = CASE
-            WHEN @Reason IS NULL THEN Notes
-            WHEN Notes IS NULL OR LTRIM(RTRIM(Notes)) = '' THEN N'Lý do hủy: ' + @Reason
-            ELSE Notes + CHAR(13) + CHAR(10) + N'Lý do hủy: ' + @Reason
-          END,
           UpdatedAt = GETDATE()
         WHERE AppointmentId = @AppointmentId
       `);
@@ -826,19 +1220,32 @@ async function remove(id, data = {}, user = null) {
       const payment = paidPayment.recordset[0];
 
       if (payment) {
-        await new sql.Request(transaction)
-          .input("PaymentId", sql.Int, payment.PaymentId)
-          .input("RefundAmount", sql.Decimal(18, 2), payment.Amount || 0)
-          .input(
-            "Reason",
-            sql.NVarChar,
-            reason || "Customer cancelled paid appointment",
-          ).query(`
-            INSERT INTO Refunds
-              (PaymentId, RefundAmount, Reason, Status)
-            VALUES
-              (@PaymentId, @RefundAmount, @Reason, 'PENDING')
+        const existingRefund = await new sql.Request(transaction).input(
+          "PaymentId",
+          sql.Int,
+          payment.PaymentId,
+        ).query(`
+            SELECT TOP 1 RefundId
+            FROM Refunds
+            WHERE PaymentId = @PaymentId
           `);
+
+        if (existingRefund.recordset.length === 0) {
+          await new sql.Request(transaction)
+            .input("PaymentId", sql.Int, payment.PaymentId)
+            .input("RefundAmount", sql.Decimal(18, 2), payment.Amount || 0)
+            .input(
+              "Reason",
+              sql.NVarChar,
+              reason || "Customer cancelled paid appointment",
+            )
+            .input("Status", sql.NVarChar, refundStatus).query(`
+              INSERT INTO Refunds
+                (PaymentId, RefundAmount, Reason, Status)
+              VALUES
+                (@PaymentId, @RefundAmount, @Reason, @Status)
+            `);
+        }
       }
     }
 
@@ -859,7 +1266,10 @@ module.exports = {
   getById,
   getMyAppointments,
   getAvailableSlots,
+  getRescheduleInfo,
+  reschedule,
   create,
   update,
+  markNoShow,
   remove,
 };

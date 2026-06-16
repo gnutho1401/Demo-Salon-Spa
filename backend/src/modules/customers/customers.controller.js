@@ -31,7 +31,7 @@ async function getMyFeedbacks(req, res) {
 }
 
 async function createMyReview(req, res) {
-  try { return success(res, await service.createMyReview(req.user.userId, req.body), 'Gửi đánh giá thành công', 201); }
+  try { return success(res, await service.createMyReview(req.user.userId, req.body, req.files || []), 'Gửi đánh giá thành công', 201); }
   catch (err) { return error(res, err.message, 400); }
 }
 
@@ -40,8 +40,33 @@ async function getMyReviews(req, res) {
   catch (err) { return error(res, err.message, 400); }
 }
 
+async function getMyServiceHistory(req, res) {
+  try { return success(res, await service.getMyServiceHistory(req.user.userId)); }
+  catch (err) { return error(res, err.message, 400); }
+}
+
 async function getMyReviewableServices(req, res) {
   try { return success(res, await service.getMyReviewableServices(req.user.userId)); }
+  catch (err) { return error(res, err.message, 400); }
+}
+
+async function getMyFavoriteServices(req, res) {
+  try { return success(res, await service.getMyFavoriteServices(req.user.userId)); }
+  catch (err) { return error(res, err.message, 400); }
+}
+
+async function getMyFavoriteEmployees(req, res) {
+  try { return success(res, await service.getMyFavoriteEmployees(req.user.userId)); }
+  catch (err) { return error(res, err.message, 400); }
+}
+
+async function toggleFavoriteService(req, res) {
+  try { return success(res, await service.toggleFavoriteService(req.user.userId, req.body.serviceId), 'Updated'); }
+  catch (err) { return error(res, err.message, 400); }
+}
+
+async function toggleFavoriteEmployee(req, res) {
+  try { return success(res, await service.toggleFavoriteEmployee(req.user.userId, req.body.employeeId), 'Updated'); }
   catch (err) { return error(res, err.message, 400); }
 }
 
@@ -77,4 +102,4 @@ async function remove(req, res) {
   try { return success(res, await service.remove(req.params.id), 'Deleted'); } catch (err) { return error(res, err.message, 400); }
 }
 
-module.exports = { getAll, getById, getMyProfile, getMyDashboard, createMyFeedback, getMyFeedbacks, createMyReview, getMyReviews, getMyReviewableServices, updateMyProfile, updateMyAvatar, createGuestContact, create, update, remove };
+module.exports = { getAll, getById, getMyProfile, getMyDashboard, createMyFeedback, getMyFeedbacks, createMyReview, getMyReviews, getMyReviewableServices, getMyFavoriteServices, getMyFavoriteEmployees, toggleFavoriteService, toggleFavoriteEmployee, updateMyProfile, updateMyAvatar, createGuestContact, create, update, remove };

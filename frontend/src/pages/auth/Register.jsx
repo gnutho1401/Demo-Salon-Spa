@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axiosClient from '../../api/axiosClient';
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -16,6 +17,8 @@ export default function Register() {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const redirectUrl = searchParams.get('redirectUrl') || localStorage.getItem('bookingRedirectUrl') || '/customer/booking';
+  const serviceId = searchParams.get('serviceId') || localStorage.getItem('bookingServiceId');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,7 +35,14 @@ export default function Register() {
         dateOfBirth: form.dateOfBirth || null
       });
       setMessage(res.data.message || 'Đăng ký thành công. Vui lòng xác thực email.');
-      setTimeout(() => navigate(`/verify-email?email=${encodeURIComponent(form.email)}`), 900);
+      const target = redirectUrl.startsWith('/') ? redirectUrl : '/customer/booking';
+      const bookingTarget = new URL(target, window.location.origin);
+      if (serviceId && !bookingTarget.searchParams.get('serviceId')) {
+        bookingTarget.searchParams.set('serviceId', serviceId);
+      }
+      localStorage.removeItem('bookingRedirectUrl');
+      localStorage.removeItem('bookingServiceId');
+      setTimeout(() => navigate(`${bookingTarget.pathname}${bookingTarget.search}${bookingTarget.hash}`), 900);
     } catch (err) {
       setIsError(true);
       setMessage(err.response?.data?.message || 'Không thể đăng ký. Vui lòng kiểm tra lại thông tin.');

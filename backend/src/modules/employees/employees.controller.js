@@ -10,7 +10,13 @@ async function getAll(req, res) {
 }
 async function getById(req, res) {
   try {
-    return success(res, await service.getById(req.params.id));
+    const data = await service.getById(req.params.id);
+
+    if (!data) {
+      return error(res, "Không tìm thấy kỹ thuật viên", 404);
+    }
+
+    return success(res, data);
   } catch (err) {
     return error(res, err.message);
   }

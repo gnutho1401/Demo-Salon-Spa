@@ -26,7 +26,17 @@ export default function AppointmentDetail() {
       setError("");
       const res = await axiosClient.get(`/appointments/${id}`);
       const data = res.data.data || res.data;
-      setAppointment(data);
+      const history =
+        typeof data?.StatusHistoryJson === "string" && data.StatusHistoryJson
+          ? JSON.parse(data.StatusHistoryJson)
+          : Array.isArray(data?.StatusHistoryJson)
+            ? data.StatusHistoryJson
+            : [];
+
+      setAppointment({
+        ...data,
+        ParsedStatusHistory: history,
+      });
       setRescheduleForm({
         appointmentDate: data?.AppointmentDate
           ? String(data.AppointmentDate).slice(0, 10)
@@ -65,6 +75,7 @@ export default function AppointmentDetail() {
             employeeId: appointment.EmployeeId,
             serviceId: appointment.ServiceId,
             appointmentDate: rescheduleForm.appointmentDate,
+            excludeAppointmentId: appointment.AppointmentId,
           },
         });
 
@@ -108,6 +119,7 @@ export default function AppointmentDetail() {
     if (s === "CONFIRMED") return "Đã xác nhận";
     if (s === "COMPLETED") return "Hoàn thành";
     if (s === "CANCELLED") return "Đã hủy";
+    if (s === "NO_SHOW") return "Vắng mặt";
     if (s === "REFUND_PENDING") return "Đang chờ hoàn tiền";
     if (s === "REFUNDED") return "Đã hoàn tiền";
     return s || "Chưa rõ";
@@ -117,6 +129,7 @@ export default function AppointmentDetail() {
     if (s === "PAID") return "Đã thanh toán";
     if (s === "PENDING") return "Đang chờ thanh toán";
     if (s === "FAILED") return "Thanh toán thất bại";
+    if (s === "REFUND_PENDING") return "Đang chờ hoàn tiền";
     if (s === "REFUNDED") return "Đã hoàn tiền";
     return "Chưa thanh toán";
   }
@@ -134,6 +147,9 @@ export default function AppointmentDetail() {
     status === "COMPLETED" &&
     Number(appointment?.ReviewCount || 0) <
       Number(appointment?.ServiceCount || 1);
+  const isNoShow = status === "NO_SHOW";
+
+  const statusHistory = appointment?.ParsedStatusHistory || [];
 
   async function submitCancel(e) {
     e.preventDefault();
@@ -167,13 +183,28 @@ export default function AppointmentDetail() {
       return setError("Vui lòng chọn giờ mới");
     }
 
+    const selectedSlot = availableSlots.find(
+      (slot) =>
+        String(slot.startTime).slice(0, 5) ===
+        String(rescheduleForm.startTime).slice(0, 5),
+    );
+
+    if (!selectedSlot) {
+      return setError(
+        "Vui lòng chọn giờ trống từ danh sách, không nhập giờ tùy ý",
+      );
+    }
+
     const today = new Date().toISOString().split("T")[0];
     if (rescheduleForm.appointmentDate < today)
       return setError("Không được đổi lịch về ngày trong quá khứ");
     try {
       setError("");
       setMessage("");
-      await axiosClient.put(`/appointments/${id}`, rescheduleForm);
+      await axiosClient.put(`/appointments/${id}`, {
+        appointmentDate: rescheduleForm.appointmentDate,
+        startTime: selectedSlot.startTime,
+      });
       setMessage("Đổi lịch thành công");
       setShowReschedule(false);
       await load();
@@ -547,7 +578,7 @@ export default function AppointmentDetail() {
                 </div>
                 <div className="info-box">
                   <b>Trạng thái</b>
-                  <span className="badge">
+                  <span className="badge" style={isNoShow ? { background: '#fff1f2', color: '#e11d48' } : undefined}>
                     {statusText(appointment.Status)}
                   </span>
                 </div>
@@ -557,12 +588,68 @@ export default function AppointmentDetail() {
                     {paymentText(appointment.PaymentStatus)}
                   </span>
                 </div>
+                <div className="info-box">
+                  <b>Lý do hủy</b>
+                  {appointment.CancelReason || "Chưa có"}
+                </div>
+                <div className="info-box">
+                  <b>Trạng thái hoàn tiền</b>
+                  {appointment.RefundStatus
+                    ? paymentText(appointment.RefundStatus)
+                    : "Chưa có"}
+                </div>
               </div>
               <p className="muted">
                 <b>Ghi chú:</b>
                 <br />
                 {appointment.Notes || "Không có ghi chú"}
               </p>
+
+              {(appointment.RefundStatus || status === "REFUND_PENDING") && (
+                <div className="dashboard-card" style={{ marginTop: 18 }}>
+                  <h3>Chi tiết hoàn tiền</h3>
+                  <div className="price-line">
+                    <span>Trạng thái</span>
+                    <b>
+                      {appointment.RefundStatus
+                        ? statusText(appointment.RefundStatus)
+                        : "Đang chờ hoàn tiền"}
+                    </b>
+                  </div>
+                  <div className="price-line">
+                    <span>Số tiền</span>
+                    <b>{money(appointment.RefundAmount)}</b>
+                  </div>
+                  <div className="price-line">
+                    <span>Lý do</span>
+                    <b>{appointment.RefundReason || appointment.CancelReason || "Chưa có"}</b>
+                  </div>
+                  <div className="price-line">
+                    <span>Ngày hoàn tiền</span>
+                    <b>{appointment.RefundDate ? date(appointment.RefundDate) : "Chưa có"}</b>
+                  </div>
+                </div>
+              )}
+
+              {statusHistory.length > 0 && (
+                <div className="dashboard-card" style={{ marginTop: 18 }}>
+                  <h3>Lịch sử trạng thái</h3>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {statusHistory.map((item, index) => (
+                      <div key={`${item.AppointmentStatusHistoryId || index}`} className="mini-item">
+                        <strong>
+                          {item.OldStatus ? `${statusText(item.OldStatus)} → ` : ""}
+                          {statusText(item.NewStatus)}
+                        </strong>
+                        <span>{item.Reason || "Không có ghi chú"}</span>
+                        <span className="status">
+                          {item.ChangedByName || "Hệ thống"} • {item.CreatedAt ? date(item.CreatedAt) : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="actions">
                 <Link className="btn btn-outline" to="/customer/appointments">
@@ -608,11 +695,13 @@ export default function AppointmentDetail() {
                   <h3>Đổi lịch hẹn</h3>
                   <input
                     type="date"
+                    min={new Date().toISOString().split("T")[0]}
                     value={rescheduleForm.appointmentDate}
                     onChange={(e) =>
                       setRescheduleForm({
                         ...rescheduleForm,
                         appointmentDate: e.target.value,
+                        startTime: "",
                       })
                     }
                   />
@@ -638,7 +727,12 @@ export default function AppointmentDetail() {
                       <option disabled>Ngày này không còn giờ trống</option>
                     )}
                   </select>
-                  <button className="btn">Lưu đổi lịch</button>
+                  <button
+                    className="btn"
+                    disabled={slotLoading || availableSlots.length === 0}
+                  >
+                    Lưu đổi lịch
+                  </button>
                 </form>
               )}
               {showCancel && (

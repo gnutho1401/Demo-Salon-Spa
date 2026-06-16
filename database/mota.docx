@@ -1,0 +1,117 @@
+HỆ THỐNG QUẢN LÝ DỊCH VỤ LÀM ĐẸP
+Spa / Nails / Hair Salon
+I. DANH SÁCH ACTOR
+1.	Guest
+Khách chưa đăng nhập hệ thống.
+2.	Customer
+Khách hàng đã đăng ký tài khoản và sử dụng dịch vụ.
+3.	Receptionist
+Lễ tân phụ trách hồ sơ khách hàng, lịch hẹn, check-in/check-out và hóa đơn.
+4.	Technician / Stylist
+Kỹ thuật viên / thợ làm tóc / thợ nail thực hiện liệu trình cho khách hàng.
+5.	Manager / Admin
+Quản lý vận hành hệ thống, nhân viên, dịch vụ, tài khoản và báo cáo.
+6.	Payment Gateway
+Hệ thống thanh toán online bên thứ ba.
+7.	Notification Service
+Hệ thống gửi email / SMS / thông báo.
+8.	AI System
+Hệ thống AI hỗ trợ tư vấn, phân tích và gợi ý dịch vụ.
+II. DANH SÁCH USE CASE CHI TIẾT
+Tổng cộng: ~65 USE CASE
+A. GUEST — 7 USE CASE
+Authentication
+• UC01: Đăng ký tài khoản
+Service Browsing
+• UC02: Xem danh sách dịch vụ
+• UC03: Xem chi tiết dịch vụ
+• UC04: Xem khuyến mãi
+• UC05: Xem danh sách kỹ thuật viên
+• UC06: Tìm kiếm dịch vụ
+Support
+• UC07: Liên hệ hỗ trợ
+B. CUSTOMER — 13 USE CASE
+Account Management
+• UC08: Đăng nhập
+• UC09: Quên mật khẩu
+• UC10: Đăng xuất
+• UC11: Quản lý tài khoản cá nhân
+Appointment Management
+• UC12: Đặt lịch hẹn
+(Bao gồm: chọn dịch vụ, chọn kỹ thuật viên, chọn thời gian)
+• UC13: Xem lịch hẹn
+• UC14: Sửa đổi lịch hẹn
+Payment
+• UC15: Thanh toán & lịch sử thanh toán
+Loyalty & Experience
+• UC16: Xem điểm thưởng & hạng thành viên
+• UC17: Mua combo / liệu trình
+• UC18: Gửi phản hồi / khiếu nại
+AI & Notification
+• UC19: Nhận thông báo & nhắc lịch
+• UC20: Nhận gợi ý dịch vụ từ AI
+C. RECEPTIONIST — 12 USE CASE
+Customer Profile
+• UC21: Xử lý hồ sơ khách hàng
+(Tạo, tìm kiếm, cập nhật, xem hồ sơ khách hàng)
+Appointment Management
+• UC22: Tạo lịch hẹn
+• UC23: Xác nhận lịch hẹn
+• UC24: Chỉnh sửa lịch hẹn
+• UC25: Hủy lịch hẹn
+• UC26: Check-in khách hàng
+• UC27: Check-out khách hàng
+• UC28: Điều phối kỹ thuật viên
+• UC29: Kiểm tra tài nguyên có sẵn
+Resource & Queue
+• UC30: Điều phối phòng / ghế / giường
+• UC31: Xử lý hàng chờ khách hàng
+Operation Monitoring
+• UC32: Theo dõi trạng thái lịch hẹn
+• UC33: Cập nhật ghi chú liệu trình
+Payment
+• UC34: Tạo hóa đơn
+D. TECHNICIAN / STYLIST — 5 USE CASE
+• UC35: Xem lịch làm việc & lịch hẹn được phân công
+• UC36: Xem thông tin khách hàng
+• UC37: Ghi chú lịch hẹn
+• UC38: Cập nhật trạng thái lịch hẹn
+• UC39: Yêu cầu đổi lịch / hỗ trợ từ lễ tân
+E. MANAGER / ADMIN — 20 USE CASE
+Employee Management
+• UC40: Thêm nhân viên
+• UC41: Phân ca làm việc
+• UC42: Theo dõi hiệu suất nhân viên
+• UC43: Cập nhật thông tin nhân viên
+• UC44: Xem thông tin nhân viên
+Service & Package Management
+• UC45: Tạo dịch vụ
+• UC46: Cập nhật thông tin dịch vụ
+• UC47: Xem thông tin dịch vụ
+• UC48: Tạo combo / liệu trình
+• UC49: Cập nhật thông tin combo / liệu trình
+Promotion Management
+• UC50: Tạo khuyến mãi
+• UC51: Cập nhật thông tin khuyến mãi
+• UC52: Xem thông tin khuyến mãi
+Membership Management
+• UC53: Tạo hạng thành viên
+• UC54: Cập nhật thông tin hạng thành viên
+• UC55: Xem thông tin hạng thành viên
+System Management
+• UC56: Tạo tài khoản hệ thống
+• UC57: Phân quyền người dùng
+• UC58: Theo dõi lịch sử thao tác hệ thống
+Reporting & Monitoring
+• UC59: Xem báo cáo kinh doanh
+F. PAYMENT GATEWAY — 2 USE CASE
+• UC60: Xử lý thanh toán online
+• UC61: Xác nhận giao dịch
+G. NOTIFICATION SERVICE — 1 USE CASE
+• UC62: Gửi thông báo hệ thống
+H. AI SYSTEM — 4 USE CASE
+• UC63: AI lễ tân hỗ trợ đặt lịch & tư vấn
+• UC64: AI phân tích khách hàng
+• UC65: AI dự đoán doanh thu & nhu cầu
+• UC66: AI gợi ý dịch vụ / combo
+

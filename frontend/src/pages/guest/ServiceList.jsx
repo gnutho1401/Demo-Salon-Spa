@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import { useAuth } from "../../context/AuthContext";
 
 export default function ServiceList() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [services, setServices] = useState([]);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [keyword, setKeyword] = useState("");
   const [category, setCategory] = useState("ALL");
   const [priceFilter, setPriceFilter] = useState("ALL");
@@ -12,12 +16,22 @@ export default function ServiceList() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    axiosClient
-      .get("/services")
-      .then((res) => setServices(res.data.data || res.data || []))
-      .catch(() => setError("Không tải được danh sách dịch vụ"))
-      .finally(() => setLoading(false));
-  }, []);
+    async function load() {
+      try {
+        const [servicesRes, favRes] = await Promise.all([
+          axiosClient.get("/services"),
+          user ? axiosClient.get("/customers/me/favorites/services") : Promise.resolve({ data: { data: [] } }),
+        ]);
+        setServices(servicesRes.data.data || servicesRes.data || []);
+        setFavoriteIds(new Set((favRes.data.data || []).map((item) => Number(item.ServiceId))));
+      } catch {
+        setError("Không tải được danh sách dịch vụ");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [user]);
 
   const categories = useMemo(() => {
     return [
@@ -25,6 +39,21 @@ export default function ServiceList() {
       ...new Set(services.map((s) => s.CategoryName).filter(Boolean)),
     ];
   }, [services]);
+
+  async function toggleFavoriteService(serviceId) {
+    if (!user) return setError("Vui lòng đăng nhập để yêu thích dịch vụ");
+    try {
+      const res = await axiosClient.post("/customers/me/favorites/services/toggle", { serviceId });
+      setFavoriteIds((prev) => {
+        const next = new Set(prev);
+        if (res.data.data?.favorited) next.add(Number(serviceId));
+        else next.delete(Number(serviceId));
+        return next;
+      });
+    } catch (err) {
+      setError(err.response?.data?.message || "Không cập nhật được yêu thích");
+    }
+  }
 
   const filteredServices = useMemo(() => {
     let result = [...services];
@@ -177,8 +206,32 @@ export default function ServiceList() {
         </div>
       ) : (
         <div className="grid">
-          {filteredServices.map((s) => (
-            <div className="service-card" key={s.ServiceId}>
+          {filteredServices.map((s) => {
+            const isFavorite = favoriteIds.has(Number(s.ServiceId));
+            return (
+            <div className="service-card" key={s.ServiceId} style={{ position: "relative" }}>
+              <button
+                type="button"
+                onClick={() => toggleFavoriteService(s.ServiceId)}
+                aria-label={isFavorite ? "Bỏ yêu thích" : "Yêu thích dịch vụ"}
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                  zIndex: 2,
+                  width: 42,
+                  height: 42,
+                  borderRadius: "50%",
+                  border: "none",
+                  background: isFavorite ? "#ff4f92" : "rgba(255,255,255,.95)",
+                  color: isFavorite ? "#fff" : "#ff4f92",
+                  boxShadow: "0 10px 24px rgba(255, 79, 146, .2)",
+                  fontSize: 18,
+                  cursor: "pointer",
+                }}
+              >
+                {isFavorite ? "❤" : "♡"}
+              </button>
               <img src={resolveFileUrl(s.ImageUrl)} alt={s.ServiceName} />
 
               <div className="service-body">
@@ -192,28 +245,43 @@ export default function ServiceList() {
                   </span>
                 </p>
 
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleFavoriteService(s.ServiceId)}
+                    aria-label={favoriteIds.has(Number(s.ServiceId)) ? "Bỏ yêu thích" : "Yêu thích"}
+                    className="card-btn"
+                    style={{ width: 48, minWidth: 48, padding: 0, fontSize: 20 }}
+                  >
+                    {favoriteIds.has(Number(s.ServiceId)) ? "♥" : "♡"}
+                  </button>
+
                   <Link to={`/services/${s.ServiceId}`} style={{ flex: 1 }}>
                     <button className="card-btn" style={{ width: "100%" }}>
                       Xem chi tiết
                     </button>
                   </Link>
 
-                  <Link
-                    to={`/customer/booking?serviceId=${s.ServiceId}`}
-                    style={{ flex: 1 }}
+                  <button
+                    type="button"
+                    className="card-btn primary"
+                    style={{ width: "100%", flex: 1 }}
+                    onClick={() => {
+                      if (!user) {
+                        localStorage.setItem("bookingServiceId", String(s.ServiceId));
+                        localStorage.setItem("bookingRedirectUrl", `/customer/booking?serviceId=${s.ServiceId}`);
+                        navigate(`/login?redirectUrl=${encodeURIComponent(`/customer/booking?serviceId=${s.ServiceId}`)}&serviceId=${s.ServiceId}`);
+                        return;
+                      }
+                      navigate(`/customer/booking?serviceId=${s.ServiceId}`);
+                    }}
                   >
-                    <button
-                      className="card-btn primary"
-                      style={{ width: "100%" }}
-                    >
-                      Đặt lịch
-                    </button>
-                  </Link>
+                    Đặt lịch
+                  </button>
                 </div>
               </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
     </section>

@@ -6,9 +6,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 export default function BookingPage() {
   const [services, setServices] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [bookingType, setBookingType] = useState("SERVICE"); // "SERVICE" or "PACKAGE"
+  const [bookingType, setBookingType] = useState("SERVICE");
+
   const [myPackages, setMyPackages] = useState([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [packageServices, setPackageServices] = useState([]);
+  const [packageDetailLoading, setPackageDetailLoading] = useState(false);
+
   const [availableSlots, setAvailableSlots] = useState([]);
   const [slotLoading, setSlotLoading] = useState(false);
 
@@ -18,6 +22,7 @@ export default function BookingPage() {
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
   const [form, setForm] = useState({
     serviceId: "",
     employeeId: "",
@@ -30,10 +35,12 @@ export default function BookingPage() {
   const [voucherCode, setVoucherCode] = useState("");
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [voucherId, setVoucherId] = useState(null);
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [employeeLoading, setEmployeeLoading] = useState(false);
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -41,6 +48,7 @@ export default function BookingPage() {
     async function loadData() {
       try {
         setPageLoading(true);
+        setError("");
 
         const [serviceRes, packageRes] = await Promise.all([
           axiosClient.get("/services"),
@@ -48,6 +56,7 @@ export default function BookingPage() {
         ]);
 
         setServices(serviceRes.data.data || []);
+
         const activePkgs = (
           packageRes.data.data ||
           packageRes.data ||
@@ -55,9 +64,9 @@ export default function BookingPage() {
         ).filter(
           (p) => p.Status === "ACTIVE" && Number(p.RemainingSessions || 0) > 0,
         );
+
         setMyPackages(activePkgs);
-        setEmployees([]);
-      } catch (err) {
+      } catch {
         setError("Không tải được dữ liệu đặt lịch");
       } finally {
         setPageLoading(false);
@@ -83,7 +92,7 @@ export default function BookingPage() {
         );
 
         setEmployees(res.data.data || []);
-      } catch (err) {
+      } catch {
         setEmployees([]);
         setError("Không tải được kỹ thuật viên theo dịch vụ");
       } finally {
@@ -126,10 +135,12 @@ export default function BookingPage() {
   }, [form.serviceId, form.employeeId, form.appointmentDate]);
 
   useEffect(() => {
-    const serviceId = searchParams.get("serviceId");
+    const serviceId =
+      searchParams.get("serviceId") || localStorage.getItem("bookingServiceId");
     const employeeId = searchParams.get("employeeId");
     const dateParam =
       searchParams.get("date") || searchParams.get("appointmentDate");
+    const customerPackageId = searchParams.get("customerPackageId");
 
     if (!serviceId && !employeeId && !dateParam) return;
 
@@ -138,16 +149,32 @@ export default function BookingPage() {
       serviceId: serviceId || prev.serviceId,
       employeeId: employeeId || prev.employeeId,
       appointmentDate: dateParam || prev.appointmentDate,
+      customerPackageId: customerPackageId || prev.customerPackageId,
     }));
 
-    if (serviceId && employeeId) {
+    if (customerPackageId && serviceId) {
+      setBookingType("PACKAGE");
+      setSelectedPackageId(customerPackageId);
+      setStep(2);
+    } else if (serviceId && employeeId) {
       setStep(3);
     } else if (serviceId) {
       setStep(2);
-    } else if (employeeId) {
-      setStep(2);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const customerPackageId = searchParams.get("customerPackageId");
+    const serviceId = searchParams.get("serviceId");
+
+    if (!customerPackageId || !serviceId || myPackages.length === 0) return;
+
+    const pkg = myPackages.find(
+      (p) => String(p.CustomerPackageId) === String(customerPackageId),
+    );
+
+    if (pkg) selectPackage(pkg);
+  }, [myPackages, searchParams]);
 
   const categories = useMemo(() => {
     return [
@@ -214,36 +241,69 @@ export default function BookingPage() {
     return Number(value || 0).toLocaleString("vi-VN") + "đ";
   }
 
+  function formatTime(value) {
+    if (!value) return "";
+    return String(value).slice(0, 5);
+  }
+
+  function resetAfterServiceChange(nextForm) {
+    setForm(nextForm);
+    setEmployees([]);
+    setVoucherDiscount(0);
+    setVoucherCode("");
+    setVoucherId(null);
+    setAvailableSlots([]);
+  }
+
   function chooseService(serviceId) {
-    setForm({
+    resetAfterServiceChange({
       ...form,
       serviceId,
       customerPackageId: "",
       employeeId: "",
+      startTime: "",
     });
 
-    setEmployees([]);
-    setVoucherDiscount(0);
-    setVoucherCode("");
     setStep(2);
   }
 
+  async function selectPackage(pkg) {
+    setSelectedPackageId(pkg.CustomerPackageId);
+    setPackageDetailLoading(true);
+    setError("");
+
+    try {
+      const res = await axiosClient.get(`/packages/${pkg.PackageId}`);
+      const data = res.data.data || res.data;
+      setPackageServices(data.Services || []);
+    } catch {
+      setPackageServices([]);
+      setError("Không tải được dịch vụ trong combo");
+    } finally {
+      setPackageDetailLoading(false);
+    }
+  }
+
   function choosePackageService(customerPackageId, serviceId) {
-    setForm({
+    resetAfterServiceChange({
       ...form,
       serviceId,
       customerPackageId,
       employeeId: "",
+      startTime: "",
     });
 
-    setEmployees([]);
-    setVoucherDiscount(0);
-    setVoucherCode("");
     setStep(2);
   }
 
   function chooseEmployee(employeeId) {
-    setForm({ ...form, employeeId });
+    setForm({
+      ...form,
+      employeeId,
+      startTime: "",
+    });
+
+    setAvailableSlots([]);
     setStep(3);
   }
 
@@ -254,7 +314,20 @@ export default function BookingPage() {
 
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+
+    if (name === "appointmentDate") {
+      setForm({
+        ...form,
+        appointmentDate: value,
+        startTime: "",
+      });
+      return;
+    }
+
+    setForm({
+      ...form,
+      [name]: value,
+    });
   }
 
   async function applyVoucher() {
@@ -286,25 +359,36 @@ export default function BookingPage() {
       setMessage(`Đã áp dụng voucher ${data.Code || code}`);
     } catch (err) {
       setVoucherDiscount(0);
+      setVoucherId(null);
       setError(err.response?.data?.message || "Mã voucher không hợp lệ");
     }
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
+
     const today = new Date().toISOString().split("T")[0];
 
-    if (form.appointmentDate < today) {
-      setMessage("Không được đặt lịch trong quá khứ");
-      return;
-    }
     setMessage("");
     setError("");
 
     if (!form.serviceId) return setError("Vui lòng chọn dịch vụ");
     if (!form.employeeId) return setError("Vui lòng chọn kỹ thuật viên");
     if (!form.appointmentDate) return setError("Vui lòng chọn ngày hẹn");
+    if (form.appointmentDate < today) {
+      return setError("Không được đặt lịch trong quá khứ");
+    }
     if (!form.startTime) return setError("Vui lòng chọn giờ hẹn");
+
+    const isValidSlot = availableSlots.some(
+      (slot) =>
+        String(slot.startTime).slice(0, 5) ===
+        String(form.startTime).slice(0, 5),
+    );
+
+    if (!isValidSlot) {
+      return setError("Vui lòng chọn giờ từ danh sách giờ trống");
+    }
 
     try {
       setLoading(true);
@@ -312,42 +396,30 @@ export default function BookingPage() {
       const payload = {
         ...form,
         startTime:
-          form.startTime.length === 5 ? form.startTime + ":00" : form.startTime,
+          form.startTime.length === 5 ? `${form.startTime}:00` : form.startTime,
       };
 
       const appointmentRes = await axiosClient.post("/appointments", payload);
 
       const appointment = appointmentRes.data.data;
-      const appointmentId =
+      const newAppointmentId =
         appointment.AppointmentId ||
         appointment.appointmentId ||
         appointment.id;
 
       sessionStorage.setItem("lastAppointment", JSON.stringify(appointment));
-      if (voucherId)
-        sessionStorage.setItem("bookingVoucherId", String(voucherId));
 
-      if (form.customerPackageId) {
-        navigate(`/customer/appointment-success/${appointmentId}`);
-      } else {
-        navigate(
-          `/customer/payment/${appointmentId}?voucherId=${voucherId || ""}&discount=${voucherDiscount || 0}`,
-        );
+      if (voucherId) {
+        sessionStorage.setItem("bookingVoucherId", String(voucherId));
       }
 
-      setForm({
-        serviceId: "",
-        employeeId: "",
-        appointmentDate: "",
-        startTime: "",
-        notes: "",
-        customerPackageId: "",
-      });
-
-      setVoucherCode("");
-      setVoucherDiscount(0);
-      setVoucherId(null);
-      setStep(1);
+      if (form.customerPackageId) {
+        navigate(`/customer/appointment-success/${newAppointmentId}`);
+      } else {
+        navigate(
+          `/customer/payment/${newAppointmentId}?voucherId=${voucherId || ""}&discount=${voucherDiscount || 0}`,
+        );
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Đặt lịch thất bại");
     } finally {
@@ -357,764 +429,424 @@ export default function BookingPage() {
 
   return (
     <CustomerLayout>
-      <style>{`
-        .booking-wrap {
-          padding: 8px 0 40px;
-        }
-
-        .booking-hero {
-          background: linear-gradient(135deg, #fff5fa, #ffffff);
-          border: 1px solid #ffd7e6;
-          border-radius: 26px;
-          padding: 26px 30px;
-          margin-bottom: 24px;
-          box-shadow: 0 20px 45px rgba(255, 75, 140, 0.08);
-        }
-
-        .booking-hero h1 {
-          margin: 0;
-          font-size: 34px;
-          font-weight: 900;
-          color: #171725;
-        }
-
-        .booking-hero p {
-          margin: 8px 0 0;
-          color: #777;
-          font-size: 16px;
-        }
-
-        .steps {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 14px;
-          margin-top: 24px;
-        }
-
-        .step-item {
-          display: flex;
-          gap: 12px;
-          align-items: center;
-          padding: 16px;
-          border-radius: 20px;
-          background: #fff;
-          border: 1px solid #f5d8e4;
-        }
-
-        .step-item.active {
-          border-color: #ff4f93;
-          box-shadow: 0 12px 28px rgba(255, 79, 147, 0.13);
-        }
-
-        .step-number {
-          min-width: 42px;
-          height: 42px;
-          border-radius: 50%;
-          display: grid;
-          place-items: center;
-          font-weight: 900;
-          color: #ff3f86;
-          background: #fff0f6;
-        }
-
-        .step-item.active .step-number {
-          color: white;
-          background: linear-gradient(135deg, #ff3f86, #ff7aad);
-        }
-
-        .step-item strong {
-          display: block;
-          color: #222;
-          font-size: 14px;
-        }
-
-        .step-item span {
-          color: #777;
-          font-size: 12px;
-        }
-
-        .booking-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 390px;
-          gap: 24px;
-          align-items: start;
-        }
-
-        .main-card,
-        .summary-card {
-          background: #fff;
-          border: 1px solid #f5d8e4;
-          border-radius: 26px;
-          box-shadow: 0 18px 45px rgba(255, 75, 140, 0.08);
-        }
-
-        .main-card {
-          padding: 26px;
-        }
-
-        .summary-card {
-          padding: 22px;
-          position: sticky;
-          top: 20px;
-        }
-
-        .section-title {
-          font-size: 23px;
-          font-weight: 900;
-          margin: 0 0 18px;
-          color: #171725;
-        }
-
-        .toolbar {
-          display: grid;
-          grid-template-columns: 1fr 230px;
-          gap: 14px;
-          margin-bottom: 20px;
-        }
-
-        .toolbar.single {
-          grid-template-columns: 1fr;
-        }
-
-        .input,
-        .select,
-        .textarea {
-          width: 100%;
-          border: 1px solid #efd8e1;
-          border-radius: 16px;
-          background: #fff;
-          padding: 14px 16px;
-          outline: none;
-          font-size: 14px;
-        }
-
-        .input:focus,
-        .select:focus,
-        .textarea:focus {
-          border-color: #ff4f93;
-          box-shadow: 0 0 0 4px rgba(255, 79, 147, 0.1);
-        }
-
-        .service-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 18px;
-        }
-
-        .service-card {
-          border: 1px solid #f2dbe5;
-          border-radius: 22px;
-          overflow: hidden;
-          cursor: pointer;
-          position: relative;
-          background: white;
-          transition: 0.2s ease;
-        }
-
-        .service-card:hover,
-        .service-card.selected {
-          transform: translateY(-4px);
-          border-color: #ff4f93;
-          box-shadow: 0 16px 32px rgba(255, 79, 147, 0.16);
-        }
-
-        .service-card.selected::after {
-          content: "✓";
-          position: absolute;
-          top: 12px;
-          right: 12px;
-          width: 34px;
-          height: 34px;
-          border-radius: 50%;
-          display: grid;
-          place-items: center;
-          background: #ff3f86;
-          color: white;
-          font-weight: 900;
-        }
-
-        .service-img {
-          width: 100%;
-          height: 145px;
-          object-fit: cover;
-          background: #fff0f6;
-        }
-
-        .service-body {
-          padding: 15px;
-        }
-
-        .service-body h3 {
-          font-size: 16px;
-          margin: 0 0 8px;
-          color: #222;
-        }
-
-        .service-meta {
-          display: flex;
-          justify-content: space-between;
-          color: #777;
-          font-size: 13px;
-          margin-bottom: 10px;
-        }
-
-        .price {
-          color: #ff3f86;
-          font-weight: 900;
-        }
-
-        .service-desc {
-          color: #777;
-          font-size: 13px;
-          line-height: 1.5;
-          height: 40px;
-          overflow: hidden;
-          margin: 0;
-        }
-
-        .employee-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 14px;
-          margin-top: 18px;
-        }
-
-        .employee-card {
-          border: 1px solid #f2dbe5;
-          border-radius: 18px;
-          padding: 14px;
-          cursor: pointer;
-          display: flex;
-          gap: 12px;
-          align-items: center;
-          transition: 0.2s ease;
-        }
-
-        .employee-card:hover,
-        .employee-card.selected {
-          border-color: #ff4f93;
-          box-shadow: 0 12px 24px rgba(255, 79, 147, 0.12);
-        }
-
-        .employee-avatar {
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          object-fit: cover;
-          background: #fff0f6;
-        }
-
-        .employee-card strong {
-          display: block;
-          font-size: 14px;
-          color: #222;
-        }
-
-        .employee-card span {
-          font-size: 12px;
-          color: #777;
-        }
-
-        .time-area {
-          display: grid;
-          grid-template-columns: 260px 1fr;
-          gap: 18px;
-          margin-top: 18px;
-        }
-
-        .time-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
-        }
-
-        .time-btn {
-          border: 1px solid #f2dbe5;
-          background: #fff;
-          padding: 13px 8px;
-          border-radius: 14px;
-          font-weight: 800;
-          cursor: pointer;
-          color: #333;
-        }
-
-        .time-btn.active {
-          background: linear-gradient(135deg, #ff3f86, #ff7aad);
-          color: white;
-          border-color: #ff3f86;
-        }
-
-        .textarea {
-          margin-top: 18px;
-          min-height: 110px;
-          resize: vertical;
-        }
-
-        .submit-row {
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 20px;
-        }
-
-        .submit-btn {
-          border: none;
-          border-radius: 16px;
-          padding: 15px 30px;
-          min-width: 220px;
-          cursor: pointer;
-          background: linear-gradient(135deg, #ff3f86, #ff7aad);
-          color: white;
-          font-size: 15px;
-          font-weight: 900;
-          box-shadow: 0 14px 28px rgba(255, 63, 134, 0.25);
-        }
-
-        .submit-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .summary-title {
-          font-size: 22px;
-          font-weight: 900;
-          margin-bottom: 18px;
-        }
-
-        .summary-box {
-          border: 1px solid #f2dbe5;
-          border-radius: 18px;
-          padding: 15px;
-          margin-bottom: 13px;
-          background: #fff;
-        }
-
-        .summary-box label {
-          display: block;
-          color: #777;
-          margin-bottom: 6px;
-          font-size: 13px;
-        }
-
-        .summary-service {
-          display: flex;
-          gap: 13px;
-          align-items: center;
-        }
-
-        .summary-service img {
-          width: 78px;
-          height: 66px;
-          object-fit: cover;
-          border-radius: 14px;
-          background: #fff0f6;
-        }
-
-        .voucher-row {
-          display: grid;
-          grid-template-columns: 1fr 96px;
-          gap: 8px;
-          margin-top: 10px;
-        }
-
-        .voucher-btn {
-          border: none;
-          border-radius: 14px;
-          background: #ff3f86;
-          color: #fff;
-          font-weight: 900;
-          cursor: pointer;
-        }
-
-        .money-row {
-          display: flex;
-          justify-content: space-between;
-          margin: 10px 0;
-          color: #666;
-        }
-
-        .total-row {
-          border-top: 1px dashed #edc8d7;
-          margin-top: 14px;
-          padding-top: 14px;
-          display: flex;
-          justify-content: space-between;
-          font-size: 21px;
-          font-weight: 900;
-        }
-
-        .note-box {
-          background: #fff5f9;
-          border: 1px solid #ffd7e6;
-          border-radius: 18px;
-          padding: 15px;
-          color: #8a4b62;
-          line-height: 1.7;
-          font-size: 13px;
-        }
-
-        .alert-success,
-        .alert-error {
-          padding: 14px 16px;
-          border-radius: 16px;
-          margin-bottom: 18px;
-          font-weight: 700;
-        }
-
-        .alert-success {
-          background: #eafff2;
-          color: #137333;
-          border: 1px solid #b7f0c7;
-        }
-
-        .alert-error {
-          background: #fff0f3;
-          color: #c5221f;
-          border: 1px solid #ffc4cf;
-        }
-
-        .empty-text {
-          grid-column: 1 / -1;
-          color: #777;
-          text-align: center;
-          padding: 20px;
-        }
-
-        @media (max-width: 1200px) {
-          .booking-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .summary-card {
-            position: static;
-          }
-
-          .service-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .employee-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 768px) {
-          .steps {
-            grid-template-columns: 1fr;
-          }
-
-          .toolbar,
-          .time-area {
-            grid-template-columns: 1fr;
-          }
-
-          .service-grid,
-          .employee-grid,
-          .time-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        .booking-tabs {
-          display: flex;
-          gap: 12px;
-          margin-bottom: 24px;
-          border-bottom: 2px solid #ffd7e6;
-          padding-bottom: 12px;
-        }
-
-        .booking-tab {
-          padding: 10px 20px;
-          border-radius: 12px;
-          font-weight: 800;
-          cursor: pointer;
-          border: 1px solid #ffd7e6;
-          background: #fff;
-          color: #ff4f93;
-          transition: all 0.2s ease;
-        }
-
-        .booking-tab.active {
-          background: linear-gradient(135deg, #ff3f86, #ff7aad);
-          color: white;
-          border-color: #ff3f86;
-          box-shadow: 0 8px 20px rgba(255, 63, 134, 0.2);
-        }
-
-        .pkg-select-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 16px;
-          margin-bottom: 24px;
-        }
-
-        .pkg-select-card {
-          border: 1px solid #f2dbe5;
-          border-radius: 20px;
-          padding: 16px;
-          cursor: pointer;
-          background: white;
-          display: flex;
-          gap: 14px;
-          transition: all 0.2s ease;
-        }
-
-        .pkg-select-card:hover,
-        .pkg-select-card.selected {
-          border-color: #ff4f93;
-          box-shadow: 0 12px 24px rgba(255, 79, 147, 0.12);
-        }
-
-        .pkg-select-card.selected {
-          background: #fff9fc;
-        }
-
-        .pkg-select-card img {
-          width: 95px;
-          height: 85px;
-          object-fit: cover;
-          border-radius: 14px;
-        }
-
-        .pkg-services-title {
-          font-size: 16px;
-          font-weight: 800;
-          margin: 18px 0 12px;
-          color: #ff3f86;
-        }
-      `}</style>
-
-      <div className="booking-wrap">
+      <div className="customer-booking-page">
         <div className="booking-hero">
-          <h1>Đặt lịch hẹn</h1>
-          <p>
-            Chọn dịch vụ, kỹ thuật viên, thời gian và xác nhận thông tin đặt
-            lịch.
-          </p>
-
-          <div className="steps">
-            {[
-              ["1", "Chọn dịch vụ", "Dịch vụ bạn muốn"],
-              ["2", "Chọn kỹ thuật viên", "Người thực hiện"],
-              ["3", "Chọn thời gian", "Ngày và giờ hẹn"],
-              ["4", "Xác nhận", "Kiểm tra thông tin"],
-            ].map((item, index) => (
-              <div
-                key={item[0]}
-                className={`step-item ${step >= index + 1 ? "active" : ""}`}
-              >
-                <div className="step-number">{item[0]}</div>
-                <div>
-                  <strong>{item[1]}</strong>
-                  <span>{item[2]}</span>
-                </div>
-              </div>
-            ))}
+          <div>
+            <div className="eyebrow">Booking</div>
+            <h1>Đặt lịch hẹn</h1>
+            <p>
+              Chọn dịch vụ, kỹ thuật viên, thời gian và xác nhận thông tin đặt
+              lịch.
+            </p>
           </div>
         </div>
 
-        {message && <div className="alert-success">{message}</div>}
-        {error && <div className="alert-error">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="booking-grid">
-          <div className="main-card">
-            <h2 className="section-title">1. Chọn dịch vụ</h2>
-
-            <div className="toolbar">
-              <input
-                className="input"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="Tìm kiếm dịch vụ theo tên hoặc mô tả..."
-              />
-
-              <select
-                className="select"
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-              >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c === "ALL" ? "Tất cả danh mục" : c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {pageLoading ? (
-              <p>Đang tải dữ liệu...</p>
-            ) : (
-              <div className="service-grid">
-                {filteredServices.length > 0 ? (
-                  filteredServices.map((item) => (
-                    <div
-                      key={item.ServiceId}
-                      className={`service-card ${
-                        String(form.serviceId) === String(item.ServiceId)
-                          ? "selected"
-                          : ""
-                      }`}
-                      onClick={() => chooseService(item.ServiceId)}
-                    >
-                      <img
-                        className="service-img"
-                        src={resolveFileUrl(item.ImageUrl)}
-                        alt={item.ServiceName}
-                      />
-
-                      <div className="service-body">
-                        <h3>{item.ServiceName}</h3>
-
-                        <div className="service-meta">
-                          <span>{item.DurationMinutes} phút</span>
-                          <span className="price">
-                            {formatMoney(item.Price)}
-                          </span>
-                        </div>
-
-                        <p className="service-desc">{item.Description}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="empty-text">Không tìm thấy dịch vụ phù hợp.</p>
-                )}
+        <div className="booking-steps">
+          {[
+            ["1", "Chọn dịch vụ", "Dịch vụ bạn muốn"],
+            ["2", "Kỹ thuật viên", "Người thực hiện"],
+            ["3", "Thời gian", "Ngày và giờ hẹn"],
+            ["4", "Xác nhận", "Kiểm tra thông tin"],
+          ].map((item, index) => (
+            <div
+              key={item[0]}
+              className={`booking-step ${step >= index + 1 ? "active" : ""}`}
+            >
+              <span>{item[0]}</span>
+              <div>
+                <strong>{item[1]}</strong>
+                <p>{item[2]}</p>
               </div>
-            )}
+            </div>
+          ))}
+        </div>
 
-            <h2 className="section-title" style={{ marginTop: 32 }}>
-              2. Chọn kỹ thuật viên
-            </h2>
+        {message && <div className="alert success">{message}</div>}
+        {error && <div className="alert error">{error}</div>}
 
-            <div className="toolbar single">
+        <form onSubmit={handleSubmit} className="booking-layout">
+          <main className="booking-main-card">
+            <section className="booking-section">
+              <div className="booking-section-head">
+                <div>
+                  <h2>1. Chọn dịch vụ</h2>
+                  <p>Chọn dịch vụ lẻ hoặc dùng combo/liệu trình còn buổi.</p>
+                </div>
+              </div>
+
+              <div className="booking-tabs">
+                <button
+                  type="button"
+                  className={`booking-tab ${
+                    bookingType === "SERVICE" ? "active" : ""
+                  }`}
+                  onClick={() => {
+                    setBookingType("SERVICE");
+                    setSelectedPackageId("");
+                    setPackageServices([]);
+                    resetAfterServiceChange({
+                      ...form,
+                      customerPackageId: "",
+                      serviceId: "",
+                      employeeId: "",
+                      startTime: "",
+                    });
+                    setStep(1);
+                  }}
+                >
+                  Dịch vụ lẻ
+                </button>
+
+                <button
+                  type="button"
+                  className={`booking-tab ${
+                    bookingType === "PACKAGE" ? "active" : ""
+                  }`}
+                  onClick={() => {
+                    setBookingType("PACKAGE");
+                    resetAfterServiceChange({
+                      ...form,
+                      customerPackageId: "",
+                      serviceId: "",
+                      employeeId: "",
+                      startTime: "",
+                    });
+                    setStep(1);
+                  }}
+                >
+                  Dùng combo / liệu trình
+                </button>
+              </div>
+
+              {bookingType === "SERVICE" ? (
+                <>
+                  <div className="booking-toolbar">
+                    <input
+                      className="booking-input"
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      placeholder="Tìm kiếm dịch vụ theo tên hoặc mô tả..."
+                    />
+
+                    <select
+                      className="booking-select"
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                    >
+                      {categories.map((c) => (
+                        <option key={c} value={c}>
+                          {c === "ALL" ? "Tất cả danh mục" : c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {pageLoading ? (
+                    <p className="booking-empty">Đang tải dữ liệu...</p>
+                  ) : (
+                    <div className="booking-service-grid">
+                      {filteredServices.length > 0 ? (
+                        filteredServices.map((item) => (
+                          <button
+                            type="button"
+                            key={item.ServiceId}
+                            className={`booking-service-card ${
+                              String(form.serviceId) === String(item.ServiceId)
+                                ? "selected"
+                                : ""
+                            }`}
+                            onClick={() => chooseService(item.ServiceId)}
+                          >
+                            <img
+                              src={
+                                resolveFileUrl(item.ImageUrl) ||
+                                "/images/default-service.jpg"
+                              }
+                              alt={item.ServiceName}
+                            />
+
+                            <div className="booking-service-body">
+                              <h3>{item.ServiceName}</h3>
+                              <div className="booking-service-meta">
+                                <span>{item.DurationMinutes} phút</span>
+                                <strong>{formatMoney(item.Price)}</strong>
+                              </div>
+                              <p>
+                                {item.Description || "Dịch vụ chăm sóc cao cấp"}
+                              </p>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="booking-empty">
+                          Không tìm thấy dịch vụ phù hợp.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : pageLoading ? (
+                <p className="booking-empty">Đang tải dữ liệu...</p>
+              ) : myPackages.length === 0 ? (
+                <p className="booking-empty">
+                  Bạn chưa có combo / liệu trình còn buổi.{" "}
+                  <a href="/customer/packages">Mua combo ngay</a>
+                </p>
+              ) : (
+                <>
+                  <div className="booking-package-grid">
+                    {myPackages.map((pkg) => (
+                      <button
+                        type="button"
+                        key={pkg.CustomerPackageId}
+                        className={`booking-package-card ${
+                          String(selectedPackageId) ===
+                          String(pkg.CustomerPackageId)
+                            ? "selected"
+                            : ""
+                        }`}
+                        onClick={() => selectPackage(pkg)}
+                      >
+                        <img
+                          src={resolveFileUrl(pkg.ImageUrl) || "/vite.svg"}
+                          alt={pkg.PackageName}
+                        />
+
+                        <div>
+                          <strong>{pkg.PackageName}</strong>
+                          <p>{pkg.ServiceNames || "Combo dịch vụ"}</p>
+                          <span>Còn {pkg.RemainingSessions} buổi</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {packageDetailLoading && (
+                    <p className="booking-empty">
+                      Đang tải dịch vụ trong combo...
+                    </p>
+                  )}
+
+                  {selectedPackageId && packageServices.length > 0 && (
+                    <>
+                      <h3 className="booking-mini-title">
+                        Chọn dịch vụ trong combo
+                      </h3>
+
+                      <div className="booking-service-grid">
+                        {packageServices.map((item) => (
+                          <button
+                            type="button"
+                            key={item.ServiceId}
+                            className={`booking-service-card ${
+                              String(form.serviceId) ===
+                                String(item.ServiceId) &&
+                              String(form.customerPackageId) ===
+                                String(selectedPackageId)
+                                ? "selected"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              choosePackageService(
+                                selectedPackageId,
+                                item.ServiceId,
+                              )
+                            }
+                          >
+                            <img
+                              src={
+                                resolveFileUrl(item.ImageUrl) ||
+                                "/images/default-service.jpg"
+                              }
+                              alt={item.ServiceName}
+                            />
+
+                            <div className="booking-service-body">
+                              <h3>{item.ServiceName}</h3>
+                              <div className="booking-service-meta">
+                                <span>{item.DurationMinutes} phút</span>
+                                <strong>0đ</strong>
+                              </div>
+                              <p>Dịch vụ thuộc combo/liệu trình đã mua.</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className="booking-section">
+              <div className="booking-section-head">
+                <div>
+                  <h2>2. Chọn kỹ thuật viên</h2>
+                  <p>Chỉ hiển thị kỹ thuật viên phù hợp với dịch vụ đã chọn.</p>
+                </div>
+              </div>
+
               <input
-                className="input"
+                className="booking-input"
                 value={employeeKeyword}
                 onChange={(e) => setEmployeeKeyword(e.target.value)}
                 placeholder="Tìm kiếm kỹ thuật viên theo tên, chuyên môn hoặc vị trí..."
               />
-            </div>
-            {!form.serviceId && (
-              <p className="empty-text">Vui lòng chọn dịch vụ trước.</p>
-            )}
 
-            {employeeLoading && (
-              <p className="empty-text">Đang tải kỹ thuật viên phù hợp...</p>
-            )}
-            <div className="employee-grid">
-              {form.serviceId &&
-              !employeeLoading &&
-              filteredEmployees.length > 0 ? (
-                filteredEmployees.map((item) => (
-                  <div
-                    key={item.EmployeeId}
-                    className={`employee-card ${
-                      String(form.employeeId) === String(item.EmployeeId)
-                        ? "selected"
-                        : ""
-                    }`}
-                    onClick={() => chooseEmployee(item.EmployeeId)}
-                  >
-                    <img
-                      className="employee-avatar"
-                      src={
-                        resolveFileUrl(item.ImageUrl) || "/default-avatar.png"
-                      }
-                      alt={item.FullName}
-                    />
+              {!form.serviceId && (
+                <p className="booking-empty">Vui lòng chọn dịch vụ trước.</p>
+              )}
 
-                    <div>
-                      <strong>{item.FullName}</strong>
-                      <span>
-                        {item.Specialization ||
-                          item.Position ||
-                          "Kỹ thuật viên"}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="empty-text">
-                  Không tìm thấy kỹ thuật viên phù hợp.
+              {employeeLoading && (
+                <p className="booking-empty">
+                  Đang tải kỹ thuật viên phù hợp...
                 </p>
               )}
-            </div>
 
-            <h2 className="section-title" style={{ marginTop: 32 }}>
-              3. Chọn thời gian
-            </h2>
+              {form.serviceId && !employeeLoading && (
+                <div className="booking-employee-grid">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((item) => (
+                      <button
+                        type="button"
+                        key={item.EmployeeId}
+                        className={`booking-employee-card ${
+                          String(form.employeeId) === String(item.EmployeeId)
+                            ? "selected"
+                            : ""
+                        }`}
+                        onClick={() => chooseEmployee(item.EmployeeId)}
+                      >
+                        <img
+                          src={
+                            resolveFileUrl(item.ImageUrl) ||
+                            "/default-avatar.png"
+                          }
+                          alt={item.FullName}
+                        />
 
-            <div className="time-area">
-              <input
-                className="input"
-                type="date"
-                name="appointmentDate"
-                min={new Date().toISOString().split("T")[0]}
-                value={form.appointmentDate}
+                        <div>
+                          <strong>{item.FullName}</strong>
+                          <span>
+                            {item.Specialization ||
+                              item.Position ||
+                              "Kỹ thuật viên"}
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="booking-empty">
+                      Không tìm thấy kỹ thuật viên phù hợp.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <section className="booking-section">
+              <div className="booking-section-head">
+                <div>
+                  <h2>3. Chọn thời gian</h2>
+                  <p>Chọn ngày và giờ trống từ hệ thống.</p>
+                </div>
+              </div>
+
+              <div className="booking-time-area">
+                <input
+                  className="booking-input"
+                  type="date"
+                  name="appointmentDate"
+                  min={new Date().toISOString().split("T")[0]}
+                  value={form.appointmentDate}
+                  onChange={handleChange}
+                />
+
+                <div className="booking-time-grid">
+                  {slotLoading ? (
+                    <p className="booking-empty">Đang tải giờ trống...</p>
+                  ) : availableSlots.length > 0 ? (
+                    availableSlots.map((slot) => (
+                      <button
+                        key={slot.startTime}
+                        type="button"
+                        className={`booking-time-btn ${
+                          String(form.startTime).slice(0, 5) ===
+                          String(slot.startTime).slice(0, 5)
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() => chooseTime(slot.startTime)}
+                      >
+                        {formatTime(slot.startTime)} -{" "}
+                        {formatTime(slot.endTime)}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="booking-empty">
+                      Vui lòng chọn dịch vụ, kỹ thuật viên và ngày hẹn.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="booking-section">
+              <div className="booking-section-head">
+                <div>
+                  <h2>4. Ghi chú</h2>
+                  <p>Nhập yêu cầu đặc biệt nếu có.</p>
+                </div>
+              </div>
+
+              <textarea
+                className="booking-textarea"
+                name="notes"
+                value={form.notes}
                 onChange={handleChange}
+                maxLength={200}
+                placeholder="Ví dụ: Tôi muốn kỹ thuật viên nhẹ tay, da nhạy cảm..."
               />
 
-              <div className="time-grid">
-                {slotLoading ? (
-                  <p className="empty-text">Đang tải giờ trống...</p>
-                ) : availableSlots.length > 0 ? (
-                  availableSlots.map((slot) => (
-                    <button
-                      key={slot.startTime}
-                      type="button"
-                      className={`time-btn ${
-                        form.startTime === slot.startTime ? "active" : ""
-                      }`}
-                      onClick={() => chooseTime(slot.startTime)}
-                    >
-                      {slot.startTime} - {slot.endTime}
-                    </button>
-                  ))
-                ) : (
-                  <p className="empty-text">
-                    Vui lòng chọn ngày hoặc ngày này không còn giờ trống.
-                  </p>
-                )}
+              <div className="booking-submit-row">
+                <button className="booking-submit-btn" disabled={loading}>
+                  {loading
+                    ? "Đang đặt lịch..."
+                    : form.customerPackageId
+                      ? "Xác nhận đặt lịch"
+                      : "Tiếp tục thanh toán"}
+                </button>
               </div>
+            </section>
+          </main>
+
+          <aside className="booking-summary-card">
+            <div className="booking-summary-title">
+              <span>Thông tin đặt lịch</span>
+              <small>Kiểm tra trước khi xác nhận</small>
             </div>
 
-            <h2 className="section-title" style={{ marginTop: 32 }}>
-              4. Ghi chú
-            </h2>
-
-            <textarea
-              className="textarea"
-              name="notes"
-              value={form.notes}
-              onChange={handleChange}
-              maxLength={200}
-              placeholder="Nhập yêu cầu đặc biệt của bạn..."
-            />
-
-            <div className="submit-row">
-              <button className="submit-btn" disabled={loading}>
-                {loading ? "Đang đặt lịch..." : "Xác nhận đặt lịch"}
-              </button>
-            </div>
-          </div>
-
-          <aside className="summary-card">
-            <div className="summary-title">Thông tin đặt lịch</div>
-
-            <div className="summary-box">
-              <label>Dịch vụ đã chọn</label>
+            <div className="booking-summary-box">
+              <label>Dịch vụ</label>
 
               {selectedService ? (
-                <div className="summary-service">
+                <div className="booking-summary-service">
                   <img
-                    src={resolveFileUrl(selectedService.ImageUrl)}
+                    src={
+                      resolveFileUrl(selectedService.ImageUrl) ||
+                      "/images/default-service.jpg"
+                    }
                     alt={selectedService.ServiceName}
                   />
+
                   <div>
                     <strong>{selectedService.ServiceName}</strong>
-                    <div>{selectedService.DurationMinutes} phút</div>
-                    <div className="price">
-                      {formatMoney(selectedService.Price)}
-                    </div>
+                    <span>{selectedService.DurationMinutes} phút</span>
+                    <b>
+                      {form.customerPackageId
+                        ? "Theo combo"
+                        : formatMoney(selectedService.Price)}
+                    </b>
                   </div>
                 </div>
               ) : (
@@ -1122,34 +854,35 @@ export default function BookingPage() {
               )}
             </div>
 
-            <div className="summary-box">
+            <div className="booking-summary-box">
               <label>Kỹ thuật viên</label>
               <strong>{selectedEmployee?.FullName || "Chưa chọn"}</strong>
             </div>
 
-            <div className="summary-box">
+            <div className="booking-summary-box">
               <label>Thời gian hẹn</label>
               <strong>
                 {form.appointmentDate && form.startTime
-                  ? `${form.appointmentDate} - ${form.startTime}`
+                  ? `${form.appointmentDate} - ${formatTime(form.startTime)}`
                   : "Chưa chọn"}
               </strong>
             </div>
 
             {!form.customerPackageId && (
-              <div className="summary-box">
+              <div className="booking-summary-box">
                 <label>Voucher / Mã giảm giá</label>
 
-                <div className="voucher-row">
+                <div className="booking-voucher-row">
                   <input
-                    className="input"
+                    className="booking-input"
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value)}
                     placeholder="Nhập voucher"
                   />
+
                   <button
                     type="button"
-                    className="voucher-btn"
+                    className="booking-voucher-btn"
                     onClick={applyVoucher}
                   >
                     Áp dụng
@@ -1158,8 +891,8 @@ export default function BookingPage() {
               </div>
             )}
 
-            <div className="summary-box">
-              <div className="money-row">
+            <div className="booking-summary-total">
+              <div>
                 <span>Giá dịch vụ</span>
                 <strong>
                   {form.customerPackageId
@@ -1169,25 +902,26 @@ export default function BookingPage() {
               </div>
 
               {!form.customerPackageId && (
-                <div className="money-row">
+                <div>
                   <span>Giảm giá</span>
                   <strong>-{formatMoney(voucherDiscount)}</strong>
                 </div>
               )}
 
-              <div className="total-row">
+              <div className="final">
                 <span>Tổng cộng</span>
-                <span className="price">
+                <strong>
                   {form.customerPackageId ? "0đ" : formatMoney(finalPrice)}
-                </span>
+                </strong>
               </div>
             </div>
 
-            <div className="note-box">
+            <div className="booking-note-box">
               <strong>Lưu ý</strong>
-              <br />
-              • Vui lòng đến trước giờ hẹn 10–15 phút.
-              <br />• Hủy lịch trước ít nhất 2 giờ để không mất phí.
+              <p>
+                Vui lòng đến trước giờ hẹn 10–15 phút. Hủy lịch trước ít nhất 2
+                giờ để không mất phí.
+              </p>
             </div>
           </aside>
         </form>

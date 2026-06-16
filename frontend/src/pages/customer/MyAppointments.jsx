@@ -6,18 +6,32 @@ import axiosClient from "../../api/axiosClient";
 export default function MyAppointments() {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [keyword, setKeyword] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("ALL");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loadingId, setLoadingId] = useState(null);
+  const [cancelModal, setCancelModal] = useState({
+    open: false,
+    appointment: null,
+    reason: "",
+    paymentStatus: "UNPAID",
+  });
 
   async function loadAppointments() {
     try {
       setError("");
-      const res = await axiosClient.get("/appointments/my");
-      setRows(res.data.data || []);
+      const [appointmentsRes, reviewsRes] = await Promise.all([
+        axiosClient.get("/appointments/my"),
+        axiosClient.get("/customers/me/reviews"),
+      ]);
+      setRows(appointmentsRes.data.data || []);
+      setReviews(reviewsRes.data.data || []);
     } catch (err) {
       setError(err.response?.data?.message || "Không tải được lịch hẹn");
     }
@@ -28,33 +42,50 @@ export default function MyAppointments() {
   }, []);
 
   const filteredRows = useMemo(() => {
-    return rows.filter((r) => {
-      const statusOk =
-        statusFilter === "ALL" ||
-        String(r.Status || "").toUpperCase() === statusFilter;
+    return [...rows]
+      .sort(
+        (a, b) => Number(b.AppointmentId || 0) - Number(a.AppointmentId || 0),
+      )
+      .filter((r) => {
+        const status = String(r.Status || "").toUpperCase();
+        const payment = String(r.PaymentStatus || "UNPAID").toUpperCase();
+        const appointmentDate = String(r.AppointmentDate || "").slice(0, 10);
 
-      const dateOk =
-        !dateFilter ||
-        String(r.AppointmentDate || "").slice(0, 10) === dateFilter;
+        const statusOk = statusFilter === "ALL" || status === statusFilter;
 
-      const text = keyword.trim().toLowerCase();
+        const paymentOk = paymentFilter === "ALL" || payment === paymentFilter;
 
-      const keywordOk =
-        !text ||
-        String(r.ServiceName || "")
-          .toLowerCase()
-          .includes(text) ||
-        String(r.EmployeeName || "")
-          .toLowerCase()
-          .includes(text) ||
-        String(r.Notes || "")
-          .toLowerCase()
-          .includes(text) ||
-        getAppointmentCode(r.AppointmentId).toLowerCase().includes(text);
+        const dateOk =
+          (!dateFilter || appointmentDate === dateFilter) &&
+          (!fromDate || appointmentDate >= fromDate) &&
+          (!toDate || appointmentDate <= toDate);
 
-      return statusOk && dateOk && keywordOk;
-    });
-  }, [rows, statusFilter, keyword, dateFilter]);
+        const text = keyword.trim().toLowerCase();
+
+        const keywordOk =
+          !text ||
+          String(r.ServiceName || "")
+            .toLowerCase()
+            .includes(text) ||
+          String(r.EmployeeName || "")
+            .toLowerCase()
+            .includes(text) ||
+          String(r.Notes || "")
+            .toLowerCase()
+            .includes(text) ||
+          getAppointmentCode(r.AppointmentId).toLowerCase().includes(text);
+
+        return statusOk && paymentOk && dateOk && keywordOk;
+      });
+  }, [
+    rows,
+    statusFilter,
+    paymentFilter,
+    keyword,
+    dateFilter,
+    fromDate,
+    toDate,
+  ]);
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -104,7 +135,9 @@ export default function MyAppointments() {
   function canPay(status, paymentStatus) {
     const s = String(status || "").toUpperCase();
     const p = String(paymentStatus || "").toUpperCase();
-    return s !== "CANCELLED" && s !== "COMPLETED" && p !== "PAID";
+    return (
+      s === "PENDING_PAYMENT" && ["UNPAID", "PENDING", "FAILED"].includes(p)
+    );
   }
 
   function canCancel(status) {
@@ -112,12 +145,36 @@ export default function MyAppointments() {
     return s === "PENDING_PAYMENT" || s === "CONFIRMED";
   }
 
+  function canReschedule(status) {
+    const s = String(status || "").toUpperCase();
+    return !["COMPLETED", "CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(s);
+  }
+
+  function hasReviewed(appointmentId, serviceId) {
+    return reviews.some(
+      (review) =>
+        String(review.AppointmentId) === String(appointmentId) &&
+        String(review.ServiceId) === String(serviceId),
+    );
+  }
+
+  function canReviewAppointment(status, appointmentId, serviceId) {
+    return (
+      String(status || "").toUpperCase() === "COMPLETED" &&
+      !hasReviewed(appointmentId, serviceId)
+    );
+  }
+
   function getStatusText(status) {
     const s = String(status || "").toUpperCase();
     if (s === "PENDING_PAYMENT") return "Chờ thanh toán";
     if (s === "CONFIRMED") return "Đã xác nhận";
+    if (s === "CHECKED_IN") return "Đã check-in";
+    if (s === "IN_PROGRESS") return "Đang thực hiện";
     if (s === "COMPLETED") return "Hoàn thành";
     if (s === "CANCELLED") return "Đã hủy";
+    if (s === "REFUND_PENDING") return "Đang chờ hoàn tiền";
+    if (s === "NO_SHOW") return "Vắng mặt";
     return status || "Chưa rõ";
   }
 
@@ -127,31 +184,68 @@ export default function MyAppointments() {
     if (p === "UNPAID") return "Chưa thanh toán";
     if (p === "PENDING") return "Đang chờ thanh toán";
     if (p === "FAILED") return "Thanh toán thất bại";
-    if (p === "PENDING") return "Đang xử lý";
+    if (p === "REFUND_PENDING") return "Đang chờ hoàn tiền";
     if (p === "REFUNDED") return "Đã hoàn tiền";
     return paymentStatus || "Chưa thanh toán";
   }
 
-  async function handleCancel(appointmentId) {
-    const ok = window.confirm("Bạn có chắc muốn hủy lịch hẹn này không?");
-    if (!ok) return;
+  function getRefundText(status) {
+    const s = String(status || "").toUpperCase();
+    if (s === "PENDING") return "Đang chờ hoàn tiền";
+    if (s === "PROCESSING") return "Đang xử lý hoàn tiền";
+    if (s === "APPROVED") return "Đã chấp nhận hoàn tiền";
+    if (s === "REFUNDED") return "Đã hoàn tiền";
+    if (s === "REJECTED") return "Từ chối hoàn tiền";
+    return status || "Chưa có";
+  }
+
+  function openCancelModal(r) {
+    setCancelModal({
+      open: true,
+      appointment: r,
+      reason: "",
+      paymentStatus: String(r.PaymentStatus || "UNPAID").toUpperCase(),
+    });
+  }
+
+  function closeCancelModal() {
+    setCancelModal({
+      open: false,
+      appointment: null,
+      reason: "",
+      paymentStatus: "UNPAID",
+    });
+  }
+
+  async function handleCancelSubmit() {
+    if (!cancelModal.reason.trim()) {
+      setError("Vui lòng nhập lý do hủy lịch");
+      return;
+    }
+
+    const appointmentId = cancelModal.appointment?.AppointmentId;
+
+    if (!appointmentId) {
+      setError("Không tìm thấy lịch hẹn cần hủy");
+      return;
+    }
 
     try {
       setLoadingId(appointmentId);
       setError("");
       setMessage("");
 
-      const reason = window.prompt("Nhập lý do hủy lịch hẹn:");
-      if (!reason || !reason.trim()) {
-        setError("Vui lòng nhập lý do hủy lịch");
-        return;
-      }
-
       await axiosClient.delete(`/appointments/${appointmentId}`, {
-        data: { reason },
+        data: { reason: cancelModal.reason.trim() },
       });
 
-      setMessage("Hủy lịch hẹn thành công");
+      setMessage(
+        cancelModal.paymentStatus === "PAID"
+          ? "Đã gửi yêu cầu hủy lịch và chờ hoàn tiền"
+          : "Hủy lịch hẹn thành công",
+      );
+
+      closeCancelModal();
       await loadAppointments();
     } catch (err) {
       setError(err.response?.data?.message || "Hủy lịch hẹn thất bại");
@@ -166,505 +260,148 @@ export default function MyAppointments() {
 
   return (
     <CustomerLayout>
-      <style>{`
-        .appointments-page {
-          position: relative;
-          min-height: 100vh;
-          padding: 26px 0 60px;
-          color: #f8f7ff;
-          background:
-            radial-gradient(circle at 15% 10%, rgba(255, 0, 128, .22), transparent 28%),
-            radial-gradient(circle at 85% 20%, rgba(120, 77, 255, .28), transparent 30%),
-            radial-gradient(circle at 50% 90%, rgba(0, 217, 255, .12), transparent 28%),
-            linear-gradient(135deg, #090518 0%, #120a2b 45%, #1a0730 100%);
-          overflow: hidden;
-        }
+      <div className="customer-appointments-page">
+        {cancelModal.open && (
+          <div className="cancel-modal-backdrop" onClick={closeCancelModal}>
+            <div className="cancel-modal" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="cancel-modal-close"
+                onClick={closeCancelModal}
+              >
+                ×
+              </button>
 
-        .appointments-page::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image:
-            radial-gradient(circle, rgba(255,255,255,.25) 1px, transparent 1px);
-          background-size: 38px 38px;
-          opacity: .16;
-          animation: starMove 18s linear infinite;
-          pointer-events: none;
-        }
+              <div className="cancel-modal-icon">!</div>
 
-        .appointments-page > * {
-          position: relative;
-          z-index: 1;
-        }
+              <h3>Xác nhận hủy lịch hẹn</h3>
 
-        .appointments-header {
-          position: relative;
-          overflow: hidden;
-          min-height: 230px;
-          border-radius: 34px;
-          padding: 42px 48px;
-          margin-bottom: 22px;
-          border: 1px solid rgba(255, 96, 190, .55);
-          background:
-            linear-gradient(90deg, rgba(15, 8, 40, .95), rgba(35, 14, 68, .72), rgba(255, 67, 150, .1)),
-            url("https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1600&q=80");
-          background-size: cover;
-          background-position: center right;
-          box-shadow:
-            0 0 0 1px rgba(255,255,255,.06) inset,
-            0 28px 90px rgba(255, 0, 128, .25),
-            0 0 60px rgba(150, 87, 255, .18);
-        }
+              <p className="cancel-modal-desc">
+                Bạn có chắc chắn muốn hủy lịch hẹn này không? Vui lòng nhập lý
+                do để salon hỗ trợ xử lý đúng nghiệp vụ.
+              </p>
 
-        .appointments-header::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background:
-            radial-gradient(circle at 80% 30%, rgba(255, 85, 170, .32), transparent 22%),
-            linear-gradient(90deg, rgba(9, 5, 24, .92), rgba(9, 5, 24, .45), transparent);
-        }
+              <div className="cancel-summary">
+                <div>
+                  <span>Mã lịch</span>
+                  <b>
+                    {getAppointmentCode(cancelModal.appointment?.AppointmentId)}
+                  </b>
+                </div>
 
-        .header-content {
-          position: relative;
-          z-index: 2;
-          max-width: 760px;
-        }
+                <div>
+                  <span>Dịch vụ</span>
+                  <b>
+                    {cancelModal.appointment?.ServiceName || "Dịch vụ đã đặt"}
+                  </b>
+                </div>
 
-        .appointments-header h2 {
-          margin: 0;
-          font-size: 48px;
-          font-weight: 950;
-          letter-spacing: -1px;
-          background: linear-gradient(90deg, #ffffff, #ff7bc0, #8fd3ff);
-          -webkit-background-clip: text;
-          color: transparent;
-          text-shadow: 0 0 28px rgba(255, 85, 170, .45);
-        }
+                <div>
+                  <span>Ngày hẹn</span>
+                  <b>{formatDate(cancelModal.appointment?.AppointmentDate)}</b>
+                </div>
 
-        .appointments-header p {
-          margin: 10px 0 0;
-          color: #ded8ff;
-          font-size: 16px;
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(150px, 1fr));
-          gap: 16px;
-          margin-top: 28px;
-          max-width: 850px;
-        }
-
-        .stat-card {
-          padding: 18px;
-          border-radius: 22px;
-          background: rgba(255,255,255,.08);
-          border: 1px solid rgba(255,255,255,.13);
-          backdrop-filter: blur(16px);
-          box-shadow: 0 18px 45px rgba(0,0,0,.22);
-          transition: .25s ease;
-        }
-
-        .stat-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 0 28px rgba(255, 71, 166, .32);
-        }
-
-        .stat-icon {
-          width: 44px;
-          height: 44px;
-          border-radius: 17px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 10px;
-          font-size: 22px;
-          background: linear-gradient(135deg, #ff2f92, #7c3cff);
-          box-shadow: 0 0 22px rgba(255, 47, 146, .45);
-        }
-
-        .stat-number {
-          font-size: 24px;
-          font-weight: 950;
-          color: #fff;
-        }
-
-        .stat-label {
-          color: #cfc8ee;
-          font-size: 13px;
-          margin-top: 3px;
-        }
-
-        .alert-success,
-        .alert-error {
-          padding: 15px 18px;
-          border-radius: 18px;
-          margin-bottom: 18px;
-          font-weight: 800;
-          backdrop-filter: blur(12px);
-        }
-
-        .alert-success {
-          background: rgba(34, 197, 94, .14);
-          color: #86efac;
-          border: 1px solid rgba(34, 197, 94, .35);
-        }
-
-        .alert-error {
-          background: rgba(244, 63, 94, .14);
-          color: #fda4af;
-          border: 1px solid rgba(244, 63, 94, .35);
-        }
-
-        .filter-card {
-          display: grid;
-          grid-template-columns: 1.5fr 240px 210px 150px;
-          gap: 14px;
-          align-items: center;
-          margin-bottom: 18px;
-          padding: 18px;
-          border-radius: 28px;
-          background: rgba(255,255,255,.08);
-          border: 1px solid rgba(255, 120, 200, .32);
-          backdrop-filter: blur(18px);
-          box-shadow:
-            0 18px 55px rgba(0,0,0,.24),
-            0 0 35px rgba(255, 47, 146, .14);
-        }
-
-        .filter-select,
-        .filter-input {
-          height: 50px;
-          padding: 0 18px;
-          border-radius: 17px;
-          border: 1px solid rgba(255,255,255,.15);
-          outline: none;
-          min-width: 0;
-          background: rgba(255,255,255,.1);
-          color: #fff;
-          font-weight: 800;
-          box-shadow: 0 0 0 rgba(255, 47, 146, 0);
-          transition: .25s ease;
-        }
-
-        .filter-select option {
-          background: #160b2d;
-          color: #fff;
-        }
-
-        .filter-input::placeholder {
-          color: #bcb4d8;
-        }
-
-        .filter-select:focus,
-        .filter-input:focus {
-          border-color: #ff4fa3;
-          box-shadow: 0 0 0 4px rgba(255, 79, 163, .18), 0 0 25px rgba(255, 79, 163, .2);
-        }
-
-        .btn-clear {
-          height: 50px;
-          border: none;
-          border-radius: 17px;
-          color: #fff;
-          font-weight: 950;
-          cursor: pointer;
-          background: linear-gradient(135deg, #ff2f92, #7c3cff);
-          box-shadow: 0 16px 38px rgba(255, 47, 146, .26);
-          transition: .25s ease;
-        }
-
-        .btn-clear:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 0 32px rgba(255, 47, 146, .55);
-        }
-
-        .table-card {
-          overflow: hidden;
-          border-radius: 30px;
-          background: rgba(12, 8, 35, .78);
-          border: 1px solid rgba(255, 120, 200, .35);
-          backdrop-filter: blur(22px);
-          box-shadow:
-            0 28px 90px rgba(0,0,0,.35),
-            0 0 50px rgba(255, 47, 146, .15);
-        }
-
-        .appointments-table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-
-        .appointments-table th {
-          background: rgba(255,255,255,.07);
-          color: #efeaff;
-          font-size: 13px;
-          text-align: left;
-          padding: 17px 14px;
-          border-bottom: 1px solid rgba(255,255,255,.1);
-          white-space: nowrap;
-        }
-
-        .appointments-table td {
-          padding: 17px 14px;
-          border-bottom: 1px solid rgba(255,255,255,.08);
-          color: #f7f4ff;
-          vertical-align: middle;
-        }
-
-        .appointments-table tr {
-          transition: .22s ease;
-        }
-
-        .appointments-table tbody tr:hover {
-          background: rgba(255, 47, 146, .09);
-          transform: scale(1.006);
-        }
-
-        .appointments-table tr:last-child td {
-          border-bottom: none;
-        }
-
-        .code {
-          font-weight: 950;
-          color: #ff4fa3;
-          text-shadow: 0 0 12px rgba(255, 79, 163, .45);
-        }
-
-        .service-cell {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .service-icon {
-          width: 42px;
-          height: 42px;
-          flex: 0 0 42px;
-          border-radius: 16px;
-          background: linear-gradient(135deg, rgba(255, 47, 146, .25), rgba(124, 60, 255, .18));
-          border: 1px solid rgba(255,255,255,.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 0 18px rgba(255, 47, 146, .22);
-        }
-
-        .service-name {
-          font-weight: 950;
-          color: #fff;
-        }
-
-        .muted {
-          color: #aaa3c8;
-          font-size: 13px;
-          margin-top: 4px;
-        }
-
-        .status-badge,
-        .payment-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 12px;
-          border-radius: 999px;
-          font-size: 12px;
-          font-weight: 950;
-          white-space: nowrap;
-        }
-
-        .status-pending {
-          background: rgba(245, 158, 11, .18);
-          color: #fbbf24;
-          box-shadow: 0 0 18px rgba(245, 158, 11, .16);
-        }
-
-        .status-confirmed {
-          background: rgba(34, 197, 94, .17);
-          color: #86efac;
-          box-shadow: 0 0 18px rgba(34, 197, 94, .15);
-        }
-
-        .status-completed {
-          background: rgba(14, 165, 233, .16);
-          color: #7dd3fc;
-        }
-
-        .status-cancelled {
-          background: rgba(244, 63, 94, .16);
-          color: #fda4af;
-        }
-
-        .payment-paid {
-          background: rgba(34, 197, 94, .17);
-          color: #86efac;
-        }
-
-        .payment-unpaid {
-          background: rgba(245, 158, 11, .18);
-          color: #fbbf24;
-        }
-
-        .action-row {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .btn-detail,
-        .btn-pay,
-        .btn-cancel,
-        .btn-again {
-          border: none;
-          border-radius: 13px;
-          padding: 10px 13px;
-          font-weight: 950;
-          cursor: pointer;
-          color: white;
-          text-decoration: none;
-          transition: .22s ease;
-          white-space: nowrap;
-        }
-
-        .btn-detail {
-          background: linear-gradient(135deg, #6d5dfc, #9d4edd);
-          box-shadow: 0 0 18px rgba(109, 93, 252, .32);
-        }
-
-        .btn-pay {
-          background: linear-gradient(135deg, #ff2f92, #ff5f6d);
-          box-shadow: 0 0 18px rgba(255, 47, 146, .32);
-        }
-
-        .btn-cancel {
-          background: linear-gradient(135deg, #ff3b30, #ff2f92);
-          box-shadow: 0 0 18px rgba(255, 59, 48, .28);
-        }
-
-        .btn-again {
-          background: linear-gradient(135deg, #13a06f, #22c55e);
-          box-shadow: 0 0 18px rgba(34, 197, 94, .25);
-        }
-
-        .btn-detail:hover,
-        .btn-pay:hover,
-        .btn-cancel:hover,
-        .btn-again:hover {
-          transform: translateY(-3px);
-          filter: brightness(1.12);
-        }
-
-        .btn-pay:disabled,
-        .btn-cancel:disabled {
-          opacity: .6;
-          cursor: not-allowed;
-        }
-
-        .empty-row {
-          text-align: center;
-          color: #cfc8ee;
-          padding: 36px !important;
-        }
-
-        .table-footer {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 18px 20px;
-          color: #cfc8ee;
-          border-top: 1px solid rgba(255,255,255,.08);
-        }
-
-        .page-dot {
-          width: 40px;
-          height: 40px;
-          border-radius: 14px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255, 47, 146, .16);
-          border: 1px solid rgba(255, 47, 146, .38);
-          color: #fff;
-          box-shadow: 0 0 18px rgba(255, 47, 146, .25);
-        }
-
-        @keyframes starMove {
-          from { transform: translateY(0); }
-          to { transform: translateY(-80px); }
-        }
-
-        @media (max-width: 1100px) {
-          .filter-card,
-          .stats-grid {
-            grid-template-columns: 1fr 1fr;
-          }
-
-          .table-card {
-            overflow-x: auto;
-          }
-
-          .appointments-table {
-            min-width: 1100px;
-          }
-        }
-
-        @media (max-width: 700px) {
-          .appointments-header {
-            padding: 30px 24px;
-          }
-
-          .appointments-header h2 {
-            font-size: 34px;
-          }
-
-          .filter-card,
-          .stats-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-      `}</style>
-
-      <div className="appointments-page">
-        <div className="appointments-header">
-          <div className="header-content">
-            <h2>Lịch hẹn của tôi ✨</h2>
-            <p>
-              Theo dõi lịch hẹn, trạng thái xác nhận và trạng thái thanh toán.
-            </p>
-
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-icon">📅</div>
-                <div className="stat-number">{stats.total}</div>
-                <div className="stat-label">Tổng lịch hẹn</div>
+                <div>
+                  <span>Thời gian</span>
+                  <b>
+                    {formatTime(cancelModal.appointment?.StartTime)} -{" "}
+                    {formatTime(cancelModal.appointment?.EndTime)}
+                  </b>
+                </div>
               </div>
 
-              <div className="stat-card">
-                <div className="stat-icon">✅</div>
-                <div className="stat-number">{stats.confirmed}</div>
-                <div className="stat-label">Đã xác nhận</div>
-              </div>
+              {cancelModal.paymentStatus === "PAID" && (
+                <div className="refund-warning">
+                  Lịch hẹn này đã thanh toán. Sau khi hủy, hệ thống sẽ chuyển
+                  lịch sang trạng thái <b>Đang chờ hoàn tiền</b>.
+                </div>
+              )}
 
-              <div className="stat-card">
-                <div className="stat-icon">⏳</div>
-                <div className="stat-number">{stats.pending}</div>
-                <div className="stat-label">Đang chờ</div>
-              </div>
+              <label className="cancel-label">Lý do hủy lịch</label>
 
-              <div className="stat-card">
-                <div className="stat-icon">💳</div>
-                <div className="stat-number">{formatMoney(stats.spent)}</div>
-                <div className="stat-label">Tổng đã chi tiêu</div>
+              <textarea
+                className="cancel-textarea"
+                value={cancelModal.reason}
+                onChange={(e) =>
+                  setCancelModal({ ...cancelModal, reason: e.target.value })
+                }
+                placeholder="Ví dụ: Tôi bận đột xuất, muốn hủy lịch..."
+                rows={4}
+              />
+
+              <div className="cancel-modal-actions">
+                <button
+                  type="button"
+                  className="cancel-keep-btn"
+                  onClick={closeCancelModal}
+                  disabled={
+                    loadingId === cancelModal.appointment?.AppointmentId
+                  }
+                >
+                  Giữ lịch
+                </button>
+
+                <button
+                  type="button"
+                  className="cancel-confirm-btn"
+                  onClick={handleCancelSubmit}
+                  disabled={
+                    loadingId === cancelModal.appointment?.AppointmentId
+                  }
+                >
+                  {loadingId === cancelModal.appointment?.AppointmentId
+                    ? "Đang xử lý..."
+                    : "Xác nhận hủy"}
+                </button>
               </div>
             </div>
+          </div>
+        )}
+
+        <div className="section-head">
+          <div>
+            <div className="eyebrow">Appointments</div>
+            <h2 className="section-title">Lịch hẹn của tôi</h2>
+            <p className="muted">
+              Theo dõi lịch hẹn, trạng thái xác nhận và trạng thái thanh toán.
+            </p>
+          </div>
+
+          <Link className="btn" to="/customer/booking">
+            Đặt lịch mới
+          </Link>
+        </div>
+
+        <div className="stats">
+          <div className="dashboard-card">
+            <h3>Tổng lịch hẹn</h3>
+            <strong>{stats.total}</strong>
+            <p className="muted">Tất cả lịch đã đặt</p>
+          </div>
+
+          <div className="dashboard-card">
+            <h3>Đã xác nhận</h3>
+            <strong>{stats.confirmed}</strong>
+            <p className="muted">Lịch đã được salon xác nhận</p>
+          </div>
+
+          <div className="dashboard-card">
+            <h3>Đang chờ</h3>
+            <strong>{stats.pending}</strong>
+            <p className="muted">Lịch chờ thanh toán</p>
+          </div>
+
+          <div className="dashboard-card">
+            <h3>Tổng chi tiêu</h3>
+            <strong>{formatMoney(stats.spent)}</strong>
+            <p className="muted">Các lịch đã thanh toán</p>
           </div>
         </div>
 
         {message && <div className="alert-success">{message}</div>}
         {error && <div className="alert-error">{error}</div>}
 
-        <div className="filter-card">
+        <div className="dashboard-card appointment-filter-card">
           <input
             className="filter-input"
             placeholder="🔍 Tìm theo mã lịch, dịch vụ, kỹ thuật viên..."
@@ -678,29 +415,53 @@ export default function MyAppointments() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="ALL">Tất cả trạng thái</option>
-            <option value="PENDING">Đang chờ</option>
+            <option value="PENDING_PAYMENT">Chờ thanh toán</option>
             <option value="CONFIRMED">Đã xác nhận</option>
             <option value="COMPLETED">Hoàn thành</option>
             <option value="CANCELLED">Đã hủy</option>
           </select>
 
+          <select
+            className="filter-select"
+            value={paymentFilter}
+            onChange={(e) => setPaymentFilter(e.target.value)}
+          >
+            <option value="ALL">Tất cả thanh toán</option>
+            <option value="UNPAID">Chưa thanh toán</option>
+            <option value="PENDING">Đang chờ</option>
+            <option value="PAID">Đã thanh toán</option>
+            <option value="FAILED">Thất bại</option>
+            <option value="REFUND_PENDING">Đang hoàn tiền</option>
+            <option value="REFUNDED">Đã hoàn tiền</option>
+          </select>
+
           <input
             className="filter-input"
             type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+          />
+
+          <input
+            className="filter-input"
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
           />
 
           <button
-            className="btn-clear"
+            className="card-btn"
             type="button"
             onClick={() => {
               setKeyword("");
               setDateFilter("");
+              setFromDate("");
+              setToDate("");
               setStatusFilter("ALL");
+              setPaymentFilter("ALL");
             }}
           >
-            Bộ lọc
+            Xóa lọc
           </button>
         </div>
 
@@ -775,26 +536,52 @@ export default function MyAppointments() {
                       <span
                         className={`status-badge status-${status.toLowerCase()}`}
                       >
-                        {status === "PENDING"
+                        {status === "PENDING_PAYMENT" || status === "PENDING"
                           ? "⏳ "
                           : status === "CONFIRMED"
                             ? "✅ "
-                            : ""}
+                            : status === "NO_SHOW"
+                              ? "🚫 "
+                              : ""}
                         {getStatusText(status)}
                       </span>
                     </td>
 
                     <td>
-                      <span
-                        className={`payment-badge ${
-                          paymentStatus === "PAID"
-                            ? "payment-paid"
-                            : "payment-unpaid"
-                        }`}
-                      >
-                        {paymentStatus === "PAID" ? "💳 " : "⚠️ "}
-                        {getPaymentText(paymentStatus)}
-                      </span>
+                      <div>
+                        <span
+                          className={`payment-badge ${
+                            paymentStatus === "PAID"
+                              ? "payment-paid"
+                              : paymentStatus === "REFUND_PENDING"
+                                ? "status-pending"
+                                : "payment-unpaid"
+                          }`}
+                        >
+                          {paymentStatus === "PAID"
+                            ? "💳 "
+                            : paymentStatus === "REFUND_PENDING"
+                              ? "⏳ "
+                              : "⚠️ "}
+                          {getPaymentText(paymentStatus)}
+                        </span>
+                        {r.CancelReason && (
+                          <div className="muted" style={{ marginTop: 8 }}>
+                            <b>Lý do hủy:</b> {r.CancelReason}
+                          </div>
+                        )}
+                        {r.RefundStatus && (
+                          <div className="muted" style={{ marginTop: 6 }}>
+                            <b>Hoàn tiền:</b> {getRefundText(r.RefundStatus)}
+                          </div>
+                        )}
+                        {String(r.Status || "").toUpperCase() ===
+                          "REFUND_PENDING" && (
+                          <div className="muted" style={{ marginTop: 6 }}>
+                            <b>Trạng thái:</b> Đang chờ hoàn tiền
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     <td>
@@ -819,33 +606,59 @@ export default function MyAppointments() {
                           </button>
                         )}
 
+                        {canReviewAppointment(
+                          r.Status,
+                          r.AppointmentId,
+                          r.ServiceId,
+                        ) ? (
+                          <button
+                            type="button"
+                            className="btn-pay"
+                            onClick={() =>
+                              navigate(
+                                `/customer/feedback?appointmentId=${r.AppointmentId}&serviceId=${r.ServiceId || ""}`,
+                              )
+                            }
+                          >
+                            Đánh giá
+                          </button>
+                        ) : String(r.Status || "").toUpperCase() ===
+                          "COMPLETED" ? (
+                          <span
+                            className="btn-pay"
+                            style={{ cursor: "default" }}
+                          >
+                            Đã đánh giá
+                          </span>
+                        ) : null}
+
+                        {canReschedule(r.Status) && (
+                          <button
+                            type="button"
+                            className="btn-detail"
+                            onClick={() =>
+                              navigate(
+                                `/customer/reschedule/${r.AppointmentId}`,
+                              )
+                            }
+                          >
+                            Đổi lịch
+                          </button>
+                        )}
+
                         {String(r.Status || "").toUpperCase() ===
                           "COMPLETED" && (
-                          <>
-                            <button
-                              type="button"
-                              className="btn-pay"
-                              onClick={() =>
-                                navigate(
-                                  `/customer/feedback?appointmentId=${r.AppointmentId}&serviceId=${r.ServiceId || ""}`,
-                                )
-                              }
-                            >
-                              Đánh giá
-                            </button>
-
-                            <button
-                              type="button"
-                              className="btn-again"
-                              onClick={() =>
-                                navigate(
-                                  `/customer/booking?serviceId=${r.ServiceId || ""}&employeeId=${r.EmployeeId || ""}`,
-                                )
-                              }
-                            >
-                              Đặt lại
-                            </button>
-                          </>
+                          <button
+                            type="button"
+                            className="btn-again"
+                            onClick={() =>
+                              navigate(
+                                `/customer/booking?serviceId=${r.ServiceId || ""}&employeeId=${r.EmployeeId || ""}`,
+                              )
+                            }
+                          >
+                            Đặt lại
+                          </button>
                         )}
 
                         {canCancel(r.Status) && (
@@ -853,7 +666,7 @@ export default function MyAppointments() {
                             type="button"
                             className="btn-cancel"
                             disabled={loadingId === r.AppointmentId}
-                            onClick={() => handleCancel(r.AppointmentId)}
+                            onClick={() => openCancelModal(r)}
                           >
                             {loadingId === r.AppointmentId
                               ? "Đang hủy..."
