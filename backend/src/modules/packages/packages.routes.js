@@ -3,7 +3,89 @@ const controller = require("./packages.controller");
 const authMiddleware = require("../../middlewares/auth.middleware");
 const allowRoles = require("../../middlewares/role.middleware");
 
+/* ===========================================================
+   CUSTOMER ROUTES
+   =========================================================== */
 router.get("/my", authMiddleware, controller.getMine);
+router.get(
+  "/my/:customerPackageId/usages",
+  authMiddleware,
+  controller.getUsageHistory,
+);
+router.get(
+  "/my/:customerPackageId/detail",
+  authMiddleware,
+  controller.getMyPackageDetail,
+);
+router.get(
+  "/my/:customerPackageId/usages-paginated",
+  authMiddleware,
+  controller.getUsageHistoryPaginated,
+);
+
+// Enterprise: Gia hạn / Đóng băng / Hủy đóng băng (Đã bãi bỏ)
+/*
+router.post(
+  "/my/:customerPackageId/extend",
+  authMiddleware,
+  controller.requestExtension,
+);
+router.post(
+  "/my/:customerPackageId/freeze",
+  authMiddleware,
+  controller.requestFreeze,
+);
+router.post(
+  "/my/:customerPackageId/unfreeze",
+  authMiddleware,
+  controller.unfreezePackage,
+);
+*/
+
+// Enterprise: Combo gia đình
+router.post(
+  "/my/:customerPackageId/members",
+  authMiddleware,
+  controller.addFamilyMember,
+);
+router.delete(
+  "/my/:customerPackageId/members/:memberId",
+  authMiddleware,
+  controller.removeFamilyMember,
+);
+
+/* ===========================================================
+   STAFF ROUTES (Receptionist duyệt yêu cầu - Đã bãi bỏ)
+   =========================================================== */
+/*
+router.get(
+  "/approvals",
+  authMiddleware,
+  allowRoles("Admin", "Manager", "Receptionist"),
+  controller.getApprovals,
+);
+router.post(
+  "/approvals/:requestId/process",
+  authMiddleware,
+  allowRoles("Admin", "Manager", "Receptionist"),
+  controller.approveRequest,
+);
+*/
+
+/* ===========================================================
+   ADMIN ROUTES (Báo cáo)
+   =========================================================== */
+router.get(
+  "/report",
+  authMiddleware,
+  allowRoles("Admin", "Manager"),
+  controller.getPackageReport,
+);
+
+/* ===========================================================
+   PUBLIC & ADMIN CRUD ROUTES
+   =========================================================== */
+router.get("/find-member", authMiddleware, controller.findMember);
 router.get("/categories/list", controller.getCategories);
 router.get("/vnpay-return", controller.vnpayReturn);
 router.post("/:id/buy", authMiddleware, controller.buyPackage);

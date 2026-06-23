@@ -14,7 +14,11 @@ export default function BookingPage() {
   const [packageDetailLoading, setPackageDetailLoading] = useState(false);
 
   const [availableSlots, setAvailableSlots] = useState([]);
+  const [alternatives, setAlternatives] = useState([]);
   const [slotLoading, setSlotLoading] = useState(false);
+  const [acceptOtherTechnician, setAcceptOtherTechnician] = useState(false);
+  const [acceptOtherTimeSlots, setAcceptOtherTimeSlots] = useState(false);
+
 
   const [keyword, setKeyword] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
@@ -36,8 +40,13 @@ export default function BookingPage() {
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [voucherId, setVoucherId] = useState(null);
 
+  const [myVouchers, setMyVouchers] = useState([]);
+  const [showVoucherList, setShowVoucherList] = useState(false);
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [waitingLoading, setWaitingLoading] = useState(false);
+  const [waitingCreated, setWaitingCreated] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [employeeLoading, setEmployeeLoading] = useState(false);
 
@@ -50,9 +59,10 @@ export default function BookingPage() {
         setPageLoading(true);
         setError("");
 
-        const [serviceRes, packageRes] = await Promise.all([
+        const [serviceRes, packageRes, voucherRes] = await Promise.all([
           axiosClient.get("/services"),
           axiosClient.get("/packages/my").catch(() => ({ data: { data: [] } })),
+          axiosClient.get("/vouchers/my").catch(() => ({ data: { data: [] } })),
         ]);
 
         setServices(serviceRes.data.data || []);
@@ -66,6 +76,17 @@ export default function BookingPage() {
         );
 
         setMyPackages(activePkgs);
+        const vouchers = voucherRes.data.data || voucherRes.data || [];
+
+        const usableVouchers = vouchers.filter((v) => {
+          const notUsed = !v.UsedStatus;
+          const active = v.Status === "ACTIVE";
+          const notExpired = !v.EndDate || new Date(v.EndDate) >= new Date();
+
+          return notUsed && active && notExpired;
+        });
+
+        setMyVouchers(usableVouchers);
       } catch {
         setError("Không tải được dữ liệu đặt lịch");
       } finally {
@@ -107,6 +128,7 @@ export default function BookingPage() {
     async function loadAvailableSlots() {
       if (!form.serviceId || !form.employeeId || !form.appointmentDate) {
         setAvailableSlots([]);
+        setAlternatives([]);
         return;
       }
 
@@ -119,12 +141,22 @@ export default function BookingPage() {
             serviceId: form.serviceId,
             employeeId: form.employeeId,
             appointmentDate: form.appointmentDate,
+            includeAlternatives: true,
+            includeAllSlots: true,
           },
         });
 
-        setAvailableSlots(res.data.data || []);
+        const data = res.data.data;
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          setAvailableSlots(data.slots || []);
+          setAlternatives(data.alternatives || []);
+        } else {
+          setAvailableSlots(data || []);
+          setAlternatives([]);
+        }
       } catch (err) {
         setAvailableSlots([]);
+        setAlternatives([]);
         setError(err.response?.data?.message || "Không tải được giờ trống");
       } finally {
         setSlotLoading(false);
@@ -142,7 +174,7 @@ export default function BookingPage() {
       searchParams.get("date") || searchParams.get("appointmentDate");
     const customerPackageId = searchParams.get("customerPackageId");
 
-    if (!serviceId && !employeeId && !dateParam) return;
+    if (!serviceId && !employeeId && !dateParam && !customerPackageId) return;
 
     setForm((prev) => ({
       ...prev,
@@ -152,10 +184,10 @@ export default function BookingPage() {
       customerPackageId: customerPackageId || prev.customerPackageId,
     }));
 
-    if (customerPackageId && serviceId) {
+    if (customerPackageId) {
       setBookingType("PACKAGE");
       setSelectedPackageId(customerPackageId);
-      setStep(2);
+      setStep(1);
     } else if (serviceId && employeeId) {
       setStep(3);
     } else if (serviceId) {
@@ -243,9 +275,63 @@ export default function BookingPage() {
 
   function formatTime(value) {
     if (!value) return "";
-    return String(value).slice(0, 5);
+    
+    // Case 1: Date object
+    if (value instanceof Date || (typeof value === "object" && typeof value.getHours === "function")) {
+      const hours = String(value.getHours()).padStart(2, "0");
+      const minutes = String(value.getMinutes()).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+    
+    // Case 2: Object with ms / milliseconds (mssql time type representation)
+    if (typeof value === "object") {
+      const ms = value.ms !== undefined ? value.ms : value.milliseconds;
+      if (typeof ms === "number") {
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+      }
+    }
+    
+    // Case 3: ISO String or date string (e.g. "1899-12-30T08:00:00.000Z")
+    const str = String(value);
+    if (str.includes("T")) {
+      const parts = str.split("T")[1];
+      if (parts) return parts.slice(0, 5);
+    }
+    
+    // Case 4: Standard string representation containing time (e.g. "Sat Dec 30 1899 08:00:00 GMT...")
+    const timeRegex = /(\d{2}):(\d{2}):(\d{2})/;
+    const match = str.match(timeRegex);
+    if (match) {
+      return `${match[1]}:${match[2]}`;
+    }
+    
+    // Case 5: Standard string like "08:00:00" or "08:00"
+    return str.slice(0, 5);
   }
 
+  function getVoucherText(voucher) {
+    if (!voucher) return "";
+
+    const type = String(voucher.DiscountType || "").toUpperCase();
+
+    if (type === "PERCENT") {
+      return `Giảm ${Number(voucher.DiscountValue || 0)}%`;
+    }
+
+    return `Giảm ${formatMoney(voucher.DiscountValue || 0)}`;
+  }
+
+  function formatVoucherDate(value) {
+    if (!value) return "Không giới hạn";
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "Không giới hạn";
+
+    return date.toLocaleDateString("vi-VN");
+  }
   function resetAfterServiceChange(nextForm) {
     setForm(nextForm);
     setEmployees([]);
@@ -253,9 +339,11 @@ export default function BookingPage() {
     setVoucherCode("");
     setVoucherId(null);
     setAvailableSlots([]);
+    setAlternatives([]);
   }
 
   function chooseService(serviceId) {
+    setWaitingCreated(false);
     resetAfterServiceChange({
       ...form,
       serviceId,
@@ -273,9 +361,26 @@ export default function BookingPage() {
     setError("");
 
     try {
-      const res = await axiosClient.get(`/packages/${pkg.PackageId}`);
+      const res = await axiosClient.get(`/packages/my/${pkg.CustomerPackageId}/detail`);
       const data = res.data.data || res.data;
-      setPackageServices(data.Services || []);
+      const svcs = data.Services || [];
+      setPackageServices(svcs);
+
+      // Tự động chọn dịch vụ nếu có tham số serviceId trên URL
+      const prefilledServiceId = searchParams.get("serviceId");
+      if (prefilledServiceId) {
+        const foundSvc = svcs.find(
+          (s) => String(s.ServiceId) === String(prefilledServiceId),
+        );
+        if (foundSvc) {
+          const maxS = Number(foundSvc.MaxSessions || 0);
+          const usedS = Number(foundSvc.UsedSessions || 0);
+          const leftS = Math.max(0, maxS - usedS);
+          if (leftS > 0) {
+            choosePackageService(pkg.CustomerPackageId, foundSvc.ServiceId);
+          }
+        }
+      }
     } catch {
       setPackageServices([]);
       setError("Không tải được dịch vụ trong combo");
@@ -297,6 +402,7 @@ export default function BookingPage() {
   }
 
   function chooseEmployee(employeeId) {
+    setWaitingCreated(false);
     setForm({
       ...form,
       employeeId,
@@ -304,6 +410,7 @@ export default function BookingPage() {
     });
 
     setAvailableSlots([]);
+    setAlternatives([]);
     setStep(3);
   }
 
@@ -316,6 +423,7 @@ export default function BookingPage() {
     const { name, value } = e.target;
 
     if (name === "appointmentDate") {
+      setWaitingCreated(false);
       setForm({
         ...form,
         appointmentDate: value,
@@ -328,6 +436,63 @@ export default function BookingPage() {
       ...form,
       [name]: value,
     });
+  }
+
+  async function joinWaitingListFromBooking() {
+    setError("");
+    setMessage("");
+
+    const now = new Date();
+    let today = now.toISOString().split("T")[0];
+    if (now.getHours() >= 21) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      today = tomorrow.toISOString().split("T")[0];
+    }
+
+    if (!form.serviceId) return setError("Vui lòng chọn dịch vụ trước");
+    if (!form.employeeId) return setError("Vui lòng chọn kỹ thuật viên trước");
+    if (!form.appointmentDate) return setError("Vui lòng chọn ngày muốn chờ");
+    if (form.appointmentDate < today) {
+      if (now.getHours() >= 21 && form.appointmentDate === now.toISOString().split("T")[0]) {
+        return setError("Thời gian hoạt động trong ngày đã kết thúc. Vui lòng chọn ngày khác.");
+      }
+      return setError("Không được tham gia hàng chờ cho ngày trong quá khứ");
+    }
+
+    try {
+      setWaitingLoading(true);
+
+      await axiosClient.post("/waiting-list", {
+        serviceId: form.serviceId,
+        preferredEmployeeId: form.employeeId,
+        preferredDate: form.appointmentDate,
+        flexibleTimeSlot: "ANY",
+        priorityLevel: "NORMAL",
+        contactMethod: "PHONE",
+        acceptOtherTechnician: acceptOtherTechnician ? 1 : 0,
+        acceptOtherTimeSlots: acceptOtherTimeSlots ? 1 : 0,
+        reason:
+          "Không còn slot trống trong ngày đã chọn, khách muốn chờ khi có slot.",
+        note:
+          form.notes ||
+          `Tạo tự động từ trang đặt lịch. Dịch vụ: ${
+            selectedService?.ServiceName || form.serviceId
+          }, kỹ thuật viên: ${selectedEmployee?.FullName || form.employeeId}.`,
+      });
+
+      setWaitingCreated(true);
+      setMessage(
+        "Đã đăng ký Hàng Chờ thành công! Lưu ý: Đây là yêu cầu hàng chờ (chưa phải lịch hẹn chính thức). Bạn có thể theo dõi và quản lý yêu cầu tại mục 'Hàng chờ của tôi'."
+      );
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          "Không thể tham gia danh sách chờ. Vui lòng thử lại.",
+      );
+    } finally {
+      setWaitingLoading(false);
+    }
   }
 
   async function applyVoucher() {
@@ -364,10 +529,44 @@ export default function BookingPage() {
     }
   }
 
+  async function chooseVoucher(voucher) {
+    setVoucherCode(voucher.Code || "");
+    setShowVoucherList(false);
+    setError("");
+    setMessage("");
+
+    if (!selectedService) {
+      setError("Vui lòng chọn dịch vụ trước khi áp dụng voucher");
+      return;
+    }
+
+    try {
+      const res = await axiosClient.post("/vouchers/validate", {
+        code: voucher.Code,
+        totalAmount: totalPrice,
+      });
+
+      const data = res.data.data;
+
+      setVoucherDiscount(Number(data.discountAmount || 0));
+      setVoucherId(data.VoucherId || data.voucherId || voucher.VoucherId);
+      setMessage(`Đã áp dụng voucher ${data.Code || voucher.Code}`);
+    } catch (err) {
+      setVoucherDiscount(0);
+      setVoucherId(null);
+      setError(err.response?.data?.message || "Voucher không hợp lệ");
+    }
+  }
   async function handleSubmit(e) {
     e.preventDefault();
 
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    let today = now.toISOString().split("T")[0];
+    if (now.getHours() >= 21) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      today = tomorrow.toISOString().split("T")[0];
+    }
 
     setMessage("");
     setError("");
@@ -376,6 +575,9 @@ export default function BookingPage() {
     if (!form.employeeId) return setError("Vui lòng chọn kỹ thuật viên");
     if (!form.appointmentDate) return setError("Vui lòng chọn ngày hẹn");
     if (form.appointmentDate < today) {
+      if (now.getHours() >= 21 && form.appointmentDate === now.toISOString().split("T")[0]) {
+        return setError("Thời gian hoạt động trong ngày đã kết thúc. Vui lòng chọn ngày khác.");
+      }
       return setError("Không được đặt lịch trong quá khứ");
     }
     if (!form.startTime) return setError("Vui lòng chọn giờ hẹn");
@@ -383,7 +585,8 @@ export default function BookingPage() {
     const isValidSlot = availableSlots.some(
       (slot) =>
         String(slot.startTime).slice(0, 5) ===
-        String(form.startTime).slice(0, 5),
+        String(form.startTime).slice(0, 5) &&
+        slot.available !== false,
     );
 
     if (!isValidSlot) {
@@ -407,6 +610,8 @@ export default function BookingPage() {
         appointment.appointmentId ||
         appointment.id;
 
+      // Lưu thêm thời điểm client tạo lịch để tính countdown chính xác (tránh lệch timezone)
+      sessionStorage.setItem("bookingCreatedAt", String(Date.now()));
       sessionStorage.setItem("lastAppointment", JSON.stringify(appointment));
 
       if (voucherId) {
@@ -634,43 +839,59 @@ export default function BookingPage() {
                       </h3>
 
                       <div className="booking-service-grid">
-                        {packageServices.map((item) => (
-                          <button
-                            type="button"
-                            key={item.ServiceId}
-                            className={`booking-service-card ${
-                              String(form.serviceId) ===
-                                String(item.ServiceId) &&
-                              String(form.customerPackageId) ===
-                                String(selectedPackageId)
-                                ? "selected"
-                                : ""
-                            }`}
-                            onClick={() =>
-                              choosePackageService(
-                                selectedPackageId,
-                                item.ServiceId,
-                              )
-                            }
-                          >
-                            <img
-                              src={
-                                resolveFileUrl(item.ImageUrl) ||
-                                "/images/default-service.jpg"
-                              }
-                              alt={item.ServiceName}
-                            />
+                        {packageServices.map((item) => {
+                          const maxS = Number(item.MaxSessions || 0);
+                          const usedS = Number(item.UsedSessions || 0);
+                          const leftS = Math.max(0, maxS - usedS);
+                          const isExhausted = leftS === 0;
 
-                            <div className="booking-service-body">
-                              <h3>{item.ServiceName}</h3>
-                              <div className="booking-service-meta">
-                                <span>{item.DurationMinutes} phút</span>
-                                <strong>0đ</strong>
+                          return (
+                            <button
+                              type="button"
+                              key={item.ServiceId}
+                              disabled={isExhausted}
+                              className={`booking-service-card ${
+                                String(form.serviceId) ===
+                                  String(item.ServiceId) &&
+                                String(form.customerPackageId) ===
+                                  String(selectedPackageId)
+                                  ? "selected"
+                                  : ""
+                              }`}
+                              style={isExhausted ? { opacity: 0.5, filter: "grayscale(100%)", cursor: "not-allowed" } : {}}
+                              onClick={() => {
+                                if (isExhausted) return;
+                                choosePackageService(
+                                  selectedPackageId,
+                                  item.ServiceId,
+                                )
+                              }}
+                            >
+                              <img
+                                src={
+                                  resolveFileUrl(item.ImageUrl) ||
+                                  "/images/default-service.jpg"
+                                }
+                                alt={item.ServiceName}
+                              />
+
+                              <div className="booking-service-body">
+                                <h3>{item.ServiceName}</h3>
+                                <div className="booking-service-meta">
+                                  <span>{item.DurationMinutes} phút</span>
+                                  <strong style={{ color: isExhausted ? "#ef4444" : "var(--primary, #8b5cf6)" }}>
+                                    {isExhausted ? "Hết buổi" : `Còn ${leftS} / ${maxS} buổi`}
+                                  </strong>
+                                </div>
+                                <p style={{ color: isExhausted ? "#ef4444" : "#64748b" }}>
+                                  {isExhausted
+                                    ? "Đã dùng hết số buổi quy định trong combo."
+                                    : "Dịch vụ thuộc combo/liệu trình đã mua."}
+                                </p>
                               </div>
-                              <p>Dịch vụ thuộc combo/liệu trình đã mua.</p>
-                            </div>
-                          </button>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     </>
                   )}
@@ -757,31 +978,166 @@ export default function BookingPage() {
                   className="booking-input"
                   type="date"
                   name="appointmentDate"
-                  min={new Date().toISOString().split("T")[0]}
+                  min={(() => {
+                    const now = new Date();
+                    if (now.getHours() >= 21) {
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      return tomorrow.toISOString().split("T")[0];
+                    }
+                    return now.toISOString().split("T")[0];
+                  })()}
                   value={form.appointmentDate}
                   onChange={handleChange}
                 />
 
-                <div className="booking-time-grid">
+                <div className="booking-time-grid-container">
                   {slotLoading ? (
                     <p className="booking-empty">Đang tải giờ trống...</p>
-                  ) : availableSlots.length > 0 ? (
-                    availableSlots.map((slot) => (
-                      <button
-                        key={slot.startTime}
-                        type="button"
-                        className={`booking-time-btn ${
-                          String(form.startTime).slice(0, 5) ===
-                          String(slot.startTime).slice(0, 5)
-                            ? "active"
-                            : ""
-                        }`}
-                        onClick={() => chooseTime(slot.startTime)}
-                      >
-                        {formatTime(slot.startTime)} -{" "}
-                        {formatTime(slot.endTime)}
-                      </button>
-                    ))
+                  ) : (availableSlots.length > 0 && availableSlots.some(slot => slot.available !== false)) ? (
+                    <div className="booking-time-grid">
+                       {availableSlots.map((slot) => {
+                         const isSlotAvailable = slot.available !== false;
+                         return (
+                           <button
+                             key={slot.startTime}
+                             type="button"
+                             disabled={!isSlotAvailable}
+                             className={`booking-time-btn ${
+                               formatTime(form.startTime) ===
+                               formatTime(slot.startTime)
+                                 ? "active"
+                                 : ""
+                             }`}
+                             style={!isSlotAvailable ? { opacity: 0.45, filter: "grayscale(100%)", cursor: "not-allowed", border: "1px dashed #d1d5db" } : {}}
+                             onClick={() => {
+                               if (!isSlotAvailable) return;
+                               chooseTime(slot.startTime);
+                             }}
+                           >
+                             {formatTime(slot.startTime)} -{" "}
+                             {formatTime(slot.endTime)}
+                             {!isSlotAvailable && <span style={{ fontSize: 10, display: "block", color: "#ef4444", fontWeight: 600 }}>Bận</span>}
+                           </button>
+                         );
+                       })}
+                    </div>
+                  ) : form.serviceId &&
+                    form.employeeId &&
+                    form.appointmentDate ? (
+                    <div className="booking-no-slots-container">
+                      {alternatives.length > 0 && (
+                        <div className="booking-alternatives-section">
+                          <h3 className="booking-alternatives-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '8px', verticalAlign: 'middle', color: '#db2777' }}>
+                              <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                              <path d="M12 6v6l4 2" />
+                            </svg>
+                            Gợi ý khung giờ trống khác dành cho bạn
+                          </h3>
+                          <div className="booking-alternatives-grid">
+                            {alternatives.map((alt, idx) => (
+                              <div
+                                key={idx}
+                                className="booking-alternative-card"
+                                onClick={() => {
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    employeeId: alt.employeeId,
+                                    appointmentDate: alt.date,
+                                    startTime: alt.startTime,
+                                  }));
+                                  setStep(4);
+                                }}
+                              >
+                                <div className={`alt-badge type-${alt.type}`}>
+                                  {alt.type === 1
+                                    ? "Đổi KTV hôm nay"
+                                    : alt.type === 2
+                                    ? "Chọn ngày khác"
+                                    : "Ngày khác & KTV khác"}
+                                </div>
+                                <div className="alt-employee-info">
+                                  <img
+                                    src={resolveFileUrl(alt.imageUrl) || "/default-avatar.png"}
+                                    alt={alt.employeeName}
+                                    className="alt-employee-img"
+                                  />
+                                  <div>
+                                    <strong className="alt-employee-name">{alt.employeeName}</strong>
+                                    <p className="alt-time-label">{alt.label}</p>
+                                  </div>
+                                </div>
+                                <div className="alt-time-badge">
+                                  {formatTime(alt.startTime)} - {formatTime(alt.endTime)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="booking-waitlist-card">
+                        <div className="booking-waitlist-icon">⏳</div>
+
+                        <div className="booking-waitlist-content">
+                          <h3>Tham gia danh sách chờ (Waiting List)</h3>
+                          <p>
+                            Khi có khách hủy lịch hoặc có slot trống phù hợp, hệ thống sẽ tự động giữ chỗ và thông báo ngay cho bạn.
+                          </p>
+
+                          <div className="booking-waitlist-info">
+                            <span>Dịch vụ: {selectedService?.ServiceName}</span>
+                            <span>Kỹ thuật viên: {selectedEmployee?.FullName}</span>
+                            <span>Ngày muốn chờ: {form.appointmentDate}</span>
+                          </div>
+
+                          <div className="booking-waitlist-checkboxes">
+                            <label className="premium-checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={acceptOtherTechnician}
+                                onChange={(e) => setAcceptOtherTechnician(e.target.checked)}
+                              />
+                              <span className="checkbox-custom"></span>
+                              Chấp nhận kỹ thuật viên khác
+                            </label>
+
+                            <label className="premium-checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={acceptOtherTimeSlots}
+                                onChange={(e) => setAcceptOtherTimeSlots(e.target.checked)}
+                              />
+                              <span className="checkbox-custom"></span>
+                              Chấp nhận khung giờ khác trong ngày
+                            </label>
+                          </div>
+
+                          <div className="booking-waitlist-actions">
+                            <button
+                              type="button"
+                              className="booking-waitlist-btn"
+                              onClick={() => {
+                                navigate(
+                                  `/customer/waiting-list?serviceId=${form.serviceId}&employeeId=${form.employeeId}&date=${form.appointmentDate}&acceptOtherTechnician=${acceptOtherTechnician}&acceptOtherTimeSlots=${acceptOtherTimeSlots}`
+                                );
+                              }}
+                            >
+                              Đăng ký hàng chờ
+                            </button>
+
+                            <button
+                              type="button"
+                              className="booking-waitlist-secondary"
+                              onClick={() => navigate("/customer/waiting-list")}
+                            >
+                              Xem hàng chờ của tôi
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <p className="booking-empty">
                       Vui lòng chọn dịch vụ, kỹ thuật viên và ngày hẹn.
@@ -876,8 +1232,12 @@ export default function BookingPage() {
                   <input
                     className="booking-input"
                     value={voucherCode}
-                    onChange={(e) => setVoucherCode(e.target.value)}
-                    placeholder="Nhập voucher"
+                    onChange={(e) => {
+                      setVoucherCode(e.target.value);
+                      setVoucherDiscount(0);
+                      setVoucherId(null);
+                    }}
+                    placeholder="Nhập hoặc chọn voucher"
                   />
 
                   <button
@@ -888,6 +1248,49 @@ export default function BookingPage() {
                     Áp dụng
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  className="booking-show-vouchers-btn"
+                  onClick={() => setShowVoucherList((prev) => !prev)}
+                >
+                  {showVoucherList
+                    ? "Ẩn voucher của tôi"
+                    : "Chọn voucher của tôi"}
+                </button>
+
+                {showVoucherList && (
+                  <div className="booking-my-voucher-list">
+                    {myVouchers.length > 0 ? (
+                      myVouchers.map((voucher) => (
+                        <button
+                          type="button"
+                          key={voucher.VoucherId}
+                          className={`booking-my-voucher-card ${
+                            String(voucherId) === String(voucher.VoucherId)
+                              ? "selected"
+                              : ""
+                          }`}
+                          onClick={() => chooseVoucher(voucher)}
+                        >
+                          <div>
+                            <strong>{voucher.Code}</strong>
+                            <span>{getVoucherText(voucher)}</span>
+                          </div>
+
+                          <small>
+                            HSD: {formatVoucherDate(voucher.EndDate)}
+                          </small>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="booking-empty small">
+                        Bạn chưa có voucher khả dụng. Hãy vào trang Voucher để
+                        lưu mã giảm giá.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

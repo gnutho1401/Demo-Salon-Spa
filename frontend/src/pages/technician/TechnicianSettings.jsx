@@ -29,18 +29,18 @@ function dateText(value) {
 
   if (Number.isNaN(date.getTime())) return "N/A";
 
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric",
   });
 }
 
 function statusText(status) {
-  if (!status) return "Active";
-  if (status === "ACTIVE") return "Active";
-  if (status === "INACTIVE") return "Inactive";
-  if (status === "OFFLINE") return "Offline";
+  if (!status) return "Đang hoạt động";
+  if (status === "ACTIVE") return "Đang hoạt động";
+  if (status === "INACTIVE") return "Ngưng hoạt động";
+  if (status === "OFFLINE") return "Ngoại tuyến";
   return status;
 }
 
@@ -96,7 +96,7 @@ export default function TechnicianSettings() {
         bio: form.bio,
       });
 
-      alert("Đã lưu thay đổi");
+      alert("Đã lưu thay đổi thành công");
       await loadSettings();
     } catch (err) {
       alert(err.response?.data?.message || "Không lưu được thay đổi");
@@ -109,12 +109,12 @@ export default function TechnicianSettings() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Vui lòng chọn file ảnh");
+      alert("Vui lòng chọn file ảnh hợp lệ");
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("Ảnh tối đa 2MB");
+      alert("Dung lượng ảnh tối đa là 2MB");
       return;
     }
 
@@ -142,9 +142,9 @@ export default function TechnicianSettings() {
         bio: profile.Bio || "",
       });
 
-      alert("Đã cập nhật ảnh đại diện");
+      alert("Đã cập nhật ảnh đại diện thành công");
     } catch (err) {
-      alert(err.response?.data?.message || "Không upload được ảnh");
+      alert(err.response?.data?.message || "Không tải lên được ảnh đại diện");
     } finally {
       setUploading(false);
     }
@@ -163,15 +163,15 @@ export default function TechnicianSettings() {
         <header className="profile-header">
           <div>
             <h1>
-              Settings <span>⚙</span>
+              Cài đặt tài khoản <span>⚙</span>
             </h1>
-            <p>Manage your profile information and avatar</p>
+            <p>Quản lý thông tin hồ sơ cá nhân và ảnh đại diện của bạn</p>
           </div>
         </header>
 
         {loading && (
           <div className="profile-card profile-loading">
-            Loading settings...
+            Đang tải cài đặt tài khoản...
           </div>
         )}
 
@@ -179,7 +179,7 @@ export default function TechnicianSettings() {
           <div className="profile-card profile-error">
             <p>{error}</p>
             <button type="button" onClick={loadSettings}>
-              Reload
+              Tải lại
             </button>
           </div>
         )}
@@ -188,87 +188,87 @@ export default function TechnicianSettings() {
           <section className="settings-layout">
             <aside className="settings-menu">
               <button type="button" className="active">
-                ☰ General
+                ☰ Thông tin chung
               </button>
             </aside>
 
             <main className="settings-main-card">
               <section>
                 <div className="settings-card-head">
-                  <h3>Profile Information</h3>
+                  <h3>Thông tin cá nhân</h3>
 
                   <button
                     type="button"
                     onClick={saveSettings}
                     disabled={saving}
                   >
-                    {saving ? "Saving..." : "Save Changes"}
+                    {saving ? "Đang lưu..." : "Lưu thay đổi"}
                   </button>
                 </div>
 
                 <div className="settings-form-grid">
                   <label>
-                    Full Name
+                    Họ và tên
                     <input
                       value={form.fullName}
                       onChange={(e) =>
                         setForm({ ...form, fullName: e.target.value })
                       }
-                      placeholder="Enter full name"
+                      placeholder="Nhập họ và tên của bạn"
                     />
                   </label>
 
                   <label>
-                    Email
-                    <input value={form.email} disabled />
+                    Địa chỉ Email
+                    <input value={form.email} disabled title="Không thể thay đổi email đăng nhập" style={{ cursor: "not-allowed" }} />
                   </label>
 
                   <label>
-                    Phone Number
+                    Số điện thoại
                     <input
                       value={form.phone}
                       onChange={(e) =>
                         setForm({ ...form, phone: e.target.value })
                       }
-                      placeholder="Enter phone number"
+                      placeholder="Nhập số điện thoại liên lạc"
                     />
                   </label>
 
                   <label>
-                    Specialization
+                    Chuyên môn dịch vụ
                     <input
                       value={form.specialization}
                       onChange={(e) =>
                         setForm({ ...form, specialization: e.target.value })
                       }
-                      placeholder="Massage, Hair, Nails..."
+                      placeholder="Ví dụ: Massage, Làm móng, Chăm sóc da mặt..."
                     />
                   </label>
                 </div>
 
                 <label className="settings-bio">
-                  Bio
+                  Giới thiệu bản thân
                   <textarea
                     value={form.bio}
                     onChange={(e) => setForm({ ...form, bio: e.target.value })}
                     maxLength={300}
-                    placeholder="Write a short professional introduction"
+                    placeholder="Viết một đoạn giới thiệu ngắn gọn về thế mạnh và chuyên môn của bạn..."
                   />
-                  <small>{form.bio.length}/300</small>
+                  <small>{form.bio.length}/300 ký tự</small>
                 </label>
 
                 <div className="settings-photo">
                   <img
-                    src={avatar(profile.AvatarUrl)}
+                    src={avatar(profile.AvatarUrl || profile.ImageUrl)}
                     onError={(e) => {
                       e.currentTarget.src = DEFAULT_AVATAR;
                     }}
-                    alt={profile.FullName || "Technician avatar"}
+                    alt={profile.FullName || "Kỹ thuật viên"}
                   />
 
                   <div>
                     <label className="quick-setting-btn">
-                      📷 {uploading ? "Uploading..." : "Change Photo"}
+                      📷 {uploading ? "Đang tải ảnh..." : "Thay đổi ảnh đại diện"}
                       <input
                         type="file"
                         accept="image/*"
@@ -278,7 +278,7 @@ export default function TechnicianSettings() {
                       />
                     </label>
 
-                    <p>JPG, PNG or WEBP. Max size 2MB</p>
+                    <p>Chấp nhận JPG, PNG hoặc WEBP. Dung lượng tối đa 2MB</p>
                   </div>
                 </div>
               </section>
@@ -286,26 +286,26 @@ export default function TechnicianSettings() {
 
             <aside className="settings-right">
               <div className="settings-side-card">
-                <h3>Account Summary</h3>
+                <h3>Tóm tắt tài khoản</h3>
 
                 <p>
-                  <span>Technician ID</span>
+                  <span>Mã kỹ thuật viên</span>
                   <b>{profile.TechnicianCode || "N/A"}</b>
                 </p>
 
                 <p>
-                  <span>Member Since</span>
+                  <span>Thành viên từ</span>
                   <b>{dateText(profile.HireDate || profile.CreatedAt)}</b>
                 </p>
 
                 <p>
-                  <span>Account Status</span>
+                  <span>Trạng thái hoạt động</span>
                   <b className="active-status">{statusText(employeeStatus)}</b>
                 </p>
 
                 <p>
-                  <span>Verified</span>
-                  <b>{profile.IsVerified === false ? "No" : "Yes"}</b>
+                  <span>Trạng thái xác minh</span>
+                  <b>{profile.IsVerified === false ? "Chưa xác minh" : "Đã xác minh"}</b>
                 </p>
               </div>
             </aside>

@@ -51,6 +51,7 @@ import AdminSystemLogs from "../pages/admin/AdminSystemLogs";
 import AdminReports from "../pages/admin/AdminReports";
 import AdminAIMonitoring from "../pages/admin/AdminAIMonitoring";
 import AdminPackages from "../pages/admin/AdminPackages";
+import AdminRefunds from "../pages/admin/AdminRefunds";
 import ReceptionistDashboard from "../pages/receptionist/ReceptionistDashboard";
 import ReceptionistAppointments from "../pages/receptionist/ReceptionistAppointments";
 import ReceptionistAppointmentDetail from "../pages/receptionist/ReceptionistAppointmentDetail";
@@ -73,6 +74,8 @@ import TechnicianProfile from "../pages/technician/TechnicianProfile";
 import TechnicianSettings from "../pages/technician/TechnicianSettings";
 import AdminLayout from "../components/layout/AdminLayout";
 import ReviewPage from "../pages/customer/ReviewPage";
+// import PackageApprovalPage from "../pages/receptionist/PackageApprovalPage";
+import PackageReportPage from "../pages/admin/PackageReportPage";
 
 function PublicPage({ children }) {
   return <GuestLayout>{children}</GuestLayout>;
@@ -479,6 +482,16 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      {/* Commented out as freeze/extension features are deprecated
+      <Route
+        path="/receptionist/approvals"
+        element={
+          <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
+            <PackageApprovalPage />
+          </ProtectedRoute>
+        }
+      />
+      */}
       <Route
         path="/technician"
         element={
@@ -652,6 +665,16 @@ export default function AppRoutes() {
         }
       />
       <Route
+        path="/admin/refunds"
+        element={
+          <AdminProtectedPage>
+            <AdminLayout>
+              <AdminRefunds />
+            </AdminLayout>
+          </AdminProtectedPage>
+        }
+      />
+      <Route
         path="/admin/reviews"
         element={
           <AdminProtectedPage>
@@ -697,6 +720,16 @@ export default function AppRoutes() {
           <AdminProtectedPage>
             <AdminLayout>
               <AdminAIMonitoring />
+            </AdminLayout>
+          </AdminProtectedPage>
+        }
+      />
+      <Route
+        path="/admin/package-reports"
+        element={
+          <AdminProtectedPage>
+            <AdminLayout>
+              <PackageReportPage />
             </AdminLayout>
           </AdminProtectedPage>
         }

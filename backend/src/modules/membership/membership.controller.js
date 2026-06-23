@@ -1,11 +1,72 @@
-const service = require('./membership.service');
-const { success, error } = require('../../utils/response');
+const service = require("./membership.service");
+const { success, error } = require("../../utils/response");
 
-async function getAll(req, res) { try { return success(res, await service.getAll()); } catch (err) { return error(res, err.message); } }
-async function getMine(req, res) { try { return success(res, await service.getMine(req.user.userId)); } catch (err) { return error(res, err.message, 400); } }
-async function getById(req, res) { try { return success(res, await service.getById(req.params.id)); } catch (err) { return error(res, err.message); } }
-async function create(req, res) { try { return success(res, await service.create(req.body), 'Created', 201); } catch (err) { return error(res, err.message, 400); } }
-async function update(req, res) { try { return success(res, await service.update(req.params.id, req.body), 'Updated'); } catch (err) { return error(res, err.message, 400); } }
-async function remove(req, res) { try { return success(res, await service.remove(req.params.id), 'Deleted'); } catch (err) { return error(res, err.message, 400); } }
+async function getAll(req, res) {
+  try {
+    return success(res, await service.getAll());
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
 
-module.exports = { getAll, getMine, getById, create, update, remove };
+async function getMine(req, res) {
+  try {
+    return success(res, await service.getMine(req.user.userId));
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function getPointHistory(req, res) {
+  try {
+    return success(res, await service.getPointHistory(req.user.userId));
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function getById(req, res) {
+  try {
+    return success(res, await service.getById(req.params.id));
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
+
+async function create(req, res) {
+  try {
+    return success(res, await service.create(req.body), "Created", 201);
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function update(req, res) {
+  try {
+    return success(
+      res,
+      await service.update(req.params.id, req.body),
+      "Updated",
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function remove(req, res) {
+  try {
+    return success(res, await service.remove(req.params.id), "Deleted");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+module.exports = {
+  getAll,
+  getMine,
+  getPointHistory,
+  getById,
+  create,
+  update,
+  remove,
+};

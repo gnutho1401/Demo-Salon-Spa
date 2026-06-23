@@ -1,8 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
 import "../../styles/pages/receptionist.css";
+
+const POPULAR_BANKS = [
+  { bin: "970436", name: "VCB - Vietcombank" },
+  { bin: "970415", name: "VietinBank" },
+  { bin: "970407", name: "Techcombank" },
+  { bin: "970418", name: "BIDV" },
+  { bin: "970422", name: "MB Bank" },
+  { bin: "970416", name: "ACB" },
+  { bin: "970423", name: "TPBank" },
+  { bin: "970419", name: "VPBank" },
+  { bin: "970403", name: "Sacombank" },
+  { bin: "970448", name: "OCB" }
+];
 
 function money(value) {
   return `${Number(value || 0).toLocaleString("vi-VN")}đ`;
@@ -15,11 +28,30 @@ function formatDate(value) {
   return d.toLocaleDateString("vi-VN");
 }
 
+function formatTime(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+}
+
 function formatDateTime(value) {
   if (!value) return "-";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("vi-VN");
+  return d.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
 }
 
 function statusClass(status) {
@@ -33,6 +65,7 @@ function statusLabel(status) {
     UNPAID: "Chưa thanh toán",
     CANCELLED: "Đã hủy",
     REFUND_PENDING: "Chờ hoàn tiền",
+    REFUNDED: "Đã hoàn tiền",
     COMPLETED: "Hoàn thành",
     CONFIRMED: "Đã xác nhận",
   };
@@ -51,8 +84,28 @@ export default function ReceptionistInvoiceDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [bankList, setBankList] = useState([]);
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  useEffect(() => {
+    fetch("https://api.vietqr.io/v2/banks")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) {
+          setBankList(data.data.map(b => ({ bin: b.bin, name: `${b.shortName} - ${b.name}` })));
+        } else {
+          setBankList(POPULAR_BANKS);
+        }
+      })
+      .catch(() => {
+        setBankList(POPULAR_BANKS);
+      });
+  }, []);
 
   async function loadInvoice() {
     try {
@@ -76,14 +129,14 @@ export default function ReceptionistInvoiceDetail() {
 
   const paymentStatus = useMemo(() => {
     return String(
+      invoice?.PaymentStatus ||
       invoice?.PaymentInfo?.Status ||
-        invoice?.PaymentStatus ||
-        invoice?.Status ||
-        "UNPAID",
+      invoice?.Status ||
+      "UNPAID",
     ).toUpperCase();
   }, [invoice]);
 
-  const canMarkPaid = paymentStatus !== "PAID";
+  const canMarkPaid = paymentStatus !== "PAID" && paymentStatus !== "REFUNDED" && paymentStatus !== "REFUND_PENDING";
   const canRefund = paymentStatus === "PAID" && !invoice?.RefundInfo;
 
   async function markPaid() {
@@ -99,7 +152,8 @@ export default function ReceptionistInvoiceDetail() {
       });
 
       await loadInvoice();
-      setSuccessMsg("Đã cập nhật hóa đơn thành đã thanh toán");
+      setSuccessMsg("Cập nhật trạng thái hóa đơn đã thanh toán thành công!");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(err.response?.data?.message || "Không thể xác nhận thanh toán");
     } finally {
@@ -110,6 +164,21 @@ export default function ReceptionistInvoiceDetail() {
   async function requestRefund() {
     if (!refundReason.trim()) {
       setError("Vui lòng nhập lý do hoàn tiền");
+      return;
+    }
+
+    if (!bankCode) {
+      setError("Vui lòng chọn ngân hàng nhận hoàn tiền");
+      return;
+    }
+
+    if (!accountNumber.trim()) {
+      setError("Vui lòng nhập số tài khoản nhận hoàn tiền");
+      return;
+    }
+
+    if (!accountName.trim()) {
+      setError("Vui lòng nhập tên chủ tài khoản nhận hoàn tiền");
       return;
     }
 
@@ -124,12 +193,19 @@ export default function ReceptionistInvoiceDetail() {
         reason: refundReason,
         refundAmount:
           refundAmount || invoice?.FinalAmount || invoice?.Total || 0,
+        bankCode,
+        accountNumber,
+        accountName: accountName.trim().toUpperCase()
       });
 
       setRefundReason("");
       setRefundAmount("");
+      setBankCode("");
+      setAccountNumber("");
+      setAccountName("");
       await loadInvoice();
-      setSuccessMsg("Đã tạo yêu cầu hoàn tiền");
+      setSuccessMsg("Tạo yêu cầu hoàn tiền thành công!");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(
         err.response?.data?.message || "Không thể tạo yêu cầu hoàn tiền",
@@ -139,401 +215,547 @@ export default function ReceptionistInvoiceDetail() {
     }
   }
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <ReceptionistLayout>
-      <div className="rx-page">
-        <div className="rx-page-header">
-          <div className="rx-title-block">
-            <div className="rx-title-icon">🧾</div>
+      <div className="rx-page fade-in">
+        <header className="rx-page-header no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+          <div className="rx-title-block" style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div className="rx-title-icon" style={{ fontSize: "32px" }}>🧾</div>
             <div>
-              <h1>Chi tiết hóa đơn #{id}</h1>
-              <p>Xem thông tin hóa đơn, dịch vụ, thanh toán và hoàn tiền.</p>
+              <h1 style={{ margin: 0, fontSize: "24px", color: "#1e293b", fontWeight: "800" }}>Chi tiết hóa đơn #{id}</h1>
+              <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "14px" }}>Xem thông tin hóa đơn, dịch vụ sử dụng, lịch sử giao dịch và in ấn.</p>
             </div>
           </div>
 
-          <div className="rx-header-actions">
+          <div className="rx-header-actions" style={{ display: "flex", gap: "10px" }}>
             <button
               className="rx-light-btn"
               type="button"
               onClick={() => navigate(-1)}
+              style={{ height: "42px", borderRadius: "10px", padding: "0 16px", cursor: "pointer", fontWeight: "bold" }}
             >
               ← Quay lại
+            </button>
+            <button
+              className="rx-outline-pink-btn"
+              type="button"
+              onClick={handlePrint}
+              disabled={!invoice}
+              style={{ height: "42px", borderRadius: "10px", padding: "0 16px", cursor: "pointer", fontWeight: "bold" }}
+            >
+              🖨 In hóa đơn
             </button>
             <button
               className="rx-primary-btn"
               type="button"
               onClick={loadInvoice}
+              style={{ height: "42px", borderRadius: "10px", padding: "0 16px", cursor: "pointer", fontWeight: "bold" }}
             >
               ↻ Làm mới
             </button>
           </div>
-        </div>
+        </header>
 
-        {error && <div className="rcc-alert error">{error}</div>}
-        {successMsg && <div className="rcc-alert success">{successMsg}</div>}
+        {error && <div className="rx-error no-print" style={{ marginBottom: 15 }}>{error}</div>}
+        {successMsg && <div className="rx-success no-print" style={{ marginBottom: 15, padding: "12px", background: "#d4edda", color: "#155724", borderRadius: "10px", fontWeight: "bold" }}>{successMsg}</div>}
 
         {loading && (
-          <div className="rx-table-card">
-            <div className="rx-empty-row">Đang tải chi tiết hóa đơn...</div>
+          <div className="rx-table-card no-print">
+            <div style={{ textAlign: "center", padding: "40px", color: "#6f766f" }}>Đang tải chi tiết hóa đơn...</div>
           </div>
         )}
 
         {!loading && !invoice && (
-          <div className="rx-table-card">
-            <div className="rx-empty-row">Không tìm thấy hóa đơn</div>
+          <div className="rx-table-card no-print">
+            <div style={{ textAlign: "center", padding: "40px", color: "#6f766f" }}>Không tìm thấy hóa đơn.</div>
           </div>
         )}
 
         {!loading && invoice && (
           <>
-            <div className="rx-invoice-hero">
-              <div className="rx-invoice-summary-card">
-                <span className="rx-muted-label">Tổng thanh toán</span>
-                <strong>{money(invoice.FinalAmount || invoice.Total)}</strong>
-                <span className={statusClass(paymentStatus)}>
-                  {statusLabel(paymentStatus)}
-                </span>
+            {/* Top Summary Cards (Hero Row) */}
+            <div className="rx-invoice-hero no-print">
+              <div className={
+                paymentStatus === "PAID" || paymentStatus === "COMPLETED" ? "rx-invoice-summary-card status-paid-bg" :
+                paymentStatus === "UNPAID" || paymentStatus === "PENDING" ? "rx-invoice-summary-card status-unpaid-bg" :
+                paymentStatus.startsWith("REFUND") ? "rx-invoice-summary-card status-refund-bg" : "rx-invoice-summary-card status-cancelled-bg"
+              }>
+                <div className="rx-summary-card-content">
+                  <div className="rx-summary-main-info">
+                    <span className="rx-muted-label">Tổng thanh toán</span>
+                    <strong>{money(invoice.FinalAmount || invoice.Total)}</strong>
+                    <span className={statusClass(paymentStatus)} style={{ alignSelf: "flex-start", marginTop: "8px" }}>
+                      {statusLabel(paymentStatus)}
+                    </span>
+                  </div>
+                  <div className={`rx-summary-icon ${
+                    paymentStatus === "PAID" || paymentStatus === "COMPLETED" ? "green" :
+                    paymentStatus === "UNPAID" || paymentStatus === "PENDING" ? "orange" : "blue"
+                  }`}>
+                    💵
+                  </div>
+                </div>
               </div>
 
-              <div className="rx-invoice-summary-card">
-                <span className="rx-muted-label">Mã lịch hẹn</span>
-                <strong>#{invoice.AppointmentId || "-"}</strong>
-                <span className={statusClass(invoice.AppointmentStatus)}>
-                  {statusLabel(invoice.AppointmentStatus)}
-                </span>
+              <div className={
+                invoice.AppointmentStatus === "COMPLETED" || invoice.AppointmentStatus === "CONFIRMED" ? "rx-invoice-summary-card status-paid-bg" :
+                invoice.AppointmentStatus === "CANCELLED" ? "rx-invoice-summary-card status-cancelled-bg" : "rx-invoice-summary-card status-unpaid-bg"
+              }>
+                <div className="rx-summary-card-content">
+                  <div className="rx-summary-main-info">
+                    <span className="rx-muted-label">Mã lịch hẹn</span>
+                    <strong>#{invoice.AppointmentId || "-"}</strong>
+                    <span className={statusClass(invoice.AppointmentStatus)} style={{ alignSelf: "flex-start", marginTop: "8px" }}>
+                      {statusLabel(invoice.AppointmentStatus)}
+                    </span>
+                  </div>
+                  <div className="rx-summary-icon">
+                    📅
+                  </div>
+                </div>
               </div>
 
-              <div className="rx-invoice-summary-card">
-                <span className="rx-muted-label">Ngày tạo</span>
-                <strong>{formatDate(invoice.CreatedAt)}</strong>
-                <span>{formatDateTime(invoice.CreatedAt)}</span>
+              <div className="rx-invoice-summary-card rx-invoice-summary-bg">
+                <div className="rx-summary-card-content">
+                  <div className="rx-summary-main-info">
+                    <span className="rx-muted-label">Ngày lập hóa đơn</span>
+                    <strong>{formatDate(invoice.CreatedAt)}</strong>
+                    <span style={{ fontSize: "13px", color: "#64748b", marginTop: "8px", fontWeight: "bold" }}>
+                      Thời gian: {formatTime(invoice.CreatedAt)}
+                    </span>
+                  </div>
+                  <div className="rx-summary-icon">
+                    ⏱️
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="rx-detail-grid">
-              <section className="rx-detail-card">
-                <div className="rx-section-title">
-                  <h2>Thông tin khách hàng</h2>
-                  <p>Người thanh toán hóa đơn</p>
-                </div>
-
-                <div className="rx-info-list">
-                  <div>
-                    <span>Khách hàng</span>
-                    <b>{invoice.CustomerName || "-"}</b>
+            {/* Layout Grid columns: Left column 460px (Ticket + Timeline), Right column 1fr (Sidebar grid cards) */}
+            <div className="rx-invoice-detail-layout">
+              
+              {/* COLUMN 1: Receipt Voucher & Activity Timeline */}
+              <div className="rx-invoice-receipt-column">
+                <div className="tactile-receipt">
+                  <div className="receipt-header">
+                    <div className="receipt-brand">✿ LUNA SALON ✿</div>
+                    <div className="receipt-subtitle">HÓA ĐƠN BIÊN LAI THANH TOÁN</div>
+                    <div className="receipt-decor-line">- - - - - - - - - - - - - - - - - - -</div>
                   </div>
-                  <div>
-                    <span>Số điện thoại</span>
-                    <b>{invoice.CustomerPhone || "-"}</b>
+
+                  <div className="receipt-info-block">
+                    <p><span>Số hóa đơn:</span> <strong>#INV-{invoice.InvoiceId}</strong></p>
+                    <p><span>Mã lịch hẹn:</span> <span>#{invoice.AppointmentId}</span></p>
+                    <p><span>Thời gian:</span> <span>{formatTime(invoice.CreatedAt)} {formatDate(invoice.CreatedAt)}</span></p>
+                    <p><span>Khách hàng:</span> <span>{invoice.CustomerName || "Khách vãng lai"}</span></p>
+                    <p><span>Điện thoại:</span> <span>{invoice.CustomerPhone || "Không có"}</span></p>
+                    <p><span>Chuyên viên:</span> <span>{invoice.TechnicianName || "Chưa chỉ định"}</span></p>
+                    <p>
+                      <span>Trạng thái:</span> 
+                      <strong className={`rx-status-text-${paymentStatus.toLowerCase()}`}>
+                        {statusLabel(paymentStatus)}
+                      </strong>
+                    </p>
                   </div>
-                  <div>
-                    <span>Email</span>
-                    <b>{invoice.CustomerEmail || "-"}</b>
-                  </div>
-                </div>
-              </section>
 
-              <section className="rx-detail-card">
-                <div className="rx-section-title">
-                  <h2>Thông tin lịch hẹn</h2>
-                  <p>Dữ liệu liên kết từ appointment</p>
-                </div>
+                  <div className="receipt-decor-line">- - - - - - - - - - - - - - - - - - -</div>
 
-                <div className="rx-info-list">
-                  <div>
-                    <span>Kỹ thuật viên</span>
-                    <b>{invoice.TechnicianName || "-"}</b>
-                  </div>
-                  <div>
-                    <span>Ngày hẹn</span>
-                    <b>{formatDate(invoice.AppointmentDate)}</b>
-                  </div>
-                  <div>
-                    <span>Thời gian</span>
-                    <b>
-                      {invoice.StartTime || "-"} - {invoice.EndTime || "-"}
-                    </b>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <section className="rx-table-card">
-              <div className="rx-table-header">
-                <div>
-                  <h2>Dịch vụ trong hóa đơn</h2>
-                  <p>Danh sách dịch vụ khách đã sử dụng hoặc đã đặt</p>
-                </div>
-              </div>
-
-              <div className="rx-table-scroll">
-                <table className="rx-appointment-table">
-                  <thead>
-                    <tr>
-                      <th>Dịch vụ</th>
-                      <th>Mã dịch vụ</th>
-                      <th>Đơn giá</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {(invoice.Services || []).map((s) => (
-                      <tr key={s.ServiceId}>
-                        <td>
-                          <b>{s.ServiceName}</b>
-                        </td>
-                        <td>#{s.ServiceId}</td>
-                        <td>{money(s.Price)}</td>
-                      </tr>
-                    ))}
-
-                    {(!invoice.Services || invoice.Services.length === 0) && (
+                  <div className="receipt-items-header">Danh sách dịch vụ</div>
+                  <table className="receipt-services-table">
+                    <thead>
                       <tr>
-                        <td colSpan="3" className="rx-empty-row">
-                          Hóa đơn chưa có dịch vụ
-                        </td>
+                        <th>Tên dịch vụ</th>
+                        <th style={{ textAlign: "right" }}>Đơn giá</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+                    </thead>
+                    <tbody>
+                      {(invoice.Services || []).map((s) => (
+                        <tr key={s.ServiceId}>
+                          <td>
+                            <span>{s.ServiceName}</span>
+                          </td>
+                          <td style={{ textAlign: "right" }}>{money(s.Price)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
 
-            <section className="rx-table-card">
-              <div className="rx-table-header">
-                <div>
-                  <h2>Lịch sử thanh toán</h2>
-                  <p>Toàn bộ giao dịch của hóa đơn này</p>
+                  <div className="receipt-decor-line">- - - - - - - - - - - - - - - - - - -</div>
+
+                  <div className="receipt-totals-block">
+                    <p><span>Tạm tính:</span> <span>{money(invoice.Total)}</span></p>
+                    <p><span>Giảm giá:</span> <span>- {money(invoice.Discount)}</span></p>
+                    <div className="receipt-grand-total">
+                      <span>TỔNG THANH TOÁN:</span>
+                      <strong>{money(invoice.FinalAmount || invoice.Total)}</strong>
+                    </div>
+                  </div>
+
+                  <div className="receipt-decor-line">- - - - - - - - - - - - - - - - - - -</div>
+
+                  <div className="receipt-footer">
+                    <p>Cảm ơn quý khách đã đồng hành cùng Luna Salon!</p>
+                    <p>Hẹn gặp lại quý khách lần sau.</p>
+                    
+                    {/* SVG Vector Barcode */}
+                    <div className="receipt-barcode-container">
+                      <svg viewBox="0 0 100 20" preserveAspectRatio="none">
+                        <rect x="0" y="0" width="2" height="20" fill="black" />
+                        <rect x="3" y="0" width="1" height="20" fill="black" />
+                        <rect x="6" y="0" width="3" height="20" fill="black" />
+                        <rect x="10" y="0" width="1" height="20" fill="black" />
+                        <rect x="13" y="0" width="4" height="20" fill="black" />
+                        <rect x="18" y="0" width="1" height="20" fill="black" />
+                        <rect x="21" y="0" width="2" height="20" fill="black" />
+                        <rect x="25" y="0" width="3" height="20" fill="black" />
+                        <rect x="29" y="0" width="1" height="20" fill="black" />
+                        <rect x="32" y="0" width="2" height="20" fill="black" />
+                        <rect x="36" y="0" width="4" height="20" fill="black" />
+                        <rect x="42" y="0" width="1" height="20" fill="black" />
+                        <rect x="44" y="0" width="3" height="20" fill="black" />
+                        <rect x="49" y="0" width="1" height="20" fill="black" />
+                        <rect x="52" y="0" width="2" height="20" fill="black" />
+                        <rect x="56" y="0" width="4" height="20" fill="black" />
+                        <rect x="61" y="0" width="1" height="20" fill="black" />
+                        <rect x="64" y="0" width="3" height="20" fill="black" />
+                        <rect x="68" y="0" width="2" height="20" fill="black" />
+                        <rect x="72" y="0" width="1" height="20" fill="black" />
+                        <rect x="75" y="0" width="4" height="20" fill="black" />
+                        <rect x="80" y="0" width="2" height="20" fill="black" />
+                        <rect x="84" y="0" width="3" height="20" fill="black" />
+                        <rect x="88" y="0" width="1" height="20" fill="black" />
+                        <rect x="91" y="0" width="4" height="20" fill="black" />
+                        <rect x="96" y="0" width="2" height="20" fill="black" />
+                        <rect x="99" y="0" width="1" height="20" fill="black" />
+                      </svg>
+                      <small>*LUNA-{invoice.InvoiceId}*</small>
+                    </div>
+
+                    {/* SVG Vector QR Code */}
+                    <div className="receipt-qr-container">
+                      <svg viewBox="0 0 100 100">
+                        {/* Finder pattern TL */}
+                        <rect x="2" y="2" width="24" height="24" fill="black" />
+                        <rect x="6" y="6" width="16" height="16" fill="#fdfdfa" />
+                        <rect x="10" y="10" width="8" height="8" fill="black" />
+                        {/* Finder pattern TR */}
+                        <rect x="74" y="2" width="24" height="24" fill="black" />
+                        <rect x="78" y="6" width="16" height="16" fill="#fdfdfa" />
+                        <rect x="82" y="10" width="8" height="8" fill="black" />
+                        {/* Finder pattern BL */}
+                        <rect x="2" y="74" width="24" height="24" fill="black" />
+                        <rect x="6" y="78" width="16" height="16" fill="#fdfdfa" />
+                        <rect x="10" y="82" width="8" height="8" fill="black" />
+                        {/* Alignment pattern BR */}
+                        <rect x="70" y="70" width="10" height="10" fill="black" />
+                        <rect x="72" y="72" width="6" height="6" fill="#fdfdfa" />
+                        <rect x="74" y="74" width="2" height="2" fill="black" />
+                        {/* QR Pixels details */}
+                        <rect x="32" y="4" width="4" height="4" fill="black" />
+                        <rect x="40" y="8" width="8" height="4" fill="black" />
+                        <rect x="52" y="4" width="4" height="8" fill="black" />
+                        <rect x="60" y="12" width="4" height="4" fill="black" />
+                        <rect x="64" y="4" width="4" height="4" fill="black" />
+                        <rect x="36" y="20" width="8" height="4" fill="black" />
+                        <rect x="48" y="16" width="4" height="4" fill="black" />
+                        <rect x="56" y="24" width="12" height="4" fill="black" />
+                        <rect x="4" y="32" width="4" height="12" fill="black" />
+                        <rect x="16" y="36" width="8" height="4" fill="black" />
+                        <rect x="28" y="32" width="4" height="4" fill="black" />
+                        <rect x="36" y="36" width="12" height="4" fill="black" />
+                        <rect x="52" y="32" width="4" height="8" fill="black" />
+                        <rect x="64" y="36" width="8" height="4" fill="black" />
+                        <rect x="76" y="32" width="4" height="12" fill="black" />
+                        <rect x="88" y="36" width="8" height="4" fill="black" />
+                        <rect x="8" y="48" width="8" height="4" fill="black" />
+                        <rect x="20" y="44" width="4" height="8" fill="black" />
+                        <rect x="32" y="48" width="4" height="4" fill="black" />
+                        <rect x="40" y="44" width="8" height="4" fill="black" />
+                        <rect x="56" y="48" width="4" height="8" fill="black" />
+                        <rect x="68" y="44" width="8" height="4" fill="black" />
+                        <rect x="80" y="48" width="12" height="4" fill="black" />
+                        <rect x="4" y="60" width="8" height="4" fill="black" />
+                        <rect x="16" y="56" width="4" height="8" fill="black" />
+                        <rect x="28" y="60" width="12" height="4" fill="black" />
+                        <rect x="44" y="56" width="4" height="4" fill="black" />
+                        <rect x="52" y="60" width="8" height="4" fill="black" />
+                        <rect x="64" y="56" width="4" height="12" fill="black" />
+                        <rect x="76" y="60" width="8" height="4" fill="black" />
+                        <rect x="88" y="56" width="4" height="4" fill="black" />
+                        <rect x="32" y="68" width="4" height="8" fill="black" />
+                        <rect x="40" y="76" width="8" height="4" fill="black" />
+                        <rect x="52" y="72" width="4" height="4" fill="black" />
+                        <rect x="60" y="80" width="8" height="4" fill="black" />
+                        <rect x="36" y="88" width="12" height="4" fill="black" />
+                        <rect x="52" y="84" width="4" height="8" fill="black" />
+                        <rect x="60" y="92" width="4" height="4" fill="black" />
+                      </svg>
+                      <small>LUNA-{invoice.InvoiceId}</small>
+                    </div>
+
+                  </div>
+
+                  <div className="receipt-tattered-edge"></div>
                 </div>
-              </div>
 
-              <div className="rx-table-scroll">
-                <table className="rx-appointment-table">
-                  <thead>
-                    <tr>
-                      <th>Mã payment</th>
-                      <th>Số tiền</th>
-                      <th>Phương thức</th>
-                      <th>Trạng thái</th>
-                      <th>Mã giao dịch</th>
-                      <th>VNPay Ref</th>
-                      <th>Ngày thanh toán</th>
-                      <th>Ngày tạo</th>
-                    </tr>
-                  </thead>
+                {/* TRANSACTION ACTIVITY TIMELINE in LEFT COLUMN */}
+                <div className="rx-invoice-receipt-timeline-card no-print">
+                  <div className="rx-detail-card" style={{ padding: "24px" }}>
+                    <div className="rx-section-title" style={{ marginBottom: "20px" }}>
+                      <h2 style={{ fontSize: "16px", color: "#1e293b", margin: 0 }}>Nhật ký hoạt động (Timeline)</h2>
+                      <p style={{ fontSize: "12px", color: "#64748b", margin: "4px 0 0" }}>Lịch sử giao dịch và thay đổi trạng thái</p>
+                    </div>
 
-                  <tbody>
-                    {(invoice.Payments || []).map((p) => (
-                      <tr key={p.PaymentId}>
-                        <td>#{p.PaymentId}</td>
-                        <td>{money(p.Amount)}</td>
-                        <td>{p.PaymentMethod || "-"}</td>
-                        <td>
-                          <span className={statusClass(p.Status)}>
-                            {statusLabel(p.Status)}
+                    <div className="rx-transaction-timeline">
+                      {/* Event 1: Invoice Created */}
+                      <div className="timeline-node success">
+                        <div className="node-icon"></div>
+                        <div className="node-content">
+                          <h4>Khởi tạo hóa đơn</h4>
+                          <p className="node-time">{formatDateTime(invoice.CreatedAt)}</p>
+                          <span className="node-desc">
+                            Hóa đơn trị giá <strong>{money(invoice.Total)}</strong> được tạo tự động cho lịch hẹn #{invoice.AppointmentId}.
                           </span>
-                        </td>
-                        <td>{p.TransactionCode || "-"}</td>
-                        <td>{p.VnpTxnRef || p.VnpTransactionNo || "-"}</td>
-                        <td>{formatDateTime(p.PaidAt)}</td>
-                        <td>{formatDateTime(p.CreatedAt)}</td>
-                      </tr>
-                    ))}
+                        </div>
+                      </div>
 
-                    {(!invoice.Payments || invoice.Payments.length === 0) && (
-                      <tr>
-                        <td colSpan="8" className="rx-empty-row">
-                          Chưa có giao dịch thanh toán
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      {/* Event 2: Payments History */}
+                      {invoice.Payments && invoice.Payments.map((p) => (
+                        <div key={p.PaymentId} className={`timeline-node ${p.Status === "PAID" ? "success" : "warning"}`}>
+                          <div className="node-icon"></div>
+                          <div className="node-content">
+                            <h4>Thanh toán #{p.PaymentId} ({p.PaymentMethod})</h4>
+                            <p className="node-time">{formatDateTime(p.PaidAt || p.CreatedAt)}</p>
+                            <span className="node-desc">
+                              Thực hiện thanh toán số tiền <strong>{money(p.Amount)}</strong>. Trạng thái: {statusLabel(p.Status)}.
+                              {p.TransactionCode && <> Mã GD: <code>{p.TransactionCode}</code>.</>}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Event 3: Refunds History */}
+                      {invoice.Refunds && invoice.Refunds.map((r) => (
+                        <div key={r.RefundId} className={`timeline-node ${r.RefundStatus === "COMPLETED" ? "danger" : "warning"}`}>
+                          <div className="node-icon"></div>
+                          <div className="node-content">
+                            <h4>Yêu cầu hoàn tiền #{r.RefundId}</h4>
+                            <p className="node-time">{formatDateTime(r.CreatedAt)}</p>
+                            <span className="node-desc">
+                              Hoàn trả số tiền <strong>{money(r.RefundAmount)}</strong> về tài khoản <code>{r.AccountName} ({r.AccountNumber})</code>.
+                              Lý do: <em>"{r.RefundReason}"</em>.
+                              Trạng thái: <strong>{statusLabel(r.RefundStatus)}</strong>.
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </section>
 
-            <section className="rx-table-card">
-              <div className="rx-table-header">
-                <div>
-                  <h2>Lịch sử hoàn tiền</h2>
-                  <p>Theo dõi các yêu cầu hoàn tiền của hóa đơn</p>
-                </div>
-              </div>
-
-              <div className="rx-table-scroll">
-                <table className="rx-appointment-table">
-                  <thead>
-                    <tr>
-                      <th>Mã refund</th>
-                      <th>Mã payment</th>
-                      <th>Số tiền hoàn</th>
-                      <th>Trạng thái</th>
-                      <th>Lý do</th>
-                      <th>Mã giao dịch</th>
-                      <th>Ngày tạo</th>
-                      <th>Ngày hoàn tất</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {(invoice.Refunds || []).map((r) => (
-                      <tr key={r.RefundId}>
-                        <td>#{r.RefundId}</td>
-                        <td>#{r.PaymentId}</td>
-                        <td>{money(r.RefundAmount)}</td>
-                        <td>
-                          <span className={statusClass(r.RefundStatus)}>
-                            {statusLabel(r.RefundStatus)}
-                          </span>
-                        </td>
-                        <td>{r.RefundReason || "-"}</td>
-                        <td>{r.TransactionCode || "-"}</td>
-                        <td>{formatDateTime(r.CreatedAt)}</td>
-                        <td>{formatDateTime(r.RefundedAt)}</td>
-                      </tr>
-                    ))}
-
-                    {(!invoice.Refunds || invoice.Refunds.length === 0) && (
-                      <tr>
-                        <td colSpan="8" className="rx-empty-row">
-                          Chưa có lịch sử hoàn tiền
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <div className="rx-detail-grid">
-              <section className="rx-detail-card">
-                <div className="rx-section-title">
-                  <h2>Tổng tiền</h2>
-                  <p>Chi tiết số tiền hóa đơn</p>
-                </div>
-
-                <div className="rx-money-box">
-                  <div>
-                    <span>Tạm tính</span>
-                    <b>{money(invoice.Total)}</b>
+              {/* COLUMN 2: Sidebar Info Panels and Admin Actions */}
+              <div className="rx-invoice-actions-column no-print">
+                
+                {/* Horizontal side-by-side Grid of details */}
+                <div className="rx-detail-grid-two-cols">
+                  {/* Customer Info Card */}
+                  <div className="rx-detail-card" style={{ padding: "20px" }}>
+                    <div className="rx-section-title" style={{ marginBottom: "15px" }}>
+                      <h2 style={{ fontSize: "16px", color: "#1e293b", margin: 0 }}>Người thanh toán</h2>
+                      <p style={{ fontSize: "12px", color: "#64748b", margin: "4px 0 0" }}>Hồ sơ khách hàng</p>
+                    </div>
+                    <div className="rx-info-list" style={{ gap: "10px" }}>
+                      <div style={{ padding: "8px 0" }}>
+                        <span>Họ tên</span>
+                        <b>{invoice.CustomerName || "Khách vãng lai"}</b>
+                      </div>
+                      <div style={{ padding: "8px 0" }}>
+                        <span>Số điện thoại</span>
+                        <b>{invoice.CustomerPhone || "Không có"}</b>
+                      </div>
+                      <div style={{ padding: "8px 0", borderBottom: "none" }}>
+                        <span>Email</span>
+                        <b style={{ wordBreak: "break-all", fontSize: "13px" }}>{invoice.CustomerEmail || "Không có"}</b>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span>Giảm giá</span>
-                    <b>- {money(invoice.Discount)}</b>
-                  </div>
-                  <div className="rx-total-line">
-                    <span>Cần thanh toán</span>
-                    <b>{money(invoice.FinalAmount || invoice.Total)}</b>
-                  </div>
-                </div>
-              </section>
 
-              <section className="rx-detail-card">
-                <div className="rx-section-title">
-                  <h2>Thanh toán</h2>
-                  <p>Cập nhật trạng thái thanh toán tại quầy</p>
-                </div>
-
-                <div className="rx-info-list">
-                  <div>
-                    <span>Trạng thái</span>
-                    <b>{statusLabel(paymentStatus)}</b>
-                  </div>
-                  <div>
-                    <span>Phương thức</span>
-                    <b>{invoice.PaymentInfo?.PaymentMethod || "-"}</b>
-                  </div>
-                  <div>
-                    <span>Mã giao dịch</span>
-                    <b>{invoice.PaymentInfo?.TransactionCode || "-"}</b>
-                  </div>
-                  <div>
-                    <span>Thời gian thanh toán</span>
-                    <b>{formatDateTime(invoice.PaymentInfo?.PaidAt)}</b>
+                  {/* Appointment Context Card */}
+                  <div className="rx-detail-card" style={{ padding: "20px" }}>
+                    <div className="rx-section-title" style={{ marginBottom: "15px" }}>
+                      <h2 style={{ fontSize: "16px", color: "#1e293b", margin: 0 }}>Thông tin lịch hẹn</h2>
+                      <p style={{ fontSize: "12px", color: "#64748b", margin: "4px 0 0" }}>Chi tiết lịch làm đẹp</p>
+                    </div>
+                    <div className="rx-info-list" style={{ gap: "10px" }}>
+                      <div style={{ padding: "8px 0" }}>
+                        <span>Kỹ thuật viên</span>
+                        <b>{invoice.TechnicianName || "Chưa có"}</b>
+                      </div>
+                      <div style={{ padding: "8px 0" }}>
+                        <span>Ngày thực hiện</span>
+                        <b>{formatDate(invoice.AppointmentDate)}</b>
+                      </div>
+                      <div style={{ padding: "8px 0", borderBottom: "none" }}>
+                        <span>Khung giờ</span>
+                        <b>{invoice.StartTime ? `${invoice.StartTime} - ${invoice.EndTime}` : "N/A"}</b>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
+                {/* Action: Mark Paid Card (for unpaid/pending bills) */}
                 {canMarkPaid && (
-                  <div className="rx-inline-action">
-                    <select
-                      value={payMethod}
-                      onChange={(e) => setPayMethod(e.target.value)}
-                    >
-                      <option value="CASH">Tiền mặt</option>
-                      <option value="CARD">Thẻ</option>
-                      <option value="TRANSFER">Chuyển khoản</option>
-                      <option value="VNPAY">VNPay</option>
-                      <option value="MOMO">MoMo</option>
-                    </select>
+                  <div className="rx-detail-card" style={{ border: "1px solid #c3e6cb", backgroundColor: "#f4fdf8", padding: "22px", marginBottom: "20px" }}>
+                    <div className="rx-section-title" style={{ marginBottom: "16px" }}>
+                      <h2 style={{ color: "#155724", fontSize: "16px", margin: 0 }}>Thanh toán hóa đơn</h2>
+                      <p style={{ color: "#28a745", fontSize: "12px", margin: "4px 0 0" }}>Xử lý giao dịch trực tiếp tại quầy</p>
+                    </div>
 
-                    <button
-                      className="rx-primary-btn"
-                      type="button"
-                      disabled={saving}
-                      onClick={markPaid}
-                    >
-                      Xác nhận đã thanh toán
-                    </button>
+                    <div className="rx-inline-action">
+                      <select
+                        value={payMethod}
+                        onChange={(e) => setPayMethod(e.target.value)}
+                        style={{ width: "100%", marginBottom: "14px", height: "42px", borderRadius: "10px", padding: "0 10px", border: "1px solid #c3e6cb" }}
+                      >
+                        <option value="CASH">💵 Tiền mặt (Cash)</option>
+                        <option value="CARD">💳 Quẹt thẻ (Card)</option>
+                        <option value="TRANSFER">🏦 Chuyển khoản ngân hàng</option>
+                        <option value="VNPAY">🏦 Thanh toán VNPay</option>
+                        <option value="MOMO">📱 Ví điện tử Momo</option>
+                      </select>
+
+                      <button
+                        className="rx-primary-btn"
+                        type="button"
+                        disabled={saving}
+                        onClick={markPaid}
+                        style={{ width: "100%", height: "46px", fontWeight: "bold", borderRadius: "12px", cursor: "pointer" }}
+                      >
+                        {saving ? "Đang xử lý..." : "Xác nhận đã thu tiền"}
+                      </button>
+                    </div>
                   </div>
                 )}
-              </section>
-            </div>
 
-            <section className="rx-detail-card">
-              <div className="rx-section-title">
-                <h2>Hoàn tiền</h2>
-                <p>Chỉ tạo yêu cầu hoàn tiền khi hóa đơn đã thanh toán</p>
+                {/* Action: Refund Request Card (for paid bills) */}
+                {invoice.RefundInfo ? (
+                  <div className="rx-detail-card" style={{ border: "1px solid #bee5eb", backgroundColor: "#f8f9fa", padding: "22px" }}>
+                    <div className="rx-section-title" style={{ marginBottom: "16px" }}>
+                      <h2 style={{ fontSize: "16px", margin: 0 }}>Yêu cầu hoàn trả</h2>
+                      <p style={{ fontSize: "12px", color: "#64748b", margin: "4px 0 0" }}>Thông tin chi tiết phiếu hoàn trả</p>
+                    </div>
+                    <div className="rx-refund-box" style={{ gap: "10px" }}>
+                      <div style={{ padding: "8px 0" }}>
+                        <span>Mã yêu cầu</span>
+                        <b>#{invoice.RefundInfo.RefundId}</b>
+                      </div>
+                      <div style={{ padding: "8px 0" }}>
+                        <span>Số tiền hoàn</span>
+                        <b style={{ color: "#d91f68" }}>{money(invoice.RefundInfo.RefundAmount)}</b>
+                      </div>
+                      <div style={{ padding: "8px 0" }}>
+                        <span>Trạng thái hoàn</span>
+                        <span className={statusClass(invoice.RefundInfo.RefundStatus)}>
+                          {statusLabel(invoice.RefundInfo.RefundStatus)}
+                        </span>
+                      </div>
+                      <div style={{ padding: "8px 0", borderBottom: "none" }}>
+                        <span>Lý do hoàn</span>
+                        <b>{invoice.RefundInfo.RefundReason || "Không có"}</b>
+                      </div>
+                    </div>
+                  </div>
+                ) : canRefund ? (
+                  <div className="rx-detail-card" style={{ border: "1px solid #f5c6cb", backgroundColor: "#fff5f6", padding: "22px" }}>
+                    <div className="rx-section-title" style={{ marginBottom: "16px" }}>
+                      <h2 style={{ color: "#721c24", fontSize: "16px", margin: 0 }}>Yêu cầu hoàn tiền dịch vụ</h2>
+                      <p style={{ color: "#b82a3c", fontSize: "12px", margin: "4px 0 0" }}>Hoàn tiền một phần hoặc toàn bộ số tiền hóa đơn</p>
+                    </div>
+
+                    <div className="rx-refund-form" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "bold", color: "#721c24", display: "block", marginBottom: "4px" }}>Số tiền hoàn (VND)</label>
+                        <input
+                          type="number"
+                          value={refundAmount}
+                          onChange={(e) => setRefundAmount(e.target.value)}
+                          placeholder={`Mặc định: ${money(invoice.FinalAmount || invoice.Total)}`}
+                          style={{ width: "100%", border: "1px solid #f5c6cb", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "bold", color: "#721c24", display: "block", marginBottom: "4px" }}>Lý do hoàn tiền</label>
+                        <input
+                          value={refundReason}
+                          onChange={(e) => setRefundReason(e.target.value)}
+                          placeholder="Nhập lý do (VD: Đổi dịch vụ, nhân viên nghỉ)..."
+                          style={{ width: "100%", border: "1px solid #f5c6cb", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "bold", color: "#721c24", display: "block", marginBottom: "4px" }}>Ngân hàng nhận hoàn</label>
+                        <select
+                          value={bankCode}
+                          onChange={(e) => setBankCode(e.target.value)}
+                          style={{ width: "100%", border: "1px solid #f5c6cb", padding: "0 14px", borderRadius: "10px", outline: "none", height: "42px", boxSizing: "border-box" }}
+                        >
+                          <option value="">-- Chọn ngân hàng --</option>
+                          {bankList.map((b) => (
+                            <option key={b.bin} value={b.bin}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "bold", color: "#721c24", display: "block", marginBottom: "4px" }}>Số tài khoản nhận hoàn</label>
+                        <input
+                          type="text"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value.replace(/\s/g, ""))}
+                          placeholder="Số tài khoản ngân hàng..."
+                          style={{ width: "100%", border: "1px solid #f5c6cb", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: "12px", fontWeight: "bold", color: "#721c24", display: "block", marginBottom: "4px" }}>Tên chủ tài khoản (VIẾT HOA KHÔNG DẤU)</label>
+                        <input
+                          type="text"
+                          value={accountName}
+                          onChange={(e) => setAccountName(e.target.value.toUpperCase())}
+                          placeholder="VD: NGUYEN VAN A..."
+                          style={{ width: "100%", border: "1px solid #f5c6cb", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box" }}
+                        />
+                      </div>
+
+                      <button
+                        className="rx-outline-pink-btn"
+                        type="button"
+                        disabled={saving}
+                        onClick={requestRefund}
+                        style={{ width: "100%", height: "46px", fontWeight: "bold", border: "1px solid #f299bb", color: "#e73675", background: "white", borderRadius: "12px", cursor: "pointer", marginTop: "5px" }}
+                      >
+                        {saving ? "Đang gửi yêu cầu..." : "Gửi yêu cầu hoàn tiền"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rx-detail-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100px', backgroundColor: "#fffaf0", border: "1px solid #ffeeba", padding: "20px" }}>
+                    <p style={{ margin: 0, color: "#856404", fontSize: "13px", textAlign: "center", fontWeight: "bold" }}>🔒 Hóa đơn này chưa thanh toán hoặc đã hoàn trả thành công.</p>
+                  </div>
+                )}
               </div>
 
-              {invoice.RefundInfo ? (
-                <div className="rx-refund-box">
-                  <div>
-                    <span>Mã hoàn tiền</span>
-                    <b>#{invoice.RefundInfo.RefundId}</b>
-                  </div>
-                  <div>
-                    <span>Số tiền hoàn</span>
-                    <b>{money(invoice.RefundInfo.RefundAmount)}</b>
-                  </div>
-                  <div>
-                    <span>Trạng thái</span>
-                    <b>{statusLabel(invoice.RefundInfo.RefundStatus)}</b>
-                  </div>
-                  <div>
-                    <span>Lý do</span>
-                    <b>{invoice.RefundInfo.RefundReason || "-"}</b>
-                  </div>
-                </div>
-              ) : canRefund ? (
-                <div className="rx-refund-form">
-                  <input
-                    type="number"
-                    value={refundAmount}
-                    onChange={(e) => setRefundAmount(e.target.value)}
-                    placeholder={`Số tiền hoàn, mặc định ${money(invoice.FinalAmount || invoice.Total)}`}
-                  />
-
-                  <input
-                    value={refundReason}
-                    onChange={(e) => setRefundReason(e.target.value)}
-                    placeholder="Nhập lý do hoàn tiền"
-                  />
-
-                  <button
-                    className="rx-outline-pink-btn"
-                    type="button"
-                    disabled={saving}
-                    onClick={requestRefund}
-                  >
-                    Tạo yêu cầu hoàn tiền
-                  </button>
-                </div>
-              ) : (
-                <div className="rx-empty-row">
-                  Hóa đơn chưa đủ điều kiện hoàn tiền hoặc chưa thanh toán.
-                </div>
-              )}
-            </section>
+            </div>
           </>
         )}
       </div>

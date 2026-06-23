@@ -177,56 +177,369 @@ async function updateMyAvatar(userId, avatarUrl) {
 
 async function getMyDashboard(userId) {
   const pool = await connectDB();
+
   const customerResult = await pool.request().input("UserId", sql.Int, userId)
     .query(`
-    SELECT
-      c.CustomerId,
-      c.LoyaltyPoints,
-      COALESCE(ml.LevelName, currentLevel.LevelName, N'Normal') AS MembershipLevel,
-      COALESCE(ml.DiscountPercent, currentLevel.DiscountPercent, 0) AS DiscountPercent
-    FROM Customers c
-    LEFT JOIN MembershipLevels ml ON c.MembershipLevelId = ml.MembershipLevelId
-    OUTER APPLY (
-      SELECT TOP 1 * FROM MembershipLevels x
-      WHERE x.MinPoints <= c.LoyaltyPoints
-      ORDER BY x.MinPoints DESC
-    ) currentLevel
-    WHERE c.UserId = @UserId
-  `);
+      SELECT
+        c.CustomerId,
+        u.UserId,
+        u.FullName,
+        u.Email,
+        u.Phone,
+        u.AvatarUrl,
+        c.Gender,
+        c.DateOfBirth,
+        c.Address,
+        c.LoyaltyPoints,
+        COALESCE(ml.LevelName, currentLevel.LevelName, N'Normal') AS MembershipLevel,
+        COALESCE(ml.DiscountPercent, currentLevel.DiscountPercent, 0) AS DiscountPercent,
+        ISNULL(nextLevel.LevelName, COALESCE(ml.LevelName, currentLevel.LevelName, N'Normal')) AS NextMembershipLevel,
+        ISNULL(nextLevel.MinPoints, c.LoyaltyPoints) AS NextLevelMinPoints,
+        CASE
+          WHEN nextLevel.MinPoints IS NULL THEN 0
+          WHEN nextLevel.MinPoints - c.LoyaltyPoints < 0 THEN 0
+          ELSE nextLevel.MinPoints - c.LoyaltyPoints
+        END AS PointsToNextLevel
+      FROM Customers c
+      JOIN Users u ON c.UserId = u.UserId
+      LEFT JOIN MembershipLevels ml ON c.MembershipLevelId = ml.MembershipLevelId
+      OUTER APPLY (
+        SELECT TOP 1 *
+        FROM MembershipLevels x
+        WHERE x.MinPoints <= c.LoyaltyPoints
+        ORDER BY x.MinPoints DESC
+      ) currentLevel
+      OUTER APPLY (
+        SELECT TOP 1 *
+        FROM MembershipLevels x
+        WHERE x.MinPoints > c.LoyaltyPoints
+        ORDER BY x.MinPoints ASC
+      ) nextLevel
+      WHERE c.UserId = @UserId
+    `);
+
   const customer = customerResult.recordset[0];
   if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
 
-  const counts = await pool
+  const summary = await pool
     .request()
     .input("CustomerId", sql.Int, customer.CustomerId)
     .input("UserId", sql.Int, userId).query(`
-    SELECT
-      (SELECT COUNT(*) FROM Appointments WHERE CustomerId = @CustomerId AND Status IN ('PENDING_PAYMENT', 'PENDING', 'PAID', 'CONFIRMED', 'IN_PROGRESS')) AS ActiveAppointments,
-      (SELECT COUNT(*) FROM Appointments WHERE CustomerId = @CustomerId AND Status = 'COMPLETED') AS CompletedAppointments,
-      (SELECT COUNT(*) FROM CustomerPackages WHERE CustomerId = @CustomerId AND Status = 'ACTIVE') AS ActivePackages,
-      (SELECT COUNT(*) FROM Notifications n JOIN Users u ON n.UserId = u.UserId WHERE u.UserId = @UserId AND n.IsRead = 0) AS UnreadNotifications
-  `);
+      SELECT
+        (SELECT COUNT(*) FROM Appointments WHERE CustomerId = @CustomerId) AS TotalAppointments,
+        (SELECT COUNT(*) FROM Appointments WHERE CustomerId = @CustomerId AND Status IN ('PENDING_PAYMENT','PENDING','PAID','CONFIRMED','CHECKED_IN','IN_PROGRESS')) AS ActiveAppointments,
+        (SELECT COUNT(*) FROM Appointments WHERE CustomerId = @CustomerId AND Status = 'COMPLETED') AS CompletedAppointments,
+        (SELECT COUNT(*) FROM Appointments WHERE CustomerId = @CustomerId AND Status IN ('CANCELLED','NO_SHOW')) AS CancelledAppointments,
+        (SELECT COUNT(*) FROM Appointments WHERE CustomerId = @CustomerId AND Status = 'REFUND_PENDING') AS RefundPendingAppointments,
+
+        (SELECT COUNT(*) 
+         FROM Invoices i 
+         JOIN Appointments a ON i.AppointmentId = a.AppointmentId 
+         WHERE a.CustomerId = @CustomerId AND i.Status = 'UNPAID') AS UnpaidInvoices,
+
+        (SELECT ISNULL(SUM(i.FinalAmount), 0) 
+         FROM Invoices i 
+         JOIN Appointments a ON i.AppointmentId = a.AppointmentId 
+         WHERE a.CustomerId = @CustomerId AND i.Status = 'UNPAID') AS UnpaidAmount,
+
+        (SELECT ISNULL(SUM(p.Amount), 0) 
+         FROM Payments p 
+         JOIN Invoices i ON p.InvoiceId = i.InvoiceId 
+         JOIN Appointments a ON i.AppointmentId = a.AppointmentId 
+         WHERE a.CustomerId = @CustomerId AND p.Status = 'PAID') AS TotalPaidAmount,
+
+        (SELECT COUNT(*) 
+         FROM Payments p 
+         JOIN Invoices i ON p.InvoiceId = i.InvoiceId 
+         JOIN Appointments a ON i.AppointmentId = a.AppointmentId 
+         WHERE a.CustomerId = @CustomerId AND p.Status = 'PAID') AS PaidPaymentCount,
+
+        (SELECT COUNT(*) FROM CustomerPackages WHERE CustomerId = @CustomerId AND Status = 'ACTIVE') AS ActivePackages,
+        (SELECT ISNULL(SUM(RemainingSessions), 0) FROM CustomerPackages WHERE CustomerId = @CustomerId AND Status = 'ACTIVE') AS RemainingPackageSessions,
+
+        (SELECT COUNT(*) 
+         FROM CustomerVouchers cv 
+         JOIN Vouchers v ON cv.VoucherId = v.VoucherId 
+         WHERE cv.CustomerId = @CustomerId 
+           AND cv.UsedStatus = 0 
+           AND v.Status = 'ACTIVE' 
+           AND (v.EndDate IS NULL OR v.EndDate >= CAST(GETDATE() AS DATE))) AS AvailableVouchers,
+
+        (SELECT COUNT(*) FROM Notifications WHERE UserId = @UserId AND IsRead = 0) AS UnreadNotifications,
+        (SELECT COUNT(*) FROM Reviews WHERE CustomerId = @CustomerId) AS TotalReviews,
+        (SELECT CAST(ISNULL(AVG(CAST(Rating AS DECIMAL(10,2))), 0) AS DECIMAL(10,2)) FROM Reviews WHERE CustomerId = @CustomerId) AS AverageServiceRating,
+        (SELECT COUNT(*) FROM Feedbacks WHERE CustomerId = @CustomerId AND Status IN ('PENDING','PROCESSING')) AS OpenFeedbacks,
+        (SELECT COUNT(*) FROM CustomerFavoriteServices WHERE UserId = @UserId) AS FavoriteServices,
+        (SELECT COUNT(*) FROM CustomerFavoriteEmployees WHERE UserId = @UserId) AS FavoriteEmployees
+    `);
 
   const upcoming = await pool
     .request()
     .input("CustomerId", sql.Int, customer.CustomerId).query(`
-    SELECT TOP 3
-      a.AppointmentId, a.AppointmentDate, CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
-      a.Status, eu.FullName AS EmployeeName, STRING_AGG(s.ServiceName, N', ') AS ServiceNames
-    FROM Appointments a
-    JOIN Employees e ON a.EmployeeId = e.EmployeeId
-    JOIN Users eu ON e.UserId = eu.UserId
-    LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
-    LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
-    WHERE a.CustomerId = @CustomerId AND a.Status IN ('PENDING_PAYMENT', 'PENDING', 'PAID', 'CONFIRMED', 'IN_PROGRESS')
-    GROUP BY a.AppointmentId, a.AppointmentDate, a.StartTime, a.Status, eu.FullName
-    ORDER BY a.AppointmentDate ASC, a.StartTime ASC
-  `);
+      SELECT TOP 6
+        a.AppointmentId,
+        a.AppointmentDate,
+        CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
+        CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
+        a.Status,
+        a.Notes,
+        a.CustomerPackageId,
+        b.BranchName,
+        b.Address AS BranchAddress,
+        e.EmployeeId,
+        eu.FullName AS EmployeeName,
+        COALESCE(e.ImageUrl, eu.AvatarUrl) AS EmployeeImageUrl,
+        i.InvoiceId,
+        i.TotalAmount,
+        i.DiscountAmount,
+        i.FinalAmount,
+        i.Status AS InvoiceStatus,
+        latestPay.Status AS PaymentStatus,
+        latestPay.PaymentMethod,
+        STRING_AGG(s.ServiceName, N', ') AS ServiceNames,
+        SUM(ISNULL(s.DurationMinutes, 0)) AS TotalDurationMinutes
+      FROM Appointments a
+      LEFT JOIN Branches b ON a.BranchId = b.BranchId
+      LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
+      LEFT JOIN Users eu ON e.UserId = eu.UserId
+      LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+      LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
+      LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+      OUTER APPLY (
+        SELECT TOP 1 p.Status, p.PaymentMethod
+        FROM Payments p
+        WHERE p.InvoiceId = i.InvoiceId
+        ORDER BY p.CreatedAt DESC, p.PaymentId DESC
+      ) latestPay
+      WHERE a.CustomerId = @CustomerId
+        AND a.Status IN ('PENDING_PAYMENT','PENDING','PAID','CONFIRMED','CHECKED_IN','IN_PROGRESS')
+      GROUP BY
+        a.AppointmentId, a.AppointmentDate, a.StartTime, a.EndTime, a.Status, a.Notes, a.CustomerPackageId,
+        b.BranchName, b.Address, e.EmployeeId, eu.FullName, e.ImageUrl, eu.AvatarUrl,
+        i.InvoiceId, i.TotalAmount, i.DiscountAmount, i.FinalAmount, i.Status,
+        latestPay.Status, latestPay.PaymentMethod
+      ORDER BY a.AppointmentDate ASC, a.StartTime ASC
+    `);
+
+  const unpaidInvoices = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT TOP 5
+        i.InvoiceId,
+        i.AppointmentId,
+        i.TotalAmount,
+        i.DiscountAmount,
+        i.FinalAmount,
+        i.Status,
+        i.CreatedAt,
+        a.AppointmentDate,
+        CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
+        STRING_AGG(s.ServiceName, N', ') AS ServiceNames
+      FROM Invoices i
+      JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+      LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+      LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
+      WHERE a.CustomerId = @CustomerId AND i.Status = 'UNPAID'
+      GROUP BY i.InvoiceId, i.AppointmentId, i.TotalAmount, i.DiscountAmount, i.FinalAmount, i.Status, i.CreatedAt, a.AppointmentDate, a.StartTime
+      ORDER BY i.CreatedAt DESC, i.InvoiceId DESC
+    `);
+
+  const recentPayments = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT TOP 6
+        p.PaymentId,
+        p.InvoiceId,
+        i.AppointmentId,
+        p.Amount,
+        p.PaymentMethod,
+        p.Status,
+        p.TransactionCode,
+        p.PaidAt,
+        p.CreatedAt,
+        a.AppointmentDate,
+        STRING_AGG(s.ServiceName, N', ') AS ServiceNames
+      FROM Payments p
+      JOIN Invoices i ON p.InvoiceId = i.InvoiceId
+      JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+      LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+      LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
+      WHERE a.CustomerId = @CustomerId
+      GROUP BY p.PaymentId, p.InvoiceId, i.AppointmentId, p.Amount, p.PaymentMethod, p.Status, p.TransactionCode, p.PaidAt, p.CreatedAt, a.AppointmentDate
+      ORDER BY p.CreatedAt DESC, p.PaymentId DESC
+    `);
+
+  const activePackages = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT TOP 6
+        cp.CustomerPackageId,
+        cp.PackageId,
+        p.PackageName,
+        p.ImageUrl,
+        cp.StartDate,
+        cp.EndDate,
+        cp.TotalSessions,
+        cp.UsedSessions,
+        cp.RemainingSessions,
+        cp.Status,
+        CASE 
+          WHEN cp.TotalSessions = 0 THEN 0 
+          ELSE CAST((cp.UsedSessions * 100.0 / cp.TotalSessions) AS DECIMAL(10,2)) 
+        END AS UsedPercent
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE cp.CustomerId = @CustomerId AND cp.Status = 'ACTIVE'
+      ORDER BY cp.EndDate ASC, cp.CustomerPackageId DESC
+    `);
+
+  const vouchers = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT TOP 6
+        v.VoucherId,
+        v.Code,
+        v.DiscountType,
+        v.DiscountValue,
+        v.MinOrderAmount,
+        v.MaxDiscountAmount,
+        v.StartDate,
+        v.EndDate,
+        cv.UsedStatus,
+        cv.UsedAt
+      FROM CustomerVouchers cv
+      JOIN Vouchers v ON cv.VoucherId = v.VoucherId
+      WHERE cv.CustomerId = @CustomerId
+        AND cv.UsedStatus = 0
+        AND v.Status = 'ACTIVE'
+        AND (v.StartDate IS NULL OR v.StartDate <= CAST(GETDATE() AS DATE))
+        AND (v.EndDate IS NULL OR v.EndDate >= CAST(GETDATE() AS DATE))
+      ORDER BY v.EndDate ASC, v.VoucherId DESC
+    `);
+
+  const serviceHistory = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT TOP 6
+        a.AppointmentId,
+        a.AppointmentDate,
+        a.Status,
+        a.CompletedAt,
+        STRING_AGG(s.ServiceName, N', ') AS ServiceNames,
+        eu.FullName AS EmployeeName,
+        i.FinalAmount
+      FROM Appointments a
+      LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+      LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
+      LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
+      LEFT JOIN Users eu ON e.UserId = eu.UserId
+      LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+      WHERE a.CustomerId = @CustomerId 
+        AND a.Status IN ('COMPLETED','CANCELLED','NO_SHOW','REFUND_PENDING')
+      GROUP BY a.AppointmentId, a.AppointmentDate, a.Status, a.CompletedAt, eu.FullName, i.FinalAmount
+      ORDER BY a.AppointmentDate DESC, a.AppointmentId DESC
+    `);
+
+  const favoriteServices = await pool.request().input("UserId", sql.Int, userId)
+    .query(`
+      SELECT TOP 5
+        s.ServiceId,
+        s.ServiceName,
+        s.Price,
+        s.DurationMinutes,
+        s.ImageUrl,
+        sc.CategoryName
+      FROM CustomerFavoriteServices fs
+      JOIN Services s ON fs.ServiceId = s.ServiceId
+      LEFT JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
+      WHERE fs.UserId = @UserId AND s.Status = 'AVAILABLE'
+      ORDER BY fs.CreatedAt DESC
+    `);
+
+  const reviewable = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT TOP 5
+        a.AppointmentId,
+        a.AppointmentDate,
+        s.ServiceId,
+        s.ServiceName,
+        eu.FullName AS EmployeeName
+      FROM Appointments a
+      JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+      JOIN Services s ON aps.ServiceId = s.ServiceId
+      LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
+      LEFT JOIN Users eu ON e.UserId = eu.UserId
+      LEFT JOIN Reviews r 
+        ON r.CustomerId = a.CustomerId 
+       AND r.AppointmentId = a.AppointmentId 
+       AND r.ServiceId = s.ServiceId
+      WHERE a.CustomerId = @CustomerId
+        AND a.Status = 'COMPLETED'
+        AND r.ReviewId IS NULL
+      ORDER BY a.AppointmentDate DESC, a.AppointmentId DESC
+    `);
+
+  const notifications = await pool.request().input("UserId", sql.Int, userId)
+    .query(`
+      SELECT TOP 5 NotificationId, Title, Content, Type, IsRead, CreatedAt
+      FROM Notifications
+      WHERE UserId = @UserId
+      ORDER BY CreatedAt DESC, NotificationId DESC
+    `);
+
+  const feedbacks = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT TOP 5 FeedbackId, Subject, Content, Status, AdminResponse, CreatedAt, UpdatedAt
+      FROM Feedbacks
+      WHERE CustomerId = @CustomerId
+      ORDER BY CreatedAt DESC, FeedbackId DESC
+    `);
+
+  const favoriteEmployees = await pool
+    .request()
+    .input("UserId", sql.Int, userId).query(`
+      SELECT TOP 4
+        e.EmployeeId,
+        u.FullName AS EmployeeName,
+        COALESCE(e.ImageUrl, u.AvatarUrl) AS ImageUrl,
+        e.Position,
+        e.Specialization,
+        e.YearsOfExperience
+      FROM CustomerFavoriteEmployees fe
+      JOIN Employees e ON fe.EmployeeId = e.EmployeeId
+      JOIN Users u ON e.UserId = u.UserId
+      WHERE fe.UserId = @UserId AND e.Status = 'ACTIVE'
+      ORDER BY fe.CreatedAt DESC
+    `);
 
   return {
-    ...customer,
-    ...counts.recordset[0],
+    Profile: customer,
+    Summary: summary.recordset[0] || {},
     UpcomingAppointments: upcoming.recordset,
+    UnpaidInvoices: unpaidInvoices.recordset,
+    RecentPayments: recentPayments.recordset,
+    ActivePackages: activePackages.recordset,
+    AvailableVouchers: vouchers.recordset,
+    ServiceHistory: serviceHistory.recordset,
+    FavoriteServices: favoriteServices.recordset,
+    FavoriteEmployees: favoriteEmployees.recordset,
+    ReviewableServices: reviewable.recordset,
+    Notifications: notifications.recordset,
+    Feedbacks: feedbacks.recordset,
+
+    CustomerId: customer.CustomerId,
+    UserId: customer.UserId,
+    FullName: customer.FullName,
+    AvatarUrl: customer.AvatarUrl,
+    LoyaltyPoints: customer.LoyaltyPoints,
+    MembershipLevel: customer.MembershipLevel,
+    DiscountPercent: customer.DiscountPercent,
+    ActiveAppointments: summary.recordset[0]?.ActiveAppointments || 0,
+    CompletedAppointments: summary.recordset[0]?.CompletedAppointments || 0,
+    ActivePackageCount: summary.recordset[0]?.ActivePackages || 0,
+    UnreadNotifications: summary.recordset[0]?.UnreadNotifications || 0,
   };
 }
 
@@ -417,8 +730,37 @@ async function createMyReview(userId, data, files = []) {
 
 async function getMyReviews(userId) {
   const pool = await connectDB();
+
   const result = await pool.request().input("UserId", sql.Int, userId).query(`
-    SELECT r.*, s.ServiceName,
+    SELECT
+      r.ReviewId,
+      r.CustomerId,
+      r.AppointmentId,
+      r.ServiceId,
+      r.EmployeeId,
+      r.Rating,
+      r.TechnicianRating,
+      r.Comment,
+      r.Status,
+      r.AdminResponse,
+      r.CreatedAt,
+      r.UpdatedAt,
+
+      s.ServiceName,
+      s.Description AS ServiceDescription,
+      s.DurationMinutes,
+      s.Price,
+      s.ImageUrl AS ServiceImageUrl,
+
+      a.AppointmentDate,
+      CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
+      CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
+
+      eu.FullName AS EmployeeName,
+      e.Position AS EmployeePosition,
+      e.Specialization AS EmployeeSpecialization,
+      COALESCE(e.ImageUrl, eu.AvatarUrl) AS EmployeeImageUrl,
+
       (
         SELECT ri.ReviewImageId, ri.ImageUrl, ri.CreatedAt
         FROM ReviewImages ri
@@ -429,9 +771,13 @@ async function getMyReviews(userId) {
     FROM Reviews r
     JOIN Customers c ON r.CustomerId = c.CustomerId
     LEFT JOIN Services s ON r.ServiceId = s.ServiceId
+    LEFT JOIN Appointments a ON r.AppointmentId = a.AppointmentId
+    LEFT JOIN Employees e ON r.EmployeeId = e.EmployeeId
+    LEFT JOIN Users eu ON e.UserId = eu.UserId
     WHERE c.UserId = @UserId
     ORDER BY r.CreatedAt DESC
   `);
+
   return result.recordset.map((row) => ({
     ...row,
     Images: row.ImagesJson ? JSON.parse(row.ImagesJson) : [],
@@ -440,103 +786,280 @@ async function getMyReviews(userId) {
 
 async function getMyServiceHistory(userId) {
   const pool = await connectDB();
-  const customer = await pool.request().input("UserId", sql.Int, userId).query(`
-    SELECT CustomerId
-    FROM Customers
-    WHERE UserId = @UserId
-  `);
 
-  if (!customer.recordset[0]) {
+  const customerResult = await pool.request().input("UserId", sql.Int, userId)
+    .query(`
+      SELECT CustomerId
+      FROM Customers
+      WHERE UserId = @UserId
+    `);
+
+  const customer = customerResult.recordset[0];
+
+  if (!customer) {
     throw new Error("Không tìm thấy hồ sơ khách hàng");
   }
 
-  const customerId = customer.recordset[0].CustomerId;
+  const customerId = customer.CustomerId;
 
-  const result = await pool.request().input("CustomerId", sql.Int, customerId)
-    .query(`
-    SELECT
-      a.AppointmentId,
-      a.AppointmentDate,
-      a.StartTime,
-      a.EndTime,
-      a.Status,
-      a.EmployeeId,
-      a.CancelReason,
-      aps.ServiceId,
-      s.ServiceName,
-      aps.Price,
-      ISNULL(i.FinalAmount, aps.Price) AS FinalAmount,
-      eu.FullName AS EmployeeName,
-      ISNULL(p.Status, 'UNPAID') AS PaymentStatus,
-      ISNULL(rv.ReviewCount, 0) AS ReviewCount,
-      ISNULL(rv.Rating, 0) AS Rating,
-      ISNULL(rv.Comment, '') AS ReviewComment,
-      ISNULL(rv.ReviewId, 0) AS ReviewId,
-      rv.ReviewedAt,
-      rv.ImagesJson
-    FROM Appointments a
-    JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
-    JOIN Services s ON aps.ServiceId = s.ServiceId
-    JOIN Employees e ON a.EmployeeId = e.EmployeeId
-    JOIN Users eu ON e.UserId = eu.UserId
-    LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
-    OUTER APPLY (
-      SELECT TOP 1
-        p2.Status,
-        p2.PaidAt
-      FROM Payments p2
-      WHERE p2.InvoiceId = i.InvoiceId
-      ORDER BY CASE WHEN p2.Status = 'PAID' THEN 1 ELSE 2 END, p2.PaymentId DESC
-    ) p
-    OUTER APPLY (
-      SELECT TOP 1
-        r.ReviewId,
-        r.Rating,
-        r.Comment,
-        r.CreatedAt AS ReviewedAt,
-        COUNT(*) OVER() AS ReviewCount,
-        (
-          SELECT ri.ReviewImageId, ri.ImageUrl, ri.CreatedAt
-          FROM ReviewImages ri
-          WHERE ri.ReviewId = r.ReviewId
-          ORDER BY ri.ReviewImageId ASC
-          FOR JSON PATH
-        ) AS ImagesJson
-      FROM Reviews r
-      WHERE r.CustomerId = @CustomerId
-        AND r.AppointmentId = a.AppointmentId
-        AND r.ServiceId = aps.ServiceId
-      ORDER BY r.CreatedAt DESC
-    ) rv
-    WHERE a.CustomerId = @CustomerId
-      AND a.Status = 'COMPLETED'
-    ORDER BY a.AppointmentDate DESC, a.StartTime DESC
-  `);
+  const result = await pool
+    .request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("UserId", sql.Int, userId).query(`
+      SELECT
+        a.AppointmentId,
+        a.AppointmentDate,
+        CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
+        CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
+        a.Status,
+        a.Notes,
+        a.CompletedAt,
+        a.CreatedAt,
 
-  const rows = result.recordset;
-  const summaryMap = new Map();
-  for (const row of rows) {
-    const key = String(row.ServiceId);
-    const current = summaryMap.get(key) || {
-      ServiceId: row.ServiceId,
-      ServiceName: row.ServiceName,
+        aps.AppointmentServiceId,
+        aps.ServiceId,
+        aps.Price,
+
+        s.ServiceName,
+        s.Description AS ServiceDescription,
+        s.DurationMinutes,
+        s.ImageUrl AS ServiceImageUrl,
+        sc.CategoryId,
+        sc.CategoryName,
+
+        a.EmployeeId,
+        eu.FullName AS EmployeeName,
+        e.Position,
+        e.Specialization,
+        e.ImageUrl AS EmployeeImageUrl,
+
+        b.BranchId,
+        b.BranchName,
+        b.Address AS BranchAddress,
+        b.Phone AS BranchPhone,
+
+        i.InvoiceId,
+        i.TotalAmount,
+        i.DiscountAmount,
+        i.FinalAmount,
+        i.Status AS InvoiceStatus,
+
+        v.VoucherId,
+        v.Code AS VoucherCode,
+
+        cp.CustomerPackageId,
+        pkg.PackageName,
+
+        p.PaymentId,
+        ISNULL(p.Status, 'UNPAID') AS PaymentStatus,
+        p.PaymentMethod,
+        p.TransactionCode,
+        p.PaidAt,
+
+        rv.ReviewId,
+        rv.Rating,
+        rv.TechnicianRating,
+        rv.Comment AS ReviewComment,
+        rv.Status AS ReviewStatus,
+        rv.AdminResponse,
+        rv.CreatedAt AS ReviewedAt,
+        rv.ImagesJson,
+
+        CASE
+          WHEN fs.ServiceId IS NULL THEN 0
+          ELSE 1
+        END AS IsFavoriteService,
+
+        CASE
+          WHEN fe.EmployeeId IS NULL THEN 0
+          ELSE 1
+        END AS IsFavoriteEmployee
+
+      FROM Appointments a
+      JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+      JOIN Services s ON aps.ServiceId = s.ServiceId
+      LEFT JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
+
+      JOIN Employees e ON a.EmployeeId = e.EmployeeId
+      JOIN Users eu ON e.UserId = eu.UserId
+      LEFT JOIN Branches b ON a.BranchId = b.BranchId
+
+      LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+      LEFT JOIN Vouchers v ON i.VoucherId = v.VoucherId
+      LEFT JOIN CustomerPackages cp ON a.CustomerPackageId = cp.CustomerPackageId
+      LEFT JOIN Packages pkg ON cp.PackageId = pkg.PackageId
+
+      LEFT JOIN CustomerFavoriteServices fs
+        ON fs.UserId = @UserId
+       AND fs.ServiceId = aps.ServiceId
+
+      LEFT JOIN CustomerFavoriteEmployees fe
+        ON fe.UserId = @UserId
+       AND fe.EmployeeId = a.EmployeeId
+
+      OUTER APPLY (
+        SELECT TOP 1
+          p2.PaymentId,
+          p2.Status,
+          p2.PaymentMethod,
+          p2.TransactionCode,
+          p2.PaidAt
+        FROM Payments p2
+        WHERE p2.InvoiceId = i.InvoiceId
+        ORDER BY
+          CASE
+            WHEN p2.Status = 'PAID' THEN 1
+            WHEN p2.Status = 'REFUND_PENDING' THEN 2
+            WHEN p2.Status = 'REFUNDED' THEN 3
+            WHEN p2.Status = 'PENDING' THEN 4
+            WHEN p2.Status = 'FAILED' THEN 5
+            ELSE 6
+          END,
+          p2.PaymentId DESC
+      ) p
+
+      OUTER APPLY (
+        SELECT TOP 1
+          r.ReviewId,
+          r.Rating,
+          r.TechnicianRating,
+          r.Comment,
+          r.Status,
+          r.AdminResponse,
+          r.CreatedAt,
+          (
+            SELECT
+              ri.ReviewImageId,
+              ri.ImageUrl,
+              ri.CreatedAt
+            FROM ReviewImages ri
+            WHERE ri.ReviewId = r.ReviewId
+            ORDER BY ri.ReviewImageId ASC
+            FOR JSON PATH
+          ) AS ImagesJson
+        FROM Reviews r
+        WHERE r.CustomerId = @CustomerId
+          AND r.AppointmentId = a.AppointmentId
+          AND r.ServiceId = aps.ServiceId
+        ORDER BY r.CreatedAt DESC
+      ) rv
+
+      WHERE a.CustomerId = @CustomerId
+        AND a.Status = 'COMPLETED'
+
+      ORDER BY a.AppointmentDate DESC, a.StartTime DESC, a.AppointmentId DESC
+    `);
+
+  const items = result.recordset.map((row) => ({
+    ...row,
+    Images: row.ImagesJson ? JSON.parse(row.ImagesJson) : [],
+  }));
+
+  const serviceMap = new Map();
+  const technicianMap = new Map();
+  const categoryMap = new Map();
+  const monthMap = new Map();
+
+  let totalSpent = 0;
+  let reviewedCount = 0;
+  let totalRating = 0;
+  let totalDuration = 0;
+
+  for (const item of items) {
+    const amount = Number(item.Price || 0);
+    totalSpent += amount;
+    totalDuration += Number(item.DurationMinutes || 0);
+
+    if (item.ReviewId) {
+      reviewedCount += 1;
+      totalRating += Number(item.Rating || 0);
+    }
+
+    const serviceKey = String(item.ServiceId);
+    const serviceValue = serviceMap.get(serviceKey) || {
+      ServiceId: item.ServiceId,
+      ServiceName: item.ServiceName,
+      CategoryName: item.CategoryName,
+      ImageUrl: item.ServiceImageUrl,
+      usageCount: 0,
+      totalSpent: 0,
+      lastUsedAt: item.AppointmentDate,
+    };
+
+    serviceValue.usageCount += 1;
+    serviceValue.totalSpent += amount;
+    serviceMap.set(serviceKey, serviceValue);
+
+    const techKey = String(item.EmployeeId);
+    const techValue = technicianMap.get(techKey) || {
+      EmployeeId: item.EmployeeId,
+      EmployeeName: item.EmployeeName,
+      ImageUrl: item.EmployeeImageUrl,
+      Specialization: item.Specialization,
+      usageCount: 0,
+    };
+
+    techValue.usageCount += 1;
+    technicianMap.set(techKey, techValue);
+
+    const categoryKey = item.CategoryName || "Khác";
+    const categoryValue = categoryMap.get(categoryKey) || {
+      CategoryName: categoryKey,
       usageCount: 0,
       totalSpent: 0,
     };
-    current.usageCount += 1;
-    current.totalSpent += Number(row.FinalAmount || row.Price || 0);
-    summaryMap.set(key, current);
+
+    categoryValue.usageCount += 1;
+    categoryValue.totalSpent += amount;
+    categoryMap.set(categoryKey, categoryValue);
+
+    const monthKey = String(item.AppointmentDate || "").slice(0, 7);
+    const monthValue = monthMap.get(monthKey) || {
+      month: monthKey,
+      usageCount: 0,
+      totalSpent: 0,
+    };
+
+    monthValue.usageCount += 1;
+    monthValue.totalSpent += amount;
+    monthMap.set(monthKey, monthValue);
   }
 
+  const favoriteService =
+    Array.from(serviceMap.values()).sort(
+      (a, b) => b.usageCount - a.usageCount || b.totalSpent - a.totalSpent,
+    )[0] || null;
+
+  const favoriteTechnician =
+    Array.from(technicianMap.values()).sort(
+      (a, b) => b.usageCount - a.usageCount,
+    )[0] || null;
+
   return {
-    items: rows.map((row) => ({
-      ...row,
-      Images: row.ImagesJson ? JSON.parse(row.ImagesJson) : [],
-    })),
-    summary: Array.from(summaryMap.values()),
-    totalSpent: rows.reduce(
-      (sum, row) => sum + Number(row.FinalAmount || row.Price || 0),
-      0,
+    items,
+    stats: {
+      totalServicesUsed: items.length,
+      totalSpent,
+      reviewedCount,
+      notReviewedCount: items.length - reviewedCount,
+      averageRating: reviewedCount
+        ? Number((totalRating / reviewedCount).toFixed(1))
+        : 0,
+      totalDuration,
+      favoriteService,
+      favoriteTechnician,
+    },
+    summary: Array.from(serviceMap.values()).sort(
+      (a, b) => b.usageCount - a.usageCount,
+    ),
+    technicianSummary: Array.from(technicianMap.values()).sort(
+      (a, b) => b.usageCount - a.usageCount,
+    ),
+    categorySummary: Array.from(categoryMap.values()).sort(
+      (a, b) => b.usageCount - a.usageCount,
+    ),
+    monthlySummary: Array.from(monthMap.values()).sort((a, b) =>
+      b.month.localeCompare(a.month),
     ),
   };
 }

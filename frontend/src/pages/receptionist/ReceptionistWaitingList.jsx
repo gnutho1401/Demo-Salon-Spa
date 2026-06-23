@@ -1,62 +1,88 @@
 import { useEffect, useMemo, useState } from "react";
-import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import axiosClient from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
 import "../../styles/pages/receptionist.css";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
-
-function avatarUrl(url) {
-  return resolveFileUrl(url) || DEFAULT_AVATAR;
-}
-
 const STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
-  { value: "WAITING", label: "Đang chờ" },
-  { value: "NOTIFIED", label: "Đã thông báo" },
-  { value: "BOOKED", label: "Đã đặt lịch" },
+  { value: "WAITING", label: "Đang chờ slot" },
+  { value: "MATCHED", label: "Đã khớp slot (Đang giữ)" },
+  { value: "NOTIFIED", label: "Đã báo khách" },
+  { value: "BOOKED", label: "Đã chuyển lịch" },
+  { value: "SKIPPED", label: "Khách bỏ lỡ" },
+  { value: "EXPIRED", label: "Hết hạn giữ slot" },
   { value: "CANCELLED", label: "Đã hủy" },
 ];
 
+function getArray(res) {
+  return res?.data?.data || res?.data || [];
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("vi-VN");
+}
+
+function formatMoney(value) {
+  return `${Number(value || 0).toLocaleString("vi-VN")}đ`;
+}
+
 function statusLabel(status) {
   const map = {
-    WAITING: "Đang chờ",
-    NOTIFIED: "Đã thông báo",
-    BOOKED: "Đã đặt lịch",
+    WAITING: "Đang chờ slot",
+    MATCHED: "Đã khớp slot (Đang giữ)",
+    NOTIFIED: "Đã báo khách",
+    BOOKED: "Đã chuyển lịch",
+    SKIPPED: "Bỏ lỡ",
+    EXPIRED: "Hết hạn",
     CANCELLED: "Đã hủy",
   };
   return map[status] || status || "-";
 }
 
 function statusClass(status) {
-  return `rx-badge status-${String(status || "").toLowerCase()}`;
+  return `wl-status ${String(status || "").toLowerCase()}`;
 }
 
-function formatDate(value) {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
-  return d.toLocaleDateString("vi-VN");
-}
+function HoldCountdown({ expiresAt, onTimeout }) {
+  const [timeLeft, setTimeLeft] = useState("");
 
-function money(value) {
-  return `${Number(value || 0).toLocaleString("vi-VN")}đ`;
-}
+  useEffect(() => {
+    function update() {
+      if (!expiresAt) return;
+      const exp = new Date(expiresAt).getTime();
+      const now = Date.now();
+      const diff = exp - now;
 
-function avatarText(name) {
-  return String(name || "?")
-    .trim()
-    .charAt(0)
-    .toUpperCase();
+      if (diff <= 0) {
+        setTimeLeft("Đã hết hạn");
+        if (onTimeout) onTimeout();
+        return;
+      }
+
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setTimeLeft(`${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`);
+    }
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  return <span className="hold-countdown" style={{ color: "#db2777", fontWeight: "bold" }}>{timeLeft}</span>;
 }
 
 export default function ReceptionistWaitingList() {
   const [items, setItems] = useState([]);
   const [services, setServices] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
 
   const [filters, setFilters] = useState({
     customer: "",
-    status: "WAITING",
+    status: "",
     serviceId: "",
     date: "",
   });
@@ -66,9 +92,19 @@ export default function ReceptionistWaitingList() {
     serviceId: "",
     preferredDate: "",
     preferredTime: "",
+    reason: "Khách muốn chờ nếu có slot trống",
+    note: "",
+  });
+
+  const [convertForm, setConvertForm] = useState({
+    waitingId: null,
+    technicianId: "",
+    appointmentDate: "",
+    startTime: "",
   });
 
   const [loading, setLoading] = useState(false);
+  const [slotLoading, setSlotLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -85,15 +121,29 @@ export default function ReceptionistWaitingList() {
         date: nextFilters.date || undefined,
       };
 
-      const [waitingRes, servicesRes, customersRes] = await Promise.all([
-        axiosClient.get("/receptionist/waiting-list", { params }),
+      const waitingRes = await axiosClient.get("/receptionist/waiting-list", {
+        params,
+      });
+
+      setItems(getArray(waitingRes));
+
+      const [servicesRes, customersRes, techRes] = await Promise.allSettled([
         axiosClient.get("/receptionist/services"),
         axiosClient.get("/receptionist/customers"),
+        axiosClient.get("/receptionist/technicians"),
       ]);
 
-      setItems(waitingRes.data?.data || waitingRes.data || []);
-      setServices(servicesRes.data?.data || servicesRes.data || []);
-      setCustomers(customersRes.data?.data || customersRes.data || []);
+      if (servicesRes.status === "fulfilled") {
+        setServices(getArray(servicesRes.value));
+      }
+
+      if (customersRes.status === "fulfilled") {
+        setCustomers(getArray(customersRes.value));
+      }
+
+      if (techRes.status === "fulfilled") {
+        setTechnicians(getArray(techRes.value));
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Không tải được Waiting List");
     } finally {
@@ -109,8 +159,11 @@ export default function ReceptionistWaitingList() {
     return {
       total: items.length,
       waiting: items.filter((x) => x.Status === "WAITING").length,
+      matched: items.filter((x) => x.Status === "MATCHED").length,
       notified: items.filter((x) => x.Status === "NOTIFIED").length,
       booked: items.filter((x) => x.Status === "BOOKED").length,
+      skipped: items.filter((x) => x.Status === "SKIPPED").length,
+      expired: items.filter((x) => x.Status === "EXPIRED").length,
       cancelled: items.filter((x) => x.Status === "CANCELLED").length,
     };
   }, [items]);
@@ -130,26 +183,28 @@ export default function ReceptionistWaitingList() {
         serviceId: "",
         preferredDate: "",
         preferredTime: "",
+        reason: "Khách muốn chờ nếu có slot trống",
+        note: "",
       });
 
       await load();
-      setSuccessMsg("Đã thêm khách vào hàng chờ");
+      setSuccessMsg("Đã thêm khách vào danh sách chờ");
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Không thể thêm khách vào hàng chờ",
-      );
+      setError(err.response?.data?.message || "Không thể thêm Waiting List");
     } finally {
       setSaving(false);
     }
   }
 
-  async function updateStatus(id, status) {
+  async function updateStatus(waitingId, status) {
     try {
       setSaving(true);
       setError("");
       setSuccessMsg("");
 
-      await axiosClient.put(`/receptionist/waiting-list/${id}`, { status });
+      await axiosClient.put(`/receptionist/waiting-list/${waitingId}`, {
+        status,
+      });
 
       await load();
       setSuccessMsg("Đã cập nhật trạng thái");
@@ -160,21 +215,111 @@ export default function ReceptionistWaitingList() {
     }
   }
 
-  async function cancelWaiting(id) {
-    if (!window.confirm("Bạn có chắc muốn hủy khách khỏi hàng chờ không?"))
-      return;
+  async function cancelWaiting(waitingId) {
+    if (!window.confirm("Bạn chắc chắn muốn hủy yêu cầu chờ này?")) return;
 
     try {
       setSaving(true);
       setError("");
       setSuccessMsg("");
 
-      await axiosClient.delete(`/receptionist/waiting-list/${id}`);
+      await axiosClient.delete(`/receptionist/waiting-list/${waitingId}`);
 
       await load();
       setSuccessMsg("Đã hủy yêu cầu chờ");
     } catch (err) {
-      setError(err.response?.data?.message || "Không thể hủy waiting list");
+      setError(err.response?.data?.message || "Không thể hủy yêu cầu chờ");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function loadWaitingSlots(waitingId, appointmentDate, technicianId) {
+    try {
+      setSlotLoading(true);
+      setError("");
+
+      if (!waitingId || !appointmentDate) {
+        setAvailableSlots([]);
+        return;
+      }
+
+      const res = await axiosClient.get(
+        `/receptionist/waiting-list/${waitingId}/available-slots`,
+        {
+          params: {
+            appointmentDate,
+            technicianId: technicianId || undefined,
+          },
+        },
+      );
+
+      setAvailableSlots(getArray(res));
+    } catch (err) {
+      setAvailableSlots([]);
+      setError(err.response?.data?.message || "Không tải được slot trống");
+    } finally {
+      setSlotLoading(false);
+    }
+  }
+
+  async function openConvertForm(item) {
+    const appointmentDate = item.PreferredDate
+      ? String(item.PreferredDate).slice(0, 10)
+      : "";
+
+    const technicianId =
+      item.PreferredEmployeeId || item.EmployeeId || item.TechnicianId || "";
+
+    const next = {
+      waitingId: item.WaitingId,
+      technicianId,
+      appointmentDate,
+      startTime: "",
+    };
+
+    setConvertForm(next);
+    setAvailableSlots([]);
+
+    if (appointmentDate) {
+      await loadWaitingSlots(item.WaitingId, appointmentDate, technicianId);
+    }
+  }
+
+  function closeConvertForm() {
+    setConvertForm({
+      waitingId: null,
+      technicianId: "",
+      appointmentDate: "",
+      startTime: "",
+    });
+    setAvailableSlots([]);
+  }
+
+  async function convertToAppointment(e) {
+    e.preventDefault();
+
+    try {
+      setSaving(true);
+      setError("");
+      setSuccessMsg("");
+
+      await axiosClient.post(
+        `/receptionist/waiting-list/${convertForm.waitingId}/convert`,
+        {
+          technicianId: convertForm.technicianId,
+          appointmentDate: convertForm.appointmentDate,
+          startTime: convertForm.startTime,
+          paymentStatus: "UNPAID",
+          paymentMethod: "CASH",
+        },
+      );
+
+      closeConvertForm();
+      await load();
+      setSuccessMsg("Đã chuyển Waiting List thành lịch hẹn");
+    } catch (err) {
+      setError(err.response?.data?.message || "Không thể chuyển thành lịch");
     } finally {
       setSaving(false);
     }
@@ -188,97 +333,102 @@ export default function ReceptionistWaitingList() {
   function resetFilter() {
     const reset = {
       customer: "",
-      status: "WAITING",
+      status: "",
       serviceId: "",
       date: "",
     };
-
     setFilters(reset);
     load(reset);
   }
 
   return (
     <ReceptionistLayout>
-      <div className="rx-page">
-        <div className="rx-page-header">
-          <div className="rx-title-block">
-            <div className="rx-title-icon">⏳</div>
+      <div className="wl-page">
+        <section className="wl-hero">
+          <div>
+            <p className="wl-kicker">Receptionist</p>
+            <h1>Waiting List</h1>
+            <p>
+              Quản lý khách đang chờ slot trống. Khi có giờ phù hợp,
+              receptionist báo khách và chuyển thành lịch hẹn chính thức.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="wl-btn secondary"
+            onClick={() => load()}
+            disabled={loading}
+          >
+            ↻ Làm mới
+          </button>
+        </section>
+
+        {error && <div className="wl-alert error">{error}</div>}
+        {successMsg && <div className="wl-alert success">{successMsg}</div>}
+
+        <section className="wl-stats">
+          <div className="wl-stat-card">
+            <span>📋</span>
+            <p>Tổng yêu cầu</p>
+            <b>{stats.total}</b>
+          </div>
+
+          <div className="wl-stat-card">
+            <span>⏳</span>
+            <p>Đang chờ slot</p>
+            <b>{stats.waiting}</b>
+          </div>
+
+          <div className="wl-stat-card">
+            <span>⚡</span>
+            <p>Đã khớp slot</p>
+            <b>{stats.matched || 0}</b>
+          </div>
+
+          <div className="wl-stat-card">
+            <span>📞</span>
+            <p>Đã báo khách</p>
+            <b>{stats.notified}</b>
+          </div>
+
+          <div className="wl-stat-card">
+            <span>✅</span>
+            <p>Đã chuyển lịch</p>
+            <b>{stats.booked}</b>
+          </div>
+
+          <div className="wl-stat-card">
+            <span>⌛</span>
+            <p>Đã bỏ lỡ</p>
+            <b>{stats.skipped || 0}</b>
+          </div>
+
+          <div className="wl-stat-card">
+            <span>📆</span>
+            <p>Đã hết hạn</p>
+            <b>{stats.expired || 0}</b>
+          </div>
+
+          <div className="wl-stat-card">
+            <span>🚫</span>
+            <p>Đã hủy</p>
+            <b>{stats.cancelled}</b>
+          </div>
+        </section>
+
+        <section className="wl-card">
+          <div className="wl-card-head">
             <div>
-              <h1>Waiting List</h1>
+              <h2>Thêm khách vào hàng chờ</h2>
               <p>
-                Quản lý khách đang chờ lịch trống, liên hệ khách và chuyển sang
-                đặt lịch.
+                Dùng khi khách muốn đặt lịch nhưng ngày/kỹ thuật viên đó đã hết
+                slot phù hợp.
               </p>
             </div>
           </div>
 
-          <div className="rx-header-actions">
-            <button
-              className="rx-light-btn"
-              type="button"
-              onClick={() => load()}
-              disabled={loading}
-            >
-              ↻ Làm mới
-            </button>
-          </div>
-        </div>
-
-        {error && <div className="rcc-alert error">{error}</div>}
-        {successMsg && <div className="rcc-alert success">{successMsg}</div>}
-
-        <div className="rx-stat-grid rx-waiting-stats">
-          <div className="rx-stat-card pink">
-            <span>📋</span>
-            <div>
-              <p>Tổng hàng chờ</p>
-              <b>{stats.total}</b>
-            </div>
-          </div>
-
-          <div className="rx-stat-card yellow">
-            <span>⏰</span>
-            <div>
-              <p>Đang chờ</p>
-              <b>{stats.waiting}</b>
-            </div>
-          </div>
-
-          <div className="rx-stat-card blue">
-            <span>📞</span>
-            <div>
-              <p>Đã thông báo</p>
-              <b>{stats.notified}</b>
-            </div>
-          </div>
-
-          <div className="rx-stat-card green">
-            <span>✅</span>
-            <div>
-              <p>Đã đặt lịch</p>
-              <b>{stats.booked}</b>
-            </div>
-          </div>
-
-          <div className="rx-stat-card red">
-            <span>✖</span>
-            <div>
-              <p>Đã hủy</p>
-              <b>{stats.cancelled}</b>
-            </div>
-          </div>
-        </div>
-
-        <div className="rx-filter-card">
-          <div className="rx-section-title">
-            <h2>Thêm khách vào hàng chờ</h2>
-            <p>Receptionist chọn khách hàng, dịch vụ và thời gian mong muốn.</p>
-          </div>
-
-          <form
-            className="rx-filter-grid rx-waiting-form"
-            onSubmit={createWaiting}
-          >
+          <form className="wl-form" onSubmit={createWaiting}>
             <label>
               <span>Khách hàng</span>
               <select
@@ -291,7 +441,7 @@ export default function ReceptionistWaitingList() {
                 <option value="">Chọn khách hàng</option>
                 {customers.map((c) => (
                   <option key={c.CustomerId} value={c.CustomerId}>
-                    {c.FullName} - {c.Phone}
+                    {c.FullName} {c.Phone ? `- ${c.Phone}` : ""}
                   </option>
                 ))}
               </select>
@@ -309,7 +459,7 @@ export default function ReceptionistWaitingList() {
                 <option value="">Chọn dịch vụ</option>
                 {services.map((s) => (
                   <option key={s.ServiceId} value={s.ServiceId}>
-                    {s.ServiceName}
+                    {s.ServiceName} - {formatMoney(s.Price)}
                   </option>
                 ))}
               </select>
@@ -337,28 +487,55 @@ export default function ReceptionistWaitingList() {
               />
             </label>
 
-            <div className="rx-waiting-submit">
+            <label className="wl-col-2">
+              <span>Lý do</span>
+              <input
+                value={form.reason}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                placeholder="Ví dụ: Khách muốn chờ nếu có người hủy lịch"
+              />
+            </label>
+
+            <label className="wl-col-2">
+              <span>Ghi chú</span>
+              <input
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                placeholder="Ghi chú thêm cho lễ tân"
+              />
+            </label>
+
+            <div className="wl-form-actions">
               <button
-                className="rx-primary-btn"
                 type="submit"
+                className="wl-btn primary"
                 disabled={saving}
               >
-                {saving ? "Đang lưu..." : "+ Thêm vào hàng chờ"}
+                {saving ? "Đang lưu..." : "+ Thêm vào Waiting List"}
               </button>
             </div>
           </form>
-        </div>
+        </section>
 
-        <form className="rx-filter-card" onSubmit={submitFilter}>
-          <div className="rx-filter-grid rx-waiting-filter">
+        <section className="wl-card">
+          <div className="wl-card-head">
+            <div>
+              <h2>Bộ lọc</h2>
+              <p>
+                Lọc theo khách hàng, trạng thái, dịch vụ hoặc ngày mong muốn.
+              </p>
+            </div>
+          </div>
+
+          <form className="wl-filter" onSubmit={submitFilter}>
             <label>
-              <span>Tìm khách hàng</span>
+              <span>Tìm khách</span>
               <input
                 value={filters.customer}
                 onChange={(e) =>
                   setFilters({ ...filters, customer: e.target.value })
                 }
-                placeholder="Tên, SĐT hoặc email"
+                placeholder="Tên, số điện thoại, email"
               />
             </label>
 
@@ -396,7 +573,7 @@ export default function ReceptionistWaitingList() {
             </label>
 
             <label>
-              <span>Ngày mong muốn</span>
+              <span>Ngày</span>
               <input
                 type="date"
                 value={filters.date}
@@ -405,145 +582,308 @@ export default function ReceptionistWaitingList() {
                 }
               />
             </label>
-          </div>
 
-          <div className="rx-filter-actions">
-            <button
-              className="rx-outline-pink-btn"
-              type="button"
-              onClick={resetFilter}
-            >
-              ↺ Đặt lại
-            </button>
-            <button className="rx-primary-btn" type="submit">
-              Tìm kiếm
-            </button>
-          </div>
-        </form>
+            <div className="wl-filter-actions">
+              <button type="submit" className="wl-btn primary">
+                Lọc
+              </button>
 
-        <div className="rx-table-card">
-          <div className="rx-table-header">
+              <button
+                type="button"
+                className="wl-btn secondary"
+                onClick={resetFilter}
+              >
+                Xóa lọc
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {convertForm.waitingId && (
+          <section className="wl-card wl-convert">
+            <div className="wl-card-head">
+              <div>
+                <h2>Chuyển Waiting List thành lịch hẹn</h2>
+                <p>
+                  Chỉ được chọn slot còn trống thật. Nếu ngày đó hết slot, hãy
+                  đổi ngày hoặc đổi kỹ thuật viên.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="wl-btn secondary"
+                onClick={closeConvertForm}
+              >
+                Đóng
+              </button>
+            </div>
+
+            <form className="wl-form" onSubmit={convertToAppointment}>
+              <label>
+                <span>Kỹ thuật viên</span>
+                <select
+                  value={convertForm.technicianId}
+                  onChange={async (e) => {
+                    const technicianId = e.target.value;
+
+                    const next = {
+                      ...convertForm,
+                      technicianId,
+                      startTime: "",
+                    };
+
+                    setConvertForm(next);
+
+                    await loadWaitingSlots(
+                      next.waitingId,
+                      next.appointmentDate,
+                      technicianId,
+                    );
+                  }}
+                  required
+                >
+                  <option value="">Chọn kỹ thuật viên</option>
+                  {technicians.map((t) => {
+                    const id = t.EmployeeId || t.TechnicianId;
+
+                    return (
+                      <option key={id} value={id}>
+                        {t.FullName || t.TechnicianName}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+
+              <label>
+                <span>Ngày hẹn</span>
+                <input
+                  type="date"
+                  value={convertForm.appointmentDate}
+                  onChange={async (e) => {
+                    const appointmentDate = e.target.value;
+
+                    const next = {
+                      ...convertForm,
+                      appointmentDate,
+                      startTime: "",
+                    };
+
+                    setConvertForm(next);
+
+                    await loadWaitingSlots(
+                      next.waitingId,
+                      appointmentDate,
+                      next.technicianId,
+                    );
+                  }}
+                  required
+                />
+              </label>
+
+              <label className="wl-col-2">
+                <span>Slot trống</span>
+                <select
+                  value={convertForm.startTime}
+                  onChange={(e) =>
+                    setConvertForm({
+                      ...convertForm,
+                      startTime: e.target.value,
+                    })
+                  }
+                  disabled={slotLoading}
+                  required
+                >
+                  <option value="">
+                    {slotLoading ? "Đang tải slot..." : "Chọn slot trống"}
+                  </option>
+
+                  {availableSlots.map((slot) => (
+                    <option
+                      key={`${slot.startTime}-${slot.employeeId}`}
+                      value={slot.startTime}
+                    >
+                      {slot.startTime} - {slot.endTime}
+                      {slot.technicianName ? ` | ${slot.technicianName}` : ""}
+                    </option>
+                  ))}
+                </select>
+
+                {convertForm.appointmentDate &&
+                  !slotLoading &&
+                  availableSlots.length === 0 && (
+                    <small className="wl-help">
+                      Chưa có slot trống phù hợp trong ngày này.
+                    </small>
+                  )}
+              </label>
+
+              <div className="wl-form-actions">
+                <button
+                  type="submit"
+                  className="wl-btn primary"
+                  disabled={saving || !convertForm.startTime}
+                >
+                  {saving ? "Đang tạo lịch..." : "Tạo lịch hẹn"}
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
+
+        <section className="wl-card">
+          <div className="wl-card-head">
             <div>
-              <h2>Danh sách khách chờ</h2>
-              <p>{items.length} khách đang hiển thị theo bộ lọc hiện tại</p>
+              <h2>Danh sách khách chờ slot</h2>
+              <p>Luồng chuẩn: WAITING → NOTIFIED → BOOKED hoặc CANCELLED.</p>
             </div>
           </div>
 
-          <div className="rx-table-scroll">
-            <table className="rx-appointment-table">
-              <thead>
-                <tr>
-                  <th>Khách hàng</th>
-                  <th>Dịch vụ</th>
-                  <th>Ngày mong muốn</th>
-                  <th>Giờ</th>
-                  <th>Thời gian chờ</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {loading && (
+          {loading ? (
+            <div className="wl-empty">Đang tải dữ liệu...</div>
+          ) : items.length === 0 ? (
+            <div className="wl-empty">Chưa có yêu cầu Waiting List.</div>
+          ) : (
+            <div className="wl-table-wrap">
+              <table className="wl-table">
+                <thead>
                   <tr>
-                    <td colSpan="7" className="rx-empty-row">
-                      Đang tải dữ liệu...
-                    </td>
+                    <th>Khách hàng</th>
+                    <th>Dịch vụ</th>
+                    <th>Thời gian mong muốn</th>
+                    <th>Lý do</th>
+                    <th>Trạng thái</th>
+                    <th>Ngày tạo</th>
+                    <th>Thao tác</th>
                   </tr>
-                )}
+                </thead>
 
-                {!loading && items.length === 0 && (
-                  <tr>
-                    <td colSpan="7" className="rx-empty-row">
-                      Không có khách trong Waiting List
-                    </td>
-                  </tr>
-                )}
-
-                {!loading &&
-                  items.map((w) => (
-                    <tr key={w.WaitingId}>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.WaitingId}>
                       <td>
-                        <div className="rx-customer-cell">
-                          <img
-                            className="rx-mini-avatar"
-                            src={avatarUrl(w.CustomerAvatarUrl)}
-                            alt={w.CustomerName || "Customer"}
-                          />
+                        <div className="wl-customer-cell">
+                          <div className="wl-avatar">
+                            {(item.CustomerName || "?").charAt(0)}
+                          </div>
+
                           <div>
-                            <b>{w.CustomerName || "-"}</b>
-                            <small>{w.CustomerPhone || "-"}</small>
-                            <small>{w.CustomerEmail || "-"}</small>
+                            <b>{item.CustomerName || "Khách hàng"}</b>
+                            <small>{item.CustomerPhone || "-"}</small>
+                            <small>{item.CustomerEmail || ""}</small>
                           </div>
                         </div>
                       </td>
 
                       <td>
-                        <b>{w.ServiceName || "-"}</b>
-                        <small>
-                          {money(w.Price)} · {w.DurationMinutes || 0} phút
-                        </small>
+                        <b>{item.ServiceName}</b>
+                        <small>{formatMoney(item.Price)}</small>
+                        {item.Status === "MATCHED" ? (
+                          <small style={{ color: "#c9235e", fontWeight: "bold" }}>
+                            Ghép KTV: {item.MatchedEmployeeName}
+                          </small>
+                        ) : item.PreferredEmployeeName ? (
+                          <small>
+                            NV mong muốn: {item.PreferredEmployeeName}
+                          </small>
+                        ) : null}
                       </td>
 
-                      <td>{formatDate(w.PreferredDate)}</td>
-                      <td>{w.PreferredTime || "-"}</td>
-                      <td>{Number(w.WaitingMinutes || 0)} phút</td>
+                      <td>
+                        {item.Status === "MATCHED" ? (
+                          <div style={{ color: "#db2777" }}>
+                            <b>⚡ Ghép: {formatDate(item.MatchedDate)}</b>
+                            <small style={{ color: "#c9235e", fontWeight: "bold", display: "block" }}>
+                              {item.MatchedStartTime} - {item.MatchedEndTime}
+                            </small>
+                            <small style={{ fontSize: "11px", marginTop: "4px", display: "block" }}>
+                              Còn: <HoldCountdown expiresAt={item.HoldExpiresAt} onTimeout={() => load()} />
+                            </small>
+                          </div>
+                        ) : (
+                          <>
+                            <b>{formatDate(item.PreferredDate)}</b>
+                            <small>
+                              {item.PreferredTime ||
+                                item.PreferredTimeFrom ||
+                                "Linh hoạt"}
+                            </small>
+                          </>
+                        )}
+                      </td>
+
+                      <td>{item.Reason || item.Note || "Chờ slot trống"}</td>
 
                       <td>
-                        <span className={statusClass(w.Status)}>
-                          {statusLabel(w.Status)}
+                        <span className={statusClass(item.Status)}>
+                          {statusLabel(item.Status)}
                         </span>
                       </td>
 
+                      <td>{formatDate(item.CreatedAt)}</td>
+
                       <td>
-                        <div className="rx-action-cell">
-                          {w.Status === "WAITING" && (
+                        <div className="wl-actions">
+                          {item.Status === "WAITING" && (
                             <button
                               type="button"
-                              className="rx-icon-btn"
-                              title="Thông báo khách"
-                              disabled={saving}
+                              className="wl-mini-btn"
                               onClick={() =>
-                                updateStatus(w.WaitingId, "NOTIFIED")
+                                updateStatus(item.WaitingId, "NOTIFIED")
                               }
+                              disabled={saving}
                             >
-                              📞
+                              Đã báo khách
                             </button>
                           )}
 
-                          {["WAITING", "NOTIFIED"].includes(w.Status) && (
+                          {["WAITING", "NOTIFIED", "MATCHED"].includes(item.Status) && (
                             <button
                               type="button"
-                              className="rx-icon-btn"
-                              title="Đánh dấu đã đặt lịch"
+                              className="wl-mini-btn primary"
+                              onClick={() => openConvertForm(item)}
                               disabled={saving}
-                              onClick={() =>
-                                updateStatus(w.WaitingId, "BOOKED")
-                              }
                             >
-                              ✅
+                              Chuyển lịch
                             </button>
                           )}
 
-                          {w.Status !== "CANCELLED" && (
+                          {["WAITING", "NOTIFIED", "MATCHED", "SKIPPED", "EXPIRED"].includes(item.Status) && (
                             <button
                               type="button"
-                              className="rx-icon-btn danger"
-                              title="Hủy"
+                              className="wl-mini-btn danger"
+                              onClick={() => cancelWaiting(item.WaitingId)}
                               disabled={saving}
-                              onClick={() => cancelWaiting(w.WaitingId)}
                             >
-                              ✕
+                              Hủy
                             </button>
+                          )}
+
+                          {item.Status === "BOOKED" && (
+                            <span className="wl-done">Đã tạo lịch</span>
+                          )}
+
+                          {item.Status === "CANCELLED" && (
+                            <span className="wl-muted">Đã hủy</span>
+                          )}
+
+                          {item.Status === "EXPIRED" && (
+                            <span className="wl-muted">Hết hạn</span>
+                          )}
+
+                          {item.Status === "SKIPPED" && (
+                            <span className="wl-muted">Bỏ lỡ</span>
                           )}
                         </div>
                       </td>
                     </tr>
                   ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </ReceptionistLayout>
   );

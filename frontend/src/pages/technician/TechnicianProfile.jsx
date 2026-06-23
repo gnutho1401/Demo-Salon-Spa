@@ -30,9 +30,9 @@ function dateText(value) {
 
   if (Number.isNaN(date.getTime())) return "N/A";
 
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric",
   });
 }
@@ -44,10 +44,10 @@ function clampPercent(value) {
 }
 
 function getStatusText(status) {
-  if (!status) return "Active";
-  if (status === "INACTIVE") return "Inactive";
-  if (status === "OFFLINE") return "Offline";
-  if (status === "ACTIVE") return "Active";
+  if (!status) return "Đang hoạt động";
+  if (status === "INACTIVE") return "Ngưng hoạt động";
+  if (status === "OFFLINE") return "Ngoại tuyến";
+  if (status === "ACTIVE") return "Đang hoạt động";
   return status;
 }
 
@@ -89,7 +89,7 @@ export default function TechnicianProfile() {
 
   const fullName = profile.FullName || "N/A";
   const specialization =
-    profile.Specialization || profile.Position || "Technician";
+    profile.Specialization || profile.Position || "Kỹ thuật viên";
   const avatarUrl = getAvatarUrl(profile.AvatarUrl || profile.ImageUrl);
   const employeeStatus =
     profile.WorkingStatus || profile.EmployeeStatus || profile.Status;
@@ -114,21 +114,21 @@ export default function TechnicianProfile() {
         <header className="profile-header">
           <div>
             <h1>
-              My Profile <span>♙</span>
+              Hồ sơ của tôi <span>♙</span>
             </h1>
-            <p>View your real profile, working hours, skills and attachments</p>
+            <p>Xem thông tin chi tiết cá nhân, ca trực, chuyên môn và tài liệu của bạn</p>
           </div>
         </header>
 
         {loading && (
-          <div className="profile-card profile-loading">Loading profile...</div>
+          <div className="profile-card profile-loading">Đang tải hồ sơ kỹ thuật viên...</div>
         )}
 
         {!loading && error && (
           <div className="profile-card profile-error">
             <p>{error}</p>
             <button type="button" onClick={loadProfile}>
-              Reload
+              Tải lại
             </button>
           </div>
         )}
@@ -147,6 +147,7 @@ export default function TechnicianProfile() {
                 <button
                   type="button"
                   onClick={() => navigate("/technician/settings")}
+                  title="Chỉnh sửa ảnh đại diện"
                 >
                   ✎
                 </button>
@@ -161,15 +162,15 @@ export default function TechnicianProfile() {
                 <p className="profile-status">
                   <b>● {getStatusText(employeeStatus)}</b>
                   <small>
-                    {profile.IsVerified === false ? "Unverified" : "Verified"}
+                    {profile.IsVerified === false ? "Chưa xác minh" : "Đã xác minh"}
                   </small>
                 </p>
 
-                <p>📞 {profile.Phone || "N/A"}</p>
+                <p>📞 {profile.Phone || "Chưa cập nhật SĐT"}</p>
                 <p>✉ {profile.Email || "N/A"}</p>
-                <p>💼 {profile.Position || "Technician"}</p>
+                <p>💼 {profile.Position || "Kỹ thuật viên"}</p>
                 <p>
-                  📅 Member since{" "}
+                  📅 Thành viên từ{" "}
                   {dateText(profile.HireDate || profile.CreatedAt)}
                 </p>
 
@@ -178,57 +179,57 @@ export default function TechnicianProfile() {
                   className="outline-profile-btn"
                   onClick={() => navigate("/technician/settings")}
                 >
-                  ✎ Edit Profile
+                  ✎ Chỉnh sửa hồ sơ
                 </button>
               </div>
 
               <div className="profile-id-box">
-                <p>Technician ID</p>
+                <p>Mã kỹ thuật viên</p>
                 <b>{technicianCode}</b>
 
-                <p>Total Appointments</p>
+                <p>Tổng số lịch hẹn</p>
                 <b>{totalAppointments}</b>
 
-                <p>Completed</p>
+                <p>Đã hoàn thành</p>
                 <b>{completedAppointments}</b>
 
-                <p>Total Ratings</p>
+                <p>Đánh giá trung bình</p>
                 <b>
-                  {averageRating} ({reviewCount} reviews)
+                  {averageRating} ⭐ ({reviewCount} đánh giá)
                 </b>
               </div>
             </div>
 
             <div className="profile-card professional-card">
-              <h3>▧ Professional Summary</h3>
-              <p>{profile.Bio || "No professional summary yet."}</p>
+              <h3>▧ Giới thiệu chuyên môn</h3>
+              <p>{profile.Bio || "Chưa có thông tin giới thiệu chuyên môn."}</p>
 
               <div className="professional-stats">
                 <div>
                   <b>{Number(profile.ExperienceYears || 0)}+</b>
-                  <span>Years Experience</span>
+                  <span>Năm kinh nghiệm</span>
                 </div>
 
                 <div>
                   <b>{happyClients}+</b>
-                  <span>Real Clients</span>
+                  <span>Khách hàng thân thiết</span>
                 </div>
 
                 <div>
                   <b>{satisfaction}%</b>
-                  <span>Client Satisfaction</span>
+                  <span>Khách hài lòng</span>
                 </div>
               </div>
             </div>
 
             <div className="profile-card skills-card">
-              <h3>Skills & Expertise</h3>
+              <h3>Kỹ năng & Chuyên môn</h3>
 
               {skills.length === 0 ? (
-                <p className="profile-empty-text">No skills found</p>
+                <p className="profile-empty-text">Chưa cấu hình kỹ năng nào</p>
               ) : (
                 skills.map((skill, index) => {
-                  const name = skill.name || `Skill ${index + 1}`;
+                  const name = skill.name || `Kỹ năng ${index + 1}`;
                   const percent = clampPercent(skill.percent);
 
                   return (
@@ -243,8 +244,7 @@ export default function TechnicianProfile() {
                       </div>
 
                       <small>
-                        {Number(skill.totalAppointments || 0)} completed
-                        appointments
+                        Đã thực hiện {Number(skill.totalAppointments || 0)} lịch hẹn
                       </small>
                     </div>
                   );
@@ -254,23 +254,23 @@ export default function TechnicianProfile() {
 
             <div className="profile-card hours-card">
               <div className="card-title-row">
-                <h3>◷ Working Hours</h3>
+                <h3>◷ Giờ làm việc cố định</h3>
                 <button
                   type="button"
                   onClick={() => navigate("/technician/schedule")}
                 >
-                  View Schedule
+                  Xem lịch biểu
                 </button>
               </div>
 
               {workingHours.length === 0 ? (
-                <p className="profile-empty-text">No working hours found</p>
+                <p className="profile-empty-text">Chưa phân ca làm việc cố định</p>
               ) : (
                 workingHours.map((item, index) => (
                   <p key={`${item.day}-${index}`}>
                     <span>{item.day || "N/A"}</span>
-                    <b className={item.time === "Day off" ? "day-off" : ""}>
-                      {item.time || "N/A"}
+                    <b className={item.time === "Day off" || item.time === "Nghỉ" ? "day-off" : ""}>
+                      {item.time === "Day off" ? "Nghỉ ca" : item.time || "N/A"}
                     </b>
                   </p>
                 ))
@@ -278,10 +278,10 @@ export default function TechnicianProfile() {
             </div>
 
             <div className="profile-card documents-card">
-              <h3>▧ Recent Treatment Attachments</h3>
+              <h3>▧ Tài liệu đính kèm điều trị gần đây</h3>
 
               {documents.length === 0 ? (
-                <p className="profile-empty-text">No attachments found</p>
+                <p className="profile-empty-text">Chưa có tài liệu hoặc chứng chỉ đính kèm</p>
               ) : (
                 documents.map((doc, index) => (
                   <div
@@ -291,8 +291,8 @@ export default function TechnicianProfile() {
                     <span>📄</span>
 
                     <div>
-                      <b>{doc.name || doc.FileName || "Attachment"}</b>
-                      <p>{doc.type || doc.FileType || "File"}</p>
+                      <b>{doc.name || doc.FileName || "Tài liệu đính kèm"}</b>
+                      <p>{doc.type || doc.FileType || "Tệp tin"}</p>
                     </div>
 
                     <small>{dateText(doc.createdAt || doc.UploadedAt)}</small>
@@ -304,6 +304,7 @@ export default function TechnicianProfile() {
                         if (url) window.open(url, "_blank");
                       }}
                       disabled={!doc.FileUrl}
+                      title="Tải tệp xuống"
                     >
                       ⇩
                     </button>

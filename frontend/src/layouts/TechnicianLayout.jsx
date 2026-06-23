@@ -49,10 +49,10 @@ export default function TechnicianLayout({ children }) {
   }, []);
 
   const displayName =
-    profile?.FullName || user?.FullName || user?.fullName || "Technician";
+    profile?.FullName || user?.FullName || user?.fullName || "Kỹ thuật viên";
 
   const displayRole =
-    profile?.Position || profile?.Specialization || "Senior Technician";
+    profile?.Position || profile?.Specialization || "Kỹ thuật viên";
 
   const avatarUrl = useMemo(() => {
     return (
@@ -70,20 +70,20 @@ export default function TechnicianLayout({ children }) {
         <div className="tech-brand">
           <div className="tech-logo">✿</div>
           <h2>LUNA SALON</h2>
-          <span>TECHNICIAN</span>
+          <span>KỸ THUẬT VIÊN</span>
         </div>
 
         <nav className="tech-menu">
           <NavLink to="/technician" end>
-            Dashboard
+            Trang chủ
           </NavLink>
-          <NavLink to="/technician/schedule">My Schedule</NavLink>
-          <NavLink to="/technician/appointments">Appointments</NavLink>
-          <NavLink to="/technician/customers">Customers</NavLink>
-          <NavLink to="/technician/treatment-notes">Notes History</NavLink>
-          <NavLink to="/technician/earnings">Earnings</NavLink>
-          <NavLink to="/technician/profile">Profile</NavLink>
-          <NavLink to="/technician/settings">Settings</NavLink>
+          <NavLink to="/technician/schedule">Lịch làm việc</NavLink>
+          <NavLink to="/technician/appointments">Lịch hẹn</NavLink>
+          <NavLink to="/technician/customers">Khách hàng</NavLink>
+          <NavLink to="/technician/treatment-notes">Lịch sử điều trị</NavLink>
+          <NavLink to="/technician/earnings">Báo cáo thu nhập</NavLink>
+          <NavLink to="/technician/profile">Hồ sơ cá nhân</NavLink>
+          <NavLink to="/technician/settings">Cài đặt</NavLink>
         </nav>
 
         <div className="tech-user-card">

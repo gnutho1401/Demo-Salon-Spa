@@ -7,14 +7,68 @@ const DEFAULT_AVATAR = "/images/default-avatar.png";
 const DEFAULT_SERVICE_IMAGE = "/images/default-service.png";
 
 const STATUS_STEPS = [
-  { key: "PENDING_PAYMENT", label: "Pending Payment", icon: "▣" },
-  { key: "PAID", label: "Paid", icon: "💳" },
-  { key: "CONFIRMED", label: "Confirmed", icon: "✓" },
-  { key: "CHECKED_IN", label: "Checked In", icon: "◇" },
-  { key: "IN_PROGRESS", label: "In Progress", icon: "▶" },
-  { key: "COMPLETED", label: "Completed", icon: "✓" },
-  { key: "NO_SHOW", label: "No Show", icon: "⊗" },
+  { key: "PENDING_PAYMENT", label: "Chờ thanh toán", icon: "▣" },
+  { key: "PAID", label: "Đã thanh toán", icon: "💳" },
+  { key: "CONFIRMED", label: "Đã xác nhận", icon: "✓" },
+  { key: "CHECKED_IN", label: "Đã check-in", icon: "◇" },
+  { key: "IN_PROGRESS", label: "Đang thực hiện", icon: "▶" },
+  { key: "COMPLETED", label: "Hoàn thành", icon: "✓" },
+  { key: "NO_SHOW", label: "Khách không đến", icon: "⊗" },
 ];
+
+const STATUS_LABELS = {
+  PENDING_PAYMENT: "Chờ thanh toán",
+  PAID: "Đã thanh toán",
+  CONFIRMED: "Đã xác nhận",
+  CHECKED_IN: "Đã check-in",
+  IN_PROGRESS: "Đang thực hiện",
+  COMPLETED: "Hoàn thành",
+  NO_SHOW: "Khách không đến",
+  CANCELLED: "Đã hủy",
+  REFUND_PENDING: "Chờ hoàn tiền",
+  UNPAID: "Chưa thanh toán",
+};
+
+const PROGRESS_LABELS = {
+  IN_PROGRESS: "Đang theo dõi",
+  IMPROVED: "Đã cải thiện",
+  NEEDS_FOLLOW_UP: "Cần theo dõi lại",
+  COMPLETED: "Hoàn thành",
+};
+
+const MEMBERSHIP_MAP = {
+  Normal: "Thành viên Thường",
+  Silver: "Thành viên Bạc",
+  Gold: "Thành viên Vàng",
+  Diamond: "Thành viên Kim cương",
+  Platinum: "Thành viên Bạch kim",
+};
+
+function getMembershipLabel(level) {
+  return MEMBERSHIP_MAP[level] || level || "Thành viên Thường";
+}
+
+const PAYMENT_METHOD_MAP = {
+  CASH: "Tiền mặt",
+  BANK_TRANSFER: "Chuyển khoản ngân hàng",
+  VNPAY: "Ví VNPAY",
+  MOMO: "Ví Momo",
+  PAYOS: "Cổng PayOS",
+};
+
+function getPaymentMethodLabel(method) {
+  return PAYMENT_METHOD_MAP[String(method).toUpperCase()] || method || "—";
+}
+
+const translateNoteType = (type) => {
+  const map = {
+    'GENERAL': 'Ghi chú chung',
+    'TREATMENT': 'Ghi chú trị liệu',
+    'PRESCRIPTION': 'Phác đồ điều trị',
+    'FOLLOWUP': 'Theo dõi',
+  };
+  return map[String(type).toUpperCase()] || type;
+};
 
 function fileUrl(url, fallback) {
   return resolveFileUrl(url) || fallback;
@@ -29,9 +83,10 @@ function safeDate(value) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
-  return date.toLocaleDateString("en-US", {
-    month: "short",
+
+  return date.toLocaleDateString("vi-VN", {
     day: "2-digit",
+    month: "2-digit",
     year: "numeric",
   });
 }
@@ -40,9 +95,10 @@ function safeDateTime(value) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 19);
-  return date.toLocaleString("en-US", {
-    month: "short",
+
+  return date.toLocaleString("vi-VN", {
     day: "2-digit",
+    month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
@@ -63,6 +119,16 @@ function statusClass(status) {
   return String(status || "pending")
     .toLowerCase()
     .replaceAll("_", "-");
+}
+
+function statusLabel(status) {
+  const key = String(status || "").toUpperCase();
+  return STATUS_LABELS[key] || key.replaceAll("_", " ") || "—";
+}
+
+function progressLabel(status) {
+  const key = String(status || "").toUpperCase();
+  return PROGRESS_LABELS[key] || key.replaceAll("_", " ") || "—";
 }
 
 export default function TechnicianAppointmentDetail() {
@@ -127,9 +193,9 @@ export default function TechnicianAppointmentDetail() {
     return index < 0 ? 0 : index;
   }, [status]);
 
-  const canStart = status === "CHECKED_IN";
+  const canStart = ["CHECKED_IN", "CONFIRMED", "PAID"].includes(status);
   const canComplete = status === "IN_PROGRESS";
-  const canNoShow = ["CONFIRMED", "CHECKED_IN"].includes(status);
+  const canNoShow = ["CONFIRMED", "CHECKED_IN", "PAID"].includes(status);
 
   function resetNoteForm() {
     setNoteTitle("");
@@ -184,7 +250,10 @@ export default function TechnicianAppointmentDetail() {
         },
       );
     } catch (err) {
-      alert(err.response?.data?.message || "Không upload được ảnh điều trị");
+      alert(
+        err.response?.data?.message ||
+          "Không tải lên được hình ảnh hoặc tài liệu điều trị",
+      );
     } finally {
       setUploadingNoteId("");
     }
@@ -192,7 +261,7 @@ export default function TechnicianAppointmentDetail() {
 
   async function saveNote() {
     if (!noteContent.trim()) {
-      alert("Vui lòng nhập nội dung ghi chú");
+      alert("Vui lòng nhập nội dung ghi chú dịch vụ");
       return;
     }
 
@@ -231,7 +300,7 @@ export default function TechnicianAppointmentDetail() {
       resetNoteForm();
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Không lưu được ghi chú điều trị");
+      alert(err.response?.data?.message || "Không lưu được ghi chú dịch vụ");
     } finally {
       setNoteSaving(false);
     }
@@ -247,13 +316,13 @@ export default function TechnicianAppointmentDetail() {
               type="button"
               onClick={() => navigate("/technician/schedule")}
             >
-              ‹ Back to Schedule
+              ‹ Quay lại lịch làm việc
             </button>
 
             <h1>
-              Appointment Details <span>▣</span>
+              Chi tiết lịch hẹn <span>▣</span>
             </h1>
-            <p>View and manage appointment information</p>
+            <p>Xem và quản lý thông tin lịch hẹn được phân công</p>
           </div>
 
           <div className="tech-apd-top-actions">
@@ -270,7 +339,7 @@ export default function TechnicianAppointmentDetail() {
               type="button"
               onClick={() => navigate("/technician/schedule")}
             >
-              View Schedule
+              Xem lịch làm việc
             </button>
           </div>
         </header>
@@ -285,21 +354,21 @@ export default function TechnicianAppointmentDetail() {
               <div className="tech-apd-hero-icon">▣</div>
 
               <div>
-                <span>Appointment ID</span>
+                <span>Mã lịch hẹn</span>
                 <strong>
                   {detail.AppointmentCode || `#APT-${detail.AppointmentId}`}
                 </strong>
               </div>
 
               <div>
-                <span>Status</span>
+                <span>Trạng thái</span>
                 <b className={`tech-apd-badge ${statusClass(status)}`}>
-                  {status.replaceAll("_", " ")}
+                  {statusLabel(status)}
                 </b>
               </div>
 
               <div>
-                <span>Date & Time</span>
+                <span>Ngày & giờ</span>
                 <strong>{safeDate(detail.AppointmentDate)}</strong>
                 <small>
                   {detail.StartTime || "—"} - {detail.EndTime || "—"}
@@ -307,23 +376,21 @@ export default function TechnicianAppointmentDetail() {
               </div>
 
               <div>
-                <span>Duration</span>
-                <strong>{detail.DurationMinutes || 0} minutes</strong>
+                <span>Thời lượng</span>
+                <strong>{detail.DurationMinutes || 0} phút</strong>
               </div>
 
               <div>
-                <span>Technician</span>
+                <span>Kỹ thuật viên</span>
                 <strong>{detail.TechnicianName || "—"}</strong>
-                <small>Beauty specialist</small>
+                <small>Chuyên viên làm đẹp</small>
               </div>
             </section>
 
             <section className="tech-apd-layout">
               <main className="tech-apd-main">
                 <div className="tech-apd-card">
-                  <div className="tech-apd-card-title">
-                    ♙ Service Information
-                  </div>
+                  <div className="tech-apd-card-title">♙ Thông tin dịch vụ</div>
 
                   {services.length === 0 ? (
                     <div className="tech-apd-empty">Chưa có dịch vụ</div>
@@ -335,7 +402,7 @@ export default function TechnicianAppointmentDetail() {
                       >
                         <img
                           src={fileUrl(srv.ImageUrl, DEFAULT_SERVICE_IMAGE)}
-                          alt={srv.ServiceName || "Service"}
+                          alt={srv.ServiceName || "Dịch vụ"}
                           onError={(event) => {
                             event.currentTarget.src = DEFAULT_SERVICE_IMAGE;
                           }}
@@ -346,7 +413,7 @@ export default function TechnicianAppointmentDetail() {
 
                           <p>
                             {srv.Description ||
-                              "Professional salon service for this appointment."}
+                              "Dịch vụ chăm sóc chuyên nghiệp tại salon."}
                           </p>
 
                           <div className="tech-apd-service-meta">
@@ -355,13 +422,13 @@ export default function TechnicianAppointmentDetail() {
                               {srv.DurationMinutes ||
                                 detail.DurationMinutes ||
                                 0}{" "}
-                              minutes
+                              phút
                             </span>
                             <span>◉ {money(srv.Price)}</span>
                           </div>
 
                           <div className="tech-apd-tags">
-                            <span>{srv.CategoryName || "Service"}</span>
+                            <span>{srv.CategoryName || "Dịch vụ"}</span>
                             <small>
                               {index + 1}/{services.length}
                             </small>
@@ -373,9 +440,7 @@ export default function TechnicianAppointmentDetail() {
                 </div>
 
                 <div className="tech-apd-card tech-apd-timeline-card">
-                  <div className="tech-apd-card-title">
-                    Appointment Timeline
-                  </div>
+                  <div className="tech-apd-card-title">Tiến trình lịch hẹn</div>
 
                   <div className="tech-apd-vertical-timeline">
                     {STATUS_STEPS.map((step, index) => (
@@ -406,9 +471,9 @@ export default function TechnicianAppointmentDetail() {
                           <p>
                             {index <= activeStepIndex
                               ? step.key === status
-                                ? "Current status"
-                                : "Updated"
-                              : "Pending"}
+                                ? "Trạng thái hiện tại"
+                                : "Đã cập nhật"
+                              : "Đang chờ"}
                           </p>
                         </section>
                       </div>
@@ -419,7 +484,7 @@ export default function TechnicianAppointmentDetail() {
                 <div className="tech-apd-card">
                   <div className="tech-apd-card-head">
                     <div className="tech-apd-card-title">
-                      Treatment Notes ({notes.length})
+                      Ghi chú dịch vụ ({notes.length})
                     </div>
 
                     <button
@@ -428,14 +493,14 @@ export default function TechnicianAppointmentDetail() {
                         document.getElementById("tech-add-note")?.focus()
                       }
                     >
-                      ＋ Add New Note
+                      ＋ Thêm ghi chú mới
                     </button>
                   </div>
 
                   <div className="tech-apd-notes-list">
                     {notes.length === 0 ? (
                       <div className="tech-apd-empty">
-                        Chưa có ghi chú điều trị
+                        Chưa có ghi chú dịch vụ
                       </div>
                     ) : (
                       notes.map((note) => (
@@ -448,11 +513,11 @@ export default function TechnicianAppointmentDetail() {
                             <h4>
                               {note.Title ||
                                 note.AuthorName ||
-                                "Technician note"}
+                                "Ghi chú của kỹ thuật viên"}
                             </h4>
 
                             <small>
-                              {note.NoteType || "GENERAL"} •{" "}
+                              {translateNoteType(note.NoteType || "GENERAL")} •{" "}
                               {safeDateTime(note.CreatedAt)}
                             </small>
 
@@ -460,48 +525,48 @@ export default function TechnicianAppointmentDetail() {
 
                             {note.SkinCondition && (
                               <p>
-                                <b>Skin condition:</b> {note.SkinCondition}
+                                <b>Tình trạng da / tóc / móng:</b>{" "}
+                                {note.SkinCondition}
                               </p>
                             )}
 
                             {note.Technique && (
                               <p>
-                                <b>Technique:</b> {note.Technique}
+                                <b>Kỹ thuật đã áp dụng:</b> {note.Technique}
                               </p>
                             )}
 
                             {note.ProductsUsed && (
                               <p>
-                                <b>Products:</b> {note.ProductsUsed}
+                                <b>Sản phẩm đã sử dụng:</b> {note.ProductsUsed}
                               </p>
                             )}
 
                             {note.CustomerFeedback && (
                               <p>
-                                <b>Customer feedback:</b>{" "}
+                                <b>Phản hồi của khách hàng:</b>{" "}
                                 {note.CustomerFeedback}
                               </p>
                             )}
 
                             {note.Recommendation && (
                               <p>
-                                <b>Recommendation:</b> {note.Recommendation}
+                                <b>Khuyến nghị sau dịch vụ:</b>{" "}
+                                {note.Recommendation}
                               </p>
                             )}
 
                             {note.FollowUpDate && (
                               <p>
-                                <b>Follow-up:</b> {safeDate(note.FollowUpDate)}
+                                <b>Ngày theo dõi lại:</b>{" "}
+                                {safeDate(note.FollowUpDate)}
                               </p>
                             )}
 
                             {note.ProgressStatus && (
                               <p>
-                                <b>Progress:</b>{" "}
-                                {String(note.ProgressStatus).replaceAll(
-                                  "_",
-                                  " ",
-                                )}
+                                <b>Tình trạng tiến triển:</b>{" "}
+                                {progressLabel(note.ProgressStatus)}
                               </p>
                             )}
 
@@ -519,7 +584,7 @@ export default function TechnicianAppointmentDetail() {
                                       target="_blank"
                                       rel="noreferrer"
                                     >
-                                      {file.FileName || "Attachment"}
+                                      {file.FileName || "Tệp đính kèm"}
                                     </a>
                                   ))}
                                 </div>
@@ -534,7 +599,7 @@ export default function TechnicianAppointmentDetail() {
                               )
                             }
                           >
-                            View Details
+                            Xem chi tiết
                           </button>
                         </article>
                       ))
@@ -546,7 +611,7 @@ export default function TechnicianAppointmentDetail() {
               <section className="tech-apd-center">
                 <div className="tech-apd-card">
                   <div className="tech-apd-card-title">
-                    ♙ Appointment Status
+                    ♙ Trạng thái lịch hẹn
                   </div>
 
                   <div className="tech-apd-steps">
@@ -564,8 +629,8 @@ export default function TechnicianAppointmentDetail() {
                   </div>
 
                   <div className="tech-apd-update-box">
-                    <h3>Update Status</h3>
-                    <p>Update the current status of this appointment</p>
+                    <h3>Cập nhật trạng thái</h3>
+                    <p>Cập nhật trạng thái hiện tại của lịch hẹn này</p>
 
                     {canStart && (
                       <button
@@ -576,14 +641,14 @@ export default function TechnicianAppointmentDetail() {
                           runAction(
                             "start",
                             `/technician/appointments/${id}/start`,
-                            "Bắt đầu dịch vụ này?",
+                            "Bạn có chắc muốn bắt đầu thực hiện dịch vụ này?",
                           )
                         }
                       >
                         ▶{" "}
                         {actionLoading === "start"
-                          ? "Processing..."
-                          : "Start Service"}
+                          ? "Đang xử lý..."
+                          : "Bắt đầu dịch vụ"}
                       </button>
                     )}
 
@@ -596,14 +661,14 @@ export default function TechnicianAppointmentDetail() {
                           runAction(
                             "complete",
                             `/technician/appointments/${id}/complete`,
-                            "Đánh dấu hoàn thành dịch vụ này?",
+                            "Bạn có chắc muốn đánh dấu hoàn thành dịch vụ này?",
                           )
                         }
                       >
                         ✓{" "}
                         {actionLoading === "complete"
-                          ? "Processing..."
-                          : "Mark as Completed"}
+                          ? "Đang xử lý..."
+                          : "Đánh dấu hoàn thành"}
                       </button>
                     )}
 
@@ -616,27 +681,27 @@ export default function TechnicianAppointmentDetail() {
                           runAction(
                             "noshow",
                             `/technician/appointments/${id}/no-show`,
-                            "Đánh dấu khách không đến?",
+                            "Bạn có chắc muốn đánh dấu khách không đến?",
                           )
                         }
                       >
                         ⊗{" "}
                         {actionLoading === "noshow"
-                          ? "Processing..."
-                          : "Mark as No Show"}
+                          ? "Đang xử lý..."
+                          : "Khách không đến"}
                       </button>
                     )}
 
                     {!canStart && !canComplete && !canNoShow && (
                       <div className="tech-apd-empty">
-                        Trạng thái này không còn thao tác cập nhật.
+                        Trạng thái này hiện không còn thao tác cập nhật.
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="tech-apd-card">
-                  <div className="tech-apd-card-title">Status History</div>
+                  <div className="tech-apd-card-title">Lịch sử trạng thái</div>
 
                   <div className="tech-apd-history">
                     {history.length === 0 ? (
@@ -652,13 +717,10 @@ export default function TechnicianAppointmentDetail() {
                           }
                         >
                           <b className={statusClass(item.NewStatus)}>
-                            {String(item.NewStatus || "UPDATED").replaceAll(
-                              "_",
-                              " ",
-                            )}
+                            {statusLabel(item.NewStatus)}
                           </b>
                           <span>{safeDateTime(item.ChangedAt)}</span>
-                          <small>by {item.ChangedByName || "System"}</small>
+                          <small>bởi {item.ChangedByName || "Hệ thống"}</small>
                         </div>
                       ))
                     )}
@@ -669,16 +731,18 @@ export default function TechnicianAppointmentDetail() {
                   className="tech-apd-card tech-apd-note-form-card"
                   id="note-form-card"
                 >
-                  <div className="tech-apd-card-title">Add Treatment Note</div>
+                  <div className="tech-apd-card-title">
+                    Thêm ghi chú dịch vụ
+                  </div>
 
                   <div className="tech-apd-form-section">
-                    <h4>Treatment Summary</h4>
+                    <h4>Tóm tắt buổi dịch vụ</h4>
 
                     <input
                       type="text"
                       value={noteTitle}
                       onChange={(event) => setNoteTitle(event.target.value)}
-                      placeholder="Session title..."
+                      placeholder="Tiêu đề buổi dịch vụ..."
                     />
 
                     <textarea
@@ -686,37 +750,37 @@ export default function TechnicianAppointmentDetail() {
                       rows={5}
                       value={noteContent}
                       onChange={(event) => setNoteContent(event.target.value)}
-                      placeholder="Describe treatment performed, customer condition and result..."
+                      placeholder="Mô tả dịch vụ đã thực hiện, tình trạng khách hàng và kết quả đạt được..."
                     />
                   </div>
 
                   <div className="tech-apd-form-section">
-                    <h4>Treatment Details</h4>
+                    <h4>Chi tiết thực hiện</h4>
 
                     <textarea
                       rows={3}
                       value={skinCondition}
                       onChange={(event) => setSkinCondition(event.target.value)}
-                      placeholder="Skin / hair / nail condition..."
+                      placeholder="Tình trạng da / tóc / móng của khách hàng..."
                     />
 
                     <textarea
                       rows={3}
                       value={technique}
                       onChange={(event) => setTechnique(event.target.value)}
-                      placeholder="Techniques used..."
+                      placeholder="Kỹ thuật đã áp dụng..."
                     />
 
                     <textarea
                       rows={3}
                       value={productsUsed}
                       onChange={(event) => setProductsUsed(event.target.value)}
-                      placeholder="Products used..."
+                      placeholder="Sản phẩm đã sử dụng..."
                     />
                   </div>
 
                   <div className="tech-apd-form-section">
-                    <h4>Follow-up & Recommendation</h4>
+                    <h4>Khuyến nghị & chăm sóc sau dịch vụ</h4>
 
                     <textarea
                       rows={3}
@@ -724,7 +788,7 @@ export default function TechnicianAppointmentDetail() {
                       onChange={(event) =>
                         setCustomerFeedback(event.target.value)
                       }
-                      placeholder="Customer feedback..."
+                      placeholder="Phản hồi của khách hàng..."
                     />
 
                     <textarea
@@ -733,12 +797,12 @@ export default function TechnicianAppointmentDetail() {
                       onChange={(event) =>
                         setRecommendation(event.target.value)
                       }
-                      placeholder="After-care recommendation..."
+                      placeholder="Hướng dẫn chăm sóc sau dịch vụ..."
                     />
 
                     <div className="tech-apd-form-row">
                       <label>
-                        <span>Follow-up date</span>
+                        <span>Ngày theo dõi lại</span>
                         <input
                           type="date"
                           value={followUpDate}
@@ -749,26 +813,26 @@ export default function TechnicianAppointmentDetail() {
                       </label>
 
                       <label>
-                        <span>Progress status</span>
+                        <span>Tình trạng tiến triển</span>
                         <select
                           value={progressStatus}
                           onChange={(event) =>
                             setProgressStatus(event.target.value)
                           }
                         >
-                          <option value="IN_PROGRESS">In Progress</option>
-                          <option value="IMPROVED">Improved</option>
+                          <option value="IN_PROGRESS">Đang theo dõi</option>
+                          <option value="IMPROVED">Đã cải thiện</option>
                           <option value="NEEDS_FOLLOW_UP">
-                            Needs Follow Up
+                            Cần theo dõi lại
                           </option>
-                          <option value="COMPLETED">Completed</option>
+                          <option value="COMPLETED">Hoàn thành</option>
                         </select>
                       </label>
                     </div>
                   </div>
 
                   <div className="tech-apd-form-section">
-                    <h4>Treatment Attachments</h4>
+                    <h4>Tệp đính kèm</h4>
 
                     <label className="tech-apd-upload-box">
                       <input
@@ -782,10 +846,10 @@ export default function TechnicianAppointmentDetail() {
                         hidden
                       />
 
-                      <strong>📷 Upload treatment photos or PDF</strong>
+                      <strong>📷 Tải lên hình ảnh điều trị hoặc tệp PDF</strong>
                       <small>
-                        Before / after images, treatment report, or consultation
-                        file
+                        Ảnh trước / sau dịch vụ, báo cáo điều trị hoặc tài liệu
+                        tư vấn
                       </small>
                     </label>
 
@@ -802,7 +866,7 @@ export default function TechnicianAppointmentDetail() {
 
                   <div className="tech-apd-note-actions">
                     <button type="button" onClick={resetNoteForm}>
-                      Clear
+                      Xóa nội dung
                     </button>
 
                     <button
@@ -812,8 +876,8 @@ export default function TechnicianAppointmentDetail() {
                       onClick={saveNote}
                     >
                       {noteSaving || uploadingNoteId
-                        ? "Saving..."
-                        : "Save Note ✚"}
+                        ? "Đang lưu..."
+                        : "Lưu ghi chú ✚"}
                     </button>
                   </div>
                 </div>
@@ -822,13 +886,13 @@ export default function TechnicianAppointmentDetail() {
               <aside className="tech-apd-side">
                 <div className="tech-apd-card tech-apd-customer">
                   <div className="tech-apd-card-title">
-                    ♡ Customer Information
+                    ♡ Thông tin khách hàng
                   </div>
 
                   <div className="tech-apd-customer-main">
                     <img
                       src={fileUrl(detail.CustomerAvatar, DEFAULT_AVATAR)}
-                      alt={detail.CustomerName || "Customer"}
+                      alt={detail.CustomerName || "Khách hàng"}
                       onError={(event) => {
                         event.currentTarget.src = DEFAULT_AVATAR;
                       }}
@@ -836,11 +900,11 @@ export default function TechnicianAppointmentDetail() {
 
                     <div>
                       <h3>
-                        {detail.CustomerName || "Customer"}{" "}
-                        <span>{detail.MembershipLevel || "Member"}</span>
+                        {detail.CustomerName || "Khách hàng"}{" "}
+                        <span>{getMembershipLabel(detail.MembershipLevel)}</span>
                       </h3>
-                      <p>♧ {detail.CustomerPhone || "No phone"}</p>
-                      <p>✉ {detail.CustomerEmail || "No email"}</p>
+                      <p>♧ {detail.CustomerPhone || "Chưa có số điện thoại"}</p>
+                      <p>✉ {detail.CustomerEmail || "Chưa có email"}</p>
                     </div>
                   </div>
 
@@ -854,15 +918,17 @@ export default function TechnicianAppointmentDetail() {
                       )
                     }
                   >
-                    View Profile
+                    Xem hồ sơ khách hàng
                   </button>
                 </div>
 
                 <div className="tech-apd-card">
-                  <div className="tech-apd-card-title">Customer Notes</div>
+                  <div className="tech-apd-card-title">
+                    Ghi chú của khách hàng
+                  </div>
 
                   <div className="tech-apd-customer-note">
-                    <b>Appointment note</b>
+                    <b>Ghi chú lịch hẹn</b>
                     <p>
                       {detail.Notes ||
                         "Khách chưa nhập ghi chú cho lịch hẹn này."}
@@ -871,50 +937,52 @@ export default function TechnicianAppointmentDetail() {
                 </div>
 
                 <div className="tech-apd-card">
-                  <div className="tech-apd-card-title">Payment Information</div>
+                  <div className="tech-apd-card-title">
+                    Thông tin thanh toán
+                  </div>
 
                   <div className="tech-apd-payment-row">
-                    <span>Payment Status</span>
+                    <span>Trạng thái thanh toán</span>
                     <b
                       className={`tech-apd-badge ${statusClass(paymentStatus)}`}
                     >
-                      {paymentStatus}
+                      {statusLabel(paymentStatus)}
                     </b>
                   </div>
 
                   <div className="tech-apd-payment-row">
-                    <span>Total</span>
+                    <span>Tổng tiền</span>
                     <strong>{money(detail.TotalAmount)}</strong>
                   </div>
 
                   <div className="tech-apd-payment-row">
-                    <span>Discount</span>
+                    <span>Giảm giá</span>
                     <strong>{money(detail.DiscountAmount)}</strong>
                   </div>
 
                   <div className="tech-apd-payment-row">
-                    <span>Amount</span>
+                    <span>Thành tiền</span>
                     <strong>{money(detail.FinalAmount)}</strong>
                   </div>
 
                   <div className="tech-apd-payment-row">
-                    <span>Payment Method</span>
-                    <strong>{detail.PaymentMethod || "—"}</strong>
+                    <span>Phương thức thanh toán</span>
+                    <strong>{getPaymentMethodLabel(detail.PaymentMethod)}</strong>
                   </div>
 
                   <div className="tech-apd-payment-row">
-                    <span>Transaction</span>
+                    <span>Mã giao dịch</span>
                     <strong>{detail.TransactionCode || "—"}</strong>
                   </div>
 
                   <div className="tech-apd-payment-row">
-                    <span>Paid On</span>
+                    <span>Ngày thanh toán</span>
                     <strong>{safeDateTime(detail.PaidAt)}</strong>
                   </div>
                 </div>
 
                 <div className="tech-apd-card">
-                  <div className="tech-apd-card-title">Quick Actions</div>
+                  <div className="tech-apd-card-title">Thao tác nhanh</div>
 
                   <div className="tech-apd-quick-list">
                     <button
@@ -926,7 +994,7 @@ export default function TechnicianAppointmentDetail() {
                         )
                       }
                     >
-                      ▣ View Customer History <span>›</span>
+                      ▣ Xem lịch sử khách hàng <span>›</span>
                     </button>
 
                     <button
@@ -938,7 +1006,7 @@ export default function TechnicianAppointmentDetail() {
                         )
                       }
                     >
-                      ♙ Customer Profile <span>›</span>
+                      ♙ Hồ sơ khách hàng <span>›</span>
                     </button>
 
                     <button
@@ -949,14 +1017,14 @@ export default function TechnicianAppointmentDetail() {
                         )
                       }
                     >
-                      ✎ Treatment Notes <span>›</span>
+                      ✎ Ghi chú dịch vụ <span>›</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => navigate("/technician/schedule")}
                     >
-                      ♧ Back to Schedule <span>›</span>
+                      ♧ Quay lại lịch làm việc <span>›</span>
                     </button>
                   </div>
                 </div>

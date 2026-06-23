@@ -35,10 +35,10 @@ export default function AdminServices() {
   const [categories, setCategories] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState([]);
+  const [statusTab, setStatusTab] = useState("ALL"); // ALL, AVAILABLE, INACTIVE, HIDDEN
   const [filters, setFilters] = useState({
     keyword: "",
     categoryId: "",
-    status: "",
   });
 
   const [selected, setSelected] = useState(null);
@@ -61,7 +61,6 @@ export default function AdminServices() {
           params: {
             keyword: filters.keyword || undefined,
             categoryId: filters.categoryId || undefined,
-            status: filters.status || undefined,
           },
         }),
         axiosClient.get("/admin/services/categories"),
@@ -84,18 +83,29 @@ export default function AdminServices() {
     load();
   }, []);
 
+  const activeItems = useMemo(() => {
+    return items.filter((x) => x.Status !== "UNAVAILABLE");
+  }, [items]);
+
   const stats = useMemo(() => {
     return {
-      total: items.length,
-      available: items.filter((x) => x.Status === "AVAILABLE").length,
-      inactive: items.filter((x) => x.Status === "INACTIVE").length,
-      hidden: items.filter((x) => x.Status === "HIDDEN").length,
-      appointments: items.reduce(
+      total: activeItems.length,
+      available: activeItems.filter((x) => x.Status === "AVAILABLE").length,
+      inactive: activeItems.filter((x) => x.Status === "INACTIVE").length,
+      hidden: activeItems.filter((x) => x.Status === "HIDDEN").length,
+      appointments: activeItems.reduce(
         (sum, x) => sum + Number(x.AppointmentCount || 0),
         0,
       ),
     };
-  }, [items]);
+  }, [activeItems]);
+
+  const filteredItems = useMemo(() => {
+    return activeItems.filter((item) => {
+      if (statusTab === "ALL") return true;
+      return String(item.Status).toUpperCase() === statusTab.toUpperCase();
+    });
+  }, [activeItems, statusTab]);
 
   function openCreate() {
     setEditingId(null);
@@ -268,7 +278,8 @@ export default function AdminServices() {
   }
 
   function clearFilters() {
-    setFilters({ keyword: "", categoryId: "", status: "" });
+    setFilters({ keyword: "", categoryId: "" });
+    setStatusTab("ALL");
   }
 
   return (
@@ -291,7 +302,11 @@ export default function AdminServices() {
       {error ? <div className="admin-error-card">{error}</div> : null}
 
       <div className="admin-stat-grid">
-        <article className="admin-stat-card">
+        <article 
+          className={`admin-stat-card ${statusTab === "ALL" ? "active" : ""}`}
+          style={{ cursor: "pointer", border: statusTab === "ALL" ? "2px solid #3f2817" : undefined }}
+          onClick={() => setStatusTab("ALL")}
+        >
           <div className="admin-stat-icon">✨</div>
           <div>
             <p>Tổng dịch vụ</p>
@@ -300,7 +315,11 @@ export default function AdminServices() {
           </div>
         </article>
 
-        <article className="admin-stat-card">
+        <article 
+          className={`admin-stat-card ${statusTab === "AVAILABLE" ? "active" : ""}`}
+          style={{ cursor: "pointer", border: statusTab === "AVAILABLE" ? "2px solid #3f2817" : undefined }}
+          onClick={() => setStatusTab("AVAILABLE")}
+        >
           <div className="admin-stat-icon">✓</div>
           <div>
             <p>Đang bán</p>
@@ -309,14 +328,18 @@ export default function AdminServices() {
           </div>
         </article>
 
-        <article className="admin-stat-card">
+        <article 
+          className={`admin-stat-card ${statusTab === "INACTIVE" || statusTab === "HIDDEN" ? "active" : ""}`}
+          style={{ cursor: "pointer", border: (statusTab === "INACTIVE" || statusTab === "HIDDEN") ? "2px solid #3f2817" : undefined }}
+          onClick={() => setStatusTab(statusTab === "INACTIVE" ? "HIDDEN" : "INACTIVE")}
+        >
           <div className="admin-stat-icon">⏸</div>
           <div>
             <p>Inactive / Hidden</p>
             <h3>
               {stats.inactive} / {stats.hidden}
             </h3>
-            <span>Dịch vụ tạm ngưng</span>
+            <span>Click để đổi bộ lọc</span>
           </div>
         </article>
 
@@ -351,16 +374,6 @@ export default function AdminServices() {
           ))}
         </select>
 
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="AVAILABLE">AVAILABLE</option>
-          <option value="INACTIVE">INACTIVE</option>
-          <option value="HIDDEN">HIDDEN</option>
-        </select>
-
         <button className="admin-refresh-btn" onClick={load}>
           Lọc
         </button>
@@ -370,13 +383,45 @@ export default function AdminServices() {
         </button>
       </div>
 
+      {/* Tabs Phân loại trạng thái */}
+      <div className="refund-tabs" style={{ display: "flex", gap: "8px" }}>
+        <button 
+          className={`refund-tab-btn ${statusTab === "ALL" ? "active" : ""}`}
+          onClick={() => setStatusTab("ALL")}
+          type="button"
+        >
+          Tất cả ({stats.total})
+        </button>
+        <button 
+          className={`refund-tab-btn ${statusTab === "AVAILABLE" ? "active" : ""}`}
+          onClick={() => setStatusTab("AVAILABLE")}
+          type="button"
+        >
+          Đang bán AVAILABLE ({stats.available})
+        </button>
+        <button 
+          className={`refund-tab-btn ${statusTab === "INACTIVE" ? "active" : ""}`}
+          onClick={() => setStatusTab("INACTIVE")}
+          type="button"
+        >
+          Tạm ngưng INACTIVE ({stats.inactive})
+        </button>
+        <button 
+          className={`refund-tab-btn ${statusTab === "HIDDEN" ? "active" : ""}`}
+          onClick={() => setStatusTab("HIDDEN")}
+          type="button"
+        >
+          Đang ẩn HIDDEN ({stats.hidden})
+        </button>
+      </div>
+
       {loading ? (
-        <div className="admin-loading-card">Đang tải danh sách dịch vụ...</div>
+        <div className="admin-loading-card" style={{ marginTop: "20px" }}>Đang tải danh sách dịch vụ...</div>
       ) : null}
 
       {!loading ? (
-        <div className="admin-services-grid">
-          {items.map((item) => (
+        <div className="admin-services-grid" style={{ marginTop: "20px" }}>
+          {filteredItems.map((item) => (
             <article className="admin-service-card" key={item.ServiceId}>
               <div className="admin-service-image">
                 <img src={image(item.ImageUrl)} alt={item.ServiceName} />
@@ -456,7 +501,7 @@ export default function AdminServices() {
             </article>
           ))}
 
-          {!items.length ? (
+          {!filteredItems.length ? (
             <div className="admin-empty">Không có dịch vụ phù hợp.</div>
           ) : null}
         </div>

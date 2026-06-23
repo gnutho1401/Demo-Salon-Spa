@@ -56,7 +56,11 @@ async function getDashboard() {
 
         ISNULL((SELECT COUNT(*) FROM Users WHERE Status = 'ACTIVE'), 0) AS ActiveUsers,
         ISNULL((SELECT COUNT(*) FROM Users WHERE Status = 'INACTIVE'), 0) AS InactiveUsers,
-        ISNULL((SELECT COUNT(*) FROM Users WHERE Status = 'BANNED'), 0) AS BannedUsers
+        ISNULL((SELECT COUNT(*) FROM Users WHERE Status = 'BANNED'), 0) AS BannedUsers,
+        ISNULL((SELECT COUNT(*) FROM WaitingList), 0) AS TotalWaitingCount,
+        ISNULL((SELECT COUNT(*) FROM WaitingList WHERE Status IN ('MATCHED', 'BOOKED', 'SKIPPED')), 0) AS MatchedWaitingCount,
+        ISNULL((SELECT COUNT(*) FROM WaitingList WHERE Status = 'BOOKED'), 0) AS BookedWaitingCount,
+        ISNULL((SELECT COUNT(*) FROM WaitingList WHERE Status IN ('EXPIRED', 'SKIPPED')), 0) AS ExpiredWaitingCount
     `),
 
     pool.request().query(`
@@ -239,6 +243,10 @@ async function getDashboard() {
       activeUsers: Number(s.ActiveUsers || 0),
       inactiveUsers: Number(s.InactiveUsers || 0),
       bannedUsers: Number(s.BannedUsers || 0),
+      totalWaitingCount: Number(s.TotalWaitingCount || 0),
+      matchedWaitingCount: Number(s.MatchedWaitingCount || 0),
+      bookedWaitingCount: Number(s.BookedWaitingCount || 0),
+      expiredWaitingCount: Number(s.ExpiredWaitingCount || 0),
     },
 
     appointmentStatus: appointmentStatus.recordset.map((row) => ({

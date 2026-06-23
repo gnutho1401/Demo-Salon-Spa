@@ -1655,3 +1655,272 @@ UNION ALL SELECT 'Notifications', COUNT(*) FROM Notifications
 UNION ALL SELECT 'TreatmentNotes', COUNT(*) FROM TreatmentNotes
 UNION ALL SELECT 'EmployeePerformance', COUNT(*) FROM EmployeePerformance;
 GO
+
+
+USE BeautySalonSystem1;
+GO
+
+IF OBJECT_ID('dbo.CustomerFavoriteEmployees', 'U') IS NOT NULL
+BEGIN
+    DROP TABLE dbo.CustomerFavoriteEmployees;
+END
+GO
+
+CREATE TABLE CustomerFavoriteEmployees (
+    UserId INT NOT NULL,
+    EmployeeId INT NOT NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+
+    CONSTRAINT PK_CustomerFavoriteEmployees 
+        PRIMARY KEY (UserId, EmployeeId),
+
+    CONSTRAINT FK_CustomerFavoriteEmployees_Users 
+        FOREIGN KEY (UserId) 
+        REFERENCES Users(UserId) 
+        ON DELETE CASCADE,
+
+    CONSTRAINT FK_CustomerFavoriteEmployees_Employees 
+        FOREIGN KEY (EmployeeId) 
+        REFERENCES Employees(EmployeeId)
+);
+GO
+
+IF COL_LENGTH('WaitingList', 'Note') IS NULL
+BEGIN
+    ALTER TABLE WaitingList ADD Note NVARCHAR(500) NULL;
+END;
+
+IF COL_LENGTH('WaitingList', 'UpdatedAt') IS NULL
+BEGIN
+    ALTER TABLE WaitingList ADD UpdatedAt DATETIME NULL;
+END;
+
+IF COL_LENGTH('dbo.WaitingList', 'Note') IS NULL
+BEGIN
+    ALTER TABLE dbo.WaitingList ADD Note NVARCHAR(500) NULL;
+END;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'UpdatedAt') IS NULL
+BEGIN
+    ALTER TABLE dbo.WaitingList ADD UpdatedAt DATETIME NULL;
+END;
+GO
+
+UPDATE dbo.WaitingList
+SET UpdatedAt = ISNULL(UpdatedAt, CreatedAt)
+WHERE UpdatedAt IS NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'Note') IS NULL
+    ALTER TABLE dbo.WaitingList ADD Note NVARCHAR(500) NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'UpdatedAt') IS NULL
+    ALTER TABLE dbo.WaitingList ADD UpdatedAt DATETIME NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'PreferredEmployeeId') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredEmployeeId INT NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'PreferredBranchId') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredBranchId INT NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'PreferredTimeFrom') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredTimeFrom TIME NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'PreferredTimeTo') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredTimeTo TIME NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'FlexibleTimeSlot') IS NULL
+    ALTER TABLE dbo.WaitingList ADD FlexibleTimeSlot NVARCHAR(30) NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'PriorityLevel') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PriorityLevel NVARCHAR(20) NOT NULL DEFAULT 'NORMAL';
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'ContactMethod') IS NULL
+    ALTER TABLE dbo.WaitingList ADD ContactMethod NVARCHAR(30) NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'ContactPhone') IS NULL
+    ALTER TABLE dbo.WaitingList ADD ContactPhone NVARCHAR(20) NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'Reason') IS NULL
+    ALTER TABLE dbo.WaitingList ADD Reason NVARCHAR(255) NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'CancelReason') IS NULL
+    ALTER TABLE dbo.WaitingList ADD CancelReason NVARCHAR(255) NULL;
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'ConvertedAppointmentId') IS NULL
+    ALTER TABLE dbo.WaitingList ADD ConvertedAppointmentId INT NULL;
+GO
+
+UPDATE dbo.WaitingList
+SET UpdatedAt = ISNULL(UpdatedAt, CreatedAt)
+WHERE UpdatedAt IS NULL;
+GO
+
+IF OBJECT_ID('dbo.LoyaltyPointTransactions', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.LoyaltyPointTransactions (
+        TransactionId INT IDENTITY(1,1) PRIMARY KEY,
+        CustomerId INT NOT NULL,
+        AppointmentId INT NULL,
+        PaymentId INT NULL,
+        Type NVARCHAR(20) NOT NULL,
+        Points INT NOT NULL,
+        Amount DECIMAL(18,2) NULL,
+        Note NVARCHAR(255) NULL,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_LoyaltyPointTransactions_Customers
+            FOREIGN KEY (CustomerId) REFERENCES dbo.Customers(CustomerId)
+    );
+END;
+GO
+
+IF COL_LENGTH('dbo.Invoices', 'RewardPointsUsed') IS NULL
+BEGIN
+    ALTER TABLE dbo.Invoices ADD RewardPointsUsed INT NOT NULL DEFAULT 0;
+END;
+GO
+
+IF COL_LENGTH('dbo.Invoices', 'RewardDiscountAmount') IS NULL
+BEGIN
+    ALTER TABLE dbo.Invoices ADD RewardDiscountAmount DECIMAL(18,2) NOT NULL DEFAULT 0;
+END;
+GO
+
+
+/*
+  Luồng combo chuẩn:
+  - Đặt lịch bằng combo: không trừ buổi.
+  - Khi lịch chuyển COMPLETED: tạo CustomerPackageUsages và trừ buổi đúng 1 lần.
+  - Hủy lịch: chỉ cộng trả buổi nếu lịch đó đã có usage USED.
+*/
+
+IF OBJECT_ID('dbo.CustomerPackageUsages', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.CustomerPackageUsages (
+    UsageId INT IDENTITY(1,1) PRIMARY KEY,
+    CustomerPackageId INT NOT NULL,
+    AppointmentId INT NOT NULL,
+    ServiceId INT NOT NULL,
+    SessionsUsed INT NOT NULL DEFAULT 1,
+    Status NVARCHAR(20) NOT NULL DEFAULT 'USED',
+    UsedAt DATETIME NULL,
+    UsedBy INT NULL,
+    CancelledAt DATETIME NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME NULL,
+    CONSTRAINT FK_CustomerPackageUsages_CustomerPackages
+      FOREIGN KEY (CustomerPackageId) REFERENCES dbo.CustomerPackages(CustomerPackageId),
+    CONSTRAINT FK_CustomerPackageUsages_Appointments
+      FOREIGN KEY (AppointmentId) REFERENCES dbo.Appointments(AppointmentId),
+    CONSTRAINT FK_CustomerPackageUsages_Services
+      FOREIGN KEY (ServiceId) REFERENCES dbo.Services(ServiceId),
+    CONSTRAINT CK_CustomerPackageUsages_Status
+      CHECK (Status IN ('USED', 'CANCELLED')),
+    CONSTRAINT CK_CustomerPackageUsages_Sessions
+      CHECK (SessionsUsed > 0)
+  );
+
+  CREATE UNIQUE INDEX UX_CustomerPackageUsages_Appointment_Used
+    ON dbo.CustomerPackageUsages(AppointmentId)
+    WHERE Status = 'USED';
+
+  CREATE INDEX IX_CustomerPackageUsages_CustomerPackage
+    ON dbo.CustomerPackageUsages(CustomerPackageId, UsedAt DESC);
+END
+GO
+
+/* Nếu database cũ đã từng trừ buổi ngay khi đặt lịch, chạy phần dưới để đồng bộ lại theo appointment COMPLETED.
+   Chỉ bật khi bạn hiểu dữ liệu thật của mình. Với database mới thì bỏ qua.
+*/
+-- UPDATE cp
+-- SET
+--   UsedSessions = ISNULL(x.UsedCount, 0),
+--   RemainingSessions = cp.TotalSessions - ISNULL(x.UsedCount, 0),
+--   Status = CASE
+--     WHEN cp.Status IN ('CANCELLED', 'PENDING_PAYMENT', 'EXPIRED') THEN cp.Status
+--     WHEN cp.TotalSessions - ISNULL(x.UsedCount, 0) <= 0 THEN 'USED_UP'
+--     ELSE 'ACTIVE'
+--   END,
+--   UpdatedAt = GETDATE()
+-- FROM CustomerPackages cp
+-- OUTER APPLY (
+--   SELECT COUNT(*) AS UsedCount
+--   FROM Appointments a
+--   WHERE a.CustomerPackageId = cp.CustomerPackageId
+--     AND a.Status = 'COMPLETED'
+-- ) x;
+
+
+IF OBJECT_ID('dbo.WaitingList', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.WaitingList (
+        WaitingId INT IDENTITY(1,1) PRIMARY KEY,
+        CustomerId INT NOT NULL,
+        ServiceId INT NOT NULL,
+        PreferredEmployeeId INT NULL,
+        PreferredBranchId INT NULL,
+        PreferredDate DATE NULL,
+        PreferredTime TIME(0) NULL,
+        PreferredTimeFrom TIME(0) NULL,
+        PreferredTimeTo TIME(0) NULL,
+        FlexibleTimeSlot NVARCHAR(20) NOT NULL DEFAULT 'ANY',
+        PriorityLevel NVARCHAR(20) NOT NULL DEFAULT 'NORMAL',
+        ContactMethod NVARCHAR(20) NOT NULL DEFAULT 'PHONE',
+        ContactPhone NVARCHAR(30) NULL,
+        Reason NVARCHAR(255) NULL,
+        Note NVARCHAR(500) NULL,
+        CancelReason NVARCHAR(255) NULL,
+        ConvertedAppointmentId INT NULL,
+        Status NVARCHAR(20) NOT NULL DEFAULT 'WAITING',
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt DATETIME NOT NULL DEFAULT GETDATE()
+    );
+END
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'WaitingId') IS NULL
+BEGIN
+    EXEC sp_rename 'dbo.WaitingList.WaitingListId', 'WaitingId', 'COLUMN';
+END
+GO
+
+IF COL_LENGTH('dbo.WaitingList', 'PreferredEmployeeId') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredEmployeeId INT NULL;
+IF COL_LENGTH('dbo.WaitingList', 'PreferredBranchId') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredBranchId INT NULL;
+IF COL_LENGTH('dbo.WaitingList', 'PreferredTime') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredTime TIME(0) NULL;
+IF COL_LENGTH('dbo.WaitingList', 'PreferredTimeFrom') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredTimeFrom TIME(0) NULL;
+IF COL_LENGTH('dbo.WaitingList', 'PreferredTimeTo') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PreferredTimeTo TIME(0) NULL;
+IF COL_LENGTH('dbo.WaitingList', 'FlexibleTimeSlot') IS NULL
+    ALTER TABLE dbo.WaitingList ADD FlexibleTimeSlot NVARCHAR(20) NOT NULL DEFAULT 'ANY';
+IF COL_LENGTH('dbo.WaitingList', 'PriorityLevel') IS NULL
+    ALTER TABLE dbo.WaitingList ADD PriorityLevel NVARCHAR(20) NOT NULL DEFAULT 'NORMAL';
+IF COL_LENGTH('dbo.WaitingList', 'ContactMethod') IS NULL
+    ALTER TABLE dbo.WaitingList ADD ContactMethod NVARCHAR(20) NOT NULL DEFAULT 'PHONE';
+IF COL_LENGTH('dbo.WaitingList', 'ContactPhone') IS NULL
+    ALTER TABLE dbo.WaitingList ADD ContactPhone NVARCHAR(30) NULL;
+IF COL_LENGTH('dbo.WaitingList', 'Reason') IS NULL
+    ALTER TABLE dbo.WaitingList ADD Reason NVARCHAR(255) NULL;
+IF COL_LENGTH('dbo.WaitingList', 'CancelReason') IS NULL
+    ALTER TABLE dbo.WaitingList ADD CancelReason NVARCHAR(255) NULL;
+IF COL_LENGTH('dbo.WaitingList', 'ConvertedAppointmentId') IS NULL
+    ALTER TABLE dbo.WaitingList ADD ConvertedAppointmentId INT NULL;
+IF COL_LENGTH('dbo.WaitingList', 'UpdatedAt') IS NULL
+    ALTER TABLE dbo.WaitingList ADD UpdatedAt DATETIME NOT NULL DEFAULT GETDATE();
+GO

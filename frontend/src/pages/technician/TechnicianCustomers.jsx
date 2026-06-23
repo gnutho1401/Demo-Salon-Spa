@@ -5,6 +5,70 @@ import TechnicianLayout from "../../layouts/TechnicianLayout";
 
 const DEFAULT_AVATAR = "/images/default-avatar.png";
 
+const MEMBERSHIP_MAP = {
+  Normal: "Thành viên Thường",
+  Silver: "Thành viên Bạc",
+  Gold: "Thành viên Vàng",
+  Diamond: "Thành viên Kim cương",
+  Platinum: "Thành viên Bạch kim",
+};
+
+const RISK_MAP = {
+  High: "Rủi ro Cao",
+  Medium: "Rủi ro Trung bình",
+  Low: "Rủi ro Thấp",
+};
+
+const GENDER_MAP = {
+  Nam: "Nam",
+  Nữ: "Nữ",
+  Khác: "Khác",
+};
+
+const STATUS_MAP = {
+  ACTIVE: "Đang hoạt động",
+  INACTIVE: "Ngừng hoạt động",
+  BANNED: "Đang bị khóa",
+  PENDING: "Đang chờ duyệt",
+};
+
+const APPT_STATUS_MAP = {
+  PENDING_PAYMENT: "Chờ thanh toán",
+  PENDING: "Chờ xác nhận",
+  PAID: "Đã thanh toán",
+  CONFIRMED: "Đã xác nhận",
+  CHECKED_IN: "Đã check-in",
+  IN_PROGRESS: "Đang thực hiện",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+  REFUND_PENDING: "Chờ hoàn tiền",
+  NO_SHOW: "Không đến",
+  UNPAID: "Chưa thanh toán",
+  PAID_INVOICE: "Đã thanh toán",
+  REFUNDED: "Đã hoàn tiền",
+  FAILED: "Thất bại",
+};
+
+function getMembershipLabel(level) {
+  return MEMBERSHIP_MAP[level] || level || "Thành viên Thường";
+}
+
+function getRiskLabel(risk) {
+  return RISK_MAP[risk] || risk || "Rủi ro Thấp";
+}
+
+function getGenderLabel(gender) {
+  return GENDER_MAP[gender] || gender || "Khác";
+}
+
+function getStatusLabel(status) {
+  return STATUS_MAP[status] || status || "Đang hoạt động";
+}
+
+function getApptStatusLabel(status) {
+  return APPT_STATUS_MAP[status] || status || "Chưa rõ";
+}
+
 function money(value) {
   return `${Number(value || 0).toLocaleString("vi-VN")} VND`;
 }
@@ -168,9 +232,9 @@ export default function TechnicianCustomers() {
         <header className="tech-page-head customer-page-head">
           <div>
             <h1>
-              Customers <span>👥</span>
+              Khách hàng <span>👥</span>
             </h1>
-            <p>Manage customer information, treatment history and insights</p>
+            <p>Quản lý hồ sơ chi tiết, lịch sử trị liệu và thông tin khách hàng</p>
           </div>
 
           <form
@@ -180,7 +244,7 @@ export default function TechnicianCustomers() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search customers, phone, email..."
+              placeholder="Tìm theo tên, điện thoại, email..."
             />
           </form>
 
@@ -189,37 +253,37 @@ export default function TechnicianCustomers() {
             className="tech-new-btn"
             onClick={() => navigate("/technician/schedule")}
           >
-            View My Schedule
+            Lịch trình của tôi
           </button>
         </header>
 
         <section className="customer-stats">
           <div className="customer-stat-card">
             <span>🏥</span>
-            <p>Total Customers</p>
+            <p>Tổng khách hàng</p>
             <h2>{summary.totalCustomers || 0}</h2>
-            <small>Assigned to you</small>
+            <small>Được phân công phụ trách</small>
           </div>
 
           <div className="customer-stat-card blue">
             <span>🔄</span>
-            <p>Active Customers</p>
+            <p>Đang hoạt động</p>
             <h2>{summary.activeCustomers || 0}</h2>
-            <small>Active accounts</small>
+            <small>Tài khoản hoạt động</small>
           </div>
 
           <div className="customer-stat-card gold">
             <span>⭐</span>
-            <p>New This Month</p>
+            <p>Khách mới tháng này</p>
             <h2>{summary.newThisMonth || 0}</h2>
-            <small>New visits</small>
+            <small>Lượt ghé thăm mới</small>
           </div>
 
           <div className="customer-stat-card purple">
             <span>💎</span>
-            <p>VIP Customers</p>
+            <p>Khách hàng VIP</p>
             <h2>{summary.vipCustomers || 0}</h2>
-            <small>Gold / Diamond</small>
+            <small>Hạng Vàng / Kim cương</small>
           </div>
         </section>
 
@@ -231,7 +295,7 @@ export default function TechnicianCustomers() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search customers by name, phone, email..."
+                placeholder="Tìm kiếm theo tên, số điện thoại, email..."
               />
 
               <select
@@ -241,12 +305,12 @@ export default function TechnicianCustomers() {
                   setPage(1);
                 }}
               >
-                <option value="ALL">All Membership</option>
-                <option value="Normal">Normal</option>
-                <option value="Silver">Silver</option>
-                <option value="Gold">Gold</option>
-                <option value="Diamond">Diamond</option>
-                <option value="Platinum">Platinum</option>
+                <option value="ALL">Tất cả hạng thành viên</option>
+                <option value="Normal">Normal (Thường)</option>
+                <option value="Silver">Silver (Bạc)</option>
+                <option value="Gold">Gold (Vàng)</option>
+                <option value="Diamond">Diamond (Kim cương)</option>
+                <option value="Platinum">Platinum (Bạch kim)</option>
               </select>
 
               <select
@@ -256,10 +320,10 @@ export default function TechnicianCustomers() {
                   setPage(1);
                 }}
               >
-                <option value="ALL">All Status</option>
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
-                <option value="BANNED">Banned</option>
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">Đang hoạt động</option>
+                <option value="INACTIVE">Ngừng hoạt động</option>
+                <option value="BANNED">Bị khóa</option>
               </select>
 
               <select
@@ -269,32 +333,32 @@ export default function TechnicianCustomers() {
                   setPage(1);
                 }}
               >
-                <option value="ALL">All Gender</option>
+                <option value="ALL">Tất cả giới tính</option>
                 <option value="Nam">Nam</option>
                 <option value="Nữ">Nữ</option>
                 <option value="Khác">Khác</option>
               </select>
 
-              <button type="submit">Search</button>
+              <button type="submit">Tìm kiếm</button>
             </form>
 
             <div className="customer-table-card">
               <div className="customer-table-title">
-                Customer List ({pagination.total || 0})
+                Danh sách khách hàng ({pagination.total || 0})
               </div>
 
               <div className="customer-table-wrap">
                 <table className="customer-table">
                   <thead>
                     <tr>
-                      <th>Customer</th>
-                      <th>Contact</th>
-                      <th>Membership</th>
-                      <th>Last Visit</th>
-                      <th>Total Visits</th>
-                      <th>Total Spent</th>
-                      <th>Status</th>
-                      <th>Actions</th>
+                      <th>Khách hàng</th>
+                      <th>Liên hệ</th>
+                      <th>Hạng thành viên</th>
+                      <th>Gần nhất</th>
+                      <th>Tổng số buổi</th>
+                      <th>Tổng chi tiêu</th>
+                      <th>Trạng thái</th>
+                      <th>Thao tác</th>
                     </tr>
                   </thead>
 
@@ -302,7 +366,7 @@ export default function TechnicianCustomers() {
                     {customers.length === 0 ? (
                       <tr>
                         <td colSpan="8" className="customer-empty-row">
-                          No customers found
+                          Không tìm thấy khách hàng nào
                         </td>
                       </tr>
                     ) : (
@@ -338,8 +402,8 @@ export default function TechnicianCustomers() {
                           </td>
 
                           <td>
-                            <b>{safeText(c.Phone, "No phone")}</b>
-                            <p>{safeText(c.Email, "No email")}</p>
+                            <b>{safeText(c.Phone, "Chưa có SĐT")}</b>
+                            <p>{safeText(c.Email, "Chưa có email")}</p>
                           </td>
 
                           <td>
@@ -348,12 +412,12 @@ export default function TechnicianCustomers() {
                                 c.MembershipLevel || "normal",
                               ).toLowerCase()}`}
                             >
-                              {c.MembershipLevel || "Normal"}
+                              {getMembershipLabel(c.MembershipLevel)}
                             </span>
                           </td>
 
                           <td>{shortDate(c.LastVisit)}</td>
-                          <td>{c.TotalVisits || 0}</td>
+                          <td>{c.TotalVisits || 0} ca</td>
                           <td>{money(c.TotalSpent)}</td>
 
                           <td>
@@ -362,7 +426,7 @@ export default function TechnicianCustomers() {
                                 c.Status,
                               )}`}
                             >
-                              {c.Status || "Active"}
+                              {getStatusLabel(c.Status)}
                             </span>
                           </td>
 
@@ -370,7 +434,7 @@ export default function TechnicianCustomers() {
                             <div className="customer-actions">
                               <button
                                 type="button"
-                                title="View detail"
+                                title="Xem chi tiết"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   loadDetail(c.CustomerId);
@@ -381,7 +445,7 @@ export default function TechnicianCustomers() {
 
                               <button
                                 type="button"
-                                title="View schedule"
+                                title="Xem lịch trình"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigate("/technician/schedule");
@@ -400,8 +464,7 @@ export default function TechnicianCustomers() {
 
               <div className="customer-pagination">
                 <span>
-                  Showing {customers.length} of {pagination.total || 0}{" "}
-                  customers
+                  Hiển thị {customers.length} trên tổng số {pagination.total || 0} khách hàng
                 </span>
 
                 <div>
@@ -431,13 +494,13 @@ export default function TechnicianCustomers() {
             <aside className="customer-detail-panel">
               {detailLoading ? (
                 <div className="empty-customer-detail">
-                  <h3>Loading...</h3>
+                  <h3>Đang tải...</h3>
                   <p>Đang tải thông tin khách hàng</p>
                 </div>
               ) : (
                 <>
                   <div className="customer-detail-head">
-                    <h3>Customer Detail</h3>
+                    <h3>Chi tiết khách hàng</h3>
 
                     <button
                       type="button"
@@ -456,28 +519,28 @@ export default function TechnicianCustomers() {
                       onError={(e) => {
                         e.currentTarget.src = DEFAULT_AVATAR;
                       }}
-                      alt={detailCustomer.FullName || "Customer"}
+                      alt={detailCustomer.FullName || "Khách hàng"}
                     />
 
                     <div>
                       <h2>{safeText(detailCustomer.FullName)}</h2>
                       <span>
-                        {detailCustomer.MembershipLevel || "Normal Member"}
+                        {getMembershipLabel(detailCustomer.MembershipLevel)}
                       </span>
-                      <p>📞 {safeText(detailCustomer.Phone, "No phone")}</p>
-                      <p>✉ {safeText(detailCustomer.Email, "No email")}</p>
+                      <p>📞 {safeText(detailCustomer.Phone, "Chưa có SĐT")}</p>
+                      <p>✉ {safeText(detailCustomer.Email, "Chưa có Email")}</p>
                       <p>🎂 {shortDate(detailCustomer.DateOfBirth)}</p>
-                      <p>📍 {safeText(detailCustomer.Address, "No address")}</p>
+                      <p>📍 {safeText(detailCustomer.Address, "Chưa có địa chỉ")}</p>
                     </div>
 
                     <div className="customer-id-box">
-                      <p>Customer ID</p>
+                      <p>Mã khách hàng</p>
                       <b>{safeText(detailCustomer.CustomerCode)}</b>
 
-                      <p>Total Visits</p>
+                      <p>Tổng số buổi</p>
                       <b>{detailCustomer.TotalVisits || visits.length || 0}</b>
 
-                      <p>Total Spent</p>
+                      <p>Tổng chi tiêu</p>
                       <b>{money(detailCustomer.TotalSpent)}</b>
                     </div>
                   </div>
@@ -485,12 +548,12 @@ export default function TechnicianCustomers() {
                   {nextAppointment && (
                     <div className="customer-upcoming-card">
                       <div>
-                        <span>Next Appointment</span>
+                        <span>Lịch hẹn tiếp theo</span>
                         <h4>
                           {shortDate(nextAppointment.AppointmentDate)} •{" "}
                           {nextAppointment.StartTime}
                         </h4>
-                        <p>{nextAppointment.ServiceName || "No service"}</p>
+                        <p>{nextAppointment.ServiceName || "Không có dịch vụ"}</p>
                       </div>
 
                       <button
@@ -501,7 +564,7 @@ export default function TechnicianCustomers() {
                           )
                         }
                       >
-                        View
+                        Xem
                       </button>
                     </div>
                   )}
@@ -511,7 +574,7 @@ export default function TechnicianCustomers() {
                       type="button"
                       onClick={() => setActiveTab("overview")}
                     >
-                      View Profile
+                      Xem hồ sơ
                     </button>
 
                     <button
@@ -525,7 +588,7 @@ export default function TechnicianCustomers() {
                         }
                       }}
                     >
-                      Contact
+                      Liên hệ
                     </button>
 
                     <button
@@ -540,7 +603,7 @@ export default function TechnicianCustomers() {
                         }
                       }}
                     >
-                      + Add Treatment Note
+                      + Thêm ghi chú trị liệu
                     </button>
                   </div>
 
@@ -550,7 +613,7 @@ export default function TechnicianCustomers() {
                       className={activeTab === "overview" ? "active" : ""}
                       onClick={() => setActiveTab("overview")}
                     >
-                      Overview
+                      Tổng quan
                     </button>
 
                     <button
@@ -558,7 +621,7 @@ export default function TechnicianCustomers() {
                       className={activeTab === "visits" ? "active" : ""}
                       onClick={() => setActiveTab("visits")}
                     >
-                      Visit History
+                      Lịch sử ghé thăm
                     </button>
 
                     <button
@@ -566,7 +629,7 @@ export default function TechnicianCustomers() {
                       className={activeTab === "notes" ? "active" : ""}
                       onClick={() => setActiveTab("notes")}
                     >
-                      Notes & Treatment
+                      Ghi chú & Trị liệu
                     </button>
 
                     <button
@@ -574,7 +637,7 @@ export default function TechnicianCustomers() {
                       className={activeTab === "timeline" ? "active" : ""}
                       onClick={() => setActiveTab("timeline")}
                     >
-                      Timeline
+                      Dòng thời gian
                     </button>
 
                     <button
@@ -582,22 +645,22 @@ export default function TechnicianCustomers() {
                       className={activeTab === "reviews" ? "active" : ""}
                       onClick={() => setActiveTab("reviews")}
                     >
-                      Reviews
+                      Đánh giá
                     </button>
                   </div>
 
                   {activeTab === "overview" && (
                     <div className="customer-detail-grid">
                       <div className="customer-info-card customer-info-main">
-                        <h4>Customer Information</h4>
+                        <h4>Thông tin khách hàng</h4>
 
                         <p>
-                          <span>Full Name</span>
+                          <span>Họ và tên</span>
                           <b>{safeText(detailCustomer.FullName)}</b>
                         </p>
 
                         <p>
-                          <span>Phone</span>
+                          <span>Số điện thoại</span>
                           <b>{safeText(detailCustomer.Phone)}</b>
                         </p>
 
@@ -607,110 +670,110 @@ export default function TechnicianCustomers() {
                         </p>
 
                         <p>
-                          <span>Date of Birth</span>
+                          <span>Ngày sinh</span>
                           <b>{shortDate(detailCustomer.DateOfBirth)}</b>
                         </p>
 
                         <p>
-                          <span>Gender</span>
-                          <b>{safeText(detailCustomer.Gender)}</b>
+                          <span>Giới tính</span>
+                          <b>{getGenderLabel(detailCustomer.Gender)}</b>
                         </p>
 
                         <p>
-                          <span>Address</span>
+                          <span>Địa chỉ</span>
                           <b>{safeText(detailCustomer.Address)}</b>
                         </p>
                       </div>
 
                       <div className="customer-info-card">
-                        <h4>Beauty Profile</h4>
+                        <h4>Hồ sơ làm đẹp</h4>
 
                         <p>
-                          <span>Skin Condition</span>
+                          <span>Tình trạng da</span>
                           <b>{safeText(beautyProfile.skinCondition)}</b>
                         </p>
 
                         <p>
-                          <span>Products Used</span>
+                          <span>Sản phẩm đã dùng</span>
                           <b>{safeText(beautyProfile.productsUsed)}</b>
                         </p>
 
                         <p>
-                          <span>Technique</span>
+                          <span>Kỹ thuật thực hiện</span>
                           <b>{safeText(beautyProfile.technique)}</b>
                         </p>
 
                         <p>
-                          <span>Recommendation</span>
+                          <span>Khuyến nghị</span>
                           <b>{safeText(beautyProfile.recommendation)}</b>
                         </p>
 
                         <p>
-                          <span>Follow Up</span>
+                          <span>Hẹn tái khám</span>
                           <b>{shortDate(beautyProfile.followUpDate)}</b>
                         </p>
                       </div>
 
                       <div className="customer-info-card">
-                        <h4>Membership Information</h4>
+                        <h4>Thông tin thành viên</h4>
 
                         <div className="membership-box">
-                          <b>{detailCustomer.MembershipLevel || "Normal"}</b>
+                          <b>{getMembershipLabel(detailCustomer.MembershipLevel)}</b>
                           <p>
-                            Member points: {detailCustomer.LoyaltyPoints || 0}
+                            Điểm tích lũy: {detailCustomer.LoyaltyPoints || 0}
                           </p>
                         </div>
 
                         <p>
-                          <span>Current Points</span>
-                          <b>{detailCustomer.LoyaltyPoints || 0} pts</b>
+                          <span>Điểm hiện tại</span>
+                          <b>{detailCustomer.LoyaltyPoints || 0} điểm</b>
                         </p>
 
                         <p>
-                          <span>Discount</span>
+                          <span>Ưu đãi giảm giá</span>
                           <b>{detailCustomer.DiscountPercent || 0}%</b>
                         </p>
 
                         <p>
-                          <span>Total Spent</span>
+                          <span>Tổng chi tiêu</span>
                           <b>{money(detailCustomer.TotalSpent)}</b>
                         </p>
 
                         <p>
-                          <span>Average Ticket</span>
+                          <span>Chi tiêu trung bình</span>
                           <b>{money(detailCustomer.AverageTicket)}</b>
                         </p>
                       </div>
 
                       <div className="customer-info-card">
-                        <h4>Customer Risk</h4>
+                        <h4>Mức độ rủi ro</h4>
 
                         <p>
-                          <span>No-show Rate</span>
+                          <span>Tỷ lệ vắng mặt</span>
                           <b>{noShowRate}%</b>
                         </p>
 
                         <p>
-                          <span>No-show Count</span>
+                          <span>Số lần vắng mặt</span>
                           <b>{detailCustomer.NoShowCount || 0}</b>
                         </p>
 
                         <p>
-                          <span>Cancelled Count</span>
+                          <span>Số lần hủy lịch</span>
                           <b>{detailCustomer.CancelledCount || 0}</b>
                         </p>
 
                         <p>
-                          <span>Risk Level</span>
-                          <b>{riskLevel}</b>
+                          <span>Mức độ rủi ro</span>
+                          <b>{getRiskLabel(riskLevel)}</b>
                         </p>
                       </div>
 
                       <div className="customer-info-card">
-                        <h4>Favorite Services</h4>
+                        <h4>Dịch vụ yêu thích</h4>
 
                         {preferences.length === 0 ? (
-                          <p className="muted-line">No favorite services</p>
+                          <p className="muted-line">Chưa có dịch vụ yêu thích</p>
                         ) : (
                           preferences.map((p, index) => (
                             <p key={`${p.ServiceName}-${index}`}>
@@ -722,10 +785,10 @@ export default function TechnicianCustomers() {
                       </div>
 
                       <div className="customer-info-card quick-stat-card">
-                        <h4>Satisfaction Summary</h4>
+                        <h4>Tóm tắt độ hài lòng</h4>
 
                         <p>
-                          <span>Average Rating</span>
+                          <span>Đánh giá trung bình</span>
                           <b>
                             ⭐{" "}
                             {Number(detailCustomer.AverageRating || 0).toFixed(
@@ -735,26 +798,26 @@ export default function TechnicianCustomers() {
                         </p>
 
                         <p>
-                          <span>Review Count</span>
+                          <span>Số lượng đánh giá</span>
                           <b>{detailCustomer.ReviewCount || 0}</b>
                         </p>
 
                         <p>
-                          <span>Last Visit</span>
+                          <span>Lượt ghé thăm gần nhất</span>
                           <b>{shortDate(detailCustomer.LastVisit)}</b>
                         </p>
 
                         <p>
-                          <span>Member Since</span>
+                          <span>Thành viên từ ngày</span>
                           <b>{shortDate(detailCustomer.MemberSince)}</b>
                         </p>
                       </div>
 
                       <div className="customer-info-card">
-                        <h4>Upcoming Appointments</h4>
+                        <h4>Lịch hẹn sắp tới</h4>
 
                         {upcoming.length === 0 ? (
-                          <p className="muted-line">No upcoming appointments</p>
+                          <p className="muted-line">Không có lịch hẹn sắp tới</p>
                         ) : (
                           upcoming.map((item) => (
                             <div className="mini-note" key={item.AppointmentId}>
@@ -763,25 +826,25 @@ export default function TechnicianCustomers() {
                                 {shortDate(item.AppointmentDate)} •{" "}
                                 {item.StartTime} - {item.EndTime}
                               </p>
-                              <small>{item.ServiceName || "No service"}</small>
+                              <small>{item.ServiceName || "Không có dịch vụ"}</small>
                             </div>
                           ))
                         )}
                       </div>
 
                       <div className="customer-info-card">
-                        <h4>Latest Treatment Notes</h4>
+                        <h4>Ghi chú trị liệu gần đây</h4>
 
                         {notes.length === 0 ? (
-                          <p className="muted-line">No treatment notes</p>
+                          <p className="muted-line">Không có ghi chú trị liệu</p>
                         ) : (
                           notes.slice(0, 3).map((n, index) => (
                             <div
                               className="mini-note"
                               key={n.NoteId || `${n.CreatedAt}-${index}`}
                             >
-                              <b>{n.Title || n.NoteType || "Treatment note"}</b>
-                              <p>{n.Content || "No content"}</p>
+                              <b>{n.Title || n.NoteType || "Ghi chú trị liệu"}</b>
+                              <p>{n.Content || "Không có nội dung"}</p>
                               <small>{shortDate(n.CreatedAt)}</small>
                             </div>
                           ))
@@ -792,10 +855,10 @@ export default function TechnicianCustomers() {
 
                   {activeTab === "visits" && (
                     <div className="customer-tab-panel">
-                      <h4>Visit History</h4>
+                      <h4>Lịch sử ghé thăm</h4>
 
                       {visits.length === 0 ? (
-                        <p className="muted-line">No visit history</p>
+                        <p className="muted-line">Không có lịch sử ghé thăm</p>
                       ) : (
                         <div className="customer-history-list">
                           {visits.map((v, index) => (
@@ -816,7 +879,7 @@ export default function TechnicianCustomers() {
                                   {safeText(v.StartTime, "--:--")} -{" "}
                                   {safeText(v.EndTime, "--:--")}
                                 </p>
-                                <p>{v.ServiceName || "No service"}</p>
+                                <p>{v.ServiceName || "Không có dịch vụ"}</p>
                               </div>
 
                               <div>
@@ -825,11 +888,11 @@ export default function TechnicianCustomers() {
                                     v.Status,
                                   )}`}
                                 >
-                                  {v.Status || "N/A"}
+                                  {getApptStatusLabel(v.Status)}
                                 </span>
                                 <p>{money(v.FinalAmount)}</p>
                                 <small>
-                                  Payment: {v.PaymentStatus || "N/A"}
+                                  Thanh toán: {getApptStatusLabel(v.PaymentStatus)}
                                 </small>
                               </div>
 
@@ -841,7 +904,7 @@ export default function TechnicianCustomers() {
                                   )
                                 }
                               >
-                                View Appointment
+                                Chi tiết lịch hẹn
                               </button>
                             </div>
                           ))}
@@ -853,7 +916,7 @@ export default function TechnicianCustomers() {
                   {activeTab === "notes" && (
                     <div className="customer-tab-panel">
                       <div className="tab-title-row">
-                        <h4>Notes & Treatment</h4>
+                        <h4>Ghi chú & Trị liệu</h4>
 
                         <button
                           type="button"
@@ -861,12 +924,12 @@ export default function TechnicianCustomers() {
                             navigate("/technician/treatment-notes")
                           }
                         >
-                          + Add Treatment Note
+                          + Thêm ghi chú
                         </button>
                       </div>
 
                       {notes.length === 0 ? (
-                        <p className="muted-line">No treatment notes</p>
+                        <p className="muted-line">Không có ghi chú trị liệu</p>
                       ) : (
                         <div className="customer-history-list">
                           {notes.map((n, index) => (
@@ -876,13 +939,13 @@ export default function TechnicianCustomers() {
                             >
                               <div>
                                 <b>
-                                  {n.Title || n.NoteType || "Treatment note"}
+                                  {n.Title || n.NoteType || "Ghi chú trị liệu"}
                                 </b>
-                                <p>{n.Content || "No content"}</p>
+                                <p>{n.Content || "Không có nội dung"}</p>
 
                                 <small>
                                   {shortDate(n.CreatedAt)} •{" "}
-                                  {n.AppointmentCode || "No appointment code"}
+                                  {n.AppointmentCode || "Không có mã lịch hẹn"}
                                 </small>
 
                                 {Array.isArray(n.Attachments) &&
@@ -910,7 +973,7 @@ export default function TechnicianCustomers() {
                                   )
                                 }
                               >
-                                View Note
+                                Xem ghi chú
                               </button>
                             </div>
                           ))}
@@ -921,20 +984,20 @@ export default function TechnicianCustomers() {
 
                   {activeTab === "timeline" && (
                     <div className="customer-tab-panel">
-                      <h4>Customer Timeline</h4>
+                      <h4>Dòng thời gian hoạt động</h4>
 
                       {timeline.length === 0 ? (
-                        <p className="muted-line">No timeline data</p>
+                        <p className="muted-line">Không có dữ liệu dòng thời gian</p>
                       ) : (
                         <div className="customer-history-list">
                           {timeline.map((item, index) => (
                             <div className="history-item" key={index}>
                               <div>
                                 <b>
-                                  {item.type === "APPOINTMENT" && "📅 "}
-                                  {item.type === "NOTE" && "📝 "}
-                                  {item.type === "REVIEW" && "⭐ "}
-                                  {item.title}
+                                  {item.type === "APPOINTMENT" && "📅 Lượt hẹn: "}
+                                  {item.type === "NOTE" && "📝 Ghi chú: "}
+                                  {item.type === "REVIEW" && "⭐ Đánh giá: "}
+                                  {item.title === "Appointment" ? "Lịch hẹn" : item.title === "Treatment note" ? "Ghi chú trị liệu" : item.title}
                                 </b>
                                 <p>{safeText(item.subtitle, "")}</p>
                                 <small>{shortDate(item.date)}</small>
@@ -946,7 +1009,7 @@ export default function TechnicianCustomers() {
                                     item.status,
                                   )}`}
                                 >
-                                  {item.status}
+                                  {getApptStatusLabel(item.status)}
                                 </span>
                               )}
 
@@ -959,7 +1022,7 @@ export default function TechnicianCustomers() {
                                     )
                                   }
                                 >
-                                  View
+                                  Xem
                                 </button>
                               )}
                             </div>
@@ -971,10 +1034,10 @@ export default function TechnicianCustomers() {
 
                   {activeTab === "reviews" && (
                     <div className="customer-tab-panel">
-                      <h4>Customer Reviews</h4>
+                      <h4>Đánh giá từ khách hàng</h4>
 
                       {reviews.length === 0 ? (
-                        <p className="muted-line">No reviews</p>
+                        <p className="muted-line">Không có đánh giá</p>
                       ) : (
                         <div className="customer-history-list">
                           {reviews.map((r, index) => (
@@ -984,9 +1047,9 @@ export default function TechnicianCustomers() {
                             >
                               <div>
                                 <b>⭐ {Number(r.Rating || 0).toFixed(1)}</b>
-                                <p>{r.Comment || "No comment"}</p>
+                                <p>{r.Comment || "Không có nhận xét"}</p>
                                 <small>
-                                  {r.ServiceName || "Service"} •{" "}
+                                  {r.ServiceName || "Dịch vụ"} •{" "}
                                   {shortDate(r.CreatedAt)}
                                 </small>
                               </div>

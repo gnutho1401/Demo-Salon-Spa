@@ -323,6 +323,34 @@ async function deleteWaitingList(req, res) {
   }
 }
 
+async function getWaitingAvailableSlots(req, res) {
+  try {
+    return success(
+      res,
+      await service.getWaitingAvailableSlots(req.params.id, req.query),
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function convertWaitingListToAppointment(req, res) {
+  try {
+    return success(
+      res,
+      await service.convertWaitingListToAppointment(
+        req.params.id,
+        req.body,
+        req.user?.userId,
+      ),
+      "Đã chuyển hàng chờ thành lịch hẹn",
+      201,
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 async function getNotifications(req, res) {
   try {
     return success(
@@ -433,5 +461,7 @@ module.exports = {
   getProfile,
   getSettings,
   updateSettings,
-  updateAvatar
+  updateAvatar,
+  getWaitingAvailableSlots,
+  convertWaitingListToAppointment,
 };

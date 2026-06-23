@@ -7,6 +7,7 @@ export default function PaymentResult() {
   const [params] = useSearchParams();
   const status = params.get("status");
   const appointmentId = params.get("appointmentId");
+  const method = (params.get("method") || "payos").toUpperCase();
 
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(Boolean(appointmentId));
@@ -69,8 +70,8 @@ export default function PaymentResult() {
 
           <h1>
             {success
-              ? "Thanh toán VNPay thành công"
-              : "Thanh toán VNPay thất bại"}
+              ? `Thanh toán ${method === "VNPAY" ? "VNPay" : "PayOS"} thành công`
+              : `Thanh toán ${method === "VNPAY" ? "VNPay" : "PayOS"} thất bại`}
           </h1>
 
           <p className="result-desc">

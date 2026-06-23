@@ -3,37 +3,173 @@ import { Link, useNavigate } from "react-router-dom";
 import CustomerLayout from "../../components/layout/CustomerLayout";
 import axiosClient from "../../api/axiosClient";
 
+const STATUS_OPTIONS = [
+  ["ALL", "Tất cả trạng thái"],
+  ["PENDING_PAYMENT", "Chờ thanh toán"],
+  ["CONFIRMED", "Đã xác nhận"],
+  ["CHECKED_IN", "Đã check-in"],
+  ["IN_PROGRESS", "Đang thực hiện"],
+  ["COMPLETED", "Hoàn thành"],
+  ["CANCELLED", "Đã hủy"],
+  ["REFUND_PENDING", "Chờ hoàn tiền"],
+  ["NO_SHOW", "Vắng mặt"],
+];
+
+const PAYMENT_OPTIONS = [
+  ["ALL", "Tất cả thanh toán"],
+  ["UNPAID", "Chưa thanh toán"],
+  ["PENDING", "Đang chờ"],
+  ["PAID", "Đã thanh toán"],
+  ["FAILED", "Thất bại"],
+  ["REFUND_PENDING", "Chờ hoàn tiền"],
+  ["REFUNDED", "Đã hoàn tiền"],
+];
+
+function formatMoney(value) {
+  return Number(value || 0).toLocaleString("vi-VN") + "đ";
+}
+
+function formatDate(value) {
+  if (!value) return "Chưa có";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString("vi-VN");
+}
+
+function formatTime(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (text.includes("T")) return text.split("T")[1]?.slice(0, 5) || "";
+  return text.includes(":") ? text.slice(0, 5) : text;
+}
+
+function getAppointmentCode(id) {
+  return `AP${String(id || "").padStart(5, "0")}`;
+}
+
+function statusText(status) {
+  const s = String(status || "").toUpperCase();
+  if (s === "PENDING_PAYMENT") return "Chờ thanh toán";
+  if (s === "CONFIRMED") return "Đã xác nhận";
+  if (s === "CHECKED_IN") return "Đã check-in";
+  if (s === "IN_PROGRESS") return "Đang thực hiện";
+  if (s === "COMPLETED") return "Hoàn thành";
+  if (s === "CANCELLED") return "Đã hủy";
+  if (s === "REFUND_PENDING") return "Chờ hoàn tiền";
+  if (s === "NO_SHOW") return "Vắng mặt";
+  return status || "Chưa rõ";
+}
+
+function paymentText(status) {
+  const s = String(status || "UNPAID").toUpperCase();
+  if (s === "PAID") return "Đã thanh toán";
+  if (s === "PENDING") return "Đang chờ thanh toán";
+  if (s === "FAILED") return "Thanh toán thất bại";
+  if (s === "REFUND_PENDING") return "Chờ hoàn tiền";
+  if (s === "REFUNDED") return "Đã hoàn tiền";
+  return "Chưa thanh toán";
+}
+
+function refundText(status) {
+  const s = String(status || "").toUpperCase();
+  if (s === "PENDING") return "Chờ hoàn tiền";
+  if (s === "PROCESSING") return "Đang xử lý";
+  if (s === "APPROVED") return "Đã duyệt";
+  if (s === "REFUNDED") return "Đã hoàn tiền";
+  if (s === "REJECTED") return "Từ chối";
+  return status || "Chưa có";
+}
+
+function canPay(row) {
+  const s = String(row.Status || "").toUpperCase();
+  const p = String(row.PaymentStatus || "UNPAID").toUpperCase();
+
+  return s === "PENDING_PAYMENT" && ["UNPAID", "PENDING", "FAILED"].includes(p);
+}
+
+function canCancel(row) {
+  const s = String(row.Status || "").toUpperCase();
+  return ["PENDING_PAYMENT", "CONFIRMED"].includes(s);
+}
+
+function canReschedule(row) {
+  const s = String(row.Status || "").toUpperCase();
+  return ["PENDING_PAYMENT", "CONFIRMED"].includes(s);
+}
+
+function canReview(row) {
+  const s = String(row.Status || "").toUpperCase();
+  return (
+    s === "COMPLETED" &&
+    Number(row.ReviewCount || 0) < Number(row.ServiceCount || 1)
+  );
+}
+
+const POPULAR_BANKS = [
+  { bin: "970436", name: "VCB - Vietcombank" },
+  { bin: "970415", name: "VietinBank" },
+  { bin: "970407", name: "Techcombank" },
+  { bin: "970418", name: "BIDV" },
+  { bin: "970422", name: "MB Bank" },
+  { bin: "970416", name: "ACB" },
+  { bin: "970423", name: "TPBank" },
+  { bin: "970419", name: "VPBank" },
+  { bin: "970403", name: "Sacombank" },
+  { bin: "970448", name: "OCB" }
+];
+
 export default function MyAppointments() {
   const navigate = useNavigate();
+
   const [rows, setRows] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [loading, setLoading] = useState(true);
+  const [loadingId, setLoadingId] = useState(null);
+
   const [keyword, setKeyword] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [paymentFilter, setPaymentFilter] = useState("ALL");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [error, setError] = useState("");
+
   const [message, setMessage] = useState("");
-  const [loadingId, setLoadingId] = useState(null);
+  const [error, setError] = useState("");
+
+  const [bankList, setBankList] = useState([]);
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+
   const [cancelModal, setCancelModal] = useState({
     open: false,
     appointment: null,
     reason: "",
-    paymentStatus: "UNPAID",
   });
+
+  useEffect(() => {
+    fetch("https://api.vietqr.io/v2/banks")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) {
+          setBankList(data.data.map(b => ({ bin: b.bin, name: `${b.shortName} - ${b.name}` })));
+        } else {
+          setBankList(POPULAR_BANKS);
+        }
+      })
+      .catch(() => {
+        setBankList(POPULAR_BANKS);
+      });
+  }, []);
 
   async function loadAppointments() {
     try {
+      setLoading(true);
       setError("");
-      const [appointmentsRes, reviewsRes] = await Promise.all([
-        axiosClient.get("/appointments/my"),
-        axiosClient.get("/customers/me/reviews"),
-      ]);
-      setRows(appointmentsRes.data.data || []);
-      setReviews(reviewsRes.data.data || []);
+
+      const res = await axiosClient.get("/appointments/my");
+      setRows(res.data.data || res.data || []);
     } catch (err) {
       setError(err.response?.data?.message || "Không tải được lịch hẹn");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -42,170 +178,88 @@ export default function MyAppointments() {
   }, []);
 
   const filteredRows = useMemo(() => {
+    const text = keyword.trim().toLowerCase();
+
     return [...rows]
-      .sort(
-        (a, b) => Number(b.AppointmentId || 0) - Number(a.AppointmentId || 0),
-      )
+      .sort((a, b) => {
+        const da = `${a.AppointmentDate || ""} ${a.StartTime || ""}`;
+        const db = `${b.AppointmentDate || ""} ${b.StartTime || ""}`;
+        return (
+          db.localeCompare(da) ||
+          Number(b.AppointmentId || 0) - Number(a.AppointmentId || 0)
+        );
+      })
       .filter((r) => {
         const status = String(r.Status || "").toUpperCase();
         const payment = String(r.PaymentStatus || "UNPAID").toUpperCase();
-        const appointmentDate = String(r.AppointmentDate || "").slice(0, 10);
+        const date = String(r.AppointmentDate || "").slice(0, 10);
 
-        const statusOk = statusFilter === "ALL" || status === statusFilter;
+        let statusOk = false;
+        if (statusFilter === "ALL") {
+          statusOk = true;
+        } else if (statusFilter === "IN_PROGRESS") {
+          statusOk = ["IN_PROGRESS", "CHECKED_IN"].includes(status);
+        } else if (statusFilter === "CANCELLED") {
+          statusOk = ["CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(status);
+        } else {
+          statusOk = status === statusFilter;
+        }
 
         const paymentOk = paymentFilter === "ALL" || payment === paymentFilter;
-
-        const dateOk =
-          (!dateFilter || appointmentDate === dateFilter) &&
-          (!fromDate || appointmentDate >= fromDate) &&
-          (!toDate || appointmentDate <= toDate);
-
-        const text = keyword.trim().toLowerCase();
+        const fromOk = !fromDate || date >= fromDate;
+        const toOk = !toDate || date <= toDate;
 
         const keywordOk =
           !text ||
-          String(r.ServiceName || "")
+          getAppointmentCode(r.AppointmentId).toLowerCase().includes(text) ||
+          String(r.ServiceNames || r.ServiceName || "")
             .toLowerCase()
             .includes(text) ||
           String(r.EmployeeName || "")
             .toLowerCase()
             .includes(text) ||
-          String(r.Notes || "")
+          String(r.BranchName || "")
             .toLowerCase()
             .includes(text) ||
-          getAppointmentCode(r.AppointmentId).toLowerCase().includes(text);
+          String(r.Notes || "")
+            .toLowerCase()
+            .includes(text);
 
-        return statusOk && paymentOk && dateOk && keywordOk;
+        return statusOk && paymentOk && fromOk && toOk && keywordOk;
       });
-  }, [
-    rows,
-    statusFilter,
-    paymentFilter,
-    keyword,
-    dateFilter,
-    fromDate,
-    toDate,
-  ]);
+  }, [rows, keyword, statusFilter, paymentFilter, fromDate, toDate]);
 
   const stats = useMemo(() => {
     const total = rows.length;
-    const confirmed = rows.filter(
-      (r) => String(r.Status || "").toUpperCase() === "CONFIRMED",
+
+    const active = rows.filter((r) =>
+      ["PENDING_PAYMENT", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(
+        String(r.Status || "").toUpperCase(),
+      ),
     ).length;
-    const pending = rows.filter(
-      (r) => String(r.Status || "").toUpperCase() === "PENDING_PAYMENT",
+
+    const completed = rows.filter(
+      (r) => String(r.Status || "").toUpperCase() === "COMPLETED",
     ).length;
+
     const spent = rows
       .filter((r) => String(r.PaymentStatus || "").toUpperCase() === "PAID")
-      .reduce((sum, r) => sum + Number(r.FinalAmount || r.Price || 0), 0);
+      .reduce((sum, r) => sum + Number(r.FinalAmount || 0), 0);
 
-    return { total, confirmed, pending, spent };
+    return { total, active, completed, spent };
   }, [rows]);
 
-  function formatMoney(value) {
-    return Number(value || 0).toLocaleString("vi-VN") + "đ";
-  }
-
-  function formatDate(value) {
-    if (!value) return "Chưa có";
-    return new Date(value).toLocaleDateString("vi-VN");
-  }
-
-  function formatTime(value) {
-    if (!value) return "";
-
-    const text = String(value);
-
-    if (text.includes("T")) {
-      const afterT = text.split("T")[1];
-      return afterT ? afterT.slice(0, 5) : "";
-    }
-
-    if (text.includes(":")) {
-      return text.slice(0, 5);
-    }
-
-    return text;
-  }
-
-  function getAppointmentCode(id) {
-    return `AP${String(id).padStart(5, "0")}`;
-  }
-
-  function canPay(status, paymentStatus) {
-    const s = String(status || "").toUpperCase();
-    const p = String(paymentStatus || "").toUpperCase();
-    return (
-      s === "PENDING_PAYMENT" && ["UNPAID", "PENDING", "FAILED"].includes(p)
-    );
-  }
-
-  function canCancel(status) {
-    const s = String(status || "").toUpperCase();
-    return s === "PENDING_PAYMENT" || s === "CONFIRMED";
-  }
-
-  function canReschedule(status) {
-    const s = String(status || "").toUpperCase();
-    return !["COMPLETED", "CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(s);
-  }
-
-  function hasReviewed(appointmentId, serviceId) {
-    return reviews.some(
-      (review) =>
-        String(review.AppointmentId) === String(appointmentId) &&
-        String(review.ServiceId) === String(serviceId),
-    );
-  }
-
-  function canReviewAppointment(status, appointmentId, serviceId) {
-    return (
-      String(status || "").toUpperCase() === "COMPLETED" &&
-      !hasReviewed(appointmentId, serviceId)
-    );
-  }
-
-  function getStatusText(status) {
-    const s = String(status || "").toUpperCase();
-    if (s === "PENDING_PAYMENT") return "Chờ thanh toán";
-    if (s === "CONFIRMED") return "Đã xác nhận";
-    if (s === "CHECKED_IN") return "Đã check-in";
-    if (s === "IN_PROGRESS") return "Đang thực hiện";
-    if (s === "COMPLETED") return "Hoàn thành";
-    if (s === "CANCELLED") return "Đã hủy";
-    if (s === "REFUND_PENDING") return "Đang chờ hoàn tiền";
-    if (s === "NO_SHOW") return "Vắng mặt";
-    return status || "Chưa rõ";
-  }
-
-  function getPaymentText(paymentStatus) {
-    const p = String(paymentStatus || "").toUpperCase();
-    if (p === "PAID") return "Đã thanh toán";
-    if (p === "UNPAID") return "Chưa thanh toán";
-    if (p === "PENDING") return "Đang chờ thanh toán";
-    if (p === "FAILED") return "Thanh toán thất bại";
-    if (p === "REFUND_PENDING") return "Đang chờ hoàn tiền";
-    if (p === "REFUNDED") return "Đã hoàn tiền";
-    return paymentStatus || "Chưa thanh toán";
-  }
-
-  function getRefundText(status) {
-    const s = String(status || "").toUpperCase();
-    if (s === "PENDING") return "Đang chờ hoàn tiền";
-    if (s === "PROCESSING") return "Đang xử lý hoàn tiền";
-    if (s === "APPROVED") return "Đã chấp nhận hoàn tiền";
-    if (s === "REFUNDED") return "Đã hoàn tiền";
-    if (s === "REJECTED") return "Từ chối hoàn tiền";
-    return status || "Chưa có";
-  }
-
-  function openCancelModal(r) {
+  function openCancelModal(row) {
+    setError("");
+    setMessage("");
     setCancelModal({
       open: true,
-      appointment: r,
+      appointment: row,
       reason: "",
-      paymentStatus: String(r.PaymentStatus || "UNPAID").toUpperCase(),
     });
+    setBankCode("");
+    setAccountNumber("");
+    setAccountName("");
   }
 
   function closeCancelModal() {
@@ -213,21 +267,43 @@ export default function MyAppointments() {
       open: false,
       appointment: null,
       reason: "",
-      paymentStatus: "UNPAID",
     });
   }
 
-  async function handleCancelSubmit() {
-    if (!cancelModal.reason.trim()) {
-      setError("Vui lòng nhập lý do hủy lịch");
-      return;
-    }
-
+  async function submitCancel() {
     const appointmentId = cancelModal.appointment?.AppointmentId;
 
     if (!appointmentId) {
       setError("Không tìm thấy lịch hẹn cần hủy");
       return;
+    }
+
+    if (!cancelModal.reason.trim()) {
+      setError("Vui lòng nhập lý do hủy lịch");
+      return;
+    }
+
+    const paymentStatus = String(
+      cancelModal.appointment?.PaymentStatus || "",
+    ).toUpperCase();
+    const paymentMethod = String(
+      cancelModal.appointment?.PaymentMethod || "",
+    ).toUpperCase();
+    const hasPaid = paymentStatus === "PAID" && paymentMethod !== "PACKAGE";
+
+    if (hasPaid) {
+      if (!bankCode) {
+        setError("Vui lòng chọn ngân hàng nhận hoàn tiền");
+        return;
+      }
+      if (!accountNumber.trim()) {
+        setError("Vui lòng nhập số tài khoản nhận hoàn tiền");
+        return;
+      }
+      if (!accountName.trim()) {
+        setError("Vui lòng nhập tên chủ tài khoản");
+        return;
+      }
     }
 
     try {
@@ -236,12 +312,21 @@ export default function MyAppointments() {
       setMessage("");
 
       await axiosClient.delete(`/appointments/${appointmentId}`, {
-        data: { reason: cancelModal.reason.trim() },
+        data: {
+          reason: cancelModal.reason.trim(),
+          bankCode,
+          accountNumber,
+          accountName: accountName.trim().toUpperCase()
+        },
       });
 
+      const paymentStatus = String(
+        cancelModal.appointment?.PaymentStatus || "",
+      ).toUpperCase();
+
       setMessage(
-        cancelModal.paymentStatus === "PAID"
-          ? "Đã gửi yêu cầu hủy lịch và chờ hoàn tiền"
+        paymentStatus === "PAID"
+          ? "Đã hủy lịch và gửi yêu cầu hoàn tiền"
           : "Hủy lịch hẹn thành công",
       );
 
@@ -254,8 +339,12 @@ export default function MyAppointments() {
     }
   }
 
-  function handlePay(appointmentId) {
-    navigate(`/customer/payment/${appointmentId}`);
+  function clearFilter() {
+    setKeyword("");
+    setStatusFilter("ALL");
+    setPaymentFilter("ALL");
+    setFromDate("");
+    setToDate("");
   }
 
   return (
@@ -273,12 +362,11 @@ export default function MyAppointments() {
               </button>
 
               <div className="cancel-modal-icon">!</div>
-
               <h3>Xác nhận hủy lịch hẹn</h3>
 
               <p className="cancel-modal-desc">
-                Bạn có chắc chắn muốn hủy lịch hẹn này không? Vui lòng nhập lý
-                do để salon hỗ trợ xử lý đúng nghiệp vụ.
+                Vui lòng nhập lý do hủy để salon xử lý lịch hẹn, thanh toán và
+                hoàn tiền chính xác.
               </p>
 
               <div className="cancel-summary">
@@ -292,7 +380,9 @@ export default function MyAppointments() {
                 <div>
                   <span>Dịch vụ</span>
                   <b>
-                    {cancelModal.appointment?.ServiceName || "Dịch vụ đã đặt"}
+                    {cancelModal.appointment?.ServiceNames ||
+                      cancelModal.appointment?.ServiceName ||
+                      "Dịch vụ"}
                   </b>
                 </div>
 
@@ -310,10 +400,58 @@ export default function MyAppointments() {
                 </div>
               </div>
 
-              {cancelModal.paymentStatus === "PAID" && (
+              {String(
+                cancelModal.appointment?.PaymentStatus || "",
+              ).toUpperCase() === "PAID" && (
                 <div className="refund-warning">
-                  Lịch hẹn này đã thanh toán. Sau khi hủy, hệ thống sẽ chuyển
-                  lịch sang trạng thái <b>Đang chờ hoàn tiền</b>.
+                  Lịch này đã thanh toán. Sau khi hủy, hệ thống sẽ tạo yêu cầu
+                  hoàn tiền qua cổng PayOS.
+                </div>
+              )}
+
+              {String(
+                cancelModal.appointment?.PaymentStatus || "",
+              ).toUpperCase() === "PAID" && (
+                <div className="bank-refund-fields" style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '15px 0', padding: '12px', border: '1px solid #ffe3e3', borderRadius: '8px', backgroundColor: '#fff9f9' }}>
+                  <h4 style={{ margin: '0 0 8px 0', color: '#d32f2f', fontSize: '14px' }}>Thông tin tài khoản nhận hoàn tiền</h4>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', textAlign: 'left' }}>Ngân hàng nhận:</label>
+                    <select
+                      style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', outline: 'none' }}
+                      value={bankCode}
+                      onChange={(e) => setBankCode(e.target.value)}
+                    >
+                      <option value="">-- Chọn ngân hàng --</option>
+                      {bankList.map((b) => (
+                        <option key={b.bin} value={b.bin}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', textAlign: 'left' }}>Số tài khoản:</label>
+                    <input
+                      type="text"
+                      placeholder="Nhập số tài khoản..."
+                      style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', outline: 'none' }}
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value.replace(/\s/g, ""))}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', textAlign: 'left' }}>Tên chủ tài khoản (viết hoa không dấu):</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: NGUYEN VAN A"
+                      style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', outline: 'none' }}
+                      value={accountName}
+                      onChange={(e) => setAccountName(e.target.value.toUpperCase())}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -323,7 +461,10 @@ export default function MyAppointments() {
                 className="cancel-textarea"
                 value={cancelModal.reason}
                 onChange={(e) =>
-                  setCancelModal({ ...cancelModal, reason: e.target.value })
+                  setCancelModal((prev) => ({
+                    ...prev,
+                    reason: e.target.value,
+                  }))
                 }
                 placeholder="Ví dụ: Tôi bận đột xuất, muốn hủy lịch..."
                 rows={4}
@@ -334,9 +475,6 @@ export default function MyAppointments() {
                   type="button"
                   className="cancel-keep-btn"
                   onClick={closeCancelModal}
-                  disabled={
-                    loadingId === cancelModal.appointment?.AppointmentId
-                  }
                 >
                   Giữ lịch
                 </button>
@@ -344,7 +482,7 @@ export default function MyAppointments() {
                 <button
                   type="button"
                   className="cancel-confirm-btn"
-                  onClick={handleCancelSubmit}
+                  onClick={submitCancel}
                   disabled={
                     loadingId === cancelModal.appointment?.AppointmentId
                   }
@@ -363,7 +501,8 @@ export default function MyAppointments() {
             <div className="eyebrow">Appointments</div>
             <h2 className="section-title">Lịch hẹn của tôi</h2>
             <p className="muted">
-              Theo dõi lịch hẹn, trạng thái xác nhận và trạng thái thanh toán.
+              Theo dõi dịch vụ, kỹ thuật viên, trạng thái lịch hẹn, thanh toán
+              và hoàn tiền.
             </p>
           </div>
 
@@ -373,22 +512,34 @@ export default function MyAppointments() {
         </div>
 
         <div className="stats">
-          <div className="dashboard-card">
+          <div 
+            className="dashboard-card" 
+            style={{ cursor: "pointer" }}
+            onClick={() => setStatusFilter("ALL")}
+          >
             <h3>Tổng lịch hẹn</h3>
             <strong>{stats.total}</strong>
             <p className="muted">Tất cả lịch đã đặt</p>
           </div>
 
-          <div className="dashboard-card">
-            <h3>Đã xác nhận</h3>
-            <strong>{stats.confirmed}</strong>
-            <p className="muted">Lịch đã được salon xác nhận</p>
+          <div 
+            className="dashboard-card" 
+            style={{ cursor: "pointer" }}
+            onClick={() => setStatusFilter("IN_PROGRESS")}
+          >
+            <h3>Đang hoạt động</h3>
+            <strong>{stats.active}</strong>
+            <p className="muted">Chờ thanh toán / xác nhận / đang làm</p>
           </div>
 
-          <div className="dashboard-card">
-            <h3>Đang chờ</h3>
-            <strong>{stats.pending}</strong>
-            <p className="muted">Lịch chờ thanh toán</p>
+          <div 
+            className="dashboard-card" 
+            style={{ cursor: "pointer" }}
+            onClick={() => setStatusFilter("COMPLETED")}
+          >
+            <h3>Hoàn thành</h3>
+            <strong>{stats.completed}</strong>
+            <p className="muted">Lịch đã sử dụng dịch vụ</p>
           </div>
 
           <div className="dashboard-card">
@@ -401,38 +552,70 @@ export default function MyAppointments() {
         {message && <div className="alert-success">{message}</div>}
         {error && <div className="alert-error">{error}</div>}
 
+        {/* Tabs Phân loại Lịch hẹn */}
+        <div className="service-history-tabs" style={{ marginBottom: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className={statusFilter === "ALL" ? "active" : ""}
+            onClick={() => setStatusFilter("ALL")}
+          >
+            Tất cả ({rows.length})
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "PENDING_PAYMENT" ? "active" : ""}
+            onClick={() => setStatusFilter("PENDING_PAYMENT")}
+          >
+            Chờ thanh toán ({rows.filter(r => String(r.Status).toUpperCase() === "PENDING_PAYMENT").length})
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "CONFIRMED" ? "active" : ""}
+            onClick={() => setStatusFilter("CONFIRMED")}
+          >
+            Đã xác nhận ({rows.filter(r => String(r.Status).toUpperCase() === "CONFIRMED").length})
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "IN_PROGRESS" ? "active" : ""}
+            onClick={() => setStatusFilter("IN_PROGRESS")}
+          >
+            Đang làm ({rows.filter(r => ["IN_PROGRESS", "CHECKED_IN"].includes(String(r.Status).toUpperCase())).length})
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "COMPLETED" ? "active" : ""}
+            onClick={() => setStatusFilter("COMPLETED")}
+          >
+            Hoàn thành ({rows.filter(r => String(r.Status).toUpperCase() === "COMPLETED").length})
+          </button>
+          <button
+            type="button"
+            className={statusFilter === "CANCELLED" ? "active" : ""}
+            onClick={() => setStatusFilter("CANCELLED")}
+          >
+            Đã hủy / Vắng mặt ({rows.filter(r => ["CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(String(r.Status).toUpperCase())).length})
+          </button>
+        </div>
+
         <div className="dashboard-card appointment-filter-card">
           <input
             className="filter-input"
-            placeholder="🔍 Tìm theo mã lịch, dịch vụ, kỹ thuật viên..."
+            placeholder="Tìm mã lịch, dịch vụ, kỹ thuật viên, chi nhánh..."
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
           />
 
           <select
             className="filter-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="PENDING_PAYMENT">Chờ thanh toán</option>
-            <option value="CONFIRMED">Đã xác nhận</option>
-            <option value="COMPLETED">Hoàn thành</option>
-            <option value="CANCELLED">Đã hủy</option>
-          </select>
-
-          <select
-            className="filter-select"
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
           >
-            <option value="ALL">Tất cả thanh toán</option>
-            <option value="UNPAID">Chưa thanh toán</option>
-            <option value="PENDING">Đang chờ</option>
-            <option value="PAID">Đã thanh toán</option>
-            <option value="FAILED">Thất bại</option>
-            <option value="REFUND_PENDING">Đang hoàn tiền</option>
-            <option value="REFUNDED">Đã hoàn tiền</option>
+            {PAYMENT_OPTIONS.map(([value, label]) => (
+              <option value={value} key={value}>
+                {label}
+              </option>
+            ))}
           </select>
 
           <input
@@ -441,7 +624,6 @@ export default function MyAppointments() {
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
           />
-
           <input
             className="filter-input"
             type="date"
@@ -449,18 +631,7 @@ export default function MyAppointments() {
             onChange={(e) => setToDate(e.target.value)}
           />
 
-          <button
-            className="card-btn"
-            type="button"
-            onClick={() => {
-              setKeyword("");
-              setDateFilter("");
-              setFromDate("");
-              setToDate("");
-              setStatusFilter("ALL");
-              setPaymentFilter("ALL");
-            }}
-          >
+          <button className="card-btn" type="button" onClick={clearFilter}>
             Xóa lọc
           </button>
         </div>
@@ -474,7 +645,7 @@ export default function MyAppointments() {
                 <th>Kỹ thuật viên</th>
                 <th>Ngày</th>
                 <th>Giờ</th>
-                <th>Giá</th>
+                <th>Thành tiền</th>
                 <th>Trạng thái</th>
                 <th>Thanh toán</th>
                 <th>Thao tác</th>
@@ -482,73 +653,92 @@ export default function MyAppointments() {
             </thead>
 
             <tbody>
-              {filteredRows.length === 0 && (
+              {loading && (
                 <tr>
                   <td className="empty-row" colSpan="9">
-                    Bạn chưa có lịch hẹn nào
+                    Đang tải lịch hẹn...
                   </td>
                 </tr>
               )}
 
-              {filteredRows.map((r) => {
-                const status = String(r.Status || "").toUpperCase();
-                const paymentStatus = String(
-                  r.PaymentStatus || "UNPAID",
-                ).toUpperCase();
+              {!loading && filteredRows.length === 0 && (
+                <tr>
+                  <td className="empty-row" colSpan="9">
+                    Không có lịch hẹn phù hợp
+                  </td>
+                </tr>
+              )}
 
-                return (
-                  <tr key={r.AppointmentId}>
-                    <td>
-                      <span className="code">
-                        {getAppointmentCode(r.AppointmentId)}
-                      </span>
-                    </td>
+              {!loading &&
+                filteredRows.map((r) => {
+                  const status = String(r.Status || "").toUpperCase();
+                  const paymentStatus = String(
+                    r.PaymentStatus || "UNPAID",
+                  ).toUpperCase();
 
-                    <td>
-                      <div className="service-cell">
-                        <div className="service-icon">🌸</div>
-                        <div>
-                          <div className="service-name">
-                            {r.ServiceName || "Dịch vụ"}
-                          </div>
-                          <div className="muted">
-                            {r.Notes
-                              ? `Ghi chú: ${r.Notes}`
-                              : "Dịch vụ chăm sóc cao cấp"}
+                  return (
+                    <tr key={r.AppointmentId}>
+                      <td>
+                        <span className="code">
+                          {getAppointmentCode(r.AppointmentId)}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div className="service-cell">
+                          <div className="service-icon">🌸</div>
+                          <div>
+                            <div className="service-name">
+                              {r.ServiceNames || r.ServiceName || "Dịch vụ"}
+                            </div>
+                            <div className="muted">
+                              {r.ServiceCount > 1
+                                ? `${r.ServiceCount} dịch vụ trong lịch hẹn`
+                                : r.Notes
+                                  ? `Ghi chú: ${r.Notes}`
+                                  : "Dịch vụ chăm sóc sắc đẹp"}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td>{r.EmployeeName || "Chưa có"}</td>
+                      <td>
+                        <b>{r.EmployeeName || "Chưa phân công"}</b>
+                        {r.BranchName && (
+                          <div className="muted">{r.BranchName}</div>
+                        )}
+                      </td>
 
-                    <td>{formatDate(r.AppointmentDate)}</td>
+                      <td>{formatDate(r.AppointmentDate)}</td>
 
-                    <td>
-                      <b>
-                        {formatTime(r.StartTime)} - {formatTime(r.EndTime)}
-                      </b>
-                    </td>
+                      <td>
+                        <b>
+                          {formatTime(r.StartTime)} - {formatTime(r.EndTime)}
+                        </b>
+                      </td>
 
-                    <td>{formatMoney(r.FinalAmount || r.Price)}</td>
+                      <td>
+                        <b>
+                          {formatMoney(
+                            r.FinalAmount || r.TotalAmount || r.TotalPrice,
+                          )}
+                        </b>
+                        {Number(r.DiscountAmount || 0) > 0 && (
+                          <div className="muted">
+                            Giảm {formatMoney(r.DiscountAmount)}
+                          </div>
+                        )}
+                      </td>
 
-                    <td>
-                      <span
-                        className={`status-badge status-${status.toLowerCase()}`}
-                      >
-                        {status === "PENDING_PAYMENT" || status === "PENDING"
-                          ? "⏳ "
-                          : status === "CONFIRMED"
-                            ? "✅ "
-                            : status === "NO_SHOW"
-                              ? "🚫 "
-                              : ""}
-                        {getStatusText(status)}
-                      </span>
-                    </td>
+                      <td>
+                        <span
+                          className={`status-badge status-${status.toLowerCase()}`}
+                        >
+                          {statusText(status)}
+                        </span>
+                      </td>
 
-                    <td>
-                      <div>
+                      <td>
                         <span
                           className={`payment-badge ${
                             paymentStatus === "PAID"
@@ -558,135 +748,106 @@ export default function MyAppointments() {
                                 : "payment-unpaid"
                           }`}
                         >
-                          {paymentStatus === "PAID"
-                            ? "💳 "
-                            : paymentStatus === "REFUND_PENDING"
-                              ? "⏳ "
-                              : "⚠️ "}
-                          {getPaymentText(paymentStatus)}
+                          {paymentText(paymentStatus)}
                         </span>
-                        {r.CancelReason && (
-                          <div className="muted" style={{ marginTop: 8 }}>
-                            <b>Lý do hủy:</b> {r.CancelReason}
-                          </div>
-                        )}
+
                         {r.RefundStatus && (
                           <div className="muted" style={{ marginTop: 6 }}>
-                            <b>Hoàn tiền:</b> {getRefundText(r.RefundStatus)}
+                            Hoàn tiền: {refundText(r.RefundStatus)}
                           </div>
                         )}
-                        {String(r.Status || "").toUpperCase() ===
-                          "REFUND_PENDING" && (
+
+                        {r.CancelReason && (
                           <div className="muted" style={{ marginTop: 6 }}>
-                            <b>Trạng thái:</b> Đang chờ hoàn tiền
+                            Lý do hủy: {r.CancelReason}
                           </div>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    <td>
-                      <div className="action-row">
-                        <Link
-                          className="btn-detail"
-                          to={`/customer/appointments/${r.AppointmentId}`}
-                        >
-                          Chi tiết
-                        </Link>
-
-                        {canPay(r.Status, r.PaymentStatus) && (
-                          <button
-                            type="button"
-                            className="btn-pay"
-                            disabled={loadingId === r.AppointmentId}
-                            onClick={() => handlePay(r.AppointmentId)}
-                          >
-                            {loadingId === r.AppointmentId
-                              ? "Đang xử lý..."
-                              : "Thanh toán"}
-                          </button>
-                        )}
-
-                        {canReviewAppointment(
-                          r.Status,
-                          r.AppointmentId,
-                          r.ServiceId,
-                        ) ? (
-                          <button
-                            type="button"
-                            className="btn-pay"
-                            onClick={() =>
-                              navigate(
-                                `/customer/feedback?appointmentId=${r.AppointmentId}&serviceId=${r.ServiceId || ""}`,
-                              )
-                            }
-                          >
-                            Đánh giá
-                          </button>
-                        ) : String(r.Status || "").toUpperCase() ===
-                          "COMPLETED" ? (
-                          <span
-                            className="btn-pay"
-                            style={{ cursor: "default" }}
-                          >
-                            Đã đánh giá
-                          </span>
-                        ) : null}
-
-                        {canReschedule(r.Status) && (
-                          <button
-                            type="button"
+                      <td>
+                        <div className="action-row">
+                          <Link
                             className="btn-detail"
-                            onClick={() =>
-                              navigate(
-                                `/customer/reschedule/${r.AppointmentId}`,
-                              )
-                            }
+                            to={`/customer/appointments/${r.AppointmentId}`}
                           >
-                            Đổi lịch
-                          </button>
-                        )}
+                            Chi tiết
+                          </Link>
 
-                        {String(r.Status || "").toUpperCase() ===
-                          "COMPLETED" && (
-                          <button
-                            type="button"
-                            className="btn-again"
-                            onClick={() =>
-                              navigate(
-                                `/customer/booking?serviceId=${r.ServiceId || ""}&employeeId=${r.EmployeeId || ""}`,
-                              )
-                            }
-                          >
-                            Đặt lại
-                          </button>
-                        )}
+                          {canPay(r) && (
+                            <button
+                              type="button"
+                              className="btn-pay"
+                              onClick={() =>
+                                navigate(`/customer/payment/${r.AppointmentId}`)
+                              }
+                            >
+                              Thanh toán
+                            </button>
+                          )}
 
-                        {canCancel(r.Status) && (
-                          <button
-                            type="button"
-                            className="btn-cancel"
-                            disabled={loadingId === r.AppointmentId}
-                            onClick={() => openCancelModal(r)}
-                          >
-                            {loadingId === r.AppointmentId
-                              ? "Đang hủy..."
-                              : paymentStatus === "PAID"
-                                ? "Hủy & hoàn"
-                                : "Hủy"}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                          {canReschedule(r) && (
+                            <button
+                              type="button"
+                              className="btn-detail"
+                              onClick={() =>
+                                navigate(
+                                  `/customer/reschedule/${r.AppointmentId}`,
+                                )
+                              }
+                            >
+                              Đổi lịch
+                            </button>
+                          )}
+
+                          {canReview(r) && (
+                            <button
+                              type="button"
+                              className="btn-pay"
+                              onClick={() =>
+                                navigate(
+                                  `/customer/reviews?appointmentId=${r.AppointmentId}`,
+                                )
+                              }
+                            >
+                              Đánh giá
+                            </button>
+                          )}
+
+                          {status === "COMPLETED" && (
+                            <button
+                              type="button"
+                              className="btn-again"
+                              onClick={() =>
+                                navigate(
+                                  `/customer/booking?serviceId=${r.ServiceId || ""}&employeeId=${r.EmployeeId || ""}`,
+                                )
+                              }
+                            >
+                              Đặt lại
+                            </button>
+                          )}
+
+                          {canCancel(r) && (
+                            <button
+                              type="button"
+                              className="btn-cancel"
+                              disabled={loadingId === r.AppointmentId}
+                              onClick={() => openCancelModal(r)}
+                            >
+                              {paymentStatus === "PAID" ? "Hủy & hoàn" : "Hủy"}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
 
           <div className="table-footer">
             <span>
-              Hiển thị 1 - {filteredRows.length} của {filteredRows.length} lịch
-              hẹn
+              Hiển thị {filteredRows.length} / {rows.length} lịch hẹn
             </span>
             <span className="page-dot">1</span>
           </div>

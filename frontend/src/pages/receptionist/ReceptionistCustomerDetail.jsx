@@ -501,8 +501,12 @@ export default function ReceptionistCustomerDetail() {
                         <td>{money(i.DiscountAmount)}</td>
                         <td>{money(i.FinalAmount)}</td>
                         <td>
-                          <span className={statusClass(i.PaymentStatus)}>
-                            {i.PaymentStatus}
+                          <span
+                            className={statusClass(
+                              i.PaymentStatus || i.InvoiceStatus,
+                            )}
+                          >
+                            {i.PaymentStatus || i.InvoiceStatus || "UNPAID"}
                           </span>
                         </td>
                         <td>{date(i.CreatedAt)}</td>

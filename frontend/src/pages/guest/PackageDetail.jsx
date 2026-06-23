@@ -70,30 +70,59 @@ export default function PackageDetail() {
           </div>
 
           <div className="payment-box">
-            <h3>Chọn phương thức thanh toán</h3>
-            <label><input type="radio" checked={method === 'VNPAY'} onChange={() => setMethod('VNPAY')} /> Thanh toán online VNPay</label>
-            <label><input type="radio" checked={method === 'CASH'} onChange={() => setMethod('CASH')} /> Thanh toán tại quầy</label>
-            {message && <div className="alert error">{message}</div>}
-            <button className="btn" disabled={paying} onClick={buy}>{paying ? 'Đang xử lý...' : method === 'VNPAY' ? 'Thanh toán VNPay' : 'Mua liệu trình'}</button>
+            <h3 style={{ margin: "0 0 12px 0", fontSize: "1rem", color: "#303442", fontWeight: 700 }}>Chọn phương thức thanh toán</h3>
+            
+            <div className="payment-method-grid">
+              <div
+                className={`payment-method-card ${method === 'VNPAY' ? 'active' : ''}`}
+                onClick={() => setMethod('VNPAY')}
+              >
+                <span className="payment-method-card-icon">💳</span>
+                <span className="payment-method-card-title">Thanh toán VNPay</span>
+              </div>
+              
+              <div
+                className={`payment-method-card ${method === 'CASH' ? 'active' : ''}`}
+                onClick={() => setMethod('CASH')}
+              >
+                <span className="payment-method-card-icon">💵</span>
+                <span className="payment-method-card-title">Tại quầy Spa</span>
+              </div>
+            </div>
+
+            {message && <div className="alert error" style={{ margin: "12px 0" }}>{message}</div>}
+            
+            <button
+              className="btn"
+              disabled={paying}
+              onClick={buy}
+              style={{ width: "100%", marginTop: "8px", justifyContent: "center", display: "flex" }}
+            >
+              {paying ? 'Đang xử lý...' : method === 'VNPAY' ? 'Thanh toán qua VNPay' : 'Xác nhận mua liệu trình'}
+            </button>
           </div>
         </div>
       </div>
 
       <div className="combo-services-section">
-        <h2>Dịch vụ trong liệu trình</h2>
+        <h2>Dịch vụ có trong gói liệu trình</h2>
         <div className="combo-service-list">
           {(item.Services || []).map((s) => (
-            <div className="combo-service-item" key={s.ServiceId}>
-              <img src={resolveFileUrl(s.ImageUrl) || '/vite.svg'} alt={s.ServiceName} />
+            <div className="combo-service-item" key={s.ServiceId} style={{ background: '#fff', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+              <img src={resolveFileUrl(s.ImageUrl) || '/vite.svg'} alt={s.ServiceName} style={{ width: '120px', height: '120px', objectFit: 'cover' }} />
               <div>
-                <h3>{s.ServiceName}</h3>
-                <p>{s.Description}</p>
-                <span>{s.DurationMinutes || 60} phút • {money(s.Price)}</span>
+                <h3 style={{ fontSize: '1.05rem', margin: '0 0 6px 0', color: '#2d2522' }}>{s.ServiceName}</h3>
+                <p style={{ fontSize: '0.85rem', color: '#667085', margin: '6px 0' }}>{s.Description || 'Chưa có mô tả cho dịch vụ này.'}</p>
+                <span style={{ fontSize: '0.8rem', color: 'var(--primary, #8b5cf6)', fontWeight: 600 }}>
+                  🕘 {s.DurationMinutes || 60} phút • Số lượng: {s.SessionCount || s.MaxSessions || 1} buổi
+                </span>
               </div>
             </div>
           ))}
         </div>
-        <Link className="card-btn" to="/packages">← Quay lại danh sách combo</Link>
+        <Link className="card-btn" to="/packages" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', width: 'auto', padding: '10px 20px' }}>
+          ← Quay lại danh sách combo
+        </Link>
       </div>
     </section>
   );

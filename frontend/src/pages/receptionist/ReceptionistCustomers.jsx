@@ -53,12 +53,18 @@ export default function ReceptionistCustomers() {
     return {
       total: items.length,
       standard: items.filter(
-        (x) => String(x.MembershipLevel || "").toLowerCase() === "standard",
+        (x) =>
+          String(x.MembershipLevel || "Standard").toLowerCase() === "standard",
       ).length,
       vip: items.filter(
-        (x) => String(x.MembershipLevel || "").toLowerCase() !== "standard",
+        (x) =>
+          String(x.MembershipLevel || "Standard").toLowerCase() !== "standard",
       ).length,
       spent: items.reduce((sum, x) => sum + Number(x.TotalSpent || 0), 0),
+      appointments: items.reduce(
+        (sum, x) => sum + Number(x.TotalAppointments || 0),
+        0,
+      ),
     };
   }, [items]);
 
@@ -168,6 +174,7 @@ export default function ReceptionistCustomers() {
                 <th>Điểm</th>
                 <th>Lịch hẹn</th>
                 <th>Chi tiêu</th>
+                <th>Lần ghé gần nhất</th>
                 <th>Thao tác</th>
               </tr>
             </thead>
@@ -203,8 +210,17 @@ export default function ReceptionistCustomers() {
                   </td>
 
                   <td>{c.Points || 0}</td>
-                  <td>{c.TotalAppointments || 0}</td>
+                  <td>
+                    <b>{c.TotalAppointments || 0}</b>
+                    <small>Hoàn thành: {c.CompletedAppointments || 0}</small>
+                  </td>
                   <td>{money(c.TotalSpent)}</td>
+
+                  <td>
+                    {c.LastVisitDate
+                      ? new Date(c.LastVisitDate).toLocaleDateString("vi-VN")
+                      : "-"}
+                  </td>
 
                   <td>
                     <Link
@@ -219,7 +235,7 @@ export default function ReceptionistCustomers() {
 
               {!loading && items.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="rcc-empty">
+                  <td colSpan="9" className="rcc-empty">
                     Không có khách hàng phù hợp
                   </td>
                 </tr>

@@ -15,8 +15,10 @@ const navItems = [
   { to: "/admin/users", label: "Users" },
   { to: "/admin/reviews", label: "Reviews" },
   { to: "/admin/feedbacks", label: "Feedbacks" },
+  { to: "/admin/refunds", label: "Refunds" },
   { to: "/admin/system-logs", label: "System Logs" },
   { to: "/admin/reports", label: "Reports" },
+  { to: "/admin/package-reports", label: "Package Reports" },
   { to: "/admin/ai-monitoring", label: "AI Monitoring" },
 ];
 

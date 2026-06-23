@@ -206,6 +206,51 @@ export default function AdminDashboard() {
               <MiniBarChart items={data.revenueByDay || []} />
             </article>
 
+            <article className="admin-panel admin-panel-large">
+              <div className="admin-panel-head">
+                <div>
+                  <h2>Thống kê hàng chờ thông minh (Smart Waiting List)</h2>
+                  <p>Phân tích tỷ lệ chuyển đổi và trạng thái hàng chờ hệ thống.</p>
+                </div>
+              </div>
+
+              <div className="admin-waitlist-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', padding: '16px 0' }}>
+                <div style={{ padding: '20px', borderRadius: '20px', background: '#fff7fb', border: '1px solid #ffe0eb', textAlign: 'center' }}>
+                  <span style={{ fontSize: '28px' }}>⏳</span>
+                  <p style={{ margin: '8px 0 4px', color: '#7b6874', fontSize: '13px', fontWeight: 'bold' }}>Tổng lượt tham gia hàng chờ</p>
+                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#2d2430' }}>{summary.totalWaitingCount || 0}</h3>
+                </div>
+
+                <div style={{ padding: '20px', borderRadius: '20px', background: '#fdf2f8', border: '1px solid #fbcfe8', textAlign: 'center' }}>
+                  <span style={{ fontSize: '28px' }}>⚡</span>
+                  <p style={{ margin: '8px 0 4px', color: '#db2777', fontSize: '13px', fontWeight: 'bold' }}>Lượt khớp slot thành công</p>
+                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#db2777' }}>{summary.matchedWaitingCount || 0}</h3>
+                </div>
+
+                <div style={{ padding: '20px', borderRadius: '20px', background: '#f0fdf4', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+                  <span style={{ fontSize: '28px' }}>✅</span>
+                  <p style={{ margin: '8px 0 4px', color: '#16a34a', fontSize: '13px', fontWeight: 'bold' }}>Lượt đặt lịch thành công</p>
+                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#16a34a' }}>{summary.bookedWaitingCount || 0}</h3>
+                </div>
+
+                <div style={{ padding: '20px', borderRadius: '20px', background: '#f9fafb', border: '1px solid #e5e7eb', textAlign: 'center' }}>
+                  <span style={{ fontSize: '28px' }}>📆</span>
+                  <p style={{ margin: '8px 0 4px', color: '#4b5563', fontSize: '13px', fontWeight: 'bold' }}>Lượt hết hạn / Bỏ lỡ</p>
+                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#4b5563' }}>{summary.expiredWaitingCount || 0}</h3>
+                </div>
+
+                <div style={{ padding: '20px', borderRadius: '20px', background: '#eff6ff', border: '1px solid #bfdbfe', textAlign: 'center' }}>
+                  <span style={{ fontSize: '28px' }}>📈</span>
+                  <p style={{ margin: '8px 0 4px', color: '#2563eb', fontSize: '13px', fontWeight: 'bold' }}>Tỷ lệ chuyển đổi thành công</p>
+                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#2563eb' }}>
+                    {summary.totalWaitingCount
+                      ? ((summary.bookedWaitingCount / summary.totalWaitingCount) * 100).toFixed(1)
+                      : "0.0"}%
+                  </h3>
+                </div>
+              </div>
+            </article>
+
             <article className="admin-panel">
               <div className="admin-panel-head">
                 <div>

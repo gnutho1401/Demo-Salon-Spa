@@ -1,4 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import axiosClient from "../../api/axiosClient";
 import TechnicianLayout from "../../layouts/TechnicianLayout";
 import "../../styles/pages/technician.css";
@@ -25,18 +37,18 @@ function formatMinutes(minutes) {
   const total = Number(minutes || 0);
   const h = Math.floor(total / 60);
   const m = total % 60;
-  return `${h}h ${m}m`;
+  return `${h}g ${m}ph`;
 }
 
 function statusText(status) {
   const map = {
-    PENDING: "Đang chờ",
+    PENDING: "Đang chờ duyệt",
     APPROVED: "Đã duyệt",
     REJECTED: "Từ chối",
     PAID: "Đã thanh toán",
   };
 
-  return map[status] || status || "N/A";
+  return map[status] || status || "Không rõ";
 }
 
 export default function TechnicianEarnings() {
@@ -73,7 +85,7 @@ export default function TechnicianEarnings() {
 
       setGoalInput(String(payload.payout?.monthlyGoal || 8000000));
     } catch (err) {
-      alert(err.response?.data?.message || "Không tải được earnings");
+      alert(err.response?.data?.message || "Không tải được báo cáo thu nhập");
     } finally {
       setLoading(false);
     }
@@ -137,7 +149,7 @@ export default function TechnicianEarnings() {
   const goal = Number(payout.monthlyGoal || 8000000);
   const earned = Number(overview.Commission || 0) + Number(overview.Tips || 0);
   const goalPercent =
-    goal > 0 ? Math.min(Math.round((earned / goal) * 100), 160) : 0;
+    goal > 0 ? Math.min(Math.round((earned / goal) * 100), 100) : 0;
 
   async function handleExport() {
     try {
@@ -156,7 +168,7 @@ export default function TechnicianEarnings() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.response?.data?.message || "Không export được báo cáo");
+      alert(err.response?.data?.message || "Không thể xuất file báo cáo");
     }
   }
 
@@ -174,9 +186,9 @@ export default function TechnicianEarnings() {
       });
 
       await loadEarnings();
-      alert("Đã cập nhật mục tiêu earning");
+      alert("Đã cập nhật mục tiêu thu nhập thành công");
     } catch (err) {
-      alert(err.response?.data?.message || "Không cập nhật được mục tiêu");
+      alert(err.response?.data?.message || "Không thể cập nhật mục tiêu");
     }
   }
 
@@ -185,21 +197,21 @@ export default function TechnicianEarnings() {
       const available = Number(payout.availableBalance || 0);
 
       if (available <= 0) {
-        alert("Không có số dư khả dụng để payout");
+        alert("Không có số dư khả dụng để gửi yêu cầu rút tiền");
         return;
       }
 
       await axiosClient.post("/technician/earnings/payouts", {
         amount: available,
-        note: payoutNote || "Technician payout request",
+        note: payoutNote.trim() || "Yêu cầu rút tiền từ Kỹ thuật viên",
       });
 
       setPayoutNote("");
       await loadEarnings();
       await loadPayoutHistory();
-      alert("Đã gửi yêu cầu payout");
+      alert("Đã gửi yêu cầu rút tiền thành công, vui lòng chờ duyệt");
     } catch (err) {
-      alert(err.response?.data?.message || "Không tạo được yêu cầu payout");
+      alert(err.response?.data?.message || "Không thể gửi yêu cầu rút tiền");
     }
   }
 
@@ -207,7 +219,7 @@ export default function TechnicianEarnings() {
     return (
       <TechnicianLayout>
         <div className="earning-page">
-          <div className="earning-loading">Đang tải earnings...</div>
+          <div className="earning-loading">Đang tải báo cáo thu nhập...</div>
         </div>
       </TechnicianLayout>
     );
@@ -219,10 +231,10 @@ export default function TechnicianEarnings() {
         <header className="earning-header">
           <div>
             <h1>
-              Earnings <span>💰</span>
+              Báo cáo Thu nhập <span>💰</span>
             </h1>
             <p>
-              Theo dõi doanh thu, hoa hồng và payout từ lịch hẹn đã hoàn thành
+              Theo dõi doanh thu, tiền hoa hồng và lịch sử yêu cầu rút tiền của bạn
             </p>
           </div>
 
@@ -236,7 +248,7 @@ export default function TechnicianEarnings() {
           </div>
 
           <button className="earning-export" onClick={handleExport}>
-            ⇩ Export JSON
+            📥 Xuất báo cáo JSON
           </button>
         </header>
 
@@ -257,25 +269,25 @@ export default function TechnicianEarnings() {
               onClick={() => setRange("week")}
               className={range === "week" ? "active" : ""}
             >
-              This Week
+              Tuần này
             </button>
             <button
               onClick={() => setRange("month")}
               className={range === "month" ? "active" : ""}
             >
-              This Month
+              Tháng này
             </button>
             <button
               onClick={() => setRange("lastMonth")}
               className={range === "lastMonth" ? "active" : ""}
             >
-              Last Month
+              Tháng trước
             </button>
             <button
               onClick={() => setRange("year")}
               className={range === "year" ? "active" : ""}
             >
-              This Year
+              Năm nay
             </button>
           </div>
         </section>
@@ -283,49 +295,49 @@ export default function TechnicianEarnings() {
         <section className="earning-stat-row">
           <div className="earning-stat-card">
             <span className="green">💵</span>
-            <p>Total Revenue</p>
+            <p>Tổng Doanh thu</p>
             <h2>{money(overview.TotalEarnings)}</h2>
-            <small>Tổng tiền invoice đã PAID</small>
+            <small>Hóa đơn khách đã thanh toán</small>
             <div className="mini-line" />
           </div>
 
           <div className="earning-stat-card">
             <span className="purple">♙</span>
-            <p>Commission</p>
+            <p>Tiền Hoa hồng</p>
             <h2>{money(overview.Commission)}</h2>
-            <small>Hoa hồng của technician</small>
+            <small>Hoa hồng được chia sẻ</small>
             <div className="mini-line purple-line" />
           </div>
 
           <div className="earning-stat-card">
             <span className="pink">♡</span>
-            <p>Tips</p>
+            <p>Tiền Tips</p>
             <h2>{money(overview.Tips)}</h2>
-            <small>Tip lưu trong invoice nếu có</small>
+            <small>Nhận trực tiếp từ khách hàng</small>
             <div className="mini-line pink-line" />
           </div>
 
           <div className="earning-stat-card">
             <span className="blue">▣</span>
-            <p>Completed</p>
+            <p>Số Lịch hoàn thành</p>
             <h2>{overview.ServicesCompleted || 0}</h2>
-            <small>Lịch hẹn đã hoàn thành và thanh toán</small>
+            <small>Lịch hẹn đã phục vụ xong</small>
             <div className="mini-line blue-line" />
           </div>
 
           <div className="earning-stat-card">
             <span className="gold">▤</span>
-            <p>Avg. Order Value</p>
+            <p>Giá trị đơn trung bình</p>
             <h2>{money(overview.AvgOrderValue)}</h2>
-            <small>Giá trị trung bình mỗi hóa đơn</small>
+            <small>Trung bình trên mỗi hóa đơn</small>
             <div className="mini-line gold-line" />
           </div>
 
           <div className="earning-stat-card">
             <span className="green">◷</span>
-            <p>Working Hours</p>
+            <p>Giờ làm việc</p>
             <h2>{formatMinutes(overview.WorkingMinutes)}</h2>
-            <small>Tính từ appointment đã completed</small>
+            <small>Tổng thời lượng làm dịch vụ</small>
             <div className="mini-line" />
           </div>
         </section>
@@ -333,85 +345,60 @@ export default function TechnicianEarnings() {
         <section className="earning-main-grid">
           <div className="earning-card earning-chart-card">
             <div className="card-head">
-              <h3>Earnings Overview</h3>
-              <button type="button">Daily</button>
+              <h3>Tổng quan Thu nhập</h3>
+              <button type="button" className="btn-chart-type">
+                Biểu đồ ngày
+              </button>
             </div>
 
-            <div className="chart-legend">
-              <span>
-                <i /> Revenue
-              </span>
-              <span>
-                <i className="commission-dot" /> Commission
-              </span>
-            </div>
-
-            <div className="bar-chart">
-              {(filteredDaily.length ? filteredDaily : [])
-                .slice(0, 20)
-                .map((item, index) => {
-                  const revenue = Number(item.TotalEarnings || 0);
-                  const commission = Number(item.Commission || 0);
-                  const max = Math.max(
-                    ...filteredDaily.map((x) => Number(x.TotalEarnings || 0)),
-                    1,
-                  );
-
-                  const height = Math.max(
-                    16,
-                    Math.round((revenue / max) * 125),
-                  );
-                  const commissionHeight = Math.max(
-                    8,
-                    Math.round((commission / max) * 125),
-                  );
-
-                  return (
-                    <div
-                      className="bar-col"
-                      key={`${item.AppointmentDate}-${index}`}
-                    >
-                      <div className="bar-tooltip">
-                        {shortDate(item.AppointmentDate)}
-                        <br />
-                        Revenue: {money(revenue)}
-                        <br />
-                        Commission: {money(commission)}
-                      </div>
-                      <i style={{ height }} />
-                      <b style={{ height: commissionHeight }} />
-                      <small>
-                        {index % 3 === 0
-                          ? shortDate(item.AppointmentDate).slice(0, 5)
-                          : ""}
-                      </small>
-                    </div>
-                  );
-                })}
-
-              {!filteredDaily.length && (
-                <div className="earning-empty">Chưa có dữ liệu earning</div>
-              )}
-            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={filteredDaily.slice(0, 15).reverse()} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
+                <XAxis dataKey="AppointmentDate" tickFormatter={(val) => shortDate(val).slice(0, 5)} stroke="#6f665b" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#6f665b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val / 1000}k`} />
+                <Tooltip formatter={(value, name) => [money(value), name === "TotalEarnings" ? "Doanh thu" : "Hoa hồng"]} labelFormatter={(label) => `Ngày: ${shortDate(label)}`} labelStyle={{ color: '#102616', fontWeight: 'bold' }} />
+                <Legend formatter={(value) => value === "TotalEarnings" ? "Doanh thu" : "Hoa hồng"} wrapperStyle={{ fontSize: '12px', marginTop: '10px' }} />
+                <Bar dataKey="TotalEarnings" fill="#456b35" radius={[4, 4, 0, 0]} barSize={14} />
+                <Bar dataKey="Commission" fill="#d9a441" radius={[4, 4, 0, 0]} barSize={14} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
           <div className="earning-card category-chart-card">
             <div className="card-head">
-              <h3>Earnings by Service Category</h3>
-              <button type="button">Details</button>
+              <h3>Thu nhập theo nhóm dịch vụ</h3>
+              <button type="button" className="btn-chart-type">
+                Chi tiết
+              </button>
             </div>
 
             <div className="donut-wrap">
-              <div className="donut">
-                <div>
-                  <h3>{money(overview.TotalEarnings)}</h3>
-                  <p>Total</p>
+              <div className="donut-chart-container">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categories}
+                      dataKey="Amount"
+                      nameKey="CategoryName"
+                      innerRadius={50}
+                      outerRadius={75}
+                      paddingAngle={2}
+                    >
+                      {categories.map((_, index) => (
+                        <Cell key={index} fill={["#456b35", "#d9a441", "#8d7b4a", "#a8b98a", "#d96b43"][index % 5]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [money(value), "Doanh thu"]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="donut-center">
+                  <span>Tổng cộng</span>
+                  <b>{money(overview.TotalEarnings)}</b>
                 </div>
               </div>
 
               <div className="category-list">
                 {categories.length === 0 ? (
-                  <p>Chưa có dữ liệu category</p>
+                  <p style={{ fontSize: "13px", color: "#6f665b", textAlign: "center" }}>Chưa có dữ liệu danh mục</p>
                 ) : (
                   categories.map((item, index) => (
                     <div
@@ -419,7 +406,8 @@ export default function TechnicianEarnings() {
                       className="category-income-row"
                     >
                       <span>
-                        <i className={`dot dot-${index}`} /> {item.CategoryName}
+                        <i className="dot" style={{ background: ["#456b35", "#d9a441", "#8d7b4a", "#a8b98a", "#d96b43"][index % 5] }} /> 
+                        {item.CategoryName}
                       </span>
                       <b>{percent(item.Amount, totalCategoryAmount)}%</b>
                       <small>{money(item.Amount)}</small>
@@ -429,144 +417,135 @@ export default function TechnicianEarnings() {
               </div>
             </div>
           </div>
+        </section>
 
-          <div className="earning-card achievement-card">
-            <h3>🏵 Monthly Achievement</h3>
-            <h4>Tiến độ mục tiêu tháng</h4>
-            <p>Dựa trên commission + tips đã kiếm được.</p>
-            <strong>{goalPercent}%</strong>
-            <span>of your monthly target</span>
-
-            <div className="goal-line">
-              <i style={{ width: `${Math.min(goalPercent, 100)}%` }} />
-            </div>
-
-            <b>
-              {money(earned)} / {money(goal)}
-            </b>
-          </div>
-
+        <section className="earning-main-grid">
           <div className="earning-card breakdown-card">
             <div className="card-head">
-              <h3>Earnings Breakdown</h3>
-              <button type="button">{filteredDaily.length} rows</button>
+              <h3>Bảng kê chi tiết thu nhập</h3>
+              <button type="button" className="btn-count">{filteredDaily.length} ngày</button>
             </div>
 
-            <table className="earning-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Appointments</th>
-                  <th>Services</th>
-                  <th>Commission</th>
-                  <th>Tips</th>
-                  <th>Total Revenue</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredDaily.slice(0, 8).map((item, index) => (
-                  <tr key={`${item.AppointmentDate}-${index}`}>
-                    <td>{shortDate(item.AppointmentDate)}</td>
-                    <td>{item.Appointments || 0}</td>
-                    <td>{item.Services || 0}</td>
-                    <td>{money(item.Commission)}</td>
-                    <td>{money(item.Tips)}</td>
-                    <td>
-                      <b>{money(item.TotalEarnings)}</b>
-                    </td>
-                    <td>
-                      <span className="paid-pill">PAID</span>
-                    </td>
-                  </tr>
-                ))}
-
-                {!filteredDaily.length && (
+            <div className="table-responsive">
+              <table className="earning-table">
+                <thead>
                   <tr>
-                    <td colSpan="7">
-                      Không có dữ liệu earning trong khoảng này
-                    </td>
+                    <th>Ngày</th>
+                    <th>Lịch hẹn</th>
+                    <th>Dịch vụ</th>
+                    <th>Hoa hồng</th>
+                    <th>Tips</th>
+                    <th>Tổng doanh thu</th>
+                    <th>Trạng thái</th>
                   </tr>
-                )}
+                </thead>
 
-                {!!filteredDaily.length && (
-                  <tr className="total-row">
-                    <td>Total</td>
-                    <td>
-                      {filteredDaily.reduce(
-                        (s, x) => s + Number(x.Appointments || 0),
-                        0,
-                      )}
-                    </td>
-                    <td>
-                      {filteredDaily.reduce(
-                        (s, x) => s + Number(x.Services || 0),
-                        0,
-                      )}
-                    </td>
-                    <td>
-                      {money(
-                        filteredDaily.reduce(
-                          (s, x) => s + Number(x.Commission || 0),
+                <tbody>
+                  {filteredDaily.slice(0, 8).map((item, index) => (
+                    <tr key={`${item.AppointmentDate}-${index}`}>
+                      <td>{shortDate(item.AppointmentDate)}</td>
+                      <td>{item.Appointments || 0}</td>
+                      <td>{item.Services || 0}</td>
+                      <td>{money(item.Commission)}</td>
+                      <td>{money(item.Tips)}</td>
+                      <td>
+                        <b>{money(item.TotalEarnings)}</b>
+                      </td>
+                      <td>
+                        <span className="paid-pill">ĐÃ TRẢ</span>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {!filteredDaily.length && (
+                    <tr>
+                      <td colSpan="7" className="empty-row-text">
+                        Không có dữ liệu thu nhập trong khoảng này
+                      </td>
+                    </tr>
+                  )}
+
+                  {!!filteredDaily.length && (
+                    <tr className="total-row">
+                      <td>Tổng cộng</td>
+                      <td>
+                        {filteredDaily.reduce(
+                          (s, x) => s + Number(x.Appointments || 0),
                           0,
-                        ),
-                      )}
-                    </td>
-                    <td>
-                      {money(
-                        filteredDaily.reduce(
-                          (s, x) => s + Number(x.Tips || 0),
+                        )}
+                      </td>
+                      <td>
+                        {filteredDaily.reduce(
+                          (s, x) => s + Number(x.Services || 0),
                           0,
-                        ),
-                      )}
-                    </td>
-                    <td>
-                      {money(
-                        filteredDaily.reduce(
-                          (s, x) => s + Number(x.TotalEarnings || 0),
-                          0,
-                        ),
-                      )}
-                    </td>
-                    <td>—</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                        )}
+                      </td>
+                      <td>
+                        {money(
+                          filteredDaily.reduce(
+                            (s, x) => s + Number(x.Commission || 0),
+                            0,
+                          ),
+                        )}
+                      </td>
+                      <td>
+                        {money(
+                          filteredDaily.reduce(
+                            (s, x) => s + Number(x.Tips || 0),
+                            0,
+                          ),
+                        )}
+                      </td>
+                      <td>
+                        {money(
+                          filteredDaily.reduce(
+                            (s, x) => s + Number(x.TotalEarnings || 0),
+                            0,
+                          ),
+                        )}
+                      </td>
+                      <td>—</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <aside className="earning-side">
             <div className="earning-card payout-card">
               <div className="card-head">
-                <h3>Payout Summary</h3>
-                <button type="button" onClick={() => setShowHistory((v) => !v)}>
-                  {showHistory ? "Hide" : "View All"}
+                <h3>Yêu cầu rút tiền (Payout)</h3>
+                <button type="button" onClick={() => setShowHistory((v) => !v)} style={{ cursor: "pointer" }}>
+                  {showHistory ? "Ẩn lịch sử" : "Xem lịch sử"}
                 </button>
               </div>
 
               <div className="payout-grid">
-                <div>
-                  <p>Available Balance</p>
+                <div className="payout-grid-left">
+                  <p>Số dư khả dụng</p>
                   <h3>{money(payout.availableBalance)}</h3>
 
                   <input
                     value={payoutNote}
                     onChange={(e) => setPayoutNote(e.target.value)}
-                    placeholder="Ghi chú payout..."
-                    style={{ width: "100%", marginBottom: 10 }}
+                    placeholder="Ghi chú nhận tiền..."
                   />
 
-                  <button onClick={handleRequestPayout}>Request Payout</button>
+                  <button 
+                    onClick={handleRequestPayout}
+                  >
+                    Gửi yêu cầu rút
+                  </button>
                 </div>
 
-                <div>
-                  <p>Last Payout</p>
+                <div className="payout-grid-right">
+                  <p>Lần rút gần nhất</p>
                   <h3>{money(payout.lastPayout)}</h3>
                   <span>
                     {payout.lastProcessedAt
                       ? shortDate(payout.lastProcessedAt)
-                      : "Chưa có payout"}
+                      : "Chưa có giao dịch"}
                   </span>
                 </div>
               </div>
@@ -574,7 +553,7 @@ export default function TechnicianEarnings() {
               {showHistory && (
                 <div className="payout-history">
                   {payoutHistory.length === 0 ? (
-                    <p>Chưa có lịch sử payout</p>
+                    <p style={{ textAlign: "center", fontSize: "13px", color: "#6f665b" }}>Chưa có lịch sử rút tiền</p>
                   ) : (
                     payoutHistory.map((item) => (
                       <div
@@ -582,7 +561,7 @@ export default function TechnicianEarnings() {
                         key={item.PayoutRequestId}
                       >
                         <b>#{item.PayoutRequestId}</b>
-                        <span>{statusText(item.Status)}</span>
+                        <span style={{ color: item.Status === "PAID" ? "#1b6b36" : item.Status === "PENDING" ? "#d9a441" : "#c73628" }}>{statusText(item.Status)}</span>
                         <strong>{money(item.Amount)}</strong>
                         <small>{shortDate(item.RequestedAt)}</small>
                       </div>
@@ -594,37 +573,38 @@ export default function TechnicianEarnings() {
 
             <div className="earning-card goal-card">
               <div className="card-head">
-                <h3>Earnings Goal</h3>
+                <h3>Mục tiêu thu nhập</h3>
                 <button type="button" onClick={handleSaveGoal}>
-                  Save
+                  Lưu
                 </button>
               </div>
 
-              <p>Monthly Goal</p>
+              <p>Mục tiêu tháng này</p>
 
               <input
                 value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
-                placeholder="Nhập mục tiêu tháng"
-                style={{ width: "100%", margin: "8px 0" }}
+                placeholder="Nhập số tiền mục tiêu"
               />
 
               <h2>{money(goal)}</h2>
 
               <div className="goal-line">
-                <i style={{ width: `${Math.min(goalPercent, 100)}%` }} />
+                <i style={{ display: "block", height: "100%", background: "#456b35", width: `${Math.min(goalPercent, 100)}%` }} />
               </div>
 
-              <small>{money(earned)} earned</small>
-              <strong>🎯</strong>
+              <div className="goal-status-text">
+                <span>Đạt được: {money(earned)}</span>
+                <b>{goalPercent}% mục tiêu</b>
+              </div>
             </div>
 
             <div className="earning-card top-service-card">
               <div className="card-head">
                 <h3>
-                  Top Services <span>By Revenue</span>
+                  Dịch vụ doanh thu cao nhất
                 </h3>
-                <button type="button">Top 5</button>
+                <button type="button" className="btn-top-count">Top 5</button>
               </div>
 
               {topServices.slice(0, 5).map((item, index) => (
@@ -636,44 +616,46 @@ export default function TechnicianEarnings() {
                 </div>
               ))}
 
-              {!topServices.length && <p>Chưa có dữ liệu service</p>}
+              {!topServices.length && <p style={{ textAlign: "center", color: "#6f665b", fontSize: "13px" }}>Chưa có dữ liệu dịch vụ</p>}
             </div>
           </aside>
+        </section>
 
+        <section className="earning-main-grid">
           <div className="earning-card yearly-card">
             <h3>
-              ▧ Yearly Summary ({year.YearNumber || new Date().getFullYear()})
+              ▧ Tổng kết doanh số năm ({year.YearNumber || new Date().getFullYear()})
             </h3>
 
             <div className="year-grid">
-              <div>
-                <p>Total Revenue</p>
+              <div className="year-grid-item">
+                <p>Doanh thu năm</p>
                 <h2>{money(year.TotalEarnings)}</h2>
-                <small>Doanh thu invoice đã paid</small>
+                <small>Hóa đơn completed đã paid</small>
               </div>
 
-              <div>
-                <p>Total Commission</p>
+              <div className="year-grid-item">
+                <p>Hoa hồng tích lũy</p>
                 <h2>{money(year.TotalCommission)}</h2>
-                <small>Hoa hồng năm nay</small>
+                <small>Tổng thu nhập hoa hồng</small>
               </div>
 
-              <div>
-                <p>Total Tips</p>
+              <div className="year-grid-item">
+                <p>Tiền Tips nhận</p>
                 <h2>{money(year.TotalTips)}</h2>
-                <small>Tip năm nay</small>
+                <small>Khách hàng thưởng năm nay</small>
               </div>
 
-              <div>
-                <p>Total Completed</p>
-                <h2>{year.TotalServices || 0}</h2>
-                <small>Lịch completed + paid</small>
+              <div className="year-grid-item">
+                <p>Số ca hoàn thành</p>
+                <h2>{year.TotalServices || 0} ca</h2>
+                <small>Buổi dịch vụ đã hoàn tất</small>
               </div>
 
-              <div>
-                <p>Avg. Monthly Revenue</p>
+              <div className="year-grid-item">
+                <p>Trung bình tháng</p>
                 <h2>{money(year.AvgMonthlyEarnings)}</h2>
-                <small>Trung bình theo tháng có doanh thu</small>
+                <small>Doanh thu bình quân mỗi tháng</small>
               </div>
             </div>
           </div>

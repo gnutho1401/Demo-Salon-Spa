@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import CustomerLayout from "../../components/layout/CustomerLayout";
 import axiosClient from "../../api/axiosClient";
+
+const AUTO_CANCEL_MINUTES = 15;
 
 function readStoredAppointment() {
   try {
@@ -10,6 +12,138 @@ function readStoredAppointment() {
   } catch {
     return null;
   }
+}
+
+function CountdownBanner({ appointment }) {
+  const navigate = useNavigate();
+  const [secondsLeft, setSecondsLeft] = useState(null);
+  const [expired, setExpired] = useState(false);
+
+  const status = String(appointment?.Status || appointment?.status || "").toUpperCase();
+  const isPending = status === "PENDING_PAYMENT";
+
+  useEffect(() => {
+    if (!isPending) return;
+
+    // Ưu tiên dùng thời điểm client lưu khi đặt lịch (tránh lệch timezone server)
+    // Fallback sang CreatedAt của server nếu không có
+    let createdMs;
+    const storedTs = sessionStorage.getItem("bookingCreatedAt");
+    if (storedTs) {
+      createdMs = Number(storedTs);
+      // Xóa sau lần đầu dùng để không ảnh hưởng lần reload tiếp theo
+      sessionStorage.removeItem("bookingCreatedAt");
+    } else {
+      const createdAt = appointment?.CreatedAt || appointment?.createdAt;
+      createdMs = createdAt ? new Date(createdAt).getTime() : Date.now();
+    }
+
+    const deadline = createdMs + AUTO_CANCEL_MINUTES * 60 * 1000;
+
+    function tick() {
+      const remaining = Math.floor((deadline - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setSecondsLeft(0);
+        setExpired(true);
+      } else {
+        setSecondsLeft(remaining);
+        setExpired(false);
+      }
+    }
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [appointment, isPending]);
+
+
+  if (!isPending || secondsLeft === null) return null;
+
+  const id = appointment?.AppointmentId || appointment?.appointmentId || appointment?.id;
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const ss = String(secondsLeft % 60).padStart(2, "0");
+
+  return (
+    <div
+      style={{
+        margin: "0 0 20px",
+        padding: "18px 24px",
+        borderRadius: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        background: expired
+          ? "linear-gradient(135deg, #ef4444, #dc2626)"
+          : secondsLeft <= 120
+          ? "linear-gradient(135deg, #f97316, #ea580c)"
+          : "linear-gradient(135deg, #ef4f83, #ff5ea8)",
+        color: "#fff",
+        fontWeight: 700,
+        boxShadow: expired
+          ? "0 8px 24px rgba(239,68,68,0.3)"
+          : "0 8px 24px rgba(239,79,131,0.28)",
+        animation: "pulse-countdown 2s ease-in-out infinite",
+      }}
+    >
+      <span style={{ fontSize: "1.8rem" }}>{expired ? "❌" : "⏰"}</span>
+      <div style={{ flex: 1 }}>
+        {expired ? (
+          <>
+            <div style={{ fontSize: "1.05rem" }}>Lịch hẹn đã hết thời gian thanh toán!</div>
+            <div style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: 4 }}>
+              Hệ thống đã tự động hủy lịch hẹn này. Bạn có thể đặt lịch lại ngay.
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: "1.05rem" }}>
+              ⚡ Vui lòng thanh toán trong&nbsp;
+              <strong style={{ fontSize: "1.3rem" }}>{mm}:{ss}</strong>
+              &nbsp;— Lịch sẽ bị hủy tự động nếu chưa thanh toán!
+            </div>
+            <div style={{ fontSize: "0.85rem", opacity: 0.85, marginTop: 4 }}>
+              Lịch hẹn được giữ tối đa {AUTO_CANCEL_MINUTES} phút sau khi đặt.
+            </div>
+          </>
+        )}
+      </div>
+      {!expired && (
+        <div
+          style={{
+            background: "rgba(255,255,255,0.2)",
+            borderRadius: 12,
+            padding: "10px 20px",
+            fontSize: "1.8rem",
+            fontWeight: 900,
+            fontVariantNumeric: "tabular-nums",
+            minWidth: 90,
+            textAlign: "center",
+          }}
+        >
+          {mm}:{ss}
+        </div>
+      )}
+      {!expired && id && (
+        <button
+          type="button"
+          onClick={() => navigate(`/customer/payment/${id}`)}
+          style={{
+            background: "rgba(255,255,255,0.25)",
+            border: "2px solid rgba(255,255,255,0.5)",
+            color: "#fff",
+            padding: "10px 20px",
+            borderRadius: 10,
+            fontWeight: 800,
+            cursor: "pointer",
+            fontSize: "0.9rem",
+            whiteSpace: "nowrap",
+          }}
+        >
+          💳 Thanh toán ngay
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function AppointmentSuccess() {
@@ -58,6 +192,7 @@ export default function AppointmentSuccess() {
     appointment.AppointmentId || appointment.appointmentId || appointment.id;
 
   const appointmentCode = `AP${String(id).padStart(5, "0")}`;
+  const isPending = String(appointment?.Status || appointment?.status || "").toUpperCase() === "PENDING_PAYMENT";
 
   return (
     <CustomerLayout>
@@ -152,6 +287,11 @@ export default function AppointmentSuccess() {
           flex-wrap: wrap;
         }
 
+        @keyframes pulse-countdown {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.92; }
+        }
+
         @media (max-width: 768px) {
           .success-grid {
             grid-template-columns: 1fr;
@@ -165,12 +305,16 @@ export default function AppointmentSuccess() {
             <div className="success-icon">✓</div>
             <h1 className="success-title">Đặt lịch thành công!</h1>
             <p className="success-subtitle">
-              Lịch hẹn của bạn đã được ghi nhận. Vui lòng đến đúng giờ hoặc
-              kiểm tra lại thông tin bên dưới.
+              {isPending
+                ? "Lịch hẹn đã được tạo. Vui lòng thanh toán để xác nhận lịch hẹn."
+                : "Lịch hẹn của bạn đã được ghi nhận. Vui lòng đến đúng giờ hoặc kiểm tra lại thông tin bên dưới."}
             </p>
           </div>
 
           <div className="success-body">
+            {/* Banner đếm ngược 15 phút */}
+            <CountdownBanner appointment={appointment} />
+
             <div className="success-grid">
               <div className="success-item">
                 <span>Mã lịch hẹn</span>
@@ -221,6 +365,11 @@ export default function AppointmentSuccess() {
             </div>
 
             <div className="success-actions">
+              {isPending && (
+                <Link className="btn" to={`/customer/payment/${id}`}>
+                  💳 Thanh toán ngay
+                </Link>
+              )}
               <Link className="btn" to={`/customer/appointments/${id}`}>
                 Xem chi tiết lịch hẹn
               </Link>

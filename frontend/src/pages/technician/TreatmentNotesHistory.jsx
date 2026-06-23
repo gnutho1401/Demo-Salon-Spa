@@ -63,6 +63,30 @@ function formatDateTime(value) {
   });
 }
 
+const NOTE_TYPE_MAP = {
+  "Skin Condition": "Tình trạng da",
+  "Products Used": "Sản phẩm đã dùng",
+  "Technique": "Kỹ thuật thực hiện",
+  "Customer Feedback": "Phản hồi khách hàng",
+  "Recommendation": "Khuyến nghị",
+  "General Notes": "Ghi chú chung",
+};
+
+function getNoteTypeLabel(type) {
+  return NOTE_TYPE_MAP[type] || type || "Ghi chú chung";
+}
+
+const PROGRESS_STATUS_MAP = {
+  NOT_STARTED: "Chưa bắt đầu",
+  IN_PROGRESS: "Đang tiến hành",
+  PAUSED: "Tạm dừng",
+  COMPLETED: "Hoàn thành",
+};
+
+function getProgressStatusLabel(status) {
+  return PROGRESS_STATUS_MAP[status] || status;
+}
+
 function getAvatar(url) {
   if (!url) return DEFAULT_AVATAR;
   return resolveFileUrl(url) || DEFAULT_AVATAR;
@@ -100,6 +124,45 @@ export default function TreatmentNotes() {
     });
     return map;
   }, [categories]);
+
+  const timelineItems = useMemo(() => {
+    if (!appointment) return [];
+    const list = [];
+    
+    // 1. Initial Appointment
+    list.push({
+      key: "initial",
+      type: "gray",
+      date: appointment.AppointmentDate,
+      user: "Lễ tân",
+      label: "Lịch hẹn được tạo",
+    });
+
+    // 2. Note added
+    if (appointment.NoteCreatedAt) {
+      list.push({
+        key: "added",
+        type: "yellow",
+        date: appointment.NoteCreatedAt,
+        user: "Kỹ thuật viên",
+        label: "Ghi chú điều trị được tạo",
+      });
+    }
+
+    // 3. Note updated
+    if (appointment.UpdatedAt && appointment.UpdatedAt !== appointment.NoteCreatedAt) {
+      list.push({
+        key: "updated",
+        type: "green",
+        date: appointment.UpdatedAt,
+        user: "Kỹ thuật viên",
+        label: "Ghi chú đã được cập nhật",
+      });
+    }
+
+    // Sort by date descending
+    return list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  }, [appointment]);
 
   const loadData = async () => {
     try {
@@ -208,23 +271,23 @@ export default function TreatmentNotes() {
         <header className="treatment-header">
           <div>
             <h1>
-              Treatment Notes <span>📋</span>
+              Ghi chú trị liệu <span>📋</span>
             </h1>
-            <p>View and manage treatment notes for your appointments</p>
+            <p>Xem và quản lý ghi chú trị liệu cho các buổi hẹn của bạn</p>
           </div>
 
           <div className="treatment-top-search">
             <span>⌕</span>
-            <input placeholder="Search customers, appointments, services..." />
+            <input placeholder="Tìm kiếm khách hàng, lịch hẹn, dịch vụ..." />
           </div>
 
-          <button className="treatment-new-btn">+ New Appointment⌄</button>
+          <button className="treatment-new-btn">+ Lịch hẹn mới⌄</button>
         </header>
 
         {error && <div className="treatment-error">{error}</div>}
 
         {loading ? (
-          <div className="treatment-loading">Loading treatment notes...</div>
+          <div className="treatment-loading">Đang tải ghi chú điều trị...</div>
         ) : !appointment ? (
           <div className="treatment-empty">
             Không có lịch hẹn nào để ghi chú.
@@ -234,12 +297,12 @@ export default function TreatmentNotes() {
             <section className="treatment-layout">
               <aside className="treatment-left">
                 <div className="treatment-card upcoming-card">
-                  <h3>📅 Upcoming Appointment</h3>
+                  <h3>📅 Buổi hẹn sắp tới</h3>
 
                   <div className="upcoming-profile">
                     <img
                       src={getAvatar(appointment.AvatarUrl)}
-                      alt={appointment.CustomerName || "Customer"}
+                      alt={appointment.CustomerName || "Khách hàng"}
                       onError={(e) => {
                         e.currentTarget.src = DEFAULT_AVATAR;
                       }}
@@ -247,9 +310,9 @@ export default function TreatmentNotes() {
 
                     <div>
                       <div className="upcoming-name-row">
-                        <h2>{appointment.CustomerName || "Customer"}</h2>
+                        <h2>{appointment.CustomerName || "Khách hàng"}</h2>
                         <span>
-                          {appointment.MembershipLevel || "Normal"} Member
+                          {appointment.MembershipLevel || "Thường"} Member
                         </span>
                       </div>
 
@@ -258,14 +321,14 @@ export default function TreatmentNotes() {
                         {appointment.StartTime || "N/A"}
                       </p>
 
-                      <b>{appointment.Status || "IN PROGRESS"}</b>
+                      <b>{appointment.Status || "Đang tiến hành"}</b>
                     </div>
                   </div>
 
                   <div className="upcoming-meta">
-                    <p>💆 {appointment.ServiceName || "Service"}</p>
+                    <p>💆 {appointment.ServiceName || "Dịch vụ"}</p>
                     <p>🏠 {appointment.RoomName || "Chưa có phòng"}</p>
-                    <p>⏱ {appointment.DurationMinutes || 0} minutes</p>
+                    <p>⏱ {appointment.DurationMinutes || 0} phút</p>
                   </div>
 
                   <button
@@ -277,103 +340,91 @@ export default function TreatmentNotes() {
                       )
                     }
                   >
-                    View Appointment Details
+                    Xem chi tiết buổi hẹn
                   </button>
                 </div>
 
                 <div className="treatment-card category-card">
-                  <h3>Note Categories</h3>
+                  <h3>Danh mục ghi chú</h3>
 
                   <div className="category-row active">
-                    <span>✅ All Notes</span>
+                    <span>✅ Tất cả ghi chú</span>
                     <b>{summary.TotalNotes || 0}</b>
                   </div>
 
                   <div className="category-row">
-                    <span>⚠️ Skin Condition</span>
+                    <span>⚠️ Tình trạng da</span>
                     <b>{categoryMap["Skin Condition"] || 0}</b>
                   </div>
 
                   <div className="category-row">
-                    <span>🧴 Products Used</span>
+                    <span>🧴 Sản phẩm đã dùng</span>
                     <b>{categoryMap["Products Used"] || 0}</b>
                   </div>
 
                   <div className="category-row">
-                    <span>🧬 Techniques</span>
+                    <span>🧬 Kỹ thuật thực hiện</span>
                     <b>{categoryMap["Technique"] || 0}</b>
                   </div>
 
                   <div className="category-row">
-                    <span>💬 Customer Feedback</span>
+                    <span>💬 Phản hồi của khách</span>
                     <b>{categoryMap["Customer Feedback"] || 0}</b>
                   </div>
 
                   <div className="category-row">
-                    <span>📌 Recommendations</span>
+                    <span>📌 Khuyến nghị</span>
                     <b>{categoryMap["Recommendation"] || 0}</b>
                   </div>
 
                   <div className="category-row">
-                    <span>📝 General Notes</span>
+                    <span>📝 Ghi chú chung</span>
                     <b>{categoryMap["General Notes"] || 0}</b>
                   </div>
                 </div>
 
                 <div className="treatment-card note-history-card">
                   <h3>
-                    Note History <small>(This Appointment)</small>
+                    Lịch sử ghi chú <small>(Buổi hẹn này)</small>
                   </h3>
 
                   <div className="note-timeline">
-                    <div className="timeline-item green">
-                      <i />
-                      <div>
-                        <p>
-                          {formatDateTime(
-                            appointment.UpdatedAt || appointment.NoteCreatedAt,
-                          )}
-                        </p>
-                        <span>{appointment.CustomerName || "Customer"}</span>
-                        <b>Note updated</b>
-                      </div>
-                    </div>
-
-                    <div className="timeline-item yellow">
-                      <i />
-                      <div>
-                        <p>{formatDateTime(appointment.NoteCreatedAt)}</p>
-                        <span>{appointment.CustomerName || "Customer"}</span>
-                        <b>Note added</b>
-                      </div>
-                    </div>
-
-                    <div className="timeline-item gray">
-                      <i />
-                      <div>
-                        <p>{formatDate(appointment.AppointmentDate)}</p>
-                        <span>Receptionist</span>
-                        <b>Initial note added</b>
-                      </div>
-                    </div>
+                    {timelineItems.length === 0 ? (
+                      <p className="muted-line">Chưa có lịch hoạt động ghi chú nào</p>
+                    ) : (
+                      timelineItems.map((item) => (
+                        <div className={`timeline-item ${item.type}`} key={item.key}>
+                          <i />
+                          <div>
+                            <p>
+                              {item.key === "initial"
+                                ? formatDate(item.date)
+                                : formatDateTime(item.date)}
+                            </p>
+                            <span>{item.user}</span>
+                            <b>{item.label}</b>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
 
-                  <button className="outline-btn">View All Notes</button>
+                  <button className="outline-btn">Xem tất cả ghi chú</button>
                 </div>
               </aside>
 
               <main className="treatment-center">
                 <div className="treatment-card editor-card">
                   <div className="editor-title">
-                    <h3>Current Treatment Note</h3>
+                    <h3>Ghi chú điều trị hiện tại</h3>
                     <div>
                       <span>
-                        Last updated:{" "}
+                        Cập nhật cuối:{" "}
                         {formatDateTime(
                           appointment.UpdatedAt || appointment.NoteCreatedAt,
                         )}
                       </span>
-                      <button>Templates⌄</button>
+                      <button>Mẫu ghi chú mẫu</button>
                     </div>
                   </div>
 
@@ -405,45 +456,45 @@ export default function TreatmentNotes() {
                     value={progressStatus}
                     onChange={(e) => setProgressStatus(e.target.value)}
                   >
-                    <option value="NOT_STARTED">Not Started</option>
-                    <option value="IN_PROGRESS">In Progress</option>
-                    <option value="PAUSED">Paused</option>
-                    <option value="COMPLETED">Completed</option>
+                    <option value="NOT_STARTED">Chưa bắt đầu</option>
+                    <option value="IN_PROGRESS">Đang thực hiện</option>
+                    <option value="PAUSED">Tạm dừng</option>
+                    <option value="COMPLETED">Hoàn thành</option>
                   </select>
 
                   <textarea
                     className="mini-note"
                     value={skinCondition}
                     onChange={(e) => setSkinCondition(e.target.value)}
-                    placeholder="Skin condition - tình trạng da/tóc/móng..."
+                    placeholder="Tình trạng da/tóc/móng..."
                   />
 
                   <textarea
                     className="mini-note"
                     value={productsUsed}
                     onChange={(e) => setProductsUsed(e.target.value)}
-                    placeholder="Products used - sản phẩm đã dùng..."
+                    placeholder="Sản phẩm đã dùng..."
                   />
 
                   <textarea
                     className="mini-note"
                     value={technique}
                     onChange={(e) => setTechnique(e.target.value)}
-                    placeholder="Technique - kỹ thuật thực hiện..."
+                    placeholder="Kỹ thuật thực hiện..."
                   />
 
                   <textarea
                     className="mini-note"
                     value={customerFeedback}
                     onChange={(e) => setCustomerFeedback(e.target.value)}
-                    placeholder="Customer feedback - phản hồi khách hàng..."
+                    placeholder="Phản hồi của khách hàng..."
                   />
 
                   <textarea
                     className="mini-note"
                     value={recommendation}
                     onChange={(e) => setRecommendation(e.target.value)}
-                    placeholder="Recommendation - lời khuyên sau điều trị..."
+                    placeholder="Khuyến nghị sau điều trị..."
                   />
 
                   <input
@@ -455,7 +506,7 @@ export default function TreatmentNotes() {
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    placeholder="Nhập ghi chú điều trị..."
+                    placeholder="Nhập nội dung ghi chú trị liệu..."
                   />
 
                   <div className="editor-bottom">
@@ -467,7 +518,7 @@ export default function TreatmentNotes() {
                           onClick={() => setNoteType(type)}
                           type="button"
                         >
-                          {type}
+                          {getNoteTypeLabel(type)}
                         </button>
                       ))}
                       <button type="button" className="plus-tag">
@@ -477,7 +528,7 @@ export default function TreatmentNotes() {
 
                     <div className="editor-actions">
                       <button type="button" onClick={() => setContent("")}>
-                        Clear
+                        Xóa nội dung
                       </button>
                       <button
                         type="button"
@@ -485,7 +536,7 @@ export default function TreatmentNotes() {
                         disabled={saving}
                         onClick={saveNote}
                       >
-                        ✓ {saving ? "Saving..." : "Save Note"}
+                        ✓ {saving ? "Đang lưu..." : "Lưu ghi chú"}
                       </button>
                     </div>
                   </div>
@@ -493,9 +544,9 @@ export default function TreatmentNotes() {
 
                 <div className="treatment-card previous-card">
                   <div className="previous-head">
-                    <h3>Previous Notes for This Customer</h3>
+                    <h3>Ghi chú trước đó của khách hàng này</h3>
                     <select>
-                      <option>Filter by Service</option>
+                      <option>Lọc theo dịch vụ</option>
                     </select>
                   </div>
 
@@ -517,32 +568,32 @@ export default function TreatmentNotes() {
                               {note.StartTime}
                             </span>
                             <span>
-                              {appointment.CustomerName || "Customer"}
+                              {appointment.CustomerName || "Khách hàng"}
                             </span>
                           </div>
 
                           <h4>
                             {note.ServiceName ||
-                              note.NoteType ||
-                              "Treatment Note"}
+                              getNoteTypeLabel(note.NoteType) ||
+                              "Ghi chú trị liệu"}
                           </h4>
                           <p>{note.Content}</p>
                         </div>
 
-                        <button>View Note</button>
+                        <button>Xem ghi chú</button>
                       </div>
                     ))
                   )}
 
-                  <button className="outline-btn">View All History</button>
+                  <button className="outline-btn">Xem tất cả lịch sử</button>
                 </div>
               </main>
 
               <aside className="treatment-right">
                 <div className="treatment-card template-card">
                   <div className="template-head">
-                    <h3>Note Templates</h3>
-                    <button>Manage</button>
+                    <h3>Mẫu ghi chú mẫu</h3>
+                    <button>Quản lý</button>
                   </div>
 
                   {TEMPLATES.map((item) => (
@@ -558,12 +609,12 @@ export default function TreatmentNotes() {
                   ))}
 
                   <button className="add-template" type="button">
-                    + Add New Template
+                    + Thêm mẫu mới
                   </button>
                 </div>
 
                 <div className="treatment-card attachment-card">
-                  <h3>Attachments ({files.length})</h3>
+                  <h3>Tệp đính kèm ({files.length})</h3>
 
                   <label className="dropzone">
                     <input
@@ -577,9 +628,9 @@ export default function TreatmentNotes() {
                     />
 
                     <span>☁</span>
-                    <b>Click to upload files</b>
-                    <p>Before/After photos, PDF, treatment documents</p>
-                    <small>JPG, PNG, PDF (Max 5MB)</small>
+                    <b>Nhấp để chọn tải lên tệp</b>
+                    <p>Ảnh trước/sau khi trị liệu, PDF, tài liệu điều trị</p>
+                    <small>JPG, PNG, PDF (Tối đa 5MB)</small>
                   </label>
 
                   {files.length > 0 && (
@@ -595,7 +646,7 @@ export default function TreatmentNotes() {
                               )
                             }
                           >
-                            Remove
+                            Gỡ bỏ
                           </button>
                         </div>
                       ))}
@@ -623,42 +674,42 @@ export default function TreatmentNotes() {
             <section className="treatment-summary">
               <div className="summary-item">
                 <span>🗒️</span>
-                <p>Total Notes</p>
+                <p>Tổng ghi chú</p>
                 <h3>{summary.TotalNotes || 0}</h3>
-                <small>All time</small>
+                <small>Từ trước tới nay</small>
               </div>
 
               <div className="summary-item">
                 <span>📋</span>
-                <p>Notes This Month</p>
+                <p>Ghi chú tháng này</p>
                 <h3>{summary.NotesThisMonth || 0}</h3>
-                <small>↑ 25% vs last month</small>
+                <small>↑ 25% so với tháng trước</small>
               </div>
 
               <div className="summary-item">
                 <span>🎯</span>
-                <p>Most Common</p>
-                <h3>{categories[0]?.NoteType || "Skin Condition"}</h3>
-                <small>{categories[0]?.Total || 0} notes</small>
+                <p>Phổ biến nhất</p>
+                <h3>{getNoteTypeLabel(categories[0]?.NoteType) || "Tình trạng da"}</h3>
+                <small>{categories[0]?.Total || 0} ghi chú</small>
               </div>
 
               <div className="summary-item">
                 <span>🧴</span>
-                <p>Most Used Product</p>
+                <p>Sản phẩm dùng nhiều</p>
                 <h3>{appointment.ProductsUsed || "Chưa có"}</h3>
-                <small>From treatment notes</small>
+                <small>Từ ghi chú trị liệu</small>
               </div>
 
               <div className="summary-item">
                 <span>📅</span>
-                <p>Last Note</p>
+                <p>Gần đây nhất</p>
                 <h3>{formatDate(summary.LastNote)}</h3>
-                <small>10:45 AM</small>
+                <small>Gần nhất</small>
               </div>
 
               <div className="quote-card">
                 <strong>“</strong>
-                <p>Good notes make great service even better.</p>
+                <p>Ghi chú điều trị chuẩn mực tạo nên dịch vụ làm đẹp hoàn hảo.</p>
               </div>
             </section>
           </>

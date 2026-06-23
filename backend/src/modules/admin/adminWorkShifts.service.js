@@ -103,7 +103,7 @@ async function list(filters = {}) {
         FROM Appointments a
         WHERE a.EmployeeId = ws.EmployeeId
           AND a.AppointmentDate = ws.ShiftDate
-          AND a.Status NOT IN ('CANCELLED', 'NO_SHOW')
+          AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
       ) ap
       WHERE
         (@EmployeeId IS NULL OR ws.EmployeeId = @EmployeeId)
@@ -222,7 +222,7 @@ async function checkAppointmentConflict(employeeId, shiftDate, isDayOff) {
       FROM Appointments
       WHERE EmployeeId = @EmployeeId
         AND AppointmentDate = @ShiftDate
-        AND Status NOT IN ('CANCELLED', 'NO_SHOW')
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
     `);
 
   if (result.recordset[0]) {
@@ -250,7 +250,7 @@ async function checkAppointmentConflictForShift(
       FROM Appointments
       WHERE EmployeeId = @EmployeeId
         AND AppointmentDate = @ShiftDate
-        AND Status NOT IN ('CANCELLED', 'NO_SHOW')
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
         AND (
           (@StartTime > AppointmentTime)
           OR (@EndTime < AppointmentTime)
@@ -434,7 +434,7 @@ async function remove(id) {
       FROM Appointments
       WHERE EmployeeId = @EmployeeId
         AND AppointmentDate = @ShiftDate
-        AND Status NOT IN ('CANCELLED', 'NO_SHOW')
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
     `);
 
   if (ap.recordset[0]) {

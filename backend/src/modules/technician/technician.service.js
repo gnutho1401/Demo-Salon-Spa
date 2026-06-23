@@ -43,13 +43,16 @@ async function getDashboard(userId) {
       (SELECT COUNT(*) FROM Appointments WHERE EmployeeId = @EmployeeId AND AppointmentDate = @Today AND Status = 'IN_PROGRESS') AS inProgress,
       (SELECT COUNT(*) FROM Appointments WHERE EmployeeId = @EmployeeId AND AppointmentDate = @Today AND Status = 'COMPLETED') AS completed,
 
-      (SELECT ISNULL(SUM(i.FinalAmount), 0)
-       FROM Appointments a
-       JOIN Invoices i ON a.AppointmentId = i.AppointmentId
-       JOIN Payments p ON i.InvoiceId = p.InvoiceId
-       WHERE a.EmployeeId = @EmployeeId
-       AND a.AppointmentDate = @Today
-       AND p.Status = 'PAID') AS todayRevenue,
+      (SELECT ISNULL(SUM(x.FinalAmount), 0)
+ FROM (
+   SELECT DISTINCT i.InvoiceId, i.FinalAmount
+   FROM Appointments a
+   JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+   JOIN Payments p ON i.InvoiceId = p.InvoiceId
+   WHERE a.EmployeeId = @EmployeeId
+     AND a.AppointmentDate = @Today
+     AND p.Status = 'PAID'
+ ) x) AS todayRevenue,
 
       (SELECT ISNULL(AVG(CAST(r.Rating AS FLOAT)), 0)
        FROM Reviews r
@@ -64,12 +67,13 @@ async function getDashboard(userId) {
     .request()
     .input("EmployeeId", sql.Int, employeeId).query(`
     SELECT 
-      a.AppointmentId,
-      CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
-      CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
-      a.Status,
-      u.FullName AS CustomerName,
-      STRING_AGG(s.ServiceName, ', ') AS ServiceName
+  a.AppointmentId,
+  CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
+  CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
+  a.Status,
+  u.FullName AS CustomerName,
+  u.AvatarUrl AS CustomerAvatar,
+  STRING_AGG(s.ServiceName, ', ') AS ServiceName
     FROM Appointments a
     JOIN Customers c ON a.CustomerId = c.CustomerId
     JOIN Users u ON c.UserId = u.UserId
@@ -77,7 +81,7 @@ async function getDashboard(userId) {
     LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
     WHERE a.EmployeeId = @EmployeeId
     AND a.AppointmentDate = CAST(GETDATE() AS DATE)
-    GROUP BY a.AppointmentId, a.StartTime, a.EndTime, a.Status, u.FullName
+    GROUP BY a.AppointmentId, a.StartTime, a.EndTime, a.Status, u.FullName, u.AvatarUrl
     ORDER BY a.StartTime
   `);
 
@@ -127,12 +131,13 @@ async function getDashboard(userId) {
       r.Rating,
       r.Comment,
       r.CreatedAt,
-      u.FullName AS CustomerName
+      u.FullName AS CustomerName,
+      u.AvatarUrl AS CustomerAvatar
     FROM Reviews r
     JOIN Customers c ON r.CustomerId = c.CustomerId
     JOIN Users u ON c.UserId = u.UserId
     WHERE r.EmployeeId = @EmployeeId
-    AND r.Status = 'APPROVED'
+      AND r.Status = 'APPROVED'
     ORDER BY r.CreatedAt DESC
   `);
 
@@ -148,6 +153,21 @@ async function getDashboard(userId) {
     ORDER BY CreatedAt DESC
   `);
 
+  const todayShift = await pool
+    .request()
+    .input("EmployeeId", sql.Int, employeeId).query(`
+      SELECT TOP 1
+        ShiftId,
+        CONVERT(VARCHAR(5), StartTime, 108) AS StartTime,
+        CONVERT(VARCHAR(5), EndTime, 108) AS EndTime,
+        ShiftType,
+        IsDayOff,
+        Notes
+      FROM WorkShifts
+      WHERE EmployeeId = @EmployeeId
+        AND ShiftDate = CAST(GETDATE() AS DATE)
+    `);
+
   return {
     technician: tech,
     stats: stats.recordset[0],
@@ -157,6 +177,7 @@ async function getDashboard(userId) {
     popularServices: popularServices.recordset,
     recentReviews: recentReviews.recordset,
     reminders: reminders.recordset,
+    todayShift: todayShift.recordset[0] || null,
   };
 }
 
@@ -404,59 +425,153 @@ async function startAppointment(userId, appointmentId) {
 async function completeAppointment(userId, appointmentId) {
   const pool = await connectDB();
   const employeeId = await getEmployeeIdByUserId(userId);
+  const transaction = new sql.Transaction(pool);
 
-  const result = await pool
-    .request()
-    .input("AppointmentId", sql.Int, Number(appointmentId))
-    .input("EmployeeId", sql.Int, employeeId)
-    .input("UserId", sql.Int, userId).query(`
-      DECLARE @OldStatus NVARCHAR(30);
+  try {
+    await transaction.begin();
 
-      SELECT @OldStatus = Status
-      FROM Appointments
-      WHERE AppointmentId = @AppointmentId
-        AND EmployeeId = @EmployeeId;
+    const currentResult = await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .input("EmployeeId", sql.Int, employeeId).query(`
+        SELECT
+          a.AppointmentId,
+          a.EmployeeId,
+          a.Status,
+          a.CustomerPackageId,
+          aps.ServiceId
+        FROM Appointments a
+        LEFT JOIN AppointmentServices aps
+          ON a.AppointmentId = aps.AppointmentId
+        WHERE a.AppointmentId = @AppointmentId
+          AND a.EmployeeId = @EmployeeId
+      `);
 
-      IF @OldStatus IS NULL
-        THROW 50001, N'Không tìm thấy lịch hẹn của kỹ thuật viên này', 1;
+    const current = currentResult.recordset[0];
 
-      IF @OldStatus <> 'IN_PROGRESS'
-        THROW 50002, N'Chỉ lịch đang thực hiện mới được hoàn thành', 1;
+    if (!current) {
+      throw new Error("Không tìm thấy lịch hẹn của kỹ thuật viên này");
+    }
 
-      UPDATE Appointments
-      SET Status = 'COMPLETED',
-          CompletedAt = GETDATE(),
-          UpdatedAt = GETDATE()
-      WHERE AppointmentId = @AppointmentId
-        AND EmployeeId = @EmployeeId
-        AND Status = 'IN_PROGRESS';
+    if (String(current.Status).toUpperCase() !== "IN_PROGRESS") {
+      throw new Error("Chỉ lịch đang thực hiện mới được hoàn thành");
+    }
 
-      INSERT INTO AppointmentStatusHistory
-      (
-        AppointmentId,
-        OldStatus,
-        NewStatus,
-        ChangedBy,
-        Reason,
-        ChangedAt
-      )
-      VALUES
-      (
-        @AppointmentId,
-        @OldStatus,
-        'COMPLETED',
-        @UserId,
-        N'Technician hoàn thành dịch vụ',
-        GETDATE()
-      );
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .input("EmployeeId", sql.Int, employeeId).query(`
+        UPDATE Appointments
+        SET Status = 'COMPLETED',
+            CompletedAt = GETDATE(),
+            UpdatedAt = GETDATE()
+        WHERE AppointmentId = @AppointmentId
+          AND EmployeeId = @EmployeeId
+          AND Status = 'IN_PROGRESS'
+      `);
 
-      SELECT *
-FROM Appointments
-WHERE AppointmentId = @AppointmentId
-  AND EmployeeId = @EmployeeId;
-    `);
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .input("OldStatus", sql.NVarChar, current.Status)
+      .input("UserId", sql.Int, userId).query(`
+        INSERT INTO AppointmentStatusHistory
+          (AppointmentId, OldStatus, NewStatus, ChangedBy, Reason, ChangedAt)
+        VALUES
+          (@AppointmentId, @OldStatus, 'COMPLETED', @UserId, N'Technician hoàn thành dịch vụ', GETDATE())
+      `);
 
-  return result.recordset[0];
+    if (current.CustomerPackageId) {
+      const usageCheck = await new sql.Request(transaction).input(
+        "AppointmentId",
+        sql.Int,
+        Number(appointmentId),
+      ).query(`
+          SELECT TOP 1 UsageId
+          FROM CustomerPackageUsages
+          WHERE AppointmentId = @AppointmentId
+            AND Status = 'USED'
+        `);
+
+      if (usageCheck.recordset.length === 0) {
+        const packageCheck = await new sql.Request(transaction)
+          .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
+          .input("ServiceId", sql.Int, current.ServiceId).query(`
+            SELECT
+              cp.CustomerPackageId,
+              cp.RemainingSessions,
+              cp.UsedSessions,
+              cp.Status,
+              cp.EndDate,
+              ISNULL(ps.SessionCount, 1) AS MaxSessions,
+              (
+                SELECT ISNULL(SUM(SessionsUsed), 0)
+                FROM CustomerPackageUsages
+                WHERE CustomerPackageId = @CustomerPackageId
+                  AND ServiceId = @ServiceId
+                  AND Status <> 'CANCELLED'
+              ) AS UsedCount
+            FROM CustomerPackages cp
+            JOIN PackageServices ps
+              ON cp.PackageId = ps.PackageId
+            WHERE cp.CustomerPackageId = @CustomerPackageId
+              AND ps.ServiceId = @ServiceId
+          `);
+
+        const cp = packageCheck.recordset[0];
+        if (!cp) throw new Error("Combo không chứa dịch vụ của lịch hẹn này");
+        if (String(cp.Status).toUpperCase() !== "ACTIVE") {
+          throw new Error("Combo không còn ở trạng thái ACTIVE");
+        }
+        if (new Date(cp.EndDate) < new Date(new Date().toDateString())) {
+          throw new Error("Combo đã hết hạn, không thể trừ buổi");
+        }
+        if (Number(cp.RemainingSessions || 0) < 1) {
+          throw new Error("Combo không còn đủ số buổi để hoàn thành lịch này");
+        }
+        if (cp.UsedCount >= cp.MaxSessions) {
+          throw new Error(`Dịch vụ này đã dùng hết số buổi quy định trong combo (Tối đa ${cp.MaxSessions} buổi)`);
+        }
+
+        await new sql.Request(transaction)
+          .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
+          .input("AppointmentId", sql.Int, Number(appointmentId))
+          .input("ServiceId", sql.Int, current.ServiceId).query(`
+            INSERT INTO CustomerPackageUsages
+              (CustomerPackageId, AppointmentId, ServiceId, SessionsUsed, Status, UsedAt, UsedBy)
+            SELECT @CustomerPackageId, @AppointmentId, @ServiceId, 1, 'USED', GETDATE(), c.UserId
+            FROM Appointments a
+            JOIN Customers c ON a.CustomerId = c.CustomerId
+            WHERE a.AppointmentId = @AppointmentId;
+
+            UPDATE CustomerPackages
+            SET
+              RemainingSessions = CASE WHEN RemainingSessions > 0 THEN RemainingSessions - 1 ELSE 0 END,
+              UsedSessions = UsedSessions + 1,
+              Status = CASE
+                WHEN RemainingSessions - 1 <= 0 THEN 'USED_UP'
+                ELSE 'ACTIVE'
+              END,
+              UpdatedAt = GETDATE()
+            WHERE CustomerPackageId = @CustomerPackageId;
+          `);
+      }
+    }
+
+    const finalResult = await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .input("EmployeeId", sql.Int, employeeId).query(`
+        SELECT *
+        FROM Appointments
+        WHERE AppointmentId = @AppointmentId
+          AND EmployeeId = @EmployeeId
+      `);
+
+    await transaction.commit();
+    return finalResult.recordset[0];
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
 }
 
 async function getAppointmentDetail(userId, appointmentId) {

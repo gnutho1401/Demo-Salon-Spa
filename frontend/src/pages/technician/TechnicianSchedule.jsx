@@ -78,21 +78,26 @@ function avatar(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
 }
 
-function statusLabel(status) {
-  const map = {
-    ALL: "All Status",
-    PENDING_PAYMENT: "Pending Payment",
-    PENDING: "Pending",
-    PAID: "Paid",
-    CONFIRMED: "Confirmed",
-    IN_PROGRESS: "In Progress",
-    COMPLETED: "Completed",
-    CANCELLED: "Cancelled",
-    REFUND_PENDING: "Refund Pending",
-    NO_SHOW: "No Show",
-  };
+const APPT_STATUS_MAP = {
+  ALL: "Tất cả trạng thái",
+  PENDING_PAYMENT: "Chờ thanh toán",
+  PENDING: "Chờ xác nhận",
+  PAID: "Đã thanh toán",
+  CONFIRMED: "Đã xác nhận",
+  CHECKED_IN: "Đã check-in",
+  IN_PROGRESS: "Đang thực hiện",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+  REFUND_PENDING: "Chờ hoàn tiền",
+  NO_SHOW: "Không đến",
+  UNPAID: "Chưa thanh toán",
+  PAID_INVOICE: "Đã thanh toán",
+  REFUNDED: "Đã hoàn tiền",
+  FAILED: "Thất bại",
+};
 
-  return map[status] || status;
+function statusLabel(status) {
+  return APPT_STATUS_MAP[status] || status || "Chưa rõ";
 }
 
 export default function TechnicianSchedule() {
@@ -323,22 +328,22 @@ export default function TechnicianSchedule() {
     }
   };
 
-  const canStart = selected && ["CONFIRMED", "PAID"].includes(selected.Status);
+  const canStart = selected && ["CONFIRMED", "PAID", "CHECKED_IN"].includes(selected.Status);
   const canComplete = selected && selected.Status === "IN_PROGRESS";
-  const canNoShow = selected && ["CONFIRMED", "PAID"].includes(selected.Status);
+  const canNoShow = selected && ["CONFIRMED", "PAID", "CHECKED_IN"].includes(selected.Status);
 
   return (
     <TechnicianLayout>
       <div className="tech-schedule-page">
         <header className="tech-page-head">
           <div>
-            <h1>My Schedule 🗓️</h1>
-            <p>Manage your appointments and working schedule</p>
+            <h1>Lịch trình của tôi 🗓️</h1>
+            <p>Quản lý các ca trực và lịch hẹn trị liệu của bạn</p>
           </div>
 
           <div className="tech-search">
             <input
-              placeholder="Search customer, phone, service, appointment code..."
+              placeholder="Tìm tên khách, số điện thoại, dịch vụ, mã lịch hẹn..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -348,7 +353,7 @@ export default function TechnicianSchedule() {
             className="tech-new-btn"
             onClick={() => navigate("/technician/appointments")}
           >
-            View Appointments
+            Xem các lịch hẹn
           </button>
         </header>
 
@@ -358,21 +363,21 @@ export default function TechnicianSchedule() {
               className={view === "day" ? "active" : ""}
               onClick={() => setView("day")}
             >
-              Day
+              Ngày
             </button>
 
             <button
               className={view === "week" ? "active" : ""}
               onClick={() => setView("week")}
             >
-              Week
+              Tuần
             </button>
 
             <button
               className={view === "month" ? "active" : ""}
               onClick={() => setView("month")}
             >
-              Month
+              Tháng
             </button>
           </div>
 
@@ -385,11 +390,11 @@ export default function TechnicianSchedule() {
 
             <button onClick={goNext}>›</button>
 
-            <button onClick={() => setBaseDate(todayISO())}>Today</button>
+            <button onClick={() => setBaseDate(todayISO())}>Hôm nay</button>
           </div>
 
           <button className="filter-btn" onClick={resetFilters}>
-            Reset Filters
+            Xóa bộ lọc
           </button>
         </div>
 
@@ -402,7 +407,7 @@ export default function TechnicianSchedule() {
               <h3>{baseDate.slice(0, 7)}</h3>
 
               <div className="mini-weekdays">
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((d) => (
                   <span key={d}>{d}</span>
                 ))}
               </div>
@@ -431,22 +436,22 @@ export default function TechnicianSchedule() {
               </div>
             </div>
             <div className="shift-box">
-              <h4>Working Shifts</h4>
+              <h4>Ca làm việc phân công</h4>
 
               {shiftByDate(baseDate).length === 0 ? (
-                <p className="shift-empty">No shift assigned</p>
+                <p className="shift-empty">Không có ca làm việc nào</p>
               ) : (
                 shiftByDate(baseDate).map((shift) => (
                   <div key={shift.ShiftId} className="shift-item">
                     <div>
                       <b>
                         {shift.IsDayOff
-                          ? "Day Off"
-                          : shift.ShiftType || "Working Shift"}
+                          ? "Ngày nghỉ"
+                          : shift.ShiftType || "Ca làm việc"}
                       </b>
                       <span>
                         {shift.IsDayOff
-                          ? "Not working today"
+                          ? "Không có ca trực hôm nay"
                           : `${shift.StartTime} - ${shift.EndTime}`}
                       </span>
                     </div>
@@ -457,7 +462,7 @@ export default function TechnicianSchedule() {
               )}
             </div>
             <div className="schedule-filter">
-              <h4>Filter by Status</h4>
+              <h4>Lọc theo trạng thái</h4>
 
               {STATUS.map((s) => (
                 <label key={s}>
@@ -470,13 +475,13 @@ export default function TechnicianSchedule() {
                 </label>
               ))}
 
-              <h4>Filter by Service</h4>
+              <h4>Lọc theo dịch vụ</h4>
 
               <select
                 value={serviceId}
                 onChange={(e) => setServiceId(e.target.value)}
               >
-                <option value="">All Services</option>
+                <option value="">Tất cả dịch vụ</option>
 
                 {data.services.map((s) => (
                   <option key={s.ServiceId} value={s.ServiceId}>
@@ -487,7 +492,7 @@ export default function TechnicianSchedule() {
             </div>
 
             <button className="export-btn" onClick={() => window.print()}>
-              Print Schedule
+              In lịch trình
             </button>
           </aside>
 
@@ -509,7 +514,7 @@ export default function TechnicianSchedule() {
               {visibleDays.map((d) => (
                 <div key={d} className={d === todayISO() ? "today" : ""}>
                   <b>
-                    {new Date(d).toLocaleDateString("en-US", {
+                    {new Date(d).toLocaleDateString("vi-VN", {
                       weekday: view === "month" ? "short" : "long",
                     })}
                   </b>
@@ -537,14 +542,14 @@ export default function TechnicianSchedule() {
                       <div className="month-day-head">
                         <b>{d.slice(8, 10)}</b>
                         <span>
-                          {new Date(d).toLocaleDateString("en-US", {
+                          {new Date(d).toLocaleDateString("vi-VN", {
                             weekday: "short",
                           })}
                         </span>
                       </div>
 
                       {dayAppointments.length === 0 ? (
-                        <p className="month-empty">No appointment</p>
+                        <p className="month-empty">Không có lịch hẹn</p>
                       ) : (
                         dayAppointments.map((a) => (
                           <button
@@ -607,7 +612,7 @@ export default function TechnicianSchedule() {
                 ))}
 
                 {data.appointments.length === 0 && !loading && (
-                  <p className="tech-empty">No appointments in this schedule</p>
+                  <p className="tech-empty">Không có lịch hẹn nào trong lịch trình</p>
                 )}
               </>
             )}
@@ -623,7 +628,7 @@ export default function TechnicianSchedule() {
 
           <aside className="schedule-detail">
             <div className="detail-head">
-              <h3>Appointment Details</h3>
+              <h3>Chi tiết lịch hẹn</h3>
               <button onClick={() => setSelected(null)}>×</button>
             </div>
 
@@ -633,12 +638,12 @@ export default function TechnicianSchedule() {
                   <img
                     className="detail-avatar"
                     src={avatar(selected.CustomerAvatar)}
-                    alt={selected.CustomerName || "Customer"}
+                    alt={selected.CustomerName || "Khách hàng"}
                   />
 
                   <div>
                     <h3>{selected.CustomerName}</h3>
-                    <p>{selected.CustomerPhone || "No phone"}</p>
+                    <p>{selected.CustomerPhone || "Chưa có SĐT"}</p>
                     <small>{selected.AppointmentCode}</small>
                   </div>
 
@@ -653,12 +658,12 @@ export default function TechnicianSchedule() {
 
                 <div className="detail-list">
                   <p>
-                    <b>Service</b>
-                    <span>{selected.ServiceName || "No service"}</span>
+                    <b>Dịch vụ</b>
+                    <span>{selected.ServiceName || "Không có dịch vụ"}</span>
                   </p>
 
                   <p>
-                    <b>Date & Time</b>
+                    <b>Ngày & Giờ</b>
                     <span>
                       {String(selected.AppointmentDate).slice(0, 10)} •{" "}
                       {selected.StartTime}
@@ -666,35 +671,35 @@ export default function TechnicianSchedule() {
                   </p>
 
                   <p>
-                    <b>Duration</b>
+                    <b>Thời lượng</b>
                     <span>
                       {selected.StartTime} - {selected.EndTime}
                       {selected.DurationMinutes
-                        ? ` • ${selected.DurationMinutes} mins`
+                        ? ` • ${selected.DurationMinutes} phút`
                         : ""}
                     </span>
                   </p>
 
                   <p>
-                    <b>Room</b>
+                    <b>Phòng</b>
                     <span>{selected.RoomName || "Chưa có phòng"}</span>
                   </p>
 
                   <p>
-                    <b>Price</b>
+                    <b>Đơn giá</b>
                     <span>
                       {money(selected.FinalAmount || selected.TotalPrice)}
                     </span>
                   </p>
 
                   <p>
-                    <b>Payment</b>
-                    <span>{selected.PaymentStatus || "UNPAID"}</span>
+                    <b>Thanh toán</b>
+                    <span>{statusLabel(selected.PaymentStatus || "UNPAID")}</span>
                   </p>
 
                   <p>
-                    <b>Notes</b>
-                    <span>{selected.Notes || "No note"}</span>
+                    <b>Ghi chú</b>
+                    <span>{selected.Notes || "Không có ghi chú"}</span>
                   </p>
                 </div>
 
@@ -705,7 +710,7 @@ export default function TechnicianSchedule() {
                       className="start"
                       disabled={actionLoading}
                     >
-                      ▷ Start Service
+                      ▷ Bắt đầu trị liệu
                     </button>
                   )}
 
@@ -715,7 +720,7 @@ export default function TechnicianSchedule() {
                       className="danger"
                       disabled={actionLoading}
                     >
-                      Mark No-show
+                      Đánh dấu vắng mặt
                     </button>
                   )}
 
@@ -727,7 +732,7 @@ export default function TechnicianSchedule() {
                       )
                     }
                   >
-                    ✎ Add Note
+                    ✎ Thêm ghi chú
                   </button>
 
                   {canComplete && (
@@ -736,14 +741,14 @@ export default function TechnicianSchedule() {
                       className="complete"
                       disabled={actionLoading}
                     >
-                      ✓ Mark as Completed
+                      ✓ Hoàn thành ca
                     </button>
                   )}
                 </div>
               </>
             ) : (
               <p className="empty-detail">
-                Select an appointment to view details
+                Chọn một lịch hẹn để xem chi tiết
               </p>
             )}
           </aside>
@@ -751,7 +756,7 @@ export default function TechnicianSchedule() {
 
         <section className="schedule-bottom">
           <div className="bottom-card">
-            <h3>Upcoming Next ({data.appointments.length})</h3>
+            <h3>Lịch hẹn tiếp theo ({data.appointments.length})</h3>
 
             <div className="upcoming-list">
               {data.appointments.slice(0, 3).map((a) => (
@@ -769,38 +774,38 @@ export default function TechnicianSchedule() {
               ))}
 
               {data.appointments.length === 0 && (
-                <p className="tech-empty">No upcoming appointment</p>
+                <p className="tech-empty">Không có lịch hẹn sắp tới</p>
               )}
             </div>
           </div>
 
           <div className="bottom-card summary-card">
-            <h3>Schedule Summary</h3>
+            <h3>Tóm tắt lịch trình</h3>
 
             <div>
               <p>
                 <b>{data.summary?.totalAppointments || 0}</b>
-                <span>Total Appointments</span>
+                <span>Tổng số buổi</span>
               </p>
 
               <p>
                 <b>{data.summary?.inProgress || 0}</b>
-                <span>In Progress</span>
+                <span>Đang thực hiện</span>
               </p>
 
               <p>
                 <b>{data.summary?.completed || 0}</b>
-                <span>Completed</span>
+                <span>Đã hoàn thành</span>
               </p>
 
               <p>
                 <b>{data.summary?.noShow || 0}</b>
-                <span>No Show</span>
+                <span>Vắng mặt</span>
               </p>
 
               <p>
                 <b>{money(data.summary?.revenue)}</b>
-                <span>Revenue</span>
+                <span>Doanh thu dự kiến</span>
               </p>
             </div>
           </div>

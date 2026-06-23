@@ -8,5 +8,6 @@ router.use(allowRoles("ADMIN", "MANAGER"));
 
 router.get("/dashboard", controller.getDashboard);
 router.use("/service-categories", require("./adminCategories.routes"));
+router.use("/refunds", require("./adminRefunds.routes"));
 
 module.exports = router;
