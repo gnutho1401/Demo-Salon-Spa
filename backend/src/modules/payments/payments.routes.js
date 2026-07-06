@@ -26,6 +26,12 @@ router.post(
 );
 
 router.post(
+  "/appointment/:appointmentId/apply-voucher",
+  authMiddleware,
+  controller.applyVoucher,
+);
+
+router.post(
   "/:id/cancel-payos",
   authMiddleware,
   controller.cancelPayos,

@@ -12,9 +12,24 @@ function percent(part, total) {
   return Math.round((Number(part || 0) / Number(total || 1)) * 100);
 }
 
+function translateStatus(status) {
+  const s = String(status || "").toUpperCase();
+  if (s === "CONFIRMED") return "Đã xác nhận";
+  if (s === "COMPLETED") return "Đã hoàn thành";
+  if (s === "CHECKED_IN") return "Đã check-in";
+  if (s === "PENDING") return "Chờ xác nhận";
+  if (s === "PENDING_PAYMENT") return "Chờ thanh toán";
+  if (s === "CANCELLED") return "Đã hủy";
+  if (s === "REFUND_PENDING") return "Chờ hoàn tiền";
+  return status;
+}
+
 function Badge({ status }) {
-  const s = String(status || "UNKNOWN").toUpperCase();
-  return <span className={`spa-badge spa-badge-${s.toLowerCase()}`}>{s}</span>;
+  const s = String(status || "").toUpperCase();
+  let label = translateStatus(s);
+  let className = s.toLowerCase();
+  
+  return <span className={`spa-badge spa-badge-${className}`}>{label}</span>;
 }
 
 function Avatar({ src, name, className = "spa-avatar" }) {
@@ -41,19 +56,20 @@ function Avatar({ src, name, className = "spa-avatar" }) {
 }
 
 function StatCard({ icon, title, value, note, type = "green" }) {
+  const typeClass = type === "gold" ? "spa-stat-gold" : type === "red" ? "spa-stat-red" : "";
+  const noteClass = type === "red" ? "trend-red" : type === "gold" ? "trend-orange" : "trend-green";
   return (
     <div className="spa-stat-card">
-      <div className={`spa-stat-icon spa-stat-${type}`}>{icon}</div>
-
-      <div className="spa-stat-content">
-        <p>{title}</p>
-        <h2>{value}</h2>
-        <span className={type === "red" ? "trend-red" : "trend-green"}>
-          {note}
-        </span>
+      <div className="spa-stat-header">
+        <span className="spa-stat-title">{title}</span>
+        <div className={`spa-stat-icon ${typeClass}`}>{icon}</div>
       </div>
-
-      <div className={`spa-spark spa-spark-${type}`} />
+      <div className="spa-stat-body">
+        <h2>{value}</h2>
+      </div>
+      <div className={`spa-stat-footer ${noteClass}`}>
+        {note}
+      </div>
     </div>
   );
 }
@@ -61,6 +77,7 @@ function StatCard({ icon, title, value, note, type = "green" }) {
 export default function ReceptionistDashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -74,7 +91,7 @@ export default function ReceptionistDashboard() {
       .catch((err) => {
         if (!mounted) return;
         setError(
-          err.response?.data?.message || "Không tải được dashboard lễ tân",
+          err.response?.data?.message || "Không tải được dữ liệu bảng điều khiển lễ tân",
         );
       });
 
@@ -84,8 +101,18 @@ export default function ReceptionistDashboard() {
   }, []);
 
   const appointments = useMemo(() => {
-    return stats?.todayAppointments || [];
-  }, [stats]);
+    let list = stats?.todayAppointments || [];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return list.filter(
+        (a) =>
+          a.CustomerName?.toLowerCase().includes(q) ||
+          a.ServiceName?.toLowerCase().includes(q) ||
+          (a.TechnicianName && a.TechnicianName.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [stats, searchQuery]);
 
   const checkInQueue = useMemo(() => {
     return stats?.checkInQueue || [];
@@ -120,22 +147,26 @@ export default function ReceptionistDashboard() {
         <header className="spa-topbar">
           <div>
             <h1>
-              Dashboard lễ tân <span>🍃</span>
+              Bảng điều khiển lễ tân <span>🍃</span>
             </h1>
-            <p>Dữ liệu thật trong ngày: {todayText}</p>
+            <p>Dữ liệu thực tế ngày hôm nay: {todayText}</p>
           </div>
 
           <div className="spa-search">
             <span>⌕</span>
-            <input placeholder="Tìm khách hàng, lịch hẹn, dịch vụ..." />
+            <input
+              placeholder="Tìm khách hàng, lịch hẹn, dịch vụ hôm nay..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
 
           <div className="spa-top-actions">
-            <Link className="spa-circle-btn" to="/receptionist/notifications">
-              🔔
+            <Link className="spa-circle-btn" to="/receptionist/profile" title="Hồ sơ cá nhân">
+              👤
             </Link>
 
-            <Link className="spa-circle-btn" to="/receptionist/appointments">
+            <Link className="spa-circle-btn" to="/receptionist/appointments" title="Xem lịch hẹn">
               📅
             </Link>
 
@@ -143,7 +174,7 @@ export default function ReceptionistDashboard() {
               className="spa-new-btn"
               to="/receptionist/appointments/create"
             >
-              + Tạo lịch hẹn
+              + Tạo lịch hẹn mới
             </Link>
           </div>
         </header>
@@ -151,35 +182,35 @@ export default function ReceptionistDashboard() {
         {error && <div className="spa-error">{error}</div>}
 
         {!stats ? (
-          <div className="spa-loading">Đang tải dashboard...</div>
+          <div className="spa-loading">Đang tải dữ liệu bảng điều khiển...</div>
         ) : (
           <>
             <section className="spa-stats">
               <StatCard
                 icon="📅"
-                title="Lịch hẹn hôm nay"
+                title="Lịch Hẹn Hôm Nay"
                 value={stats.todayAppointmentsCount || 0}
-                note={`${stats.pendingCount || 0} chờ xác nhận`}
+                note={`${stats.pendingCount || 0} yêu cầu chờ xác nhận`}
               />
 
               <StatCard
                 icon="✅"
-                title="Đã check-in"
+                title="Đã Check-in"
                 value={stats.checkedInCount || 0}
-                note={`${stats.confirmedCount || 0} khách chờ check-in`}
+                note={`${stats.confirmedCount || 0} khách sẵn sàng chờ dịch vụ`}
                 type="gold"
               />
 
               <StatCard
                 icon="💆"
-                title="Đang phục vụ"
+                title="Đang Phục Vụ"
                 value={stats.inProgressCount || 0}
-                note={`${stats.completedCount || 0} đã hoàn thành`}
+                note={`${stats.completedCount || 0} khách đã hoàn thành xong`}
               />
 
               <StatCard
                 icon="💰"
-                title="Doanh thu hôm nay"
+                title="Doanh Thu Hôm Nay"
                 value={money(stats.todayRevenue)}
                 note={`${stats.paidInvoiceCount || 0} hóa đơn đã thanh toán`}
                 type="gold"
@@ -187,45 +218,45 @@ export default function ReceptionistDashboard() {
 
               <StatCard
                 icon="↩"
-                title="Hoàn tiền chờ xử lý"
+                title="Yêu Cầu Hoàn Tiền"
                 value={stats.refundPendingCount || 0}
-                note={`${stats.waitingListCount || 0} khách trong hàng chờ`}
+                note={`${stats.waitingListCount || 0} khách trong hàng đợi`}
                 type="red"
               />
             </section>
 
-            <section className="spa-stats-title-section" style={{ marginTop: '24px', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#2d2430', display: 'flex', alignItems: 'center' }}>
-                <span style={{ marginRight: '8px' }}>⏳</span> Smart Waiting List Hôm Nay
+            <section className="spa-stats-title-section" style={{ marginTop: '32px', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#2d2430', display: 'flex', alignItems: 'center', fontFamily: 'var(--font-heading), Georgia, serif' }}>
+                <span style={{ marginRight: '10px' }}>⏳</span> Hệ Thống Hàng Chờ Thông Minh (Smart Waiting List)
               </h3>
             </section>
             <section className="spa-stats" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
               <StatCard
                 icon="⏳"
-                title="Khách đang chờ"
+                title="Khách Đang Chờ"
                 value={stats.waitingTodayCount || 0}
-                note="Chờ khớp khung giờ trống"
+                note="Đang chờ khớp khung giờ trống"
                 type="gold"
               />
               <StatCard
                 icon="⚡"
-                title="Đã khớp slot"
+                title="Đã Khớp Khung Giờ"
                 value={stats.matchedTodayCount || 0}
-                note="Đang trong 15p giữ chỗ"
+                note="Đang giữ chỗ tạm thời (15p)"
                 type="green"
               />
               <StatCard
                 icon="✅"
-                title="Đã đặt lịch thành công"
+                title="Đã Đặt Lịch Thành Công"
                 value={stats.bookedTodayCount || 0}
-                note="Từ hàng chờ chuyển sang"
+                note="Đã chuyển thành công từ hàng chờ"
                 type="green"
               />
               <StatCard
                 icon="📆"
-                title="Đã hết hạn/Bỏ lỡ"
+                title="Hết Hạn / Bỏ Lỡ"
                 value={stats.expiredTodayCount || 0}
-                note="Tự động hủy lúc 23:59:59"
+                note="Hệ thống tự động hủy lúc 23:59:59"
                 type="red"
               />
             </section>
@@ -233,15 +264,15 @@ export default function ReceptionistDashboard() {
             <section className="spa-main-grid">
               <div className="spa-card spa-appointments-card">
                 <div className="spa-card-head">
-                  <h3>Lịch hẹn hôm nay</h3>
-                  <Link to="/receptionist/appointments">Xem tất cả</Link>
+                  <h3>Lịch hẹn trong ngày</h3>
+                  <Link to="/receptionist/appointments">Xem toàn bộ</Link>
                 </div>
 
                 <div className="spa-timeline">
                   {appointments.length === 0 ? (
-                    <p className="spa-empty">Hôm nay chưa có lịch hẹn.</p>
+                    <p className="spa-empty">Không tìm thấy lịch hẹn nào hôm nay.</p>
                   ) : (
-                    appointments.slice(0, 6).map((a) => (
+                    appointments.map((a) => (
                       <div className="spa-timeline-row" key={a.AppointmentId}>
                         <span className="spa-time">{a.StartTime}</span>
                         <div className="spa-dot" />
@@ -255,7 +286,7 @@ export default function ReceptionistDashboard() {
                           <h4>{a.CustomerName}</h4>
                           <p>
                             {a.ServiceName} · KTV:{" "}
-                            {a.TechnicianName || "Chưa có"}
+                            {a.TechnicianName || "Chưa phân bổ"}
                           </p>
                         </div>
 
@@ -268,16 +299,16 @@ export default function ReceptionistDashboard() {
 
               <div className="spa-card spa-checkin-card">
                 <div className="spa-card-head">
-                  <h3>Hàng chờ check-in</h3>
+                  <h3>Khách chờ check-in</h3>
                   <Link to="/receptionist/appointments?status=CONFIRMED">
-                    Xem tất cả
+                    Danh sách
                   </Link>
                 </div>
 
                 <div className="spa-queue">
                   {checkInQueue.length === 0 ? (
                     <p className="spa-empty">
-                      Không có khách đang chờ check-in.
+                      Hiện tại không có khách nào đang chờ check-in.
                     </p>
                   ) : (
                     checkInQueue.slice(0, 5).map((a) => (
@@ -294,13 +325,13 @@ export default function ReceptionistDashboard() {
                           <h4>{a.CustomerName}</h4>
                           <p>{a.ServiceName}</p>
                           <small>
-                            {a.StartTime} - {a.EndTime}
+                            Khung giờ: {a.StartTime} - {a.EndTime}
                           </small>
                         </div>
 
                         <div className="spa-room">
                           <b>{a.TotalDuration || 0} phút</b>
-                          <span>{a.Status}</span>
+                          <span>{translateStatus(a.Status)}</span>
                         </div>
                       </div>
                     ))
@@ -317,12 +348,9 @@ export default function ReceptionistDashboard() {
 
               <div className="spa-card spa-calendar-card">
                 <div className="spa-card-head">
-                  <h3>Lịch nhanh</h3>
+                  <h3>Lịch tháng</h3>
                   <span>
-                    {today.toLocaleDateString("vi-VN", {
-                      month: "long",
-                      year: "numeric",
-                    })}
+                    Tháng {today.getMonth() + 1} / {today.getFullYear()}
                   </span>
                 </div>
 
@@ -346,53 +374,55 @@ export default function ReceptionistDashboard() {
               </div>
 
               <div className="spa-card spa-reminder-card">
-                <h3>Hoạt động gân đây</h3>
+                <h3>Hoạt động vừa diễn ra</h3>
 
-                {recentCheckIns.length === 0 ? (
-                  <p className="spa-empty">Chưa có hoạt động check-in.</p>
-                ) : (
-                  recentCheckIns.slice(0, 3).map((item) => (
-                    <div
-                      className="spa-reminder"
-                      key={`recent-checkin-${item.AppointmentId}`}
-                    >
-                      <Avatar
-                        src={item.CustomerAvatarUrl}
-                        name={item.CustomerName}
-                      />
+                <div className="spa-queue" style={{ maxHeight: "250px" }}>
+                  {recentCheckIns.length === 0 ? (
+                    <p className="spa-empty">Chưa có hoạt động check-in nào.</p>
+                  ) : (
+                    recentCheckIns.slice(0, 4).map((item) => (
+                      <div
+                        className="spa-reminder"
+                        key={`recent-checkin-${item.AppointmentId}`}
+                      >
+                        <Avatar
+                          src={item.CustomerAvatarUrl}
+                          name={item.CustomerName}
+                        />
 
-                      <div>
-                        <b>{item.CustomerName}</b>
-                        <p>
-                          {item.ServiceName} · {item.Status}
-                        </p>
+                        <div>
+                          <b>{item.CustomerName}</b>
+                          <p>
+                            {item.ServiceName} · {translateStatus(item.Status)}
+                          </p>
+                        </div>
+
+                        <small>{item.StartTime}</small>
                       </div>
-
-                      <small>{item.StartTime}</small>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
 
               <div className="spa-card spa-revenue-card">
                 <div className="spa-card-head">
-                  <h3>Doanh thu hôm nay</h3>
+                  <h3>Doanh thu theo hóa đơn</h3>
                   <Link to="/receptionist/invoices">Hóa đơn</Link>
                 </div>
 
                 <h2>{money(stats.todayRevenue)}</h2>
-                <p className="trend-green">
-                  Dựa trên các payment PAID trong ngày.
+                <p className="trend-green" style={{ fontSize: '13px' }}>
+                  Tổng doanh thu từ các giao dịch thành công.
                 </p>
 
                 <div className="spa-line-chart">
                   <div className="spa-line-path" />
                   <div className="spa-chart-days">
-                    <span>Paid</span>
+                    <span>Đã thu</span>
                     <span>{paidInvoiceCount}</span>
-                    <span>Unpaid</span>
+                    <span>Chưa thu</span>
                     <span>{unpaidInvoiceCount}</span>
-                    <span>Refund</span>
+                    <span>Hoàn tiền</span>
                     <span>{refundPendingCount}</span>
                   </div>
                 </div>
@@ -400,12 +430,12 @@ export default function ReceptionistDashboard() {
 
               <div className="spa-card spa-services-card">
                 <div className="spa-card-head">
-                  <h3>Dịch vụ phổ biến hôm nay</h3>
-                  <Link to="/receptionist/appointments">Xem lịch hẹn</Link>
+                  <h3>Dịch vụ được chọn nhiều</h3>
+                  <Link to="/receptionist/appointments">Chi tiết</Link>
                 </div>
 
                 {popularServices.length === 0 ? (
-                  <p className="spa-empty">Chưa có dữ liệu dịch vụ hôm nay.</p>
+                  <p className="spa-empty">Chưa có số liệu thống kê dịch vụ.</p>
                 ) : (
                   popularServices.map((s) => {
                     const max = Math.max(
@@ -435,17 +465,17 @@ export default function ReceptionistDashboard() {
 
               <div className="spa-card spa-invoice-card">
                 <div className="spa-card-head">
-                  <h3>Tổng quan hóa đơn</h3>
+                  <h3>Tổng quan hóa đơn hôm nay</h3>
                   <Link to="/receptionist/invoices">Xem tất cả</Link>
                 </div>
 
                 <div className="spa-invoice-row">
-                  <span>🧾 Tổng hóa đơn</span>
+                  <span>🧾 Tổng số lượng hóa đơn</span>
                   <b>{invoiceCount}</b>
                 </div>
 
                 <div className="spa-invoice-row">
-                  <span>✅ Đã thanh toán</span>
+                  <span>✅ Hóa đơn đã thanh toán</span>
                   <b>
                     {paidInvoiceCount}{" "}
                     <small>{percent(paidInvoiceCount, invoiceCount)}%</small>
@@ -453,7 +483,7 @@ export default function ReceptionistDashboard() {
                 </div>
 
                 <div className="spa-invoice-row">
-                  <span>📄 Chưa thanh toán</span>
+                  <span>📄 Hóa đơn chưa thanh toán</span>
                   <b>
                     {unpaidInvoiceCount}{" "}
                     <small>{percent(unpaidInvoiceCount, invoiceCount)}%</small>
@@ -461,7 +491,7 @@ export default function ReceptionistDashboard() {
                 </div>
 
                 <div className="spa-invoice-row">
-                  <span>↩ Hoàn tiền</span>
+                  <span>↩ Hóa đơn chờ hoàn tiền</span>
                   <b>
                     {refundPendingCount}{" "}
                     <small>{percent(refundPendingCount, invoiceCount)}%</small>
@@ -469,13 +499,13 @@ export default function ReceptionistDashboard() {
                 </div>
 
                 <div className="spa-total-row">
-                  <span>Doanh thu hôm nay</span>
+                  <span>Tổng doanh thu thực tế</span>
                   <strong>{money(stats.todayRevenue)}</strong>
                 </div>
               </div>
 
               <div className="spa-card spa-profile-card">
-                <h3>Khách hàng gần đây</h3>
+                <h3>Khách hàng nổi bật gần đây</h3>
 
                 <Avatar
                   className="spa-profile-avatar"
@@ -483,40 +513,40 @@ export default function ReceptionistDashboard() {
                   name={highlightedCustomer?.FullName}
                 />
 
-                <h2>{highlightedCustomer?.FullName || "Chưa có khách hàng"}</h2>
+                <h2>{highlightedCustomer?.FullName || "Chưa có thông tin"}</h2>
 
                 <ul>
-                  <li>☎ {highlightedCustomer?.Phone || "Chưa có SĐT"}</li>
-                  <li>✉ {highlightedCustomer?.Email || "Chưa có email"}</li>
+                  <li>☎ Điện thoại: {highlightedCustomer?.Phone || "Chưa cập nhật"}</li>
+                  <li>✉ Email: {highlightedCustomer?.Email || "Chưa cập nhật"}</li>
                   <li>
-                    📅 {highlightedCustomer?.TotalAppointments || 0} lịch hẹn
+                    📅 Tổng lịch hẹn: {highlightedCustomer?.TotalAppointments || 0} lần
                   </li>
                   <li>
-                    💰 Tổng chi tiêu: {money(highlightedCustomer?.TotalSpent)}
+                    💰 Tổng tích lũy chi tiêu: {money(highlightedCustomer?.TotalSpent)}
                   </li>
                   <li>
-                    ♕ Thành viên từ:{" "}
+                    ♕ Ngày tham gia:{" "}
                     {highlightedCustomer?.MemberSince
                       ? new Date(
                           highlightedCustomer.MemberSince,
                         ).toLocaleDateString("vi-VN")
-                      : "Chưa có"}
+                      : "Chưa cập nhật"}
                   </li>
                 </ul>
 
                 <Link to="/receptionist/customers" className="spa-profile-btn">
-                  Xem khách hàng
+                  Xem chi tiết khách hàng
                 </Link>
               </div>
 
               <div className="spa-card spa-recent-card">
                 <div className="spa-card-head">
-                  <h3>Lịch hẹn gần nhất</h3>
+                  <h3>Lịch hẹn mới đặt</h3>
                   <Link to="/receptionist/appointments">Xem tất cả</Link>
                 </div>
 
                 {appointments.length === 0 ? (
-                  <p className="spa-empty">Chưa có lịch hẹn hôm nay.</p>
+                  <p className="spa-empty">Chưa có lịch hẹn nào mới.</p>
                 ) : (
                   appointments.slice(0, 4).map((a) => (
                     <div
@@ -528,7 +558,7 @@ export default function ReceptionistDashboard() {
                       <div>
                         <h4>{a.CustomerName}</h4>
                         <p>
-                          {a.StartTime} · {a.ServiceName}
+                          Thời gian: {a.StartTime} · {a.ServiceName}
                         </p>
                       </div>
 
@@ -539,44 +569,45 @@ export default function ReceptionistDashboard() {
               </div>
 
               <div className="spa-card spa-actions-card">
-                <h3>Thao tác nhanh</h3>
+                <h3>Thao tác nhanh thường dùng</h3>
 
                 <div className="spa-actions">
                   <Link to="/receptionist/appointments/create">
                     📅
-                    <span>Tạo lịch hẹn</span>
+                    <span>Đặt lịch hẹn</span>
                   </Link>
 
                   <Link to="/receptionist/appointments?status=CONFIRMED">
-                    ✅<span>Check-in khách</span>
+                    ✅
+                    <span>Check-in</span>
                   </Link>
 
                   <Link to="/receptionist/appointments/create?walkin=1">
                     🚶
-                    <span>Khách walk-in</span>
+                    <span>Khách Walk-in</span>
                   </Link>
 
                   <Link to="/receptionist/invoices">
                     🧾
-                    <span>Quản lý hóa đơn</span>
+                    <span>Hóa đơn</span>
                   </Link>
 
                   <Link to="/receptionist/waiting-list">
-                    ⏳<span>Hàng chờ</span>
+                    ⏳
+                    <span>Hàng chờ</span>
                   </Link>
                 </div>
               </div>
 
               <div className="spa-promo-card">
                 <div>
-                  <h3>Hàng chờ hôm nay</h3>
+                  <h3>Quản lý danh sách hàng chờ</h3>
                   <p>
-                    Hiện có {stats.waitingListCount || 0} khách đang trong hàng
-                    chờ. Lễ tân có thể chuyển khách sang lịch hẹn khi có slot
-                    trống.
+                    Hiện tại đang có {stats.waitingListCount || 0} khách hàng nằm trong danh sách chờ. 
+                    Bạn có thể theo dõi và xếp slot lịch hẹn trống ngay lập tức khi có kỹ thuật viên rảnh.
                   </p>
 
-                  <Link to="/receptionist/waiting-list">Xem waiting list</Link>
+                  <Link to="/receptionist/waiting-list">Xem hàng chờ ngay</Link>
                 </div>
               </div>
             </section>
@@ -586,3 +617,4 @@ export default function ReceptionistDashboard() {
     </ReceptionistLayout>
   );
 }
+

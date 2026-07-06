@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import CustomerLayout from "../../components/layout/CustomerLayout";
-import axiosClient from "../../api/axiosClient";
+import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
 const STATUS_LABELS = {
   PENDING_PAYMENT: "Chờ thanh toán",
@@ -224,7 +224,7 @@ export default function CustomerDashboard() {
             <div className="customer-dash-avatar">
               {profile.AvatarUrl ? (
                 <img
-                  src={profile.AvatarUrl}
+                  src={resolveFileUrl(profile.AvatarUrl)}
                   alt={profile.FullName || "Avatar"}
                 />
               ) : (

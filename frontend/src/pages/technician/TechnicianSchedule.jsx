@@ -335,7 +335,482 @@ export default function TechnicianSchedule() {
   return (
     <TechnicianLayout>
       <div className="tech-schedule-page">
+        <style>{`
+          /* Premium Style Upgrades for Technician Schedule */
+          .tech-schedule-page {
+            font-family: 'Outfit', 'Inter', sans-serif;
+            background: #faf6f0;
+            padding: 10px;
+          }
+
+          .tech-page-head {
+            background: #fff;
+            padding: 24px 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(165,145,115,0.08);
+            border: 1px solid rgba(222, 203, 166, 0.4);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .tech-page-head h1 {
+            font-size: 1.85rem;
+            color: #1e351f;
+            font-weight: 800;
+          }
+
+          .tech-page-head p {
+            color: #6b7280;
+            margin-top: 4px;
+            font-size: 0.9rem;
+          }
+
+          .tech-new-btn {
+            background: linear-gradient(135deg, #2d6a4f, #1b4332) !important;
+            box-shadow: 0 8px 20px rgba(45, 106, 79, 0.25) !important;
+            font-weight: 700;
+            transition: all 0.25s ease;
+          }
+
+          .tech-new-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(45, 106, 79, 0.35) !important;
+          }
+
+          .schedule-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 14px 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(222, 203, 166, 0.4);
+            box-shadow: 0 6px 20px rgba(165,145,115,0.04);
+            margin-bottom: 24px;
+            gap: 16px;
+          }
+
+          .schedule-tabs {
+            background: #f4f1eb !important;
+            border-radius: 12px !important;
+            padding: 4px !important;
+            border: none !important;
+          }
+
+          .schedule-tabs button {
+            padding: 8px 20px !important;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #5c554a;
+            border-radius: 8px !important;
+            transition: all 0.25s ease;
+          }
+
+          .schedule-tabs button.active {
+            background: #2d6a4f !important;
+            color: #fff !important;
+            box-shadow: 0 4px 10px rgba(45, 106, 79, 0.2);
+          }
+
+          .schedule-date-nav {
+            background: #fff !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 12px !important;
+            align-items: center;
+          }
+
+          .schedule-date-nav button {
+            background: #f4f1eb !important;
+            color: #2d6a4f !important;
+            font-weight: 800;
+            width: 38px;
+            height: 38px;
+            padding: 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px !important;
+            transition: all 0.2s;
+          }
+
+          .schedule-date-nav button:hover {
+            background: #2d6a4f !important;
+            color: #fff !important;
+          }
+
+          .schedule-date-nav span {
+            font-weight: 700;
+            color: #1e351f;
+            font-size: 0.95rem;
+            padding: 0 16px !important;
+            min-width: auto !important;
+          }
+
+          .filter-btn {
+            background: #fef2f2 !important;
+            border: 1px solid #fecaca !important;
+            color: #dc2626 !important;
+            font-weight: 700;
+            border-radius: 10px !important;
+            padding: 8px 16px !important;
+            transition: all 0.2s;
+          }
+
+          .filter-btn:hover {
+            background: #dc2626 !important;
+            color: #fff !important;
+          }
+
+          /* Left Panel / Mini calendar */
+          .schedule-left-panel {
+            background: #fff !important;
+            border: 1px solid rgba(222, 203, 166, 0.45) !important;
+            border-radius: 20px !important;
+            padding: 20px !important;
+            box-shadow: 0 8px 24px rgba(165,145,115,0.06) !important;
+          }
+
+          .mini-calendar {
+            background: #fcfbf9 !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 14px !important;
+          }
+
+          .mini-calendar h3 {
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: #2d6a4f;
+            text-align: center;
+            margin-bottom: 12px;
+          }
+
+          .mini-weekdays span {
+            font-weight: 700;
+            color: #9ca3af;
+            font-size: 0.78rem;
+          }
+
+          .mini-days button {
+            width: 30px !important;
+            height: 30px !important;
+            font-size: 0.85rem !important;
+            font-weight: 500;
+            transition: all 0.2s;
+          }
+
+          .mini-days button.active {
+            background: #2d6a4f !important;
+            color: #fff !important;
+            box-shadow: 0 4px 10px rgba(45, 106, 79, 0.25);
+          }
+
+          .shift-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 14px;
+            margin-top: 18px;
+          }
+
+          .shift-box h4 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            margin-bottom: 10px;
+            font-weight: 800;
+          }
+
+          .shift-item {
+            background: #fff;
+            border-left: 4px solid #3b82f6;
+            border-radius: 8px;
+            padding: 10px 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+          }
+
+          .shift-item b {
+            color: #1e3a8a;
+            font-size: 0.88rem;
+          }
+
+          .shift-item span {
+            color: #4b5563;
+            font-size: 0.8rem;
+          }
+
+          /* Main Calendar Grid */
+          .schedule-calendar {
+            background: #fff !important;
+            border: 1px solid rgba(222, 203, 166, 0.45) !important;
+            border-radius: 20px !important;
+            box-shadow: 0 8px 24px rgba(165,145,115,0.06) !important;
+            padding: 16px !important;
+          }
+
+          .calendar-head {
+            border-bottom: 2px solid #f1ece1 !important;
+            background: #faf9f6;
+            border-radius: 12px 12px 0 0;
+          }
+
+          .calendar-head > div {
+            border-left: 1px solid #f1ece1 !important;
+            padding: 12px 6px !important;
+          }
+
+          .calendar-head b {
+            font-size: 0.85rem;
+            color: #374151;
+            text-transform: uppercase;
+          }
+
+          .calendar-head span {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 2px;
+          }
+
+          .calendar-head .today {
+            background: #2d6a4f !important;
+            color: #fff !important;
+            border-radius: 10px !important;
+            margin: 4px !important;
+          }
+
+          .calendar-head .today span {
+            color: rgba(255,255,255,0.85) !important;
+          }
+
+          .calendar-row {
+            border-bottom: 1px solid #f3ece0 !important;
+          }
+
+          .calendar-cell {
+            border-left: 1px solid #f3ece0 !important;
+            background: #fff;
+          }
+
+          .calendar-cell:hover {
+            background: #fbfbf9;
+          }
+
+          /* Appointment block style */
+          .appointment-block {
+            border-radius: 10px !important;
+            padding: 8px 10px !important;
+            border-width: 1px !important;
+            border-style: solid !important;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.04) !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            gap: 2px !important;
+          }
+
+          .appointment-block:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.08) !important;
+          }
+
+          .appointment-block b {
+            font-size: 0.78rem !important;
+            font-weight: 800;
+          }
+
+          .appointment-block span {
+            font-size: 0.82rem !important;
+            font-weight: 700 !important;
+          }
+
+          .appointment-block small {
+            font-size: 0.72rem !important;
+            font-weight: 600;
+            color: rgba(0,0,0,0.6) !important;
+          }
+
+          /* Status colors (Premium palette) */
+          .appointment-block.pending {
+            background: #fffbeb !important;
+            border-color: #fde68a !important;
+            color: #b45309 !important;
+          }
+          .appointment-block.confirmed {
+            background: #ecfdf5 !important;
+            border-color: #a7f3d0 !important;
+            color: #065f46 !important;
+          }
+          .appointment-block.in_progress {
+            background: #eff6ff !important;
+            border-color: #bfdbfe !important;
+            color: #1e40af !important;
+          }
+          .appointment-block.completed {
+            background: #f5f3ff !important;
+            border-color: #ddd6fe !important;
+            color: #5b21b6 !important;
+          }
+          .appointment-block.cancelled {
+            background: #f9fafb !important;
+            border-color: #e5e7eb !important;
+            color: #374151 !important;
+            opacity: 0.7;
+          }
+
+          /* Month view list grid */
+          .month-list {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+          }
+
+          .month-day-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #fff;
+          }
+
+          .month-day-card.today {
+            border-color: #2d6a4f !important;
+            box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.2);
+          }
+
+          .month-day-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            background: #f9fafb;
+            border-bottom: 1px solid #f3f4f6;
+          }
+
+          .month-day-card .appointment-block {
+            margin: 4px 6px;
+            width: calc(100% - 12px);
+          }
+
+          /* Right Panel Detail View */
+          .schedule-detail {
+            background: #fff !important;
+            border: 1px solid rgba(222, 203, 166, 0.45) !important;
+            border-radius: 20px !important;
+            box-shadow: 0 8px 24px rgba(165,145,115,0.06) !important;
+            padding: 24px !important;
+          }
+
+          .detail-head h3 {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #1e351f;
+          }
+
+          .detail-customer {
+            background: #faf9f6;
+            border: 1px solid rgba(222, 203, 166, 0.35);
+            border-radius: 16px;
+            padding: 14px;
+            margin: 18px 0 !important;
+          }
+
+          .detail-customer h3 {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #2d6a4f;
+          }
+
+          .detail-status {
+            font-weight: 700;
+            border-radius: 8px !important;
+            padding: 4px 8px !important;
+            text-transform: uppercase;
+            font-size: 0.68rem !important;
+            letter-spacing: 0.5px;
+          }
+
+          .detail-status.pending { background: #fef3c7; color: #d97706; }
+          .detail-status.confirmed { background: #d1fae5; color: #059669; }
+          .detail-status.in_progress { background: #dbeafe; color: #2563eb; }
+          .detail-status.completed { background: #f3e8ff; color: #7c3aed; }
+          .detail-status.cancelled { background: #f3f4f6; color: #4b5563; }
+
+          .detail-list {
+            border-color: #f1ece1 !important;
+          }
+
+          .detail-list p {
+            margin: 12px 0 !important;
+            grid-template-columns: 100px 1fr !important;
+          }
+
+          .detail-list b {
+            font-size: 0.85rem;
+            color: #6b7280;
+          }
+
+          .detail-list span {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #1f2937;
+          }
+
+          .detail-actions button {
+            border-radius: 12px !important;
+            font-weight: 700;
+            font-size: 0.88rem;
+            transition: all 0.2s ease;
+          }
+
+          .detail-actions .start {
+            background: #2d6a4f !important;
+            box-shadow: 0 4px 12px rgba(45, 106, 79, 0.2);
+          }
+
+          .detail-actions .start:hover {
+            background: #1b4332 !important;
+            transform: translateY(-1px);
+          }
+
+          .detail-actions .note {
+            background: #fffbeb !important;
+            border: 1.5px solid #fde68a !important;
+            color: #b45309 !important;
+          }
+
+          .detail-actions .note:hover {
+            background: #fef3c7 !important;
+          }
+
+          .detail-actions .complete {
+            background: #2d6a4f !important;
+            color: #fff !important;
+            border: none !important;
+            box-shadow: 0 4px 12px rgba(45, 106, 79, 0.2);
+          }
+
+          .detail-actions .complete:hover {
+            background: #1b4332 !important;
+          }
+
+          .detail-actions .danger {
+            background: #fef2f2 !important;
+            border: 1.5px solid #fecaca !important;
+            color: #dc2626 !important;
+          }
+
+          .detail-actions .danger:hover {
+            background: #fee2e2 !important;
+          }
+        `}</style>
+
         <header className="tech-page-head">
+
           <div>
             <h1>Lịch trình của tôi 🗓️</h1>
             <p>Quản lý các ca trực và lịch hẹn trị liệu của bạn</p>
@@ -506,22 +981,41 @@ export default function TechnicianSchedule() {
             <div
               className="calendar-grid calendar-head"
               style={{
-                gridTemplateColumns: `70px repeat(${visibleDays.length}, 1fr)`,
+                gridTemplateColumns: `70px repeat(${visibleDays.length}, minmax(120px, 1fr))`,
               }}
             >
               <div></div>
 
-              {visibleDays.map((d) => (
-                <div key={d} className={d === todayISO() ? "today" : ""}>
-                  <b>
-                    {new Date(d).toLocaleDateString("vi-VN", {
-                      weekday: view === "month" ? "short" : "long",
-                    })}
-                  </b>
-                  <span>{d}</span>
-                </div>
-              ))}
+              {visibleDays.map((d) => {
+                const isSelectedDay = baseDate === d;
+                return (
+                  <div
+                    key={d}
+                    className={`${d === todayISO() ? "today" : ""} ${isSelectedDay ? "active-col-day" : ""}`}
+                    onClick={() => setBaseDate(d)}
+                    style={{
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      background: isSelectedDay ? "rgba(45, 106, 79, 0.15)" : "transparent",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <b style={{ color: isSelectedDay ? "#2d6a4f" : undefined }}>
+                      {new Date(d).toLocaleDateString("vi-VN", {
+                        weekday: view === "month" ? "short" : "long",
+                      })}
+                    </b>
+                    <span style={{
+                      fontWeight: isSelectedDay ? 700 : 400,
+                      color: isSelectedDay ? "#2d6a4f" : undefined,
+                      textDecoration: isSelectedDay ? "underline" : "none"
+                    }}>{d}</span>
+                  </div>
+                );
+              })}
             </div>
+
 
             {view === "month" ? (
               <div className="month-list">
@@ -529,19 +1023,29 @@ export default function TechnicianSchedule() {
                   const dayAppointments = data.appointments.filter(
                     (a) => String(a.AppointmentDate).slice(0, 10) === d,
                   );
+                  const isSelectedDay = baseDate === d;
 
                   return (
                     <div
                       key={d}
-                      className={
-                        d === todayISO()
-                          ? "month-day-card today"
-                          : "month-day-card"
-                      }
+                      className={`${d === todayISO() ? "month-day-card today" : "month-day-card"}`}
+                      onClick={() => setBaseDate(d)}
+                      style={{
+                        cursor: "pointer",
+                        border: isSelectedDay ? "2px solid #2d6a4f" : "1px solid #e5e7eb",
+                        boxShadow: isSelectedDay ? "0 4px 12px rgba(45, 106, 79, 0.15)" : "none",
+                        background: isSelectedDay ? "#f4fcf9" : undefined,
+                        transition: "all 0.2s"
+                      }}
                     >
-                      <div className="month-day-head">
-                        <b>{d.slice(8, 10)}</b>
-                        <span>
+                      <div className="month-day-head" style={{
+                        background: isSelectedDay ? "#2d6a4f" : undefined,
+                        color: isSelectedDay ? "#fff" : undefined,
+                        padding: "6px 8px",
+                        borderRadius: isSelectedDay ? "4px 4px 0 0" : undefined
+                      }}>
+                        <b style={{ color: isSelectedDay ? "#fff" : undefined }}>{d.slice(8, 10)}</b>
+                        <span style={{ color: isSelectedDay ? "#fff" : undefined }}>
                           {new Date(d).toLocaleDateString("vi-VN", {
                             weekday: "short",
                           })}
@@ -557,12 +1061,16 @@ export default function TechnicianSchedule() {
                             className={`appointment-block ${String(
                               a.Status,
                             ).toLowerCase()}`}
-                            onClick={() => setSelected(a)}
-                            onDoubleClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelected(a);
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
                               navigate(
                                 `/technician/appointments/${a.AppointmentId}`,
-                              )
-                            }
+                              );
+                            }}
                           >
                             <b>{a.StartTime}</b>
                             <span>{a.CustomerName}</span>
@@ -574,6 +1082,7 @@ export default function TechnicianSchedule() {
                   );
                 })}
               </div>
+
             ) : (
               <>
                 {hours.map((hour) => (
@@ -581,7 +1090,7 @@ export default function TechnicianSchedule() {
                     className="calendar-grid calendar-row"
                     key={hour}
                     style={{
-                      gridTemplateColumns: `70px repeat(${visibleDays.length}, 1fr)`,
+                      gridTemplateColumns: `70px repeat(${visibleDays.length}, minmax(120px, 1fr))`,
                     }}
                   >
                     <div className="calendar-hour">{hour}</div>
@@ -594,12 +1103,16 @@ export default function TechnicianSchedule() {
                             className={`appointment-block ${String(
                               a.Status,
                             ).toLowerCase()}`}
-                            onClick={() => setSelected(a)}
-                            onDoubleClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelected(a);
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
                               navigate(
                                 `/technician/appointments/${a.AppointmentId}`,
-                              )
-                            }
+                              );
+                            }}
                           >
                             <b>{a.StartTime}</b>
                             <span>{a.CustomerName}</span>
@@ -607,6 +1120,7 @@ export default function TechnicianSchedule() {
                           </button>
                         ))}
                       </div>
+
                     ))}
                   </div>
                 ))}
@@ -664,7 +1178,16 @@ export default function TechnicianSchedule() {
 
                   <p>
                     <b>Ngày & Giờ</b>
-                    <span>
+                    <span
+                      onClick={() => setBaseDate(String(selected.AppointmentDate).slice(0, 10))}
+                      style={{
+                        cursor: "pointer",
+                        color: "#2d6a4f",
+                        fontWeight: 600,
+                        textDecoration: "underline"
+                      }}
+                      title="Click để nhảy đến ngày này"
+                    >
                       {String(selected.AppointmentDate).slice(0, 10)} •{" "}
                       {selected.StartTime}
                     </span>
@@ -728,11 +1251,11 @@ export default function TechnicianSchedule() {
                     className="note"
                     onClick={() =>
                       navigate(
-                        `/technician/appointments/${selected.AppointmentId}`,
+                        `/technician/treatment-notes?appointmentId=${selected.AppointmentId}`,
                       )
                     }
                   >
-                    ✎ Thêm ghi chú
+                    📝 Ghi chú điều trị
                   </button>
 
                   {canComplete && (

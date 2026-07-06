@@ -35,14 +35,9 @@ export default function Register() {
         dateOfBirth: form.dateOfBirth || null
       });
       setMessage(res.data.message || 'Đăng ký thành công. Vui lòng xác thực email.');
-      const target = redirectUrl.startsWith('/') ? redirectUrl : '/customer/booking';
-      const bookingTarget = new URL(target, window.location.origin);
-      if (serviceId && !bookingTarget.searchParams.get('serviceId')) {
-        bookingTarget.searchParams.set('serviceId', serviceId);
-      }
       localStorage.removeItem('bookingRedirectUrl');
       localStorage.removeItem('bookingServiceId');
-      setTimeout(() => navigate(`${bookingTarget.pathname}${bookingTarget.search}${bookingTarget.hash}`), 900);
+      setTimeout(() => navigate(`/verify-email?email=${encodeURIComponent(form.email)}`), 900);
     } catch (err) {
       setIsError(true);
       setMessage(err.response?.data?.message || 'Không thể đăng ký. Vui lòng kiểm tra lại thông tin.');

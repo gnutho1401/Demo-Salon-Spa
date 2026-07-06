@@ -29,9 +29,8 @@ function makeSafeFileName(originalname) {
     .replace(/\s+/g, "-")
     .replace(/[^a-zA-Z0-9-_]/g, "");
 
-  return `${Date.now()}-${Math.round(Math.random() * 1e9)}-${
-    baseName || "file"
-  }${ext}`;
+  return `${Date.now()}-${Math.round(Math.random() * 1e9)}-${baseName || "file"
+    }${ext}`;
 }
 
 const treatmentStorage = multer.diskStorage({
@@ -110,6 +109,76 @@ router.get(
 );
 
 router.get(
+  "/schedule/available-slots",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.getAvailableSlots,
+);
+
+router.get(
+  "/shifts",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.getAvailableShifts,
+);
+
+router.post(
+  "/shifts/register",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.registerShift,
+);
+
+router.delete(
+  "/shifts/register/:id",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.cancelRegistration,
+);
+
+router.get(
+  "/my-shifts",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.getMyShifts,
+);
+
+router.get(
+  "/shifts/quotas",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.getShiftQuotas,
+);
+
+router.get(
+  "/shifts/stats",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.getAttendanceWeeklyStats,
+);
+
+router.post(
+  "/attendance/check-in",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.checkIn,
+);
+
+router.post(
+  "/attendance/check-out",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.checkOut,
+);
+
+router.get(
+  "/reviews",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.getReviews,
+);
+
+router.get(
   "/customers/summary",
   authMiddleware,
   allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
@@ -135,6 +204,13 @@ router.get(
   authMiddleware,
   allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
   controller.getCustomerDetail,
+);
+
+router.get(
+  "/customers/:id/insights",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.getCustomerInsights,
 );
 
 router.patch(
@@ -177,6 +253,13 @@ router.get(
   authMiddleware,
   allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
   controller.getAppointments,
+);
+
+router.post(
+  "/appointments",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.createAppointment,
 );
 
 router.get(

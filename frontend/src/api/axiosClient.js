@@ -19,7 +19,7 @@ axiosClient.interceptors.request.use((config) => {
 
 export function resolveFileUrl(url) {
   if (!url) return '';
-  if (url.startsWith('http')) return url;
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
   return `${API_BASE_URL}${url}`;
 }
 

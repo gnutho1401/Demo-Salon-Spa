@@ -102,6 +102,18 @@ async function remove(req, res) {
   }
 }
 
+async function confirm(req, res) {
+  try {
+    return success(
+      res,
+      await service.confirmAppointment(req.params.id, req.user),
+      "Xác nhận lịch hẹn thành công",
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
   getAll,
   getById,
@@ -113,4 +125,5 @@ module.exports = {
   create,
   update,
   remove,
+  confirm,
 };

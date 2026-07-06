@@ -11,7 +11,7 @@ function avatarUrl(url) {
 }
 
 function money(value) {
-  return `${Number(value || 0).toLocaleString("vi-VN")}đ`;
+  return `${Number(value || 0).toLocaleString("vi-VN")} VND`;
 }
 
 function date(value) {
@@ -19,6 +19,25 @@ function date(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
   return d.toLocaleDateString("vi-VN");
+}
+
+function translateStatus(status) {
+  const s = String(status || "").toUpperCase();
+  const map = {
+    PENDING: "Chờ xác nhận",
+    CONFIRMED: "Đã xác nhận",
+    COMPLETED: "Đã hoàn thành",
+    CHECKED_IN: "Đã check-in",
+    PENDING_PAYMENT: "Chờ thanh toán",
+    CANCELLED: "Đã hủy",
+    REFUND_PENDING: "Chờ hoàn tiền",
+    PAID: "Đã thanh toán",
+    UNPAID: "Chưa thanh toán",
+    REFUNDED: "Đã hoàn tiền",
+    ACTIVE: "Đang hoạt động",
+    EXPIRED: "Hết hạn",
+  };
+  return map[s] || status || "-";
 }
 
 function statusClass(status) {
@@ -46,6 +65,9 @@ export default function ReceptionistCustomerDetail() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  const [treatmentNotes, setTreatmentNotes] = useState([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+
   async function load() {
     try {
       setLoading(true);
@@ -66,7 +88,7 @@ export default function ReceptionistCustomerDetail() {
       });
     } catch (err) {
       setError(
-        err.response?.data?.message || "Không tải được chi tiết khách hàng",
+        err.response?.data?.message || "Không tải được chi tiết khách hàng từ hệ thống",
       );
     } finally {
       setLoading(false);
@@ -76,6 +98,24 @@ export default function ReceptionistCustomerDetail() {
   useEffect(() => {
     load();
   }, [id]);
+
+  async function loadTreatmentNotes() {
+    try {
+      setNotesLoading(true);
+      const res = await axiosClient.get(`/v2/treatment-notes/customers/${id}`);
+      setTreatmentNotes(res.data?.data || res.data || []);
+    } catch (err) {
+      console.error("Failed to load treatment notes:", err);
+    } finally {
+      setNotesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab === "treatment-notes") {
+      loadTreatmentNotes();
+    }
+  }, [tab, id]);
 
   const profile = item?.Profile || {};
   const summary = item?.Summary || {};
@@ -161,21 +201,22 @@ export default function ReceptionistCustomerDetail() {
       await load();
 
       setEditMode(false);
-      setSuccessMsg("Đã cập nhật thông tin khách hàng");
+      setSuccessMsg("Cập nhật thông tin hồ sơ khách hàng thành công!");
     } catch (err) {
-      setError(err.response?.data?.message || "Cập nhật khách hàng thất bại");
+      setError(err.response?.data?.message || "Cập nhật thông tin thất bại");
     } finally {
       setSaving(false);
     }
   }
 
   const tabs = [
-    ["appointments", "Lịch hẹn"],
-    ["invoices", "Hóa đơn"],
-    ["payments", "Thanh toán"],
-    ["reviews", "Đánh giá"],
-    ["feedbacks", "Phản hồi"],
-    ["packages", "Gói dịch vụ"],
+    ["appointments", "Lịch hẹn dịch vụ"],
+    ["invoices", "Hóa đơn thanh toán"],
+    ["payments", "Lịch sử giao dịch"],
+    ["reviews", "Đánh giá chất lượng"],
+    ["feedbacks", "Ý kiến phản hồi"],
+    ["packages", "Gói liệu trình đã mua"],
+    ["treatment-notes", "Hồ sơ trị liệu"],
   ];
 
   return (
@@ -183,10 +224,9 @@ export default function ReceptionistCustomerDetail() {
       <div className="rcc-page">
         <div className="rcc-header">
           <div>
-            <h1>Chi tiết khách hàng #{id}</h1>
+            <h1>Chi tiết hồ sơ khách hàng #{id}</h1>
             <p>
-              Hồ sơ khách hàng, lịch sử đặt lịch, thanh toán, đánh giá và gói
-              dịch vụ.
+              Xem chi tiết hồ sơ cá nhân, lịch sử sử dụng dịch vụ, hóa đơn giao dịch và gói liệu trình.
             </p>
           </div>
 
@@ -196,10 +236,10 @@ export default function ReceptionistCustomerDetail() {
               type="button"
               onClick={() => navigate(-1)}
             >
-              ← Quay lại
+              ← Quay lại danh sách
             </button>
             <button className="rcc-primary-btn" type="button" onClick={load}>
-              ↻ Làm mới
+              Làm mới dữ liệu
             </button>
           </div>
         </div>
@@ -209,13 +249,13 @@ export default function ReceptionistCustomerDetail() {
 
         {loading && (
           <div className="rcc-table-card rcc-empty">
-            Đang tải chi tiết khách hàng...
+            Đang tải dữ liệu hồ sơ chi tiết khách hàng...
           </div>
         )}
 
         {!loading && !item && (
           <div className="rcc-table-card rcc-empty">
-            Không tìm thấy khách hàng
+            Không tìm thấy thông tin khách hàng này trên hệ thống.
           </div>
         )}
 
@@ -232,15 +272,15 @@ export default function ReceptionistCustomerDetail() {
                 <div>
                   <h2>{profile.FullName || "-"}</h2>
                   <p>
-                    {profile.Phone || "-"} · {profile.Email || "-"}
+                    ☎ {profile.Phone || "-"} · ✉ {profile.Email || "-"}
                   </p>
 
                   <div className="rcc-profile-tags">
-                    <span className="rcc-badge">
-                      {item.Membership?.MembershipLevel || "Standard"}
+                    <span className={`rcc-badge ${String(item.Membership?.MembershipLevel || "Standard").toLowerCase() !== "standard" ? "green" : ""}`}>
+                      Hạng: {item.Membership?.MembershipLevel || "Standard"}
                     </span>
                     <span className="rcc-badge green">
-                      {item.Membership?.Points || 0} điểm
+                      Tích lũy: {item.Membership?.Points || 0} điểm
                     </span>
                   </div>
                 </div>
@@ -248,20 +288,26 @@ export default function ReceptionistCustomerDetail() {
 
               <div className="rcc-stat-card pink">
                 <span>📅</span>
-                <p>Lịch hẹn</p>
-                <b>{summary.TotalAppointments || stats.appointments}</b>
+                <div>
+                  <p>Tổng lịch hẹn</p>
+                  <b>{summary.TotalAppointments || stats.appointments} lượt</b>
+                </div>
               </div>
 
               <div className="rcc-stat-card gold">
                 <span>💰</span>
-                <p>Tổng chi tiêu</p>
-                <b>{money(summary.TotalSpent)}</b>
+                <div>
+                  <p>Tích lũy chi tiêu</p>
+                  <b>{money(summary.TotalSpent)}</b>
+                </div>
               </div>
 
               <div className="rcc-stat-card green">
                 <span>⭐</span>
-                <p>Đánh giá</p>
-                <b>{stats.reviews}</b>
+                <div>
+                  <p>Số lần đánh giá</p>
+                  <b>{stats.reviews} đánh giá</b>
+                </div>
               </div>
             </div>
 
@@ -269,8 +315,8 @@ export default function ReceptionistCustomerDetail() {
               <section className="rcc-detail-card">
                 <div className="rcc-card-head">
                   <div>
-                    <h2>Thông tin cá nhân</h2>
-                    <p>Cập nhật nhanh thông tin khách tại quầy</p>
+                    <h2>Thông tin cá nhân khách hàng</h2>
+                    <p>Hồ sơ lưu trữ cơ bản tại quầy</p>
                   </div>
 
                   {!editMode && (
@@ -279,7 +325,7 @@ export default function ReceptionistCustomerDetail() {
                       type="button"
                       onClick={() => setEditMode(true)}
                     >
-                      Sửa
+                      Chỉnh sửa
                     </button>
                   )}
                 </div>
@@ -287,7 +333,7 @@ export default function ReceptionistCustomerDetail() {
                 {!editMode ? (
                   <div className="rcc-info-list">
                     <div>
-                      <span>Họ tên</span>
+                      <span>Họ và tên khách</span>
                       <b>{profile.FullName || "-"}</b>
                     </div>
                     <div>
@@ -295,44 +341,44 @@ export default function ReceptionistCustomerDetail() {
                       <b>{profile.Phone || "-"}</b>
                     </div>
                     <div>
-                      <span>Email</span>
+                      <span>Địa chỉ Email</span>
                       <b>{profile.Email || "-"}</b>
                     </div>
                     <div>
                       <span>Giới tính</span>
-                      <b>{profile.Gender || "-"}</b>
+                      <b>{profile.Gender === "Male" ? "Nam" : profile.Gender === "Female" ? "Nữ" : "Khác"}</b>
                     </div>
                     <div>
-                      <span>Ngày sinh</span>
+                      <span>Ngày sinh nhật</span>
                       <b>{date(profile.DateOfBirth)}</b>
                     </div>
                     <div>
-                      <span>Địa chỉ</span>
+                      <span>Địa chỉ thường trú</span>
                       <b>{profile.Address || "-"}</b>
                     </div>
                     <div>
-                      <span>Ngày tạo</span>
+                      <span>Ngày lập tài khoản</span>
                       <b>{date(profile.CreatedAt)}</b>
                     </div>
                   </div>
                 ) : (
                   <div className="rcc-edit-form">
                     <input
-                      placeholder="Họ tên"
+                      placeholder="Họ và tên đầy đủ..."
                       value={form.FullName}
                       onChange={(e) =>
                         setForm({ ...form, FullName: e.target.value })
                       }
                     />
                     <input
-                      placeholder="Số điện thoại"
+                      placeholder="Số điện thoại..."
                       value={form.Phone}
                       onChange={(e) =>
                         setForm({ ...form, Phone: e.target.value })
                       }
                     />
                     <input
-                      placeholder="Email"
+                      placeholder="Địa chỉ email..."
                       value={form.Email}
                       onChange={(e) =>
                         setForm({ ...form, Email: e.target.value })
@@ -345,9 +391,9 @@ export default function ReceptionistCustomerDetail() {
                       }
                     >
                       <option value="">Chọn giới tính</option>
-                      <option value="MALE">Nam</option>
-                      <option value="FEMALE">Nữ</option>
-                      <option value="OTHER">Khác</option>
+                      <option value="Male">Nam</option>
+                      <option value="Female">Nữ</option>
+                      <option value="Other">Khác</option>
                     </select>
                     <input
                       type="date"
@@ -357,7 +403,7 @@ export default function ReceptionistCustomerDetail() {
                       }
                     />
                     <input
-                      placeholder="Địa chỉ"
+                      placeholder="Địa chỉ thường trú..."
                       value={form.Address}
                       onChange={(e) =>
                         setForm({ ...form, Address: e.target.value })
@@ -378,7 +424,7 @@ export default function ReceptionistCustomerDetail() {
                         type="button"
                         onClick={() => setEditMode(false)}
                       >
-                        Hủy
+                        Hủy bỏ
                       </button>
                     </div>
                   </div>
@@ -388,31 +434,31 @@ export default function ReceptionistCustomerDetail() {
               <section className="rcc-detail-card">
                 <div className="rcc-card-head">
                   <div>
-                    <h2>Membership</h2>
-                    <p>Thông tin hạng thành viên và ưu đãi</p>
+                    <h2>Thông tin thẻ thành viên (Membership)</h2>
+                    <p>Ưu đãi chiết khấu trực tiếp trên hóa đơn</p>
                   </div>
                 </div>
 
                 <div className="rcc-info-list">
                   <div>
-                    <span>Hạng</span>
-                    <b>{item.Membership?.MembershipLevel || "Standard"}</b>
+                    <span>Hạng thành viên hiện tại</span>
+                    <b style={{ color: "var(--pink)" }}>{item.Membership?.MembershipLevel || "Standard"}</b>
                   </div>
                   <div>
-                    <span>Điểm</span>
-                    <b>{item.Membership?.Points || 0}</b>
+                    <span>Điểm tích lũy</span>
+                    <b>{item.Membership?.Points || 0} điểm</b>
                   </div>
                   <div>
-                    <span>Giảm giá</span>
-                    <b>{item.Membership?.DiscountPercent || 0}%</b>
+                    <span>Ưu đãi giảm giá (%)</span>
+                    <b style={{ color: '#2e6221' }}>Giảm {item.Membership?.DiscountPercent || 0}% trên dịch vụ</b>
                   </div>
                   <div>
-                    <span>Lần ghé gần nhất</span>
+                    <span>Lần ghé salon gần nhất</span>
                     <b>{date(summary.LastVisitDate)}</b>
                   </div>
                   <div>
-                    <span>Lịch hoàn thành</span>
-                    <b>{summary.CompletedAppointments || 0}</b>
+                    <span>Số lịch hẹn hoàn thành</span>
+                    <b>{summary.CompletedAppointments || 0} lần</b>
                   </div>
                 </div>
               </section>
@@ -436,29 +482,33 @@ export default function ReceptionistCustomerDetail() {
                 <table className="rcc-table">
                   <thead>
                     <tr>
-                      <th>Mã</th>
-                      <th>Dịch vụ</th>
-                      <th>Kỹ thuật viên</th>
-                      <th>Ngày</th>
-                      <th>Giờ</th>
-                      <th>Tiền</th>
+                      <th style={{ width: "100px" }}>Mã lịch</th>
+                      <th>Danh sách dịch vụ</th>
+                      <th>Kỹ thuật viên thực hiện</th>
+                      <th>Ngày đặt hẹn</th>
+                      <th>Thời gian</th>
+                      <th>Số tiền</th>
                       <th>Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedAppointments.map((a) => (
                       <tr key={a.AppointmentId}>
-                        <td>#{a.AppointmentId}</td>
-                        <td>{a.ServiceNames || "-"}</td>
+                        <td>
+                          <Link to={`/receptionist/appointments/${a.AppointmentId}`}>
+                            #{a.AppointmentId}
+                          </Link>
+                        </td>
+                        <td><b>{a.ServiceNames || "-"}</b></td>
                         <td>{a.TechnicianName || "-"}</td>
                         <td>{date(a.AppointmentDate)}</td>
                         <td>
-                          {a.StartTime} - {a.EndTime}
+                          <b>{a.StartTime} - {a.EndTime}</b>
                         </td>
-                        <td>{money(a.FinalAmount)}</td>
+                        <td><b>{money(a.FinalAmount)}</b></td>
                         <td>
                           <span className={statusClass(a.Status)}>
-                            {a.Status}
+                            {translateStatus(a.Status)}
                           </span>
                         </td>
                       </tr>
@@ -472,13 +522,13 @@ export default function ReceptionistCustomerDetail() {
                   <thead>
                     <tr>
                       <th>Mã hóa đơn</th>
-                      <th>Lịch hẹn</th>
+                      <th>Mã lịch hẹn</th>
                       <th>Ngày hẹn</th>
-                      <th>Tổng tiền</th>
-                      <th>Giảm giá</th>
+                      <th>Tổng tiền gốc</th>
+                      <th>Giảm giá hạng</th>
                       <th>Thành tiền</th>
-                      <th>Thanh toán</th>
-                      <th>Ngày tạo</th>
+                      <th>Trạng thái hóa đơn</th>
+                      <th>Ngày thanh toán</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -499,14 +549,14 @@ export default function ReceptionistCustomerDetail() {
                         <td>{date(i.AppointmentDate)}</td>
                         <td>{money(i.TotalAmount)}</td>
                         <td>{money(i.DiscountAmount)}</td>
-                        <td>{money(i.FinalAmount)}</td>
+                        <td><b>{money(i.FinalAmount)}</b></td>
                         <td>
                           <span
                             className={statusClass(
                               i.PaymentStatus || i.InvoiceStatus,
                             )}
                           >
-                            {i.PaymentStatus || i.InvoiceStatus || "UNPAID"}
+                            {translateStatus(i.PaymentStatus || i.InvoiceStatus || "UNPAID")}
                           </span>
                         </td>
                         <td>{date(i.CreatedAt)}</td>
@@ -520,11 +570,11 @@ export default function ReceptionistCustomerDetail() {
                 <table className="rcc-table">
                   <thead>
                     <tr>
-                      <th>Mã</th>
-                      <th>Invoice</th>
-                      <th>Số tiền</th>
-                      <th>Phương thức</th>
-                      <th>Ngày</th>
+                      <th>Mã thanh toán</th>
+                      <th>Mã hóa đơn</th>
+                      <th>Số tiền trả</th>
+                      <th>Phương thức giao dịch</th>
+                      <th>Ngày giao dịch</th>
                       <th>Trạng thái</th>
                     </tr>
                   </thead>
@@ -537,12 +587,12 @@ export default function ReceptionistCustomerDetail() {
                             #{p.InvoiceId}
                           </Link>
                         </td>
-                        <td>{money(p.Amount)}</td>
+                        <td><b>{money(p.Amount)}</b></td>
                         <td>{p.PaymentMethod || "-"}</td>
                         <td>{date(p.PaidAt || p.CreatedAt)}</td>
                         <td>
                           <span className={statusClass(p.Status)}>
-                            {p.Status}
+                            {translateStatus(p.Status)}
                           </span>
                         </td>
                       </tr>
@@ -555,25 +605,25 @@ export default function ReceptionistCustomerDetail() {
                 <table className="rcc-table">
                   <thead>
                     <tr>
-                      <th>Dịch vụ</th>
+                      <th>Dịch vụ đánh giá</th>
                       <th>Kỹ thuật viên</th>
-                      <th>Rating</th>
-                      <th>Nội dung</th>
-                      <th>Ngày</th>
-                      <th>Trạng thái</th>
+                      <th>Số sao đánh giá</th>
+                      <th>Nội dung nhận xét</th>
+                      <th>Ngày nhận xét</th>
+                      <th>Trạng thái hiển thị</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedReviews.map((r) => (
                       <tr key={r.ReviewId}>
-                        <td>{r.ServiceName || "-"}</td>
+                        <td><b>{r.ServiceName || "-"}</b></td>
                         <td>{r.TechnicianName || "-"}</td>
-                        <td>⭐ {r.Rating}/5</td>
-                        <td>{r.Comment || "-"}</td>
+                        <td style={{ color: '#b57a13', fontWeight: 'bold' }}>⭐ {r.Rating}/5</td>
+                        <td><i>"{r.Comment || "Không để lại nhận xét viết."}"</i></td>
                         <td>{date(r.CreatedAt)}</td>
                         <td>
                           <span className={statusClass(r.Status)}>
-                            {r.Status}
+                            {translateStatus(r.Status)}
                           </span>
                         </td>
                       </tr>
@@ -586,23 +636,23 @@ export default function ReceptionistCustomerDetail() {
                 <table className="rcc-table">
                   <thead>
                     <tr>
-                      <th>Tiêu đề</th>
-                      <th>Nội dung</th>
-                      <th>Phản hồi admin</th>
-                      <th>Ngày</th>
-                      <th>Trạng thái</th>
+                      <th>Chủ đề đóng góp</th>
+                      <th>Nội dung chi tiết</th>
+                      <th>Phản hồi của Salon</th>
+                      <th>Ngày gửi ý kiến</th>
+                      <th>Trạng thái xử lý</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedFeedbacks.map((f) => (
                       <tr key={f.FeedbackId}>
-                        <td>{f.Subject}</td>
+                        <td><b>{f.Subject}</b></td>
                         <td>{f.Content}</td>
                         <td>{f.AdminResponse || "-"}</td>
                         <td>{date(f.CreatedAt)}</td>
                         <td>
                           <span className={statusClass(f.Status)}>
-                            {f.Status}
+                            {translateStatus(f.Status)}
                           </span>
                         </td>
                       </tr>
@@ -615,30 +665,33 @@ export default function ReceptionistCustomerDetail() {
                 <table className="rcc-table">
                   <thead>
                     <tr>
-                      <th>Gói</th>
-                      <th>Thời hạn</th>
-                      <th>Buổi</th>
-                      <th>Giá</th>
-                      <th>Thanh toán</th>
-                      <th>Trạng thái</th>
+                      <th>Gói dịch trình mua</th>
+                      <th>Thời gian áp dụng</th>
+                      <th>Số buổi liệu trình</th>
+                      <th>Giá tiền mua</th>
+                      <th>Trạng thái thanh toán</th>
+                      <th>Trạng thái gói</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedPackages.map((p) => (
                       <tr key={p.CustomerPackageId}>
-                        <td>{p.PackageName}</td>
+                        <td><b>{p.PackageName}</b></td>
                         <td>
                           {date(p.StartDate)} - {date(p.EndDate)}
                         </td>
                         <td>
-                          {p.UsedSessions}/{p.TotalSessions} đã dùng · còn{" "}
-                          {p.RemainingSessions}
+                          <b>{p.UsedSessions}/{p.TotalSessions}</b> buổi đã dùng (Còn <b>{p.RemainingSessions}</b>)
                         </td>
                         <td>{money(p.SalePrice)}</td>
-                        <td>{p.PaymentStatus || "-"}</td>
+                        <td>
+                          <span className={statusClass(p.PaymentStatus)}>
+                            {translateStatus(p.PaymentStatus)}
+                          </span>
+                        </td>
                         <td>
                           <span className={statusClass(p.Status)}>
-                            {p.Status}
+                            {translateStatus(p.Status)}
                           </span>
                         </td>
                       </tr>
@@ -647,8 +700,71 @@ export default function ReceptionistCustomerDetail() {
                 </table>
               )}
 
-              {item?.[tab.charAt(0).toUpperCase() + tab.slice(1)]?.length ===
-                0 && <div className="rcc-empty">Chưa có dữ liệu</div>}
+              {tab === "treatment-notes" && (
+                notesLoading ? (
+                  <div className="rcc-empty">Đang tải hồ sơ trị liệu...</div>
+                ) : treatmentNotes.length === 0 ? (
+                  <div className="rcc-empty">Chưa có ghi nhận hồ sơ trị liệu nào.</div>
+                ) : (
+                  <div className="treatment-notes-timeline" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+                    {treatmentNotes.map((note) => (
+                      <div key={note.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px', marginBottom: '15px' }}>
+                          <div>
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#db2777', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                              {note.CategoryName || "Dịch vụ"}
+                            </span>
+                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#1f2937' }}>
+                              {note.ServiceName}
+                            </h4>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: '13px', color: '#6b7280', display: 'block' }}>
+                              🗓 {new Date(note.service_date_time).toLocaleDateString("vi-VN")}
+                            </span>
+                            <span style={{
+                              display: 'inline-block',
+                              marginTop: '4px',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              backgroundColor: note.status === 'finalized' ? '#d1fae5' : '#fef3c7',
+                              color: note.status === 'finalized' ? '#065f46' : '#92400e'
+                            }}>
+                              {note.status === 'finalized' ? '🔒 Đã khóa' : '📝 Bản nháp'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                          <div>
+                            <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#4b5563', fontWeight: '600' }}>Tình trạng trước thực hiện:</h5>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#374151', whiteSpace: 'pre-line' }}>{note.before_condition || "Chưa ghi nhận"}</p>
+                          </div>
+                          <div>
+                            <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#4b5563', fontWeight: '600' }}>Kết quả sau thực hiện:</h5>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#374151', whiteSpace: 'pre-line' }}>{note.after_result || "Chưa ghi nhận"}</p>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: '15px', borderTop: '1px solid #f3f4f6', paddingTop: '15px' }}>
+                          <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#4b5563', fontWeight: '600' }}>Chỉ định / Khuyên dùng tại nhà:</h5>
+                          <p style={{ margin: 0, fontSize: '13px', color: '#374151', whiteSpace: 'pre-line' }}>{note.recommendations || "Không có khuyên dùng đặc biệt"}</p>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', padding: '8px 12px', backgroundColor: '#f9fafb', borderRadius: '8px', fontSize: '12px', color: '#6b7280' }}>
+                          <span>KTV thực hiện: <strong>{note.TechnicianName}</strong></span>
+                          <span>Thời lượng: {note.duration_minutes} phút</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {tab !== "treatment-notes" && item?.[tab.charAt(0).toUpperCase() + tab.slice(1)]?.length ===
+                0 && <div className="rcc-empty">Hiện tại khách hàng chưa có dữ liệu ở mục này.</div>}
             </section>
           </>
         )}

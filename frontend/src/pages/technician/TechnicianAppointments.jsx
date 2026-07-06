@@ -204,7 +204,463 @@ export default function TechnicianAppointments() {
   return (
     <TechnicianLayout>
       <div className="tech-appointments-page">
+
+        <style>{`
+          /* Premium Style Upgrades for Technician Appointments */
+          .tech-appointments-page {
+            font-family: 'Outfit', 'Inter', sans-serif;
+            background: #faf6f0;
+            padding: 10px;
+          }
+
+          .tech-page-head {
+            background: #fff;
+            padding: 24px 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(165,145,115,0.08);
+            border: 1px solid rgba(222, 203, 166, 0.4);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .tech-page-head h1 {
+            font-weight: 800;
+            color: #1e351f;
+          }
+
+          .tech-new-btn {
+            background: linear-gradient(135deg, #2d6a4f, #1b4332) !important;
+            box-shadow: 0 8px 20px rgba(45, 106, 79, 0.25) !important;
+            font-weight: 700;
+            transition: all 0.25s ease;
+          }
+
+          .tech-new-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(45, 106, 79, 0.35) !important;
+          }
+
+          /* Filter Bar Upgrade */
+          .appt-filter-bar {
+            grid-template-columns: 1.2fr 0.8fr 1.5fr !important;
+            margin-bottom: 24px;
+            gap: 16px;
+          }
+
+          .appt-filter-card,
+          .appt-search-card {
+            background: #fff !important;
+            border: 1px solid rgba(222, 203, 166, 0.45) !important;
+            border-radius: 16px !important;
+            padding: 12px 18px !important;
+            box-shadow: 0 4px 14px rgba(165,145,115,0.04) !important;
+            transition: all 0.2s;
+          }
+
+          .appt-filter-card:hover,
+          .appt-search-card:hover {
+            border-color: #2d6a4f !important;
+            box-shadow: 0 6px 18px rgba(45,106,79,0.08) !important;
+          }
+
+          .appt-filter-card span {
+            color: #8b7d6b !important;
+            font-size: 0.78rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px;
+          }
+
+          .appt-filter-card input[type="date"],
+          .appt-filter-card select,
+          .appt-search-card input {
+            color: #1a331e !important;
+            font-weight: 700 !important;
+            font-size: 0.9rem !important;
+          }
+
+          /* Tab Filter buttons */
+          .appt-tabs {
+            background: #fff !important;
+            border: 1px solid rgba(222, 203, 166, 0.4) !important;
+            border-bottom: none !important;
+            padding: 10px 14px !important;
+            border-radius: 20px 20px 0 0 !important;
+            display: flex;
+            gap: 10px !important;
+          }
+
+          .appt-tabs button {
+            border: none !important;
+            background: #f4f1eb !important;
+            color: #5c554a !important;
+            font-weight: 700 !important;
+            font-size: 0.88rem !important;
+            padding: 8px 18px !important;
+            border-radius: 10px !important;
+            cursor: pointer;
+            transition: all 0.25s;
+            display: flex;
+            align-items: center;
+          }
+
+          .appt-tabs button.active {
+            background: #2d6a4f !important;
+            color: #fff !important;
+            box-shadow: 0 4px 10px rgba(45,106,79,0.2) !important;
+          }
+
+          /* Appointments Table */
+          .appointments-table-card {
+            border-radius: 0 0 20px 20px !important;
+            border: 1px solid rgba(222, 203, 166, 0.45) !important;
+            box-shadow: 0 10px 30px rgba(165,145,115,0.06) !important;
+            background: #fff !important;
+            width: 100%;
+            overflow-x: hidden !important; /* Không cần cuộn ngang nữa */
+          }
+
+          .appointments-table {
+            width: 100%;
+            table-layout: fixed; /* Thiết lập layout fixed giúp chia cột đều */
+            border-collapse: collapse;
+          }
+
+          /* Định kích thước % cho từng cột */
+          .appointments-table th:nth-child(1),
+          .appointments-table td:nth-child(1) { width: 14%; } /* Mã LH */
+          .appointments-table th:nth-child(2),
+          .appointments-table td:nth-child(2) { width: 23%; } /* Khách hàng */
+          .appointments-table th:nth-child(3),
+          .appointments-table td:nth-child(3) { width: 13%; } /* Dịch vụ */
+          .appointments-table th:nth-child(4),
+          .appointments-table td:nth-child(4) { width: 16%; } /* Thời gian */
+          .appointments-table th:nth-child(5),
+          .appointments-table td:nth-child(5) { width: 14%; } /* Trạng thái */
+          .appointments-table th:nth-child(6),
+          .appointments-table td:nth-child(6) { width: 9%; }  /* Thời lượng */
+          .appointments-table th:nth-child(7),
+          .appointments-table td:nth-child(7) { width: 11%; } /* Thao tác */
+
+          .appointments-table th {
+            font-size: 0.78rem !important;
+            font-weight: 800 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: #5c554a !important;
+            background: #faf8f4 !important;
+            border-bottom: 2px solid #f1ece1 !important;
+            padding: 10px 6px !important; /* Giảm padding tiêu đề */
+            text-align: left;
+            white-space: nowrap;
+          }
+
+          .appointments-table tr {
+            border-bottom: 1px solid #f3ece0 !important;
+            transition: all 0.2s;
+          }
+
+          .appointments-table tr:hover {
+            background: #fdfbf9 !important;
+          }
+
+          .appointments-table td {
+            padding: 8px 6px !important; /* Giảm padding nội dung cell */
+            border-bottom: 1px solid #f3ece0 !important;
+            vertical-align: middle !important;
+            word-wrap: break-word; /* Tự động xuống dòng nếu text quá dài */
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .appt-code-cell {
+            display: flex;
+            gap: 6px !important;
+            align-items: center;
+          }
+
+          .appt-code-cell b {
+            color: #1e351f !important;
+            font-size: 0.82rem !important;
+          }
+
+          .appt-code-cell p {
+            font-size: 0.75rem !important;
+            margin-top: 1px !important;
+          }
+
+          .appt-customer-cell {
+            display: flex;
+            gap: 6px !important;
+            align-items: center;
+          }
+
+          .appt-customer-cell b {
+            color: #1e351f !important;
+            font-size: 0.82rem !important;
+          }
+
+          .appt-customer-cell p {
+            font-size: 0.75rem !important;
+            margin-top: 1px !important;
+          }
+
+          .appt-customer-cell small {
+            font-size: 0.65rem !important;
+            padding: 1px 4px !important;
+            margin-top: 2px !important;
+          }
+
+          .appt-avatar, .appt-avatar img {
+            width: 32px !important; /* Giảm kích thước avatar */
+            height: 32px !important;
+            border-radius: 50%;
+          }
+
+          .appt-avatar img {
+            border: 1.5px solid rgba(45, 106, 79, 0.2);
+            transition: all 0.2s;
+          }
+
+          .appt-avatar img:hover {
+            border-color: #2d6a4f;
+            transform: scale(1.05);
+          }
+
+          /* Status Badges */
+          .appt-status {
+            font-weight: 700 !important;
+            border-radius: 6px !important;
+            padding: 3px 6px !important; /* Giảm padding badge */
+            font-size: 0.68rem !important; /* Giảm cỡ chữ badge */
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            display: inline-block;
+            text-align: center;
+            width: 100%;
+            white-space: nowrap;
+          }
+
+
+          .appt-status.pending-payment,
+          .appt-status.pending {
+            background: #fffbeb !important;
+            color: #d97706 !important;
+            border: 1px solid #fde68a;
+          }
+
+          .appt-status.confirmed,
+          .appt-status.paid {
+            background: #ecfdf5 !important;
+            color: #059669 !important;
+            border: 1px solid #a7f3d0;
+          }
+
+          .appt-status.checked-in {
+            background: #f0fdfa !important;
+            color: #0d9488 !important;
+            border: 1px solid #99f6e4;
+          }
+
+          .appt-status.in-progress {
+            background: #eff6ff !important;
+            color: #2563eb !important;
+            border: 1px solid #bfdbfe;
+          }
+
+          .appt-status.completed {
+            background: #f5f3ff !important;
+            color: #7c3aed !important;
+            border: 1px solid #ddd6fe;
+          }
+
+          .appt-status.cancelled,
+          .appt-status.no-show {
+            background: #f9fafb !important;
+            color: #4b5563 !important;
+            border: 1px solid #e5e7eb;
+          }
+
+          /* Actions button styles */
+          .appt-actions button {
+            border-radius: 8px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            transition: all 0.2s !important;
+            width: 28px !important;
+            height: 28px !important;
+            font-size: 11px !important;
+            padding: 0 !important;
+          }
+
+
+          .appt-actions button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+          }
+
+          .appt-actions button[title="Chi tiết lịch hẹn"] {
+            border-color: #e5e7eb !important;
+            color: #4b5563 !important;
+          }
+          .appt-actions button[title="Chi tiết lịch hẹn"]:hover {
+            background: #f3f4f6 !important;
+            color: #1f2937 !important;
+          }
+
+          .appt-actions button[title="Bắt đầu dịch vụ"] {
+            background: #2d6a4f !important;
+            color: #fff !important;
+            box-shadow: 0 3px 8px rgba(45, 106, 79, 0.25) !important;
+          }
+          .appt-actions button[title="Bắt đầu dịch vụ"]:hover {
+            background: #1b4332 !important;
+          }
+
+          .appt-actions button[title="Hoàn thành dịch vụ"] {
+            background: #d97706 !important;
+            color: #fff !important;
+            box-shadow: 0 3px 8px rgba(217, 119, 6, 0.25) !important;
+          }
+          .appt-actions button[title="Hoàn thành dịch vụ"]:hover {
+            background: #b45309 !important;
+          }
+
+          .appt-actions button[title="Khách không đến"] {
+            background: #fef2f2 !important;
+            border-color: #fecaca !important;
+            color: #dc2626 !important;
+          }
+          .appt-actions button[title="Khách không đến"]:hover {
+            background: #dc2626 !important;
+            color: #fff !important;
+          }
+
+          /* Right side panel cards */
+          .appointments-side {
+            display: flex;
+            flex-direction: column;
+            gap: 20px !important;
+          }
+
+          .appt-side-card {
+            background: #fff !important;
+            border: 1px solid rgba(222, 203, 166, 0.45) !important;
+            border-radius: 20px !important;
+            box-shadow: 0 8px 24px rgba(165,145,115,0.06) !important;
+            padding: 22px !important;
+          }
+
+          .appt-side-card h3 {
+            font-size: 1.05rem !important;
+            font-weight: 800;
+            color: #1e351f;
+          }
+
+          .summary-grid > div {
+            background: #fbfbf9 !important;
+            border: 1px solid #f1ece1;
+            transition: all 0.2s;
+          }
+
+          .summary-grid > div:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+          }
+
+          .summary-grid b {
+            color: #2d6a4f !important;
+            font-weight: 800;
+          }
+
+          .popular-service-row span {
+            font-weight: 700 !important;
+          }
+
+          .popular-bar i {
+            background: #2d6a4f !important;
+          }
+
+          .appt-quick-actions button {
+            background: #f4f1eb !important;
+            color: #2d6a4f !important;
+            border: 1.5px solid #e9e4db !important;
+            font-weight: 700 !important;
+            border-radius: 12px !important;
+            padding: 12px !important;
+            transition: all 0.2s;
+          }
+
+          .appt-quick-actions button:hover {
+            background: #2d6a4f !important;
+            color: #fff !important;
+            border-color: #2d6a4f !important;
+            box-shadow: 0 4px 10px rgba(45, 106, 79, 0.2);
+          }
+
+          /* Pagination Active style */
+          .appt-pagination b {
+            background: #2d6a4f !important;
+            box-shadow: 0 3px 8px rgba(45, 106, 79, 0.2);
+          }
+
+          /* Responsive Layout (Tự động thích ứng kích thước trình duyệt) */
+          .appointments-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 350px;
+            gap: 20px;
+            align-items: start;
+          }
+
+
+          /* Khi chiều rộng trình duyệt nhỏ hơn 1200px (Laptop nhỏ / Tablet) */
+          @media (max-width: 1200px) {
+            .appointments-layout {
+              grid-template-columns: 1fr !important; /* Xếp cột bên phải xuống dưới */
+            }
+          }
+
+          /* Khi chiều rộng trình duyệt nhỏ hơn 992px (Tablet) */
+          @media (max-width: 992px) {
+            .appt-filter-bar {
+              grid-template-columns: 1fr !important; /* Bộ lọc chuyển thành xếp dọc */
+              gap: 12px !important;
+            }
+          }
+
+          /* Khi chiều rộng trình duyệt nhỏ hơn 768px (Mobile) */
+          @media (max-width: 768px) {
+            .tech-page-head {
+              flex-direction: column !important;
+              align-items: flex-start !important;
+              gap: 14px !important;
+              padding: 20px !important;
+            }
+            .tech-new-btn {
+              width: 100% !important;
+              text-align: center;
+            }
+            .appt-tabs {
+              overflow-x: auto !important; /* Cuộn ngang các tab trên mobile */
+              white-space: nowrap !important;
+              padding: 6px !important;
+            }
+            .appt-tabs button {
+              flex-shrink: 0 !important;
+              padding: 6px 14px !important;
+            }
+            .appt-side-card {
+              padding: 16px !important;
+            }
+          }
+        `}</style>
+
+
         <header className="tech-page-head" style={{ marginBottom: "28px" }}>
+
           <div>
             <h1 style={{ fontSize: "32px", margin: 0, color: "#1f1a13" }}>Danh sách Lịch hẹn 🗓️</h1>
             <p style={{ margin: "6px 0 0", color: "#6f665b" }}>Xem và xử lý các lịch hẹn chăm sóc làm đẹp được phân công cho bạn</p>
@@ -342,13 +798,13 @@ export default function TechnicianAppointments() {
               <table className="appointments-table" style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "rgba(244, 234, 218, 0.3)" }}>
-                    <th style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>Mã lịch hẹn</th>
-                    <th style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>Khách hàng</th>
-                    <th style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>Dịch vụ</th>
-                    <th style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>Thời gian</th>
-                    <th style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>Trạng thái</th>
-                    <th style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>Thời lượng</th>
-                    <th style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>Thao tác</th>
+                    <th>Mã lịch hẹn</th>
+                    <th>Khách hàng</th>
+                    <th>Dịch vụ</th>
+                    <th>Thời gian</th>
+                    <th>Trạng thái</th>
+                    <th>Thời lượng</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
 
@@ -367,9 +823,8 @@ export default function TechnicianAppointments() {
 
                       return (
                         <tr key={a.AppointmentId} style={{ transition: "all 0.2s ease" }}>
-                          <td style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>
+                          <td>
                             <div className="appt-code-cell">
-                              <span style={{ fontSize: "18px" }}>📅</span>
                               <div>
                                 <b style={{ color: "#102616" }}>
                                   {a.AppointmentCode || `#APT-${a.AppointmentId}`}
@@ -379,13 +834,13 @@ export default function TechnicianAppointments() {
                             </div>
                           </td>
 
-                          <td style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>
+                          <td>
                             <div className="appt-customer-cell">
                               <div className="appt-avatar">
                                 <img
                                   src={avatar(a.CustomerAvatar)}
                                   alt={a.CustomerName || "Khách hàng"}
-                                  style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }}
+                                  style={{ borderRadius: "50%", objectFit: "cover" }}
                                   onError={(e) => {
                                     e.currentTarget.src = DEFAULT_AVATAR;
                                   }}
@@ -402,12 +857,12 @@ export default function TechnicianAppointments() {
                             </div>
                           </td>
 
-                          <td style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>
+                          <td>
                             <b style={{ color: "#102616" }}>{service.main}</b>
                             {service.more && <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#8b651e" }}>{service.more}</p>}
                           </td>
 
-                          <td style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>
+                          <td>
                             <b style={{ color: "#102616" }}>
                               {safeDateString(a.AppointmentDate)}
                             </b>
@@ -417,7 +872,7 @@ export default function TechnicianAppointments() {
                             </p>
                           </td>
 
-                          <td style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>
+                          <td>
                             <span
                               className={`appt-status ${statusClass(a.Status)}`}
                             >
@@ -425,12 +880,12 @@ export default function TechnicianAppointments() {
                             </span>
                           </td>
 
-                          <td style={{ padding: "16px", borderBottom: "1px solid #eadfca", color: "#102616", fontWeight: "bold" }}>
+                          <td style={{ color: "#102616", fontWeight: "bold" }}>
                             ⏱ {a.DurationMinutes || 0} phút
                           </td>
 
-                          <td style={{ padding: "16px", borderBottom: "1px solid #eadfca" }}>
-                            <div className="appt-actions" style={{ display: "flex", gap: "6px" }}>
+                          <td>
+                            <div className="appt-actions" style={{ display: "flex", gap: "4px" }}>
                               <button
                                 title="Chi tiết lịch hẹn"
                                 onClick={() =>
@@ -438,7 +893,7 @@ export default function TechnicianAppointments() {
                                     `/technician/appointments/${a.AppointmentId}`,
                                   )
                                 }
-                                style={{ width: "34px", height: "34px", borderRadius: "8px", border: "1px solid #eadfca", background: "white", cursor: "pointer", transition: "all 0.2s" }}
+                                style={{ border: "1px solid #eadfca", background: "white", cursor: "pointer" }}
                               >
                                 👁
                               </button>
@@ -451,7 +906,7 @@ export default function TechnicianAppointments() {
                                   onClick={() =>
                                     startAppointment(a.AppointmentId)
                                   }
-                                  style={{ width: "34px", height: "34px", borderRadius: "8px", border: "none", background: "#24431f", color: "white", cursor: "pointer", transition: "all 0.2s" }}
+                                  style={{ border: "none", background: "#24431f", color: "white", cursor: "pointer" }}
                                 >
                                   ▶
                                 </button>
@@ -463,7 +918,7 @@ export default function TechnicianAppointments() {
                                   onClick={() =>
                                     completeAppointment(a.AppointmentId)
                                   }
-                                  style={{ width: "34px", height: "34px", borderRadius: "8px", border: "none", background: "#e5aa3d", color: "white", cursor: "pointer", transition: "all 0.2s" }}
+                                  style={{ border: "none", background: "#e5aa3d", color: "white", cursor: "pointer" }}
                                 >
                                   ✅
                                 </button>
@@ -475,7 +930,7 @@ export default function TechnicianAppointments() {
                                 <button
                                   title="Khách không đến"
                                   onClick={() => markNoShow(a.AppointmentId)}
-                                  style={{ width: "34px", height: "34px", borderRadius: "8px", border: "1px solid #e46d5b", background: "#fff8f6", color: "#c73628", cursor: "pointer", transition: "all 0.2s" }}
+                                  style={{ border: "1px solid #e46d5b", background: "#fff8f6", color: "#c73628", cursor: "pointer" }}
                                 >
                                   🚫
                                 </button>
@@ -488,6 +943,7 @@ export default function TechnicianAppointments() {
                   )}
                 </tbody>
               </table>
+
 
               <div className="appt-pagination" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", borderTop: "1px solid #eadfca" }}>
                 <span style={{ fontSize: "14px", color: "#6f665b" }}>

@@ -6,6 +6,7 @@ const allowRoles = require("../../middlewares/role.middleware");
 router.use(authMiddleware);
 router.use(allowRoles("ADMIN", "MANAGER"));
 
+router.get("/filters", controller.getLogFilters);
 router.get("/", controller.list);
 router.get("/:id", controller.getById);
 

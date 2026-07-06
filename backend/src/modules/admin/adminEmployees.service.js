@@ -437,6 +437,52 @@ async function changeStatus(id, data) {
   }
 }
 
+async function getAssignedServices(employeeId) {
+  const pool = await connectDB();
+  const result = await pool.request().input("EmployeeId", sql.Int, Number(employeeId)).query(`
+    SELECT
+      s.ServiceId,
+      s.ServiceName,
+      sc.CategoryName,
+      CASE WHEN es.EmployeeId IS NOT NULL THEN 1 ELSE 0 END AS Assigned
+    FROM Services s
+    JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
+    LEFT JOIN EmployeeServices es ON s.ServiceId = es.ServiceId AND es.EmployeeId = @EmployeeId
+    WHERE s.Status = 'ACTIVE'
+    ORDER BY sc.CategoryName, s.ServiceName
+  `);
+  return result.recordset;
+}
+
+async function updateAssignedServices(employeeId, serviceIds = []) {
+  const pool = await connectDB();
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
+
+    await new sql.Request(transaction)
+      .input("EmployeeId", sql.Int, Number(employeeId))
+      .query("DELETE FROM EmployeeServices WHERE EmployeeId = @EmployeeId");
+
+    if (serviceIds && serviceIds.length > 0) {
+      for (const serviceId of serviceIds) {
+        await new sql.Request(transaction)
+          .input("EmployeeId", sql.Int, Number(employeeId))
+          .input("ServiceId", sql.Int, Number(serviceId))
+          .query("INSERT INTO EmployeeServices (EmployeeId, ServiceId) VALUES (@EmployeeId, @ServiceId)");
+      }
+    }
+
+    await transaction.commit();
+    return await getAssignedServices(employeeId);
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
+}
+
 module.exports = {
   getRoles,
   getBranches,
@@ -446,4 +492,6 @@ module.exports = {
   create,
   update,
   changeStatus,
+  getAssignedServices,
+  updateAssignedServices,
 };

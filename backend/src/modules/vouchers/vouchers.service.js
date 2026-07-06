@@ -11,7 +11,7 @@ async function getCustomer(pool, userId) {
 async function getAllActive() {
   const pool = await connectDB();
   const res = await pool.request().query(`
-    SELECT VoucherId, Code, DiscountType, DiscountValue, StartDate, EndDate, Quantity, Status
+    SELECT VoucherId, Code, DiscountType, DiscountValue, MinOrderAmount, MaxDiscountAmount, StartDate, EndDate, Quantity, Status
     FROM Vouchers
     WHERE Status = 'ACTIVE'
       AND (StartDate IS NULL OR StartDate <= CAST(GETDATE() AS DATE))
@@ -21,20 +21,81 @@ async function getAllActive() {
   return res.recordset;
 }
 
-async function getMine(userId) {
+async function getMine(userId, customerId = null) {
   const pool = await connectDB();
-  const customer = await getCustomer(pool, userId);
+  let customer;
+  if (customerId) {
+    customer = { CustomerId: customerId };
+  } else {
+    customer = await getCustomer(pool, userId);
+  }
   if (!customer) return [];
-  const res = await pool
+
+  const vouchersRes = await pool
     .request()
     .input("CustomerId", sql.Int, customer.CustomerId).query(`
-    SELECT cv.CustomerId, cv.VoucherId, cv.UsedStatus, v.Code, v.DiscountType, v.DiscountValue, v.StartDate, v.EndDate, v.Status
+    SELECT 
+      cv.CustomerId, 
+      cv.VoucherId, 
+      cv.UsedStatus, 
+      v.Code, 
+      v.DiscountType, 
+      v.DiscountValue, 
+      v.MinOrderAmount, 
+      v.MaxDiscountAmount, 
+      v.StartDate, 
+      v.EndDate, 
+      v.Status,
+      v.Quantity,
+      (
+        SELECT COUNT(*)
+        FROM Invoices i
+        JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+        WHERE a.CustomerId = cv.CustomerId
+          AND i.VoucherId = cv.VoucherId
+          AND a.Status NOT IN ('CANCELLED', 'REFUND_PENDING', 'REFUNDED', 'NO_SHOW')
+      ) AS UseCount
     FROM CustomerVouchers cv
     JOIN Vouchers v ON cv.VoucherId = v.VoucherId
     WHERE cv.CustomerId = @CustomerId
     ORDER BY cv.UsedStatus ASC, v.EndDate ASC
   `);
-  return res.recordset;
+
+  const vouchers = vouchersRes.recordset;
+
+  const apptsRes = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+    SELECT 
+      i.VoucherId,
+      a.AppointmentId,
+      a.Status AS AppointmentStatus,
+      COALESCE(
+        (SELECT TOP 1 Status FROM Payments WHERE InvoiceId = i.InvoiceId ORDER BY PaymentId DESC), 
+        'UNPAID'
+      ) AS PaymentStatus,
+      (
+        SELECT STRING_AGG(s.ServiceName, ', ')
+        FROM AppointmentServices abs
+        JOIN Services s ON abs.ServiceId = s.ServiceId
+        WHERE abs.AppointmentId = a.AppointmentId
+      ) AS ServiceNames
+    FROM Appointments a
+    JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+    WHERE a.CustomerId = @CustomerId
+      AND i.VoucherId IS NOT NULL
+      AND a.Status <> 'CANCELLED'
+  `);
+
+  const appts = apptsRes.recordset;
+
+  return vouchers.map(v => {
+    const usages = appts.filter(a => a.VoucherId === v.VoucherId);
+    return {
+      ...v,
+      Usages: usages
+    };
+  });
 }
 
 async function saveVoucher(userId, voucherId) {
@@ -71,11 +132,6 @@ async function saveVoucher(userId, voucherId) {
         OUTPUT INSERTED.*
         VALUES (@CustomerId, @VoucherId, 0)
       `);
-    await new sql.Request(tran)
-      .input("VoucherId", sql.Int, voucherId)
-      .query(
-        "UPDATE Vouchers SET Quantity = Quantity - 1 WHERE VoucherId = @VoucherId AND Quantity > 0",
-      );
     await tran.commit();
     return result.recordset[0];
   } catch (err) {
@@ -86,7 +142,7 @@ async function saveVoucher(userId, voucherId) {
   }
 }
 
-async function validateVoucher(userId, data) {
+async function validateVoucher(userId, data, customerId = null) {
   const code = String(data.code || "")
     .trim()
     .toUpperCase();
@@ -103,6 +159,8 @@ async function validateVoucher(userId, data) {
         Code,
         DiscountType,
         DiscountValue,
+        MinOrderAmount,
+        MaxDiscountAmount,
         StartDate,
         EndDate,
         Status
@@ -119,7 +177,17 @@ async function validateVoucher(userId, data) {
     throw new Error("Voucher không hợp lệ hoặc đã hết hạn");
   }
 
-  const customer = await getCustomer(pool, userId);
+  const minOrder = Number(voucher.MinOrderAmount || 0);
+  if (minOrder > 0 && totalAmount < minOrder) {
+    throw new Error(`Đơn hàng tối thiểu ${minOrder.toLocaleString('vi-VN')}đ để sử dụng voucher này`);
+  }
+
+  let customer;
+  if (customerId) {
+    customer = { CustomerId: customerId };
+  } else {
+    customer = await getCustomer(pool, userId);
+  }
   if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
 
   const useCheck = await pool.request()
@@ -135,14 +203,31 @@ async function validateVoucher(userId, data) {
     throw new Error("Vui lòng lưu voucher này trước khi sử dụng");
   }
 
-  if (useCheck.recordset[0].UsedStatus) {
-    throw new Error("Bạn đã sử dụng voucher này rồi");
+  const countRes = await pool.request()
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .input("VoucherId", sql.Int, voucher.VoucherId)
+    .query(`
+      SELECT COUNT(*) AS UseCount
+      FROM Invoices i
+      JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+      WHERE a.CustomerId = @CustomerId
+        AND i.VoucherId = @VoucherId
+        AND a.Status NOT IN ('CANCELLED', 'REFUND_PENDING', 'REFUNDED', 'NO_SHOW')
+    `);
+
+  const useCount = countRes.recordset[0].UseCount;
+  if (useCount >= 3) {
+    throw new Error("Bạn đã sử dụng voucher này tối đa 3 lần");
   }
 
   let discountAmount = 0;
 
   if (String(voucher.DiscountType).toUpperCase() === "PERCENT") {
     discountAmount = (totalAmount * Number(voucher.DiscountValue || 0)) / 100;
+    const maxDiscount = Number(voucher.MaxDiscountAmount || 0);
+    if (maxDiscount > 0) {
+      discountAmount = Math.min(discountAmount, maxDiscount);
+    }
   } else {
     discountAmount = Number(voucher.DiscountValue || 0);
   }

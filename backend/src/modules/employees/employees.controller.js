@@ -63,5 +63,12 @@ async function getByService(req, res) {
     });
   }
 }
+async function getBranches(req, res) {
+  try {
+    return success(res, await service.getBranches());
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
 
-module.exports = { getAll, getById, create, update, remove, getByService };
+module.exports = { getAll, getById, create, update, remove, getByService, getBranches };

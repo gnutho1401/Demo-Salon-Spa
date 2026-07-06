@@ -162,6 +162,11 @@ async function register(data) {
 
   await pool
     .request()
+    .input("Email", sql.NVarChar, email)
+    .query(`DELETE FROM PendingUsers WHERE Email = @Email`);
+
+  await pool
+    .request()
     .input("FullName", sql.NVarChar, fullName)
     .input("Email", sql.NVarChar, email)
     .input("Phone", sql.NVarChar, phone)
@@ -171,8 +176,6 @@ async function register(data) {
     .input("Address", sql.NVarChar, address)
     .input("VerifyCode", sql.NVarChar, verifyCode)
     .input("VerifyCodeExpires", sql.DateTime, verifyCodeExpires).query(`
-      DELETE FROM PendingUsers WHERE Email = @Email;
-
       INSERT INTO PendingUsers
       (FullName, Email, Phone, PasswordHash, Gender, DateOfBirth, Address, VerifyCode, VerifyCodeExpires)
       VALUES
@@ -342,6 +345,7 @@ async function googleLogin(idToken) {
     audience: process.env.GOOGLE_CLIENT_ID,
   });
   const payload = ticket.getPayload();
+  console.log("Google Login Payload:", payload);
 
   const email = normalizeEmail(payload.email);
   const fullName = payload.name || email;
@@ -397,7 +401,7 @@ async function googleLogin(idToken) {
         UPDATE Users
         SET IsVerified = 1,
             GoogleId = @GoogleId,
-            AvatarUrl = COALESCE(AvatarUrl, @AvatarUrl),
+            AvatarUrl = COALESCE(@AvatarUrl, AvatarUrl),
             UpdatedAt = GETDATE()
         WHERE Email = @Email
       `);

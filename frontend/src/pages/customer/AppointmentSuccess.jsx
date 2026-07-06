@@ -35,7 +35,18 @@ function CountdownBanner({ appointment }) {
       sessionStorage.removeItem("bookingCreatedAt");
     } else {
       const createdAt = appointment?.CreatedAt || appointment?.createdAt;
-      createdMs = createdAt ? new Date(createdAt).getTime() : Date.now();
+      if (createdAt) {
+        const dateWithZ = new Date(createdAt);
+        // Nếu dateWithZ lớn hơn thời gian hiện tại nhiều hơn thời gian tự hủy (do lệch múi giờ UTC vs Local)
+        if (dateWithZ.getTime() - Date.now() > AUTO_CANCEL_MINUTES * 60 * 1000) {
+          const cleanStr = typeof createdAt === "string" ? createdAt.replace(/Z$/, "") : createdAt;
+          createdMs = new Date(cleanStr).getTime();
+        } else {
+          createdMs = dateWithZ.getTime();
+        }
+      } else {
+        createdMs = Date.now();
+      }
     }
 
     const deadline = createdMs + AUTO_CANCEL_MINUTES * 60 * 1000;

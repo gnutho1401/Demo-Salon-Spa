@@ -274,6 +274,39 @@ async function requestInvoiceRefund(req, res) {
   }
 }
 
+async function createInvoiceManually(req, res) {
+  try {
+    return success(
+      res,
+      await service.createInvoiceManually(req.params.id)
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function updateInvoiceDetails(req, res) {
+  try {
+    return success(
+      res,
+      await service.updateInvoiceDetails(req.params.id, req.body)
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function sendInvoiceEmail(req, res) {
+  try {
+    return success(
+      res,
+      await service.sendInvoiceEmail(req.params.id)
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 /* =========================
    WAITING LIST
 ========================= */
@@ -313,9 +346,10 @@ async function updateWaitingList(req, res) {
 
 async function deleteWaitingList(req, res) {
   try {
+    const cancelReason = req.body?.cancelReason || req.query?.cancelReason || null;
     return success(
       res,
-      await service.deleteWaitingList(req.params.id),
+      await service.deleteWaitingList(req.params.id, cancelReason),
       "Đã hủy hàng chờ",
     );
   } catch (err) {
@@ -373,6 +407,17 @@ async function markNotificationRead(req, res) {
   }
 }
 
+async function markAllNotificationsRead(req, res) {
+  try {
+    return success(
+      res,
+      await service.markAllNotificationsRead(req.user?.userId),
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 async function getReviews(req, res) {
   try {
     return success(res, await service.getReceptionistReviews(req.query));
@@ -419,7 +464,89 @@ async function updateAvatar(req, res) {
   }
 }
 
+async function checkoutAppointment(req, res) {
+  try {
+    return success(
+      res,
+      await service.checkoutAppointment(req.params.id, req.user?.userId),
+      "Check-out khách hàng thành công!"
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function getTechnicianWorkload(req, res) {
+  try {
+    const { date } = req.query;
+    return success(
+      res,
+      await service.getTechnicianWorkload(req.params.id, date)
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function assignTechnician(req, res) {
+  try {
+    const { technicianId, overrideOverload } = req.body;
+    return success(
+      res,
+      await service.assignTechnician(
+        req.params.id,
+        technicianId,
+        overrideOverload,
+        req.user?.userId
+      ),
+      "Điều phối kỹ thuật viên thành công!"
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function transferAppointments(req, res) {
+  try {
+    const { fromTechnicianId, toTechnicianId, date, overrideConflict } = req.body;
+    return success(
+      res,
+      await service.transferAppointments(
+        fromTechnicianId,
+        toTechnicianId,
+        date,
+        overrideConflict,
+        req.user?.userId
+      ),
+      "Chuyển giao lịch làm việc thành công!"
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function getSmartBookingSuggestions(req, res) {
+  try {
+    const { customerId, serviceId, branchId, appointmentDate, preferredStartTime } = req.query;
+    if (!serviceId) throw new Error("Vui lòng chọn dịch vụ");
+    if (!branchId) throw new Error("Vui lòng chọn chi nhánh");
+    if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn");
+
+    const data = await service.getSmartBookingSuggestions({
+      customerId: customerId ? Number(customerId) : null,
+      serviceId: Number(serviceId),
+      branchId: Number(branchId),
+      appointmentDate,
+      preferredStartTime: preferredStartTime || null
+    });
+    return success(res, data, "Lấy đề xuất đặt lịch thành công");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
+  getSmartBookingSuggestions,
   getDashboard,
 
   getAppointments,
@@ -429,6 +556,7 @@ module.exports = {
   checkInAppointment,
   startAppointment,
   completeAppointment,
+  checkoutAppointment,
   cancelAppointment,
   noShowAppointment,
   rescheduleAppointment,
@@ -449,6 +577,9 @@ module.exports = {
   getInvoiceById,
   markInvoicePaid,
   requestInvoiceRefund,
+  createInvoiceManually,
+  updateInvoiceDetails,
+  sendInvoiceEmail,
 
   getWaitingList,
   createWaitingList,
@@ -457,6 +588,7 @@ module.exports = {
   createWalkInAppointment,
   getNotifications,
   markNotificationRead,
+  markAllNotificationsRead,
   getReviews,
   getProfile,
   getSettings,
@@ -464,4 +596,7 @@ module.exports = {
   updateAvatar,
   getWaitingAvailableSlots,
   convertWaitingListToAppointment,
+  getTechnicianWorkload,
+  assignTechnician,
+  transferAppointments,
 };

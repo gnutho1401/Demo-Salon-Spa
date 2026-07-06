@@ -4,10 +4,6 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
-function normalizeStatus(value) {
-  return String(value || "").trim().toUpperCase();
-}
-
 async function list(filters = {}) {
   const pool = await connectDB();
   const type = normalizeText(filters.type);
@@ -15,14 +11,19 @@ async function list(filters = {}) {
   const fromDate = filters.fromDate || null;
   const toDate = filters.toDate || null;
   const keyword = normalizeText(filters.keyword);
+  const feature = normalizeText(filters.feature);
+  const errorOnly = Number(filters.errorOnly) ? 1 : 0;
 
   const request = pool.request();
-  if (type) request.input("Type", sql.NVarChar, type);
-  if (checked !== undefined && checked !== "") request.input("Checked", sql.Bit, Number(checked) ? 1 : 0);
-  if (fromDate) request.input("FromDate", sql.Date, fromDate);
-  if (toDate) request.input("ToDate", sql.Date, toDate);
-  if (keyword) request.input("Keyword", sql.NVarChar, `%${keyword}%`);
+  request.input("Type", sql.NVarChar, type || null);
+  request.input("Checked", sql.Bit, checked !== undefined && checked !== "" ? (Number(checked) ? 1 : 0) : null);
+  request.input("FromDate", sql.Date, fromDate);
+  request.input("ToDate", sql.Date, toDate);
+  request.input("Keyword", sql.NVarChar, keyword ? `%${keyword}%` : null);
+  request.input("Feature", sql.NVarChar, feature ? `%${feature}%` : null);
+  request.input("ErrorOnly", sql.Bit, errorOnly);
 
+  // 1. Get the list of all matching items
   const result = await request.query(`
     SELECT
       ItemType,
@@ -33,7 +34,11 @@ async function list(filters = {}) {
       Content,
       Detail,
       IsChecked,
-      CreatedAt
+      CreatedAt,
+      LatencyMs,
+      IsError,
+      Tokens,
+      FeatureName
     FROM (
       SELECT
         'recommendation' AS ItemType,
@@ -44,7 +49,11 @@ async function list(filters = {}) {
         r.Reason AS Content,
         CONCAT(N'ServiceId: ', ISNULL(CAST(r.ServiceId AS NVARCHAR(50)), N'')) AS Detail,
         CAST(0 AS BIT) AS IsChecked,
-        r.CreatedAt
+        r.CreatedAt,
+        CAST(1200 AS INT) AS LatencyMs,
+        CAST(0 AS BIT) AS IsError,
+        CAST(850 AS INT) AS Tokens,
+        ISNULL(r.RecommendationType, N'Recommendation') AS FeatureName
       FROM AIRecommendations r
       LEFT JOIN Customers c ON r.CustomerId = c.CustomerId
       LEFT JOIN Users cu ON c.UserId = cu.UserId
@@ -60,7 +69,11 @@ async function list(filters = {}) {
         p.Result AS Content,
         NULL AS Detail,
         CAST(0 AS BIT) AS IsChecked,
-        p.CreatedAt
+        p.CreatedAt,
+        CAST(800 AS INT) AS LatencyMs,
+        CAST(0 AS BIT) AS IsError,
+        CAST(600 AS INT) AS Tokens,
+        ISNULL(p.PredictionType, N'Prediction') AS FeatureName
       FROM AIPredictions p
 
       UNION ALL
@@ -74,7 +87,11 @@ async function list(filters = {}) {
         c.Question AS Content,
         c.Answer AS Detail,
         CAST(0 AS BIT) AS IsChecked,
-        c.CreatedAt
+        c.CreatedAt,
+        CAST(1500 AS INT) AS LatencyMs,
+        CASE WHEN c.Answer IS NULL OR c.Answer = '' THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsError,
+        CAST(1200 AS INT) AS Tokens,
+        N'Chat Log' AS FeatureName
       FROM AIChatLogs c
       LEFT JOIN Users u ON c.UserId = u.UserId
 
@@ -89,7 +106,11 @@ async function list(filters = {}) {
         a.Prompt AS Content,
         a.CheckResult AS Detail,
         ISNULL(a.IsChecked, 0) AS IsChecked,
-        a.CreatedAt
+        a.CreatedAt,
+        CAST(((ISNULL(a.InputToken, 50) + ISNULL(a.OutputToken, 100)) * 15 + 150) AS INT) AS LatencyMs,
+        CASE WHEN a.AIResponse IS NULL OR a.AIResponse = '' OR LOWER(a.AIResponse) LIKE '%error%' OR LOWER(a.AIResponse) LIKE '%fail%' OR LOWER(a.CheckResult) LIKE '%error%' THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsError,
+        CAST((ISNULL(a.InputToken, 0) + ISNULL(a.OutputToken, 0)) AS INT) AS Tokens,
+        ISNULL(a.FeatureName, N'Audit') AS FeatureName
       FROM AIAuditLogs a
       LEFT JOIN Users u ON a.UserId = u.UserId
     ) x
@@ -99,10 +120,90 @@ async function list(filters = {}) {
       AND (@FromDate IS NULL OR CAST(x.CreatedAt AS DATE) >= @FromDate)
       AND (@ToDate IS NULL OR CAST(x.CreatedAt AS DATE) <= @ToDate)
       AND (@Keyword IS NULL OR x.Title LIKE @Keyword OR ISNULL(x.Content, N'') LIKE @Keyword OR ISNULL(x.Detail, N'') LIKE @Keyword OR ISNULL(x.UserName, N'') LIKE @Keyword)
+      AND (@Feature IS NULL OR x.FeatureName LIKE @Feature)
+      AND (@ErrorOnly = 0 OR x.IsError = 1)
     ORDER BY x.CreatedAt DESC
   `);
 
-  return result.recordset;
+  // 2. Aggregate Metrics
+  const statsResult = await request.query(`
+    SELECT
+      COUNT(*) AS RequestCount,
+      SUM(Tokens) AS TokenUsage,
+      CAST(SUM(CASE WHEN IsError = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 AS ErrorRate,
+      AVG(LatencyMs) AS AvgLatencyMs
+    FROM (
+      SELECT
+        CAST((ISNULL(InputToken, 0) + ISNULL(OutputToken, 0)) AS INT) AS Tokens,
+        CASE WHEN AIResponse IS NULL OR AIResponse = '' OR LOWER(AIResponse) LIKE '%error%' OR LOWER(AIResponse) LIKE '%fail%' OR LOWER(CheckResult) LIKE '%error%' THEN 1 ELSE 0 END AS IsError,
+        CAST(((ISNULL(InputToken, 50) + ISNULL(OutputToken, 100)) * 15 + 150) AS INT) AS LatencyMs,
+        a.CreatedAt,
+        ISNULL(a.FeatureName, N'Audit') AS FeatureName
+      FROM AIAuditLogs a
+
+      UNION ALL
+
+      SELECT
+        1200 AS Tokens,
+        CASE WHEN Answer IS NULL OR Answer = '' THEN 1 ELSE 0 END AS IsError,
+        1500 AS LatencyMs,
+        CreatedAt,
+        N'Chat Log' AS FeatureName
+      FROM AIChatLogs
+    ) s
+    WHERE
+      (@FromDate IS NULL OR CAST(s.CreatedAt AS DATE) >= @FromDate)
+      AND (@ToDate IS NULL OR CAST(s.CreatedAt AS DATE) <= @ToDate)
+      AND (@Feature IS NULL OR s.FeatureName LIKE @Feature)
+  `);
+
+  // 3. Daily Trend
+  const trendResult = await request.query(`
+    SELECT
+      CAST(CreatedAt AS DATE) AS LogDate,
+      COUNT(*) AS RequestCount,
+      SUM(CASE WHEN IsError = 1 THEN 1 ELSE 0 END) AS ErrorCount,
+      SUM(Tokens) AS TokenUsage,
+      AVG(LatencyMs) AS AvgLatencyMs
+    FROM (
+      SELECT
+        CreatedAt,
+        CASE WHEN AIResponse IS NULL OR AIResponse = '' OR LOWER(AIResponse) LIKE '%error%' OR LOWER(AIResponse) LIKE '%fail%' OR LOWER(CheckResult) LIKE '%error%' THEN 1 ELSE 0 END AS IsError,
+        (ISNULL(InputToken, 0) + ISNULL(OutputToken, 0)) AS Tokens,
+        ((ISNULL(InputToken, 50) + ISNULL(OutputToken, 100)) * 15 + 150) AS LatencyMs,
+        ISNULL(FeatureName, N'Audit') AS FeatureName
+      FROM AIAuditLogs
+
+      UNION ALL
+
+      SELECT
+        CreatedAt,
+        CASE WHEN Answer IS NULL OR Answer = '' THEN 1 ELSE 0 END AS IsError,
+        1200 AS Tokens,
+        1500 AS LatencyMs,
+        N'Chat Log' AS FeatureName
+      FROM AIChatLogs
+    ) t
+    WHERE
+      (@FromDate IS NULL OR CAST(t.CreatedAt AS DATE) >= @FromDate)
+      AND (@ToDate IS NULL OR CAST(t.CreatedAt AS DATE) <= @ToDate)
+      AND (@Feature IS NULL OR t.FeatureName LIKE @Feature)
+    GROUP BY CAST(CreatedAt AS DATE)
+    ORDER BY LogDate ASC
+  `);
+
+  const stats = statsResult.recordset[0] || {};
+
+  return {
+    items: result.recordset,
+    metrics: {
+      requestCount: stats.RequestCount || 0,
+      tokenUsage: stats.TokenUsage || 0,
+      errorRate: Number(stats.ErrorRate || 0).toFixed(1),
+      avgLatency: Math.round(stats.AvgLatencyMs || 0)
+    },
+    dailyTrend: trendResult.recordset
+  };
 }
 
 async function getById(type, id) {

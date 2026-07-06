@@ -220,7 +220,7 @@ export default function WaitingListPage() {
     preferredTimeFrom: "",
     preferredTimeTo: "",
     priorityLevel: "NORMAL",
-    contactMethod: "PHONE",
+    contactMethod: "EMAIL",
     contactPhone: "",
     reason: "",
     note: "",
@@ -244,15 +244,90 @@ export default function WaitingListPage() {
     return services.find((s) => String(s.ServiceId) === String(form.serviceId));
   }, [services, form.serviceId]);
 
+  const selectedBranchObject = useMemo(() => {
+    return branches.find((b) => String(b.BranchId) === String(form.preferredBranchId));
+  }, [branches, form.preferredBranchId]);
+
   const availableEmployees = useMemo(() => {
-    if (!form.serviceId) return employees;
+    let list = employees;
+    if (form.serviceId) {
+      const allowedIds = employeeServices
+        .filter((x) => String(x.ServiceId) === String(form.serviceId))
+        .map((x) => String(x.EmployeeId));
+      list = list.filter((e) => allowedIds.includes(String(e.EmployeeId)));
+    }
+    if (form.preferredBranchId) {
+      list = list.filter((e) => String(e.BranchId) === String(form.preferredBranchId));
+    }
+    return list;
+  }, [employees, employeeServices, form.serviceId, form.preferredBranchId]);
 
-    const allowedIds = employeeServices
-      .filter((x) => String(x.ServiceId) === String(form.serviceId))
-      .map((x) => String(x.EmployeeId));
+  const [fullyBookedEmployeeIds, setFullyBookedEmployeeIds] = useState([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
 
-    return employees.filter((e) => allowedIds.includes(String(e.EmployeeId)));
-  }, [employees, employeeServices, form.serviceId]);
+  useEffect(() => {
+    let active = true;
+    if (!form.serviceId || !form.preferredDate || availableEmployees.length === 0) {
+      setFullyBookedEmployeeIds([]);
+      return;
+    }
+
+    async function checkTechniciansAvailability() {
+      try {
+        setLoadingAvailability(true);
+        const promises = availableEmployees.map(async (emp) => {
+          try {
+            const res = await axiosClient.get("/appointments/available-slots", {
+              params: {
+                serviceId: form.serviceId,
+                employeeId: emp.EmployeeId,
+                appointmentDate: form.preferredDate,
+              },
+            });
+            const data = res.data?.data;
+            const isFullyBooked = Array.isArray(data)
+              ? data.length === 0
+              : (!data?.slots || data.slots.length === 0);
+            return { employeeId: emp.EmployeeId, isFullyBooked };
+          } catch (e) {
+            return { employeeId: emp.EmployeeId, isFullyBooked: true };
+          }
+        });
+
+        const results = await Promise.all(promises);
+        if (active) {
+          const bookedIds = results
+            .filter((r) => r.isFullyBooked)
+            .map((r) => String(r.employeeId));
+          setFullyBookedEmployeeIds(bookedIds);
+          
+          setForm((prev) => {
+            if (prev.preferredEmployeeId && !bookedIds.includes(String(prev.preferredEmployeeId))) {
+              return { ...prev, preferredEmployeeId: "" };
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error("Lỗi kiểm tra lịch rảnh KTV:", err);
+      } finally {
+        if (active) setLoadingAvailability(false);
+      }
+    }
+
+    checkTechniciansAvailability();
+
+    return () => {
+      active = false;
+    };
+  }, [form.serviceId, form.preferredDate, availableEmployees]);
+
+  const filteredEmployees = useMemo(() => {
+    if (!form.preferredDate) return availableEmployees;
+    return availableEmployees.filter((emp) =>
+      fullyBookedEmployeeIds.includes(String(emp.EmployeeId))
+    );
+  }, [availableEmployees, fullyBookedEmployeeIds, form.preferredDate]);
 
   async function loadOptions() {
     const res = await axiosClient.get("/waiting-list/options");
@@ -298,19 +373,40 @@ export default function WaitingListPage() {
     const acceptTime = searchParams.get("acceptOtherTimeSlots");
 
     if (serviceId || employeeId || date || acceptTech || acceptTime) {
-      setForm((prev) => ({
-        ...prev,
-        serviceId: serviceId || prev.serviceId,
-        preferredEmployeeId: employeeId || prev.preferredEmployeeId,
-        preferredDate: date || prev.preferredDate,
-        acceptOtherTechnician: acceptTech === "true" || acceptTech === "1" ? true : prev.acceptOtherTechnician,
-        acceptOtherTimeSlots: acceptTime === "true" || acceptTime === "1" ? true : prev.acceptOtherTimeSlots,
-      }));
+      setForm((prev) => {
+        const isAcceptTech = acceptTech === "true" || acceptTech === "1" ? true : prev.acceptOtherTechnician;
+        const isAcceptTime = acceptTime === "true" || acceptTime === "1" ? true : prev.acceptOtherTimeSlots;
+        return {
+          ...prev,
+          serviceId: serviceId || prev.serviceId,
+          preferredEmployeeId: isAcceptTech ? "" : (employeeId || prev.preferredEmployeeId),
+          preferredDate: date || prev.preferredDate,
+          acceptOtherTechnician: isAcceptTech,
+          acceptOtherTimeSlots: isAcceptTime,
+          flexibleTimeSlot: isAcceptTime ? "ANY" : prev.flexibleTimeSlot,
+          preferredTimeFrom: isAcceptTime ? "" : prev.preferredTimeFrom,
+          preferredTimeTo: isAcceptTime ? "" : prev.preferredTimeTo,
+        };
+      });
       setTimeout(() => {
         window.scrollTo({ top: 430, behavior: "smooth" });
       }, 300);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (form.preferredEmployeeId && employees.length > 0) {
+      const selectedEmpObj = employees.find(
+        (emp) => String(emp.EmployeeId) === String(form.preferredEmployeeId)
+      );
+      if (selectedEmpObj && selectedEmpObj.BranchId && String(form.preferredBranchId) !== String(selectedEmpObj.BranchId)) {
+        setForm((prev) => ({
+          ...prev,
+          preferredBranchId: String(selectedEmpObj.BranchId),
+        }));
+      }
+    }
+  }, [form.preferredEmployeeId, employees]);
 
   function resetForm() {
     setForm({
@@ -323,8 +419,8 @@ export default function WaitingListPage() {
       preferredTimeFrom: "",
       preferredTimeTo: "",
       priorityLevel: "NORMAL",
-      contactMethod: "PHONE",
-      contactPhone: customer?.Phone || "",
+      contactMethod: "EMAIL",
+      contactPhone: "",
       reason: "",
       note: "",
       acceptOtherTechnician: false,
@@ -405,24 +501,26 @@ export default function WaitingListPage() {
   }
 
   function editItem(item) {
+    const isAcceptTech = !!item.AcceptOtherTechnician;
+    const isAcceptTime = !!item.AcceptOtherTimeSlots;
     setForm({
       waitingId: item.WaitingId,
       serviceId: item.ServiceId || "",
-      preferredEmployeeId: item.PreferredEmployeeId || "",
+      preferredEmployeeId: isAcceptTech ? "" : (item.PreferredEmployeeId || ""),
       preferredBranchId: item.PreferredBranchId || "",
       preferredDate: item.PreferredDate
         ? String(item.PreferredDate).slice(0, 10)
         : "",
-      flexibleTimeSlot: item.FlexibleTimeSlot || "ANY",
-      preferredTimeFrom: item.PreferredTimeFrom || "",
-      preferredTimeTo: item.PreferredTimeTo || "",
+      flexibleTimeSlot: isAcceptTime ? "ANY" : (item.FlexibleTimeSlot || "ANY"),
+      preferredTimeFrom: isAcceptTime ? "" : (item.PreferredTimeFrom || ""),
+      preferredTimeTo: isAcceptTime ? "" : (item.PreferredTimeTo || ""),
       priorityLevel: item.PriorityLevel || "NORMAL",
-      contactMethod: item.ContactMethod || "PHONE",
-      contactPhone: item.ContactPhone || customer?.Phone || "",
+      contactMethod: item.ContactMethod || "EMAIL",
+      contactPhone: item.ContactPhone || "",
       reason: item.Reason || "",
       note: item.Note || "",
-      acceptOtherTechnician: !!item.AcceptOtherTechnician,
-      acceptOtherTimeSlots: !!item.AcceptOtherTimeSlots,
+      acceptOtherTechnician: isAcceptTech,
+      acceptOtherTimeSlots: isAcceptTime,
     });
 
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -471,14 +569,23 @@ export default function WaitingListPage() {
             </p>
 
             <div className="wlx-hero-actions">
-              <button
-                type="button"
-                onClick={() =>
-                  window.scrollTo({ top: 430, behavior: "smooth" })
-                }
-              >
-                + Tạo yêu cầu
-              </button>
+              {searchParams.get("serviceId") ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.scrollTo({ top: 430, behavior: "smooth" })
+                  }
+                >
+                  + Tạo yêu cầu
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate("/customer/booking")}
+                >
+                  + Đăng ký hàng chờ
+                </button>
+              )}
               <button
                 type="button"
                 className="ghost"
@@ -529,7 +636,36 @@ export default function WaitingListPage() {
         </section>
 
         <section className="wlx-create-grid">
-          <form className="wlx-form" onSubmit={submit}>
+          {!form.waitingId && !searchParams.get("serviceId") ? (
+            <div className="wlx-form wlx-info-placeholder" style={{ padding: "40px", textAlign: "center", background: "rgba(255, 255, 255, 0.05)", borderRadius: "16px", backdropFilter: "blur(10px)", border: "1px solid rgba(255, 255, 255, 0.1)" }}>
+              <div style={{ fontSize: "48px", marginBottom: "20px" }}>ℹ️</div>
+              <h2 style={{ color: "#ef4f83", marginBottom: "15px" }}>Không thể tạo yêu cầu trực tiếp</h2>
+              <p style={{ fontSize: "15px", lineHeight: "1.6", marginBottom: "15px" }}>
+                Yêu cầu xếp hàng chờ chỉ được thực hiện khi bạn <strong>đặt lịch hẹn bình thường nhưng hết slot trống phù hợp</strong>.
+              </p>
+              <p style={{ fontSize: "14px", color: "#aaa", marginBottom: "25px" }}>
+                Vui lòng truy cập trang Đặt lịch hẹn để chọn dịch vụ và thời gian mong muốn.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/customer/booking")}
+                style={{
+                  backgroundColor: "#ef4f83",
+                  color: "white",
+                  padding: "12px 30px",
+                  border: "none",
+                  borderRadius: "25px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 15px rgba(239, 79, 131, 0.3)",
+                  fontSize: "15px"
+                }}
+              >
+                Đến trang Đặt lịch hẹn
+              </button>
+            </div>
+          ) : (
+            <form className="wlx-form" onSubmit={submit}>
             <div className="wlx-title">
               <span>01</span>
               <div>
@@ -600,9 +736,18 @@ export default function WaitingListPage() {
                   Chi nhánh mong muốn
                   <select
                     value={form.preferredBranchId}
-                    onChange={(e) =>
-                      setForm({ ...form, preferredBranchId: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const nextBranchId = e.target.value;
+                      const currentEmp = employees.find((x) => String(x.EmployeeId) === String(form.preferredEmployeeId));
+                      const nextEmpId = currentEmp && nextBranchId && String(currentEmp.BranchId) !== String(nextBranchId)
+                        ? ""
+                        : form.preferredEmployeeId;
+                      setForm({
+                        ...form,
+                        preferredBranchId: nextBranchId,
+                        preferredEmployeeId: nextEmpId
+                      });
+                    }}
                   >
                     <option value="">Bất kỳ chi nhánh</option>
                     {branches.map((b) => (
@@ -613,17 +758,47 @@ export default function WaitingListPage() {
                   </select>
                 </label>
 
+                {selectedBranchObject?.Address && (
+                  <div style={{ marginTop: "10px", borderRadius: "12px", overflow: "hidden", border: "1px solid #ffe1ea", gridColumn: "span 2", width: "100%" }}>
+                    <iframe
+                      title="Bản đồ chi nhánh hàng chờ"
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedBranchObject.Address)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                      width="100%"
+                      height="150"
+                      style={{ border: 0, display: "block" }}
+                      allowFullScreen=""
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+
                 <label>
                   Kỹ thuật viên mong muốn
+                  {form.preferredDate && filteredEmployees.length === 0 && !loadingAvailability && (
+                    <span style={{ color: "#ef4f83", fontSize: "12px", marginLeft: "10px", fontWeight: "normal" }}>
+                      (Tất cả KTV còn slot trống, hãy đặt lịch bình thường)
+                    </span>
+                  )}
+                  {form.preferredDate && filteredEmployees.length > 0 && (
+                    <span style={{ color: "#aaa", fontSize: "12px", marginLeft: "10px", fontWeight: "normal" }}>
+                      (Chỉ hiển thị KTV đã hết lịch)
+                    </span>
+                  )}
                   <select
                     value={form.preferredEmployeeId}
-                    onChange={(e) =>
-                      setForm({ ...form, preferredEmployeeId: e.target.value })
-                    }
-                    disabled={!form.serviceId}
+                    onChange={(e) => {
+                      const empId = e.target.value;
+                      const empObj = employees.find((x) => String(x.EmployeeId) === String(empId));
+                      setForm({
+                        ...form,
+                        preferredEmployeeId: empId,
+                        preferredBranchId: empObj ? String(empObj.BranchId) : form.preferredBranchId
+                      });
+                    }}
+                    disabled={!form.serviceId || form.acceptOtherTechnician || loadingAvailability}
                   >
                     <option value="">Không yêu cầu</option>
-                    {availableEmployees.map((e) => (
+                    {filteredEmployees.map((e) => (
                       <option key={e.EmployeeId} value={e.EmployeeId}>
                         {e.FullName} - {e.Specialization || "Kỹ thuật viên"}
                       </option>
@@ -657,6 +832,7 @@ export default function WaitingListPage() {
                         preferredTimeTo: "",
                       })
                     }
+                    disabled={form.acceptOtherTimeSlots}
                   >
                     <option value="ANY">Linh hoạt cả ngày</option>
                     <option value="MORNING">Buổi sáng 08:00 - 12:00</option>
@@ -698,56 +874,36 @@ export default function WaitingListPage() {
                   <input
                     type="checkbox"
                     checked={form.acceptOtherTechnician}
-                    onChange={(e) =>
-                      setForm({ ...form, acceptOtherTechnician: e.target.checked })
-                    }
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        acceptOtherTechnician: checked,
+                        preferredEmployeeId: checked ? "" : prev.preferredEmployeeId,
+                      }));
+                    }}
                   />
                   <span className="checkbox-custom"></span>
-                  Chấp nhận kỹ thuật viên khác
+                  Chấp nhận kỹ thuật viên khác (Không yêu cầu)
                 </label>
 
                 <label className="premium-checkbox-label">
                   <input
                     type="checkbox"
                     checked={form.acceptOtherTimeSlots}
-                    onChange={(e) =>
-                      setForm({ ...form, acceptOtherTimeSlots: e.target.checked })
-                    }
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        acceptOtherTimeSlots: checked,
+                        flexibleTimeSlot: checked ? "ANY" : prev.flexibleTimeSlot,
+                        preferredTimeFrom: "",
+                        preferredTimeTo: "",
+                      }));
+                    }}
                   />
                   <span className="checkbox-custom"></span>
-                  Chấp nhận khung giờ khác trong ngày
-                </label>
-              </div>
-            </div>
-
-            <div className="wlx-form-section">
-              <h3>Thông tin liên hệ</h3>
-
-              <div className="wlx-two">
-                <label>
-                  Phương thức liên hệ
-                  <select
-                    value={form.contactMethod}
-                    onChange={(e) =>
-                      setForm({ ...form, contactMethod: e.target.value })
-                    }
-                  >
-                    <option value="PHONE">Gọi điện</option>
-                    <option value="ZALO">Zalo</option>
-                    <option value="SMS">SMS</option>
-                    <option value="EMAIL">Email</option>
-                  </select>
-                </label>
-
-                <label>
-                  Số điện thoại liên hệ
-                  <input
-                    value={form.contactPhone}
-                    onChange={(e) =>
-                      setForm({ ...form, contactPhone: e.target.value })
-                    }
-                    placeholder="Số điện thoại để salon liên hệ"
-                  />
+                  Chấp nhận khung giờ khác trong ngày (Linh hoạt cả ngày)
                 </label>
               </div>
             </div>
@@ -768,6 +924,7 @@ export default function WaitingListPage() {
               )}
             </div>
           </form>
+          )}
 
           <aside className="wlx-side-panel">
             <h3>Quy trình xử lý</h3>
@@ -1193,9 +1350,22 @@ export default function WaitingListPage() {
                   <span>Chi nhánh</span>
                   <b>{detail.PreferredBranchName || "Bất kỳ"}</b>
                 </div>
-                <div>
+                 <div>
                   <span>Địa chỉ</span>
                   <b>{detail.PreferredBranchAddress || "-"}</b>
+                  {detail.PreferredBranchAddress && (
+                    <div style={{ marginTop: "8px", borderRadius: "10px", overflow: "hidden", border: "1px solid #ffe1ea", width: "100%" }}>
+                      <iframe
+                        title="Bản đồ chi nhánh hàng chờ detail"
+                        src={`https://maps.google.com/maps?q=${encodeURIComponent(detail.PreferredBranchAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                        width="100%"
+                        height="140"
+                        style={{ border: 0, display: "block" }}
+                        allowFullScreen=""
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <span>Liên hệ</span>

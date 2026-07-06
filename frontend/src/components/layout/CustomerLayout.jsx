@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import GuestLayout from "./GuestLayout";
 import { useAuth } from "../../context/AuthContext";
-import axiosClient from "../../api/axiosClient";
+import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
 const menuGroups = [
   {
@@ -29,6 +29,7 @@ const menuGroups = [
       { to: "/customer/waiting-list", icon: "⏳", label: "Hàng chờ" },
       { to: "/customer/notifications", icon: "🔔", label: "Thông báo" },
       { to: "/customer/ai", icon: "✨", label: "AI tư vấn" },
+      { to: "/customer/stylist-advisor", icon: "💇", label: "AI Stylist" },
       { to: "/customer/feedback", icon: "💌", label: "Phản hồi" },
       { to: "/customer/reviews", icon: "⭐", label: "Đánh giá" },
     ],
@@ -37,7 +38,7 @@ const menuGroups = [
     title: "Tài khoản",
     items: [
       { to: "/customer/profile", icon: "👤", label: "Hồ sơ cá nhân" },
-      { to: "/customer/change-password", icon: "🔒", label: "Đổi mật khẩu" },
+      { to: "/customer/profile?tab=password", icon: "🔒", label: "Đổi mật khẩu" },
     ],
   },
 ];
@@ -46,6 +47,23 @@ export default function CustomerLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const sidebarRef = useRef(null);
+
+  useEffect(() => {
+    const savedScrollTop = sessionStorage.getItem("customer-sidebar-scroll");
+    if (savedScrollTop && sidebarRef.current) {
+      sidebarRef.current.scrollTop = Number(savedScrollTop);
+    } else {
+      const activeLink = sidebarRef.current?.querySelector(".customer-pink-nav-link.active");
+      if (activeLink) {
+        activeLink.scrollIntoView({ block: "nearest", behavior: "auto" });
+      }
+    }
+  }, [location.pathname]);
+
+  const handleSidebarScroll = (e) => {
+    sessionStorage.setItem("customer-sidebar-scroll", e.currentTarget.scrollTop);
+  };
 
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -93,7 +111,11 @@ export default function CustomerLayout({ children }) {
   return (
     <GuestLayout>
       <div className="customer-pink-shell">
-        <aside className="customer-pink-sidebar">
+        <aside 
+          ref={sidebarRef}
+          onScroll={handleSidebarScroll}
+          className="customer-pink-sidebar"
+        >
           <Link to="/customer" className="customer-pink-brand">
             <div className="customer-pink-brand-icon">🌸</div>
             <div>
@@ -104,7 +126,7 @@ export default function CustomerLayout({ children }) {
 
           <div className="customer-pink-user">
             <div className="customer-pink-avatar">
-              {avatar ? <img src={avatar} alt={displayName} /> : initial}
+              {avatar ? <img src={resolveFileUrl(avatar)} alt={displayName} /> : initial}
             </div>
 
             <div>
@@ -114,27 +136,39 @@ export default function CustomerLayout({ children }) {
           </div>
 
           <nav className="customer-pink-nav">
-            {menuGroups.map((group) => (
-              <div className="customer-pink-nav-group" key={group.title}>
-                <p>{group.title}</p>
+            {menuGroups.map((group) => {
+              return (
+                <div className="customer-pink-nav-group" key={group.title}>
+                  <p>{group.title}</p>
+  
+                  {group.items.map((item) => {
+                    const isProfileLink = item.to.startsWith("/customer/profile");
+                    
+                    const isLinkActive = isProfileLink
+                      ? (item.to.includes("tab=password")
+                          ? location.search.includes("tab=password")
+                          : !location.search.includes("tab=password") && location.pathname === "/customer/profile")
+                      : location.pathname === item.to;
 
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      isActive
-                        ? "customer-pink-nav-link active"
-                        : "customer-pink-nav-link"
-                    }
-                  >
-                    <span>{item.icon}</span>
-                    <b>{item.label}</b>
-                  </NavLink>
-                ))}
-              </div>
-            ))}
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.end}
+                        className={
+                          isLinkActive
+                            ? "customer-pink-nav-link active"
+                            : "customer-pink-nav-link"
+                        }
+                      >
+                        <span>{item.icon}</span>
+                        <b>{item.label}</b>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </nav>
 
           <div className="customer-pink-sidebar-bottom">

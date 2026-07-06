@@ -299,9 +299,9 @@ async function getMyDashboard(userId) {
         STRING_AGG(s.ServiceName, N', ') AS ServiceNames,
         SUM(ISNULL(s.DurationMinutes, 0)) AS TotalDurationMinutes
       FROM Appointments a
-      LEFT JOIN Branches b ON a.BranchId = b.BranchId
       LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
       LEFT JOIN Users eu ON e.UserId = eu.UserId
+      LEFT JOIN Branches b ON COALESCE(a.BranchId, e.BranchId) = b.BranchId
       LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
       LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
       LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
@@ -668,7 +668,7 @@ async function createMyReview(userId, data, files = []) {
       .input("AppointmentId", sql.Int, appointmentId)
       .input("ServiceId", sql.Int, serviceId).query(`
         SELECT TOP 1 ReviewId
-        FROM Reviews WITH (UPDLOCK, HOLDLOCK)
+        FROM Reviews
         WHERE CustomerId = @CustomerId
           AND AppointmentId = @AppointmentId
           AND ServiceId = @ServiceId
@@ -882,7 +882,7 @@ async function getMyServiceHistory(userId) {
 
       JOIN Employees e ON a.EmployeeId = e.EmployeeId
       JOIN Users eu ON e.UserId = eu.UserId
-      LEFT JOIN Branches b ON a.BranchId = b.BranchId
+      LEFT JOIN Branches b ON COALESCE(a.BranchId, e.BranchId) = b.BranchId
 
       LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
       LEFT JOIN Vouchers v ON i.VoucherId = v.VoucherId
@@ -1182,6 +1182,8 @@ async function getMyReviewableServices(userId) {
         a.Status,
         aps.ServiceId,
         s.ServiceName,
+        s.Description AS ServiceDescription,
+        s.ImageUrl AS ServiceImageUrl,
         aps.Price,
         a.EmployeeId,
         eu.FullName AS EmployeeName

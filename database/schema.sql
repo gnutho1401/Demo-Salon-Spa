@@ -632,6 +632,8 @@ CREATE TABLE TreatmentNotes (
     Recommendation NVARCHAR(MAX) NULL,
     FollowUpDate DATE NULL,
     ProgressStatus NVARCHAR(30) NOT NULL DEFAULT 'IN_PROGRESS',
+    PersonalNotes NVARCHAR(MAX) NULL,
+    SpecialNotice NVARCHAR(MAX) NULL,
     CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
     UpdatedAt DATETIME NULL,
     CONSTRAINT FK_TreatmentNotes_Appointments FOREIGN KEY (AppointmentId) REFERENCES Appointments(AppointmentId) ON DELETE CASCADE,

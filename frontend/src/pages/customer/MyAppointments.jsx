@@ -5,6 +5,7 @@ import axiosClient from "../../api/axiosClient";
 
 const STATUS_OPTIONS = [
   ["ALL", "Tất cả trạng thái"],
+  ["PENDING", "Chờ xác nhận"],
   ["PENDING_PAYMENT", "Chờ thanh toán"],
   ["CONFIRMED", "Đã xác nhận"],
   ["CHECKED_IN", "Đã check-in"],
@@ -48,6 +49,7 @@ function getAppointmentCode(id) {
 
 function statusText(status) {
   const s = String(status || "").toUpperCase();
+  if (s === "PENDING") return "Chờ xác nhận";
   if (s === "PENDING_PAYMENT") return "Chờ thanh toán";
   if (s === "CONFIRMED") return "Đã xác nhận";
   if (s === "CHECKED_IN") return "Đã check-in";
@@ -79,21 +81,26 @@ function refundText(status) {
   return status || "Chưa có";
 }
 
+// ... helper methods for checking state transitions ...
 function canPay(row) {
   const s = String(row.Status || "").toUpperCase();
   const p = String(row.PaymentStatus || "UNPAID").toUpperCase();
+  const isBilledUnderPackage = row.CustomerPackageId != null;
 
-  return s === "PENDING_PAYMENT" && ["UNPAID", "PENDING", "FAILED"].includes(p);
+  if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(s)) return false;
+  if (p === "PAID" || isBilledUnderPackage) return false;
+
+  return ["UNPAID", "PENDING", "FAILED"].includes(p);
 }
 
 function canCancel(row) {
   const s = String(row.Status || "").toUpperCase();
-  return ["PENDING_PAYMENT", "CONFIRMED"].includes(s);
+  return ["PENDING", "PENDING_PAYMENT", "CONFIRMED"].includes(s);
 }
 
 function canReschedule(row) {
   const s = String(row.Status || "").toUpperCase();
-  return ["PENDING_PAYMENT", "CONFIRMED"].includes(s);
+  return ["PENDING", "PENDING_PAYMENT", "CONFIRMED"].includes(s);
 }
 
 function canReview(row) {
@@ -165,11 +172,26 @@ export default function MyAppointments() {
       setError("");
 
       const res = await axiosClient.get("/appointments/my");
-      setRows(res.data.data || res.data || []);
+      setRows(Array.isArray(res.data.data) ? res.data.data : Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setError(err.response?.data?.message || "Không tải được lịch hẹn");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleConfirm(appointmentId) {
+    try {
+      setLoadingId(appointmentId);
+      setError("");
+      setMessage("");
+      await axiosClient.post(`/appointments/${appointmentId}/confirm`);
+      setMessage("Xác nhận lịch hẹn tái khám thành công!");
+      await loadAppointments();
+    } catch (err) {
+      setError(err.response?.data?.message || "Xác nhận lịch hẹn thất bại");
+    } finally {
+      setLoadingId(null);
     }
   }
 
@@ -233,7 +255,7 @@ export default function MyAppointments() {
     const total = rows.length;
 
     const active = rows.filter((r) =>
-      ["PENDING_PAYMENT", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(
+      ["PENDING", "PENDING_PAYMENT", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(
         String(r.Status || "").toUpperCase(),
       ),
     ).length;
@@ -320,12 +342,8 @@ export default function MyAppointments() {
         },
       });
 
-      const paymentStatus = String(
-        cancelModal.appointment?.PaymentStatus || "",
-      ).toUpperCase();
-
       setMessage(
-        paymentStatus === "PAID"
+        hasPaid
           ? "Đã hủy lịch và gửi yêu cầu hoàn tiền"
           : "Hủy lịch hẹn thành công",
       );
@@ -402,7 +420,9 @@ export default function MyAppointments() {
 
               {String(
                 cancelModal.appointment?.PaymentStatus || "",
-              ).toUpperCase() === "PAID" && (
+              ).toUpperCase() === "PAID" && String(
+                cancelModal.appointment?.PaymentMethod || "",
+              ).toUpperCase() !== "PACKAGE" && (
                 <div className="refund-warning">
                   Lịch này đã thanh toán. Sau khi hủy, hệ thống sẽ tạo yêu cầu
                   hoàn tiền qua cổng PayOS.
@@ -411,7 +431,9 @@ export default function MyAppointments() {
 
               {String(
                 cancelModal.appointment?.PaymentStatus || "",
-              ).toUpperCase() === "PAID" && (
+              ).toUpperCase() === "PAID" && String(
+                cancelModal.appointment?.PaymentMethod || "",
+              ).toUpperCase() !== "PACKAGE" && (
                 <div className="bank-refund-fields" style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '15px 0', padding: '12px', border: '1px solid #ffe3e3', borderRadius: '8px', backgroundColor: '#fff9f9' }}>
                   <h4 style={{ margin: '0 0 8px 0', color: '#d32f2f', fontSize: '14px' }}>Thông tin tài khoản nhận hoàn tiền</h4>
                   
@@ -563,6 +585,13 @@ export default function MyAppointments() {
           </button>
           <button
             type="button"
+            className={statusFilter === "PENDING" ? "active" : ""}
+            onClick={() => setStatusFilter("PENDING")}
+          >
+            Chờ xác nhận ({rows.filter(r => String(r.Status).toUpperCase() === "PENDING").length})
+          </button>
+          <button
+            type="button"
             className={statusFilter === "PENDING_PAYMENT" ? "active" : ""}
             onClick={() => setStatusFilter("PENDING_PAYMENT")}
           >
@@ -675,6 +704,9 @@ export default function MyAppointments() {
                   const paymentStatus = String(
                     r.PaymentStatus || "UNPAID",
                   ).toUpperCase();
+                  const paymentMethod = String(
+                    r.PaymentMethod || "",
+                  ).toUpperCase();
 
                   return (
                     <tr key={r.AppointmentId}>
@@ -691,6 +723,23 @@ export default function MyAppointments() {
                             <div className="service-name">
                               {r.ServiceNames || r.ServiceName || "Dịch vụ"}
                             </div>
+                            {r.CustomerPackageId && r.CustomerPackageName && (
+                              <div style={{
+                                marginTop: '4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 6px',
+                                backgroundColor: '#f3e8ff',
+                                color: '#6b21a8',
+                                border: '1px solid #e9d5ff',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '500'
+                              }}>
+                                📦 Combo: {r.CustomerPackageName}
+                              </div>
+                            )}
                             <div className="muted">
                               {r.ServiceCount > 1
                                 ? `${r.ServiceCount} dịch vụ trong lịch hẹn`
@@ -773,6 +822,18 @@ export default function MyAppointments() {
                             Chi tiết
                           </Link>
 
+                          {status === "PENDING" && (
+                            <button
+                              type="button"
+                              className="btn-pay"
+                              style={{ backgroundColor: "#10b981", color: "#fff" }}
+                              onClick={() => handleConfirm(r.AppointmentId)}
+                              disabled={loadingId === r.AppointmentId}
+                            >
+                              {loadingId === r.AppointmentId ? "..." : "Xác nhận"}
+                            </button>
+                          )}
+
                           {canPay(r) && (
                             <button
                               type="button"
@@ -834,7 +895,7 @@ export default function MyAppointments() {
                               disabled={loadingId === r.AppointmentId}
                               onClick={() => openCancelModal(r)}
                             >
-                              {paymentStatus === "PAID" ? "Hủy & hoàn" : "Hủy"}
+                              {paymentStatus === "PAID" && paymentMethod !== "PACKAGE" ? "Hủy & hoàn" : "Hủy"}
                             </button>
                           )}
                         </div>

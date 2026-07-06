@@ -23,11 +23,12 @@ import BookingPage from "../pages/customer/BookingPage";
 import MyAppointments from "../pages/customer/MyAppointments";
 import PaymentHistory from "../pages/customer/PaymentHistory";
 import CustomerProfile from "../pages/customer/CustomerProfile";
-import ChangePassword from "../pages/customer/ChangePassword";
+
 import CustomerPackages from "../pages/customer/CustomerPackages";
 import MembershipPage from "../pages/customer/MembershipPage";
 import NotificationsPage from "../pages/customer/NotificationsPage";
 import AiAssistantPage from "../pages/customer/AiAssistantPage";
+import AiStylistAdvisor from "../pages/customer/AiStylistAdvisor";
 import FeedbackPage from "../pages/customer/FeedbackPage";
 import VouchersPage from "../pages/customer/VouchersPage";
 import WaitingListPage from "../pages/customer/WaitingListPage";
@@ -52,6 +53,8 @@ import AdminReports from "../pages/admin/AdminReports";
 import AdminAIMonitoring from "../pages/admin/AdminAIMonitoring";
 import AdminPackages from "../pages/admin/AdminPackages";
 import AdminRefunds from "../pages/admin/AdminRefunds";
+import AdminCustomers from "../pages/admin/AdminCustomers";
+import AdminAiCrm from "../pages/admin/AdminAiCrm";
 import ReceptionistDashboard from "../pages/receptionist/ReceptionistDashboard";
 import ReceptionistAppointments from "../pages/receptionist/ReceptionistAppointments";
 import ReceptionistAppointmentDetail from "../pages/receptionist/ReceptionistAppointmentDetail";
@@ -62,6 +65,9 @@ import ReceptionistInvoices from "../pages/receptionist/ReceptionistInvoices";
 import ReceptionistInvoiceDetail from "../pages/receptionist/ReceptionistInvoiceDetail";
 import ReceptionistWaitingList from "../pages/receptionist/ReceptionistWaitingList";
 import ReceptionistReviews from "../pages/receptionist/ReceptionistReviews";
+import ReceptionistNotifications from "../pages/receptionist/ReceptionistNotifications";
+import TechnicianDispatcher from "../pages/receptionist/TechnicianDispatcher";
+import ReceptionistRescheduleRequests from "../pages/receptionist/ReceptionistRescheduleRequests";
 import TechnicianDashboard from "../pages/technician/TechnicianDashboard";
 import TechnicianSchedule from "../pages/technician/TechnicianSchedule";
 import ProtectedRoute from "./ProtectedRoute";
@@ -69,9 +75,13 @@ import TechnicianAppointmentDetail from "../pages/technician/TechnicianAppointme
 import TechnicianAppointments from "../pages/technician/TechnicianAppointments";
 import TechnicianCustomers from "../pages/technician/TechnicianCustomers";
 import TreatmentNotesHistory from "../pages/technician/TreatmentNotesHistory";
+import TreatmentNotesV2 from "../pages/technician/TreatmentNotesV2";
 import TechnicianEarnings from "../pages/technician/TechnicianEarnings";
 import TechnicianProfile from "../pages/technician/TechnicianProfile";
 import TechnicianSettings from "../pages/technician/TechnicianSettings";
+import TechnicianAttendanceManager from "../pages/technician/TechnicianAttendanceManager";
+import TechnicianNotifications from "../pages/technician/TechnicianNotifications";
+import TechnicianReviews from "../pages/technician/TechnicianReviews";
 import AdminLayout from "../components/layout/AdminLayout";
 import ReviewPage from "../pages/customer/ReviewPage";
 // import PackageApprovalPage from "../pages/receptionist/PackageApprovalPage";
@@ -337,6 +347,14 @@ export default function AppRoutes() {
         }
       />
       <Route
+        path="/customer/stylist-advisor"
+        element={
+          <CustomerProtectedPage>
+            <AiStylistAdvisor />
+          </CustomerProtectedPage>
+        }
+      />
+      <Route
         path="/customer/feedback"
         element={
           <CustomerProtectedPage>
@@ -362,14 +380,7 @@ export default function AppRoutes() {
           </CustomerProtectedPage>
         }
       />
-      <Route
-        path="/customer/change-password"
-        element={
-          <CustomerProtectedPage>
-            <ChangePassword />
-          </CustomerProtectedPage>
-        }
-      />
+
       <Route
         path="/customer/appointment-success/:appointmentId"
         element={
@@ -403,10 +414,10 @@ export default function AppRoutes() {
         }
       />
       <Route
-        path="/receptionist/appointments/:id"
+        path="/receptionist/dispatch"
         element={
           <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
-            <ReceptionistAppointmentDetail />
+            <TechnicianDispatcher />
           </ProtectedRoute>
         }
       />
@@ -415,6 +426,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
             <ReceptionistCreateAppointment />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/receptionist/appointments/:id"
+        element={
+          <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
+            <ReceptionistAppointmentDetail />
           </ProtectedRoute>
         }
       />
@@ -475,10 +494,26 @@ export default function AppRoutes() {
         }
       />
       <Route
+        path="/receptionist/notifications"
+        element={
+          <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
+            <ReceptionistNotifications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/receptionist/reviews"
         element={
           <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
             <ReceptionistReviews />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/receptionist/reschedule-requests"
+        element={
+          <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
+            <ReceptionistRescheduleRequests />
           </ProtectedRoute>
         }
       />
@@ -536,7 +571,7 @@ export default function AppRoutes() {
         path="/technician/treatment-notes"
         element={
           <ProtectedRoute allowedRoles={["TECHNICIAN"]}>
-            <TreatmentNotesHistory />
+            <TreatmentNotesV2 />
           </ProtectedRoute>
         }
       />
@@ -545,6 +580,22 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["TECHNICIAN"]}>
             <TechnicianEarnings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/technician/notifications"
+        element={
+          <ProtectedRoute allowedRoles={["TECHNICIAN"]}>
+            <TechnicianNotifications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/technician/attendance"
+        element={
+          <ProtectedRoute allowedRoles={["TECHNICIAN"]}>
+            <TechnicianAttendanceManager />
           </ProtectedRoute>
         }
       />
@@ -561,6 +612,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["TECHNICIAN"]}>
             <TechnicianSettings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/technician/reviews"
+        element={
+          <ProtectedRoute allowedRoles={["TECHNICIAN"]}>
+            <TechnicianReviews />
           </ProtectedRoute>
         }
       />
@@ -730,6 +789,26 @@ export default function AppRoutes() {
           <AdminProtectedPage>
             <AdminLayout>
               <PackageReportPage />
+            </AdminLayout>
+          </AdminProtectedPage>
+        }
+      />
+      <Route
+        path="/admin/customers"
+        element={
+          <AdminProtectedPage>
+            <AdminLayout>
+              <AdminCustomers />
+            </AdminLayout>
+          </AdminProtectedPage>
+        }
+      />
+      <Route
+        path="/admin/ai-crm"
+        element={
+          <AdminProtectedPage>
+            <AdminLayout>
+              <AdminAiCrm />
             </AdminLayout>
           </AdminProtectedPage>
         }

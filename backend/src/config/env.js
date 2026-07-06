@@ -9,16 +9,7 @@ module.exports = {
   port: process.env.PORT || 5000,
   jwtSecret: process.env.JWT_SECRET || 'dev_secret_key',
   db: {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER || 'localhost',
-    database: process.env.DB_DATABASE,
-    port: Number(process.env.DB_PORT || 1433),
-    options: {
-      encrypt: toBool(process.env.DB_ENCRYPT, false),
-      trustServerCertificate: toBool(process.env.DB_TRUST_CERT, true),
-      enableArithAbort: true,
-    }
+    connectionString: process.env.DATABASE_URL
   },
   vnpay: {
     tmnCode: process.env.VNPAY_TMN_CODE || process.env.VNP_TMN_CODE,

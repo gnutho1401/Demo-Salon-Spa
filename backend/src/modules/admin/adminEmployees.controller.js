@@ -113,6 +113,36 @@ async function changeStatus(req, res) {
   }
 }
 
+async function getAssignedServices(req, res) {
+  try {
+    return success(res, await service.getAssignedServices(req.params.id));
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
+
+async function updateAssignedServices(req, res) {
+  try {
+    const before = await service.getAssignedServices(req.params.id);
+    const result = await service.updateAssignedServices(req.params.id, req.body.serviceIds);
+
+    await logs.writeLog({
+      userId: currentUser(req),
+      roleName: currentRole(req),
+      actionName: "Admin update employee services",
+      actionType: "UPDATE",
+      description: `Updated assigned services for employee ID ${req.params.id}`,
+      ipAddress: req.ip,
+      oldValue: JSON.stringify(before),
+      newValue: JSON.stringify(result),
+    });
+
+    return success(res, result);
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
+
 module.exports = {
   getRoles,
   getBranches,
@@ -121,4 +151,6 @@ module.exports = {
   create,
   update,
   changeStatus,
+  getAssignedServices,
+  updateAssignedServices,
 };

@@ -50,8 +50,12 @@ export default function RescheduleAppointment() {
   const navigate = useNavigate();
 
   const [appointment, setAppointment] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState("");
   const [employees, setEmployees] = useState([]);
   const [slots, setSlots] = useState([]);
+  const [alternatives, setAlternatives] = useState([]);
+
 
   const [loading, setLoading] = useState(true);
   const [slotLoading, setSlotLoading] = useState(false);
@@ -67,7 +71,25 @@ export default function RescheduleAppointment() {
     reason: "",
   });
 
-  const minDate = new Date().toISOString().slice(0, 10);
+  const isPendingFollowUp = appointment?.isPendingFollowUp === true;
+
+  // Lấy ngày hôm nay theo múi giờ local địa phương để tránh lệch múi giờ UTC
+  const getLocalToday = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  // Lịch tái khám thì minDate phải từ ngày tái khám được đề xuất trở về sau
+  const minDate = isPendingFollowUp && appointment?.suggestedDate
+    ? appointment.suggestedDate
+    : getLocalToday();
+
+
+  const filteredEmployees = useMemo(() => {
+    return employees.filter((emp) => {
+      return !selectedBranchId || String(emp.BranchId) === String(selectedBranchId);
+    });
+  }, [employees, selectedBranchId]);
 
   const selectedEmployee = useMemo(() => {
     return employees.find(
@@ -81,12 +103,17 @@ export default function RescheduleAppointment() {
     );
   }, [slots, form.startTime]);
 
+  const getFormattedDate = (val) => {
+    if (!val) return "";
+    const d = new Date(val);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
   const hasChanged = useMemo(() => {
     if (!appointment) return false;
 
     return (
-      form.appointmentDate !==
-        String(appointment.AppointmentDate || "").slice(0, 10) ||
+      form.appointmentDate !== getFormattedDate(appointment.AppointmentDate) ||
       String(form.employeeId) !== String(appointment.EmployeeId || "") ||
       form.startTime !== formatTime(appointment.StartTime)
     );
@@ -97,18 +124,43 @@ export default function RescheduleAppointment() {
       setLoading(true);
       setError("");
 
-      const res = await axiosClient.get(`/appointments/${id}/reschedule`);
+      const [res, branchRes] = await Promise.all([
+        axiosClient.get(`/appointments/${id}/reschedule`),
+        axiosClient.get("/employees/branches").catch(() => ({ data: { data: [] } })),
+      ]);
+      
       const data = res.data.data || res.data;
+      const branchList = branchRes.data.data || branchRes.data || [];
 
       setAppointment(data);
-      setEmployees(data.AvailableEmployees || []);
+      const availableEmps = data.AvailableEmployees || [];
+      setEmployees(availableEmps);
+      setBranches(branchList);
+
+      // For PENDING follow-up: use suggested date, otherwise use current appointment date
+      const initialDate = data.isPendingFollowUp && data.suggestedDate
+        ? data.suggestedDate
+        : getFormattedDate(data.AppointmentDate);
+
+      const initialTime = data.isPendingFollowUp && data.suggestedStartTime
+        ? formatTime(data.suggestedStartTime)
+        : formatTime(data.StartTime);
 
       setForm({
-        appointmentDate: String(data.AppointmentDate || "").slice(0, 10),
+        appointmentDate: initialDate,
         employeeId: String(data.EmployeeId || ""),
-        startTime: formatTime(data.StartTime),
+        startTime: initialTime,
         reason: "",
       });
+
+      // Auto-select branch of the current employee
+      const currentEmpId = String(data.EmployeeId || "");
+      if (currentEmpId) {
+        const found = availableEmps.find(e => String(e.EmployeeId) === currentEmpId);
+        if (found && found.BranchId) {
+          setSelectedBranchId(found.BranchId);
+        }
+      }
     } catch (err) {
       setError(
         err.response?.data?.message || "Không tải được dữ liệu đổi lịch",
@@ -144,15 +196,19 @@ export default function RescheduleAppointment() {
             serviceId: appointment.ServiceId,
             excludeAppointmentId: id,
             includeAllSlots: true,
+            includeAlternatives: true,
           },
         });
 
         const data = res.data.data;
         if (data && typeof data === "object" && !Array.isArray(data)) {
           setSlots(data.slots || []);
+          setAlternatives(data.alternatives || []);
         } else {
           setSlots(data || []);
+          setAlternatives([]);
         }
+
       } catch (err) {
         setSlots([]);
         setError(err.response?.data?.message || "Không tải được slot trống");
@@ -171,13 +227,19 @@ export default function RescheduleAppointment() {
     setMessage("");
 
     if (!form.appointmentDate) return setError("Vui lòng chọn ngày mới");
-    if (form.appointmentDate < minDate)
-      return setError("Không được đổi lịch về ngày trong quá khứ");
+    if (form.appointmentDate < minDate) {
+      return setError(isPendingFollowUp 
+        ? `Ngày đổi lịch không được trước ngày đề xuất tái khám (${formatDate(minDate)})` 
+        : "Không được đổi lịch về ngày trong quá khứ");
+    }
+
     if (!form.employeeId) return setError("Vui lòng chọn kỹ thuật viên");
     if (!form.startTime) return setError("Vui lòng chọn khung giờ mới");
     if (!selectedSlot)
       return setError("Vui lòng chọn slot hợp lệ từ danh sách");
-    if (!hasChanged) return setError("Bạn chưa thay đổi thông tin lịch hẹn");
+    if (!isPendingFollowUp && !hasChanged) {
+      return setError("Bạn chưa thay đổi thông tin lịch hẹn");
+    }
 
     try {
       setSubmitting(true);
@@ -254,6 +316,28 @@ export default function RescheduleAppointment() {
                 <b>{statusText(appointment.Status)}</b>
               </section>
 
+              {/* Banner for PENDING follow-up */}
+              {isPendingFollowUp && (
+                <div style={{
+                  background: "linear-gradient(135deg, #f0fdf4, #ecfdf5)",
+                  border: "1.5px solid #86efac",
+                  borderRadius: 12,
+                  padding: "14px 18px",
+                  marginBottom: 20,
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "flex-start"
+                }}>
+                  <span style={{ fontSize: 22 }}>📋</span>
+                  <div>
+                    <b style={{ color: "#15803d", fontSize: 14 }}>Đề xuất lịch tái khám từ Kỹ thuật viên</b>
+                    <p style={{ color: "#166534", fontSize: 13, margin: "4px 0 0" }}>
+                      Kỹ thuật viên <b>{appointment.EmployeeName}</b> đã đề xuất lịch tái khám này cho bạn. Bạn có thể tự do thay đổi ngày hẹn, kỹ thuật viên hoặc khung giờ mong muốn phía dưới.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <section className="reschedule-panel-pro">
                 <div className="reschedule-panel-head">
                   <div>
@@ -267,13 +351,22 @@ export default function RescheduleAppointment() {
                   type="date"
                   min={minDate}
                   value={form.appointmentDate}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const selectedVal = e.target.value;
+                    if (selectedVal && selectedVal < minDate) {
+                      setError(isPendingFollowUp
+                        ? `Ngày hẹn tái khám không thể trước ngày đề xuất tái khám (${formatDate(minDate)})!`
+                        : "Ngày hẹn không thể là ngày trong quá khứ!");
+                      return;
+                    }
+                    setError("");
                     setForm((prev) => ({
                       ...prev,
-                      appointmentDate: e.target.value,
+                      appointmentDate: selectedVal,
                       startTime: "",
-                    }))
-                  }
+                    }));
+                  }}
+
                 />
               </section>
 
@@ -281,49 +374,48 @@ export default function RescheduleAppointment() {
                 <div className="reschedule-panel-head">
                   <div>
                     <span>Bước 2</span>
-                    <h3>Chọn kỹ thuật viên</h3>
+                    <h3>Chọn chi nhánh</h3>
                   </div>
-
-                  <small>{employees.length} người phù hợp</small>
                 </div>
 
-                <div className="reschedule-employee-grid">
-                  {employees.map((emp) => (
-                    <button
-                      type="button"
-                      key={emp.EmployeeId}
-                      className={`reschedule-employee-card ${
-                        String(form.employeeId) === String(emp.EmployeeId)
-                          ? "active"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setForm((prev) => ({
-                          ...prev,
-                          employeeId: String(emp.EmployeeId),
-                          startTime: "",
-                        }))
-                      }
-                    >
-                      <img
-                        src={resolveFileUrl(emp.ImageUrl) || FALLBACK_AVATAR}
-                        alt={emp.EmployeeName}
-                      />
-
-                      <div>
-                        <b>{emp.EmployeeName}</b>
-                        <span>
-                          {emp.Specialization ||
-                            emp.Position ||
-                            "Beauty Expert"}
+                <div className="reschedule-branch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '14px', marginTop: '12px' }}>
+                  {branches.map((b) => {
+                    const isSelected = String(selectedBranchId) === String(b.BranchId);
+                    return (
+                      <button
+                        type="button"
+                        key={b.BranchId}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          padding: '16px',
+                          border: isSelected ? '2px solid #ef4f83' : '1px solid #e5e7eb',
+                          borderRadius: '12px',
+                          backgroundColor: isSelected ? '#fff0f5' : '#ffffff',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.2s',
+                          width: '100%'
+                        }}
+                        onClick={() => {
+                          setSelectedBranchId(b.BranchId);
+                          setForm((prev) => ({
+                            ...prev,
+                            employeeId: "",
+                            startTime: "",
+                          }));
+                        }}
+                      >
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: isSelected ? '#ef4f83' : '#374151', marginBottom: '4px' }}>
+                          🏢 {b.BranchName}
                         </span>
-                        <small>
-                          ⭐ {Number(emp.AverageRating || 0).toFixed(1)} ·{" "}
-                          {emp.ReviewCount || 0} đánh giá
-                        </small>
-                      </div>
-                    </button>
-                  ))}
+                        <span style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.3' }}>
+                          📍 {b.Address}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -331,6 +423,63 @@ export default function RescheduleAppointment() {
                 <div className="reschedule-panel-head">
                   <div>
                     <span>Bước 3</span>
+                    <h3>Kỹ thuật viên</h3>
+                  </div>
+
+                  <small>{filteredEmployees.length} người phù hợp</small>
+                </div>
+
+                {/* Clickable employee grid */}
+                <div className="reschedule-employee-grid">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((emp) => (
+                      <button
+                        type="button"
+                        key={emp.EmployeeId}
+                        className={`reschedule-employee-card ${
+                          String(form.employeeId) === String(emp.EmployeeId)
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            employeeId: String(emp.EmployeeId),
+                            startTime: "",
+                          }))
+                        }
+                      >
+                        <img
+                          src={resolveFileUrl(emp.ImageUrl) || FALLBACK_AVATAR}
+                          alt={emp.EmployeeName}
+                        />
+
+                        <div>
+                          <b>{emp.EmployeeName}</b>
+                          <span>
+                            {emp.Specialization ||
+                              emp.Position ||
+                              "Beauty Expert"}
+                          </span>
+                          <small>
+                            ⭐ {Number(emp.AverageRating || 0).toFixed(1)} ·{" "}
+                            {emp.ReviewCount || 0} đánh giá
+                          </small>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <p style={{ gridColumn: '1 / -1', color: '#94a3b8', textAlign: 'center', padding: '16px' }}>
+                      Không có kỹ thuật viên phù hợp tại chi nhánh đã chọn.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <section className="reschedule-panel-pro">
+                <div className="reschedule-panel-head">
+                  <div>
+                    <span>Bước 4</span>
                     <h3>Chọn slot trống</h3>
                   </div>
 
@@ -345,45 +494,96 @@ export default function RescheduleAppointment() {
                   <div className="reschedule-slot-empty">
                     Đang tải slot trống...
                   </div>
-                ) : !slots.some(slot => slot.available !== false) ? (
-                  <div className="reschedule-slot-empty">
-                    Không có slot trống. Hãy thử đổi ngày hoặc kỹ thuật viên
-                    khác.
+                ) : slots.length > 0 ? (
+                  <div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                      {slots.map((slot) => {
+                        const isSlotAvailable = slot.available !== false;
+                        const formattedStart = formatTime(slot.startTime);
+                        const formattedEnd = formatTime(slot.endTime);
+                        const isActive = formatTime(form.startTime) === formattedStart;
+
+                        return (
+                          <button
+                            key={slot.startTime}
+                            type="button"
+                            disabled={!isSlotAvailable}
+                            onClick={() => {
+                              if (!isSlotAvailable) return;
+                              setForm((prev) => ({
+                                ...prev,
+                                startTime: slot.startTime,
+                              }));
+                            }}
+                            style={{
+                              padding: "8px 12px",
+                              borderRadius: 8,
+                              border: isActive ? "2.5px solid #2d6a4f" : "1.5px solid #e5e7eb",
+                              background: isActive ? "#2d6a4f" : "#fff",
+                              color: isActive ? "#fff" : "#374151",
+                              fontWeight: isActive ? 700 : 500,
+                              fontSize: "0.82rem",
+                              cursor: isSlotAvailable ? "pointer" : "not-allowed",
+                              opacity: isSlotAvailable ? 1 : 0.45,
+                              transition: "all 0.15s",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              minWidth: 90,
+                            }}
+                          >
+                            <span style={{ fontWeight: 700 }}>{formattedStart}</span>
+                            <span style={{ fontSize: "0.68rem", opacity: 0.85 }}>- {formattedEnd}</span>
+                            {!isSlotAvailable && <span style={{ fontSize: "0.68rem", color: "#ef4444", fontWeight: 700, marginTop: 2 }}>Bận</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Alternatives suggestions if any */}
+                    {alternatives.length > 0 && (
+                      <div style={{ marginTop: 12, padding: "12px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10 }}>
+                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#0369a1", display: "block", marginBottom: 6 }}>
+                          💡 Kỹ thuật viên khác đang rảnh vào giờ này:
+                        </span>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {alternatives.map((alt) => (
+                            <button
+                              key={`${alt.employeeId}-${alt.startTime}`}
+                              type="button"
+                              onClick={() => {
+                                setForm((prev) => ({
+                                  ...prev,
+                                  employeeId: String(alt.employeeId),
+                                  startTime: alt.startTime,
+                                }));
+                              }}
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: 6,
+                                background: "#fff",
+                                border: "1px solid #e0f2fe",
+                                color: "#0369a1",
+                                fontSize: "0.78rem",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                transition: "all 0.15s",
+                              }}
+                            >
+                              👤 {alt.employeeName} ({formatTime(alt.startTime)})
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="reschedule-slot-grid">
-                    {slots.map((slot) => {
-                      const isSlotAvailable = slot.available !== false;
-                      const formattedStart = formatTime(slot.startTime);
-                      const formattedEnd = formatTime(slot.endTime);
-
-                      return (
-                        <button
-                          key={`${slot.startTime}-${slot.endTime}`}
-                          type="button"
-                          disabled={!isSlotAvailable}
-                          className={`reschedule-slot-btn ${
-                            formatTime(form.startTime) === formattedStart ? "active" : ""
-                          }`}
-                          style={!isSlotAvailable ? { opacity: 0.45, filter: "grayscale(100%)", cursor: "not-allowed", border: "1px dashed #d1d5db" } : {}}
-                          onClick={() => {
-                            if (!isSlotAvailable) return;
-                            setForm((prev) => ({
-                              ...prev,
-                              startTime: slot.startTime,
-                            }));
-                          }}
-                        >
-                          <b>{formattedStart}</b>
-                          <span>
-                            {formattedStart} - {formattedEnd}
-                          </span>
-                          {!isSlotAvailable && <span style={{ fontSize: 10, display: "block", color: "#ef4444", fontWeight: 600 }}>Bận</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <p style={{ fontSize: "0.85rem", color: "#6b7280", margin: "10px 0" }}>
+                    💡 Vui lòng chọn kỹ thuật viên và ngày để xem khung giờ.
+                  </p>
                 )}
+
               </section>
 
               <section className="reschedule-panel-pro">
@@ -447,6 +647,13 @@ export default function RescheduleAppointment() {
                     <b>{appointment.EmployeeName || "-"}</b>
                   </div>
 
+                  {appointment.BranchName && (
+                    <div>
+                      <span>Chi nhánh cũ</span>
+                      <b>{appointment.BranchName}</b>
+                    </div>
+                  )}
+
                   <div>
                     <span>Ngày giờ cũ</span>
                     <b>
@@ -481,6 +688,16 @@ export default function RescheduleAppointment() {
                     <b>{selectedEmployee?.EmployeeName || "Chưa chọn"}</b>
                   </div>
 
+                  {selectedEmployee && (
+                    <div>
+                      <span>Chi nhánh mới</span>
+                      <b>{selectedEmployee.BranchName || "Chi nhánh chính"}</b>
+                      <span style={{ fontSize: "0.78rem", color: "#6b7280", fontWeight: 400, display: "block", marginTop: "2px" }}>
+                        📍 {selectedEmployee.BranchAddress}
+                      </span>
+                    </div>
+                  )}
+
                   <div>
                     <span>Giờ mới</span>
                     <b>
@@ -496,6 +713,20 @@ export default function RescheduleAppointment() {
                   </div>
                 </div>
               </section>
+
+              {selectedEmployee?.BranchAddress && (
+                <section className="reschedule-summary-card" style={{ padding: "0", borderRadius: "14px", overflow: "hidden", border: "1px solid #efd8e1" }}>
+                  <iframe
+                    title="Google Maps Reschedule Branch Locator"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedEmployee.BranchAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                    width="100%"
+                    height="170"
+                    style={{ border: 0, display: "block" }}
+                    allowFullScreen=""
+                    loading="lazy"
+                  />
+                </section>
+              )}
 
               <section className="reschedule-note-card">
                 <b>Lưu ý đổi lịch</b>

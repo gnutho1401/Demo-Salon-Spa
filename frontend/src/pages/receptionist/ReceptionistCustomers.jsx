@@ -8,8 +8,9 @@ const DEFAULT_AVATAR = "/images/default-avatar.png";
 function avatarUrl(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
 }
+
 function money(value) {
-  return `${Number(value || 0).toLocaleString("vi-VN")}đ`;
+  return `${Number(value || 0).toLocaleString("vi-VN")} VND`;
 }
 
 export default function ReceptionistCustomers() {
@@ -38,7 +39,7 @@ export default function ReceptionistCustomers() {
       });
       setItems(res.data.data || res.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải được khách hàng");
+      setError(err.response?.data?.message || "Không tải được danh sách khách hàng từ hệ thống");
     } finally {
       setLoading(false);
     }
@@ -89,9 +90,9 @@ export default function ReceptionistCustomers() {
       });
 
       await load();
-      setSuccess("Đã tạo khách hàng mới thành công");
+      setSuccess("Tạo mới hồ sơ khách hàng thành công!");
     } catch (err) {
-      setError(err.response?.data?.message || "Tạo khách hàng thất bại");
+      setError(err.response?.data?.message || "Lỗi tạo hồ sơ khách hàng mới");
     } finally {
       setLoading(false);
     }
@@ -102,10 +103,9 @@ export default function ReceptionistCustomers() {
       <div className="rcc-page">
         <div className="rcc-header">
           <div>
-            <h1>Khách hàng</h1>
+            <h1>Hồ sơ khách hàng</h1>
             <p>
-              Quản lý hồ sơ khách hàng, lịch sử đặt lịch, thanh toán và
-              membership.
+              Quản lý danh sách khách hàng, lịch sử dịch vụ, hóa đơn tích lũy và thẻ thành viên.
             </p>
           </div>
 
@@ -114,7 +114,7 @@ export default function ReceptionistCustomers() {
             type="button"
             onClick={() => setShowCreate(true)}
           >
-            + Thêm khách hàng
+            + Thêm khách hàng mới
           </button>
         </div>
 
@@ -124,33 +124,41 @@ export default function ReceptionistCustomers() {
         <div className="rcc-stat-grid">
           <div className="rcc-stat-card pink">
             <span>👥</span>
-            <p>Tổng khách hàng</p>
-            <b>{stats.total}</b>
+            <div>
+              <p>Tổng số khách hàng</p>
+              <b>{stats.total} khách</b>
+            </div>
           </div>
           <div className="rcc-stat-card green">
             <span>⭐</span>
-            <p>Standard</p>
-            <b>{stats.standard}</b>
+            <div>
+              <p>Hạng chuẩn (Standard)</p>
+              <b>{stats.standard} khách</b>
+            </div>
           </div>
           <div className="rcc-stat-card purple">
             <span>💎</span>
-            <p>VIP / Member</p>
-            <b>{stats.vip}</b>
+            <div>
+              <p>Hạng VIP / Thân thiết</p>
+              <b>{stats.vip} khách</b>
+            </div>
           </div>
           <div className="rcc-stat-card gold">
             <span>💰</span>
-            <p>Tổng chi tiêu</p>
-            <b>{money(stats.spent)}</b>
+            <div>
+              <p>Doanh số tích lũy</p>
+              <b>{money(stats.spent)}</b>
+            </div>
           </div>
         </div>
 
         <div className="rcc-filter-card">
           <label>
-            Tìm khách hàng
+            Tìm kiếm khách hàng nhanh
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Nhập tên, số điện thoại hoặc email..."
+              placeholder="Nhập tên khách hàng, số điện thoại hoặc email liên hệ..."
             />
           </label>
 
@@ -159,7 +167,7 @@ export default function ReceptionistCustomers() {
             type="button"
             onClick={() => setKeyword("")}
           >
-            Đặt lại
+            Xóa bộ lọc
           </button>
         </div>
 
@@ -167,15 +175,15 @@ export default function ReceptionistCustomers() {
           <table className="rcc-table">
             <thead>
               <tr>
-                <th>Mã</th>
-                <th>Khách hàng</th>
+                <th style={{ width: "80px" }}>Mã KH</th>
+                <th>Thông tin khách hàng</th>
                 <th>Liên hệ</th>
-                <th>Membership</th>
-                <th>Điểm</th>
-                <th>Lịch hẹn</th>
-                <th>Chi tiêu</th>
+                <th>Hạng thành viên</th>
+                <th>Điểm tích lũy</th>
+                <th>Số lịch hẹn</th>
+                <th>Tổng chi tiêu</th>
                 <th>Lần ghé gần nhất</th>
-                <th>Thao tác</th>
+                <th style={{ width: "120px" }}>Thao tác</th>
               </tr>
             </thead>
 
@@ -193,7 +201,7 @@ export default function ReceptionistCustomers() {
                       />
                       <div>
                         <b>{c.FullName}</b>
-                        <small>Customer ID #{c.CustomerId}</small>
+                        <small>ID hệ thống: #{c.CustomerId}</small>
                       </div>
                     </div>
                   </td>
@@ -204,22 +212,24 @@ export default function ReceptionistCustomers() {
                   </td>
 
                   <td>
-                    <span className="rcc-badge">
+                    <span className={`rcc-badge ${String(c.MembershipLevel || "Standard").toLowerCase() !== "standard" ? "green" : ""}`}>
                       {c.MembershipLevel || "Standard"}
                     </span>
                   </td>
 
-                  <td>{c.Points || 0}</td>
+                  <td><b>{c.Points || 0}</b> điểm</td>
                   <td>
-                    <b>{c.TotalAppointments || 0}</b>
-                    <small>Hoàn thành: {c.CompletedAppointments || 0}</small>
+                    <b>{c.TotalAppointments || 0}</b> lượt
+                    <small>Đã xong: {c.CompletedAppointments || 0}</small>
                   </td>
-                  <td>{money(c.TotalSpent)}</td>
+                  <td><b style={{ color: '#4a7c36' }}>{money(c.TotalSpent)}</b></td>
 
                   <td>
-                    {c.LastVisitDate
-                      ? new Date(c.LastVisitDate).toLocaleDateString("vi-VN")
-                      : "-"}
+                    <b>
+                      {c.LastVisitDate
+                        ? new Date(c.LastVisitDate).toLocaleDateString("vi-VN")
+                        : "-"}
+                    </b>
                   </td>
 
                   <td>
@@ -236,7 +246,7 @@ export default function ReceptionistCustomers() {
               {!loading && items.length === 0 && (
                 <tr>
                   <td colSpan="9" className="rcc-empty">
-                    Không có khách hàng phù hợp
+                    Không tìm thấy dữ liệu khách hàng phù hợp.
                   </td>
                 </tr>
               )}
@@ -247,14 +257,15 @@ export default function ReceptionistCustomers() {
         {showCreate && (
           <div className="rcc-modal-backdrop">
             <form className="rcc-modal" onSubmit={createCustomer}>
-              <h3>Thêm khách hàng mới</h3>
-              <p>Tạo nhanh hồ sơ khách tại quầy lễ tân.</p>
+              <h3>Thêm hồ sơ khách hàng</h3>
+              <p>Tạo nhanh thông tin khách hàng tại quầy tiếp đón.</p>
 
               <div className="rcc-form-grid">
                 <label>
-                  Họ tên *
+                  Họ và tên *
                   <input
                     value={form.FullName}
+                    placeholder="Nhập họ và tên đầy đủ..."
                     onChange={(e) =>
                       setForm((p) => ({ ...p, FullName: e.target.value }))
                     }
@@ -263,9 +274,10 @@ export default function ReceptionistCustomers() {
                 </label>
 
                 <label>
-                  Số điện thoại *
+                  Số điện thoại liên hệ *
                   <input
                     value={form.Phone}
+                    placeholder="Nhập số điện thoại..."
                     onChange={(e) =>
                       setForm((p) => ({ ...p, Phone: e.target.value }))
                     }
@@ -274,10 +286,11 @@ export default function ReceptionistCustomers() {
                 </label>
 
                 <label>
-                  Email
+                  Địa chỉ Email
                   <input
                     type="email"
                     value={form.Email}
+                    placeholder="VD: customer@gmail.com..."
                     onChange={(e) =>
                       setForm((p) => ({ ...p, Email: e.target.value }))
                     }
@@ -285,7 +298,7 @@ export default function ReceptionistCustomers() {
                 </label>
 
                 <label>
-                  Giới tính
+                  Giới tính khách hàng
                   <select
                     value={form.Gender}
                     onChange={(e) =>
@@ -300,7 +313,7 @@ export default function ReceptionistCustomers() {
                 </label>
 
                 <label>
-                  Ngày sinh
+                  Ngày sinh nhật
                   <input
                     type="date"
                     value={form.DateOfBirth}
@@ -311,9 +324,10 @@ export default function ReceptionistCustomers() {
                 </label>
 
                 <label>
-                  Địa chỉ
+                  Địa chỉ thường trú
                   <input
                     value={form.Address}
+                    placeholder="Nhập số nhà, tên đường, khu vực..."
                     onChange={(e) =>
                       setForm((p) => ({ ...p, Address: e.target.value }))
                     }
@@ -322,15 +336,15 @@ export default function ReceptionistCustomers() {
               </div>
 
               <div className="rcc-modal-actions">
-                <button className="rcc-primary-btn" disabled={loading}>
-                  {loading ? "Đang lưu..." : "Tạo khách hàng"}
+                <button className="rcc-primary-btn" disabled={loading} type="submit">
+                  {loading ? "Đang xử lý..." : "Lưu hồ sơ"}
                 </button>
                 <button
                   className="rcc-light-btn"
                   type="button"
                   onClick={() => setShowCreate(false)}
                 >
-                  Đóng
+                  Đóng lại
                 </button>
               </div>
             </form>

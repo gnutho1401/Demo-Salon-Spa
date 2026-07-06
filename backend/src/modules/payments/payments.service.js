@@ -44,13 +44,15 @@ async function getPayableAppointment(
   appointmentId,
   voucherId = null,
   rewardPoints = 0,
+  isStaff = false,
 ) {
   const pool = await connectDB();
 
   const info = await pool
     .request()
     .input("UserId", sql.Int, userId)
-    .input("AppointmentId", sql.Int, appointmentId).query(`
+    .input("AppointmentId", sql.Int, appointmentId)
+    .input("IsStaff", sql.Bit, isStaff ? 1 : 0).query(`
       SELECT
         a.AppointmentId,
         a.CustomerId,
@@ -62,7 +64,7 @@ async function getPayableAppointment(
       INNER JOIN AppointmentServices aps ON aps.AppointmentId = a.AppointmentId
       LEFT JOIN Services s ON s.ServiceId = aps.ServiceId
       WHERE a.AppointmentId = @AppointmentId
-        AND c.UserId = @UserId
+        AND (@IsStaff = 1 OR c.UserId = @UserId)
       GROUP BY
         a.AppointmentId,
         a.CustomerId,
@@ -125,7 +127,7 @@ async function getPayableAppointment(
         WHERE v.VoucherId = @VoucherId
           AND cv.CustomerId = @CustomerId
           AND v.Status = 'ACTIVE'
-          AND ISNULL(cv.UsedStatus, 0) = 0
+          AND cv.UsedStatus = 0
           AND ISNULL(v.MinOrderAmount, 0) <= @TotalAmount
           AND (v.StartDate IS NULL OR v.StartDate <= CAST(GETDATE() AS DATE))
           AND (v.EndDate IS NULL OR v.EndDate >= CAST(GETDATE() AS DATE))
@@ -324,7 +326,7 @@ async function createPaymentRow(
           @Status,
           @TransactionCode,
           GETDATE(),
-          CASE WHEN @Status = 'PAID' THEN GETDATE() ELSE NULL END
+          CASE WHEN CAST(@Status AS VARCHAR) = 'PAID' THEN GETDATE() ELSE NULL END
         )
     `);
 
@@ -334,17 +336,35 @@ async function createPaymentRow(
 async function markVoucherUsed(transaction, customerId, voucherId) {
   if (!customerId || !voucherId) return;
 
-  await new sql.Request(transaction)
+  const req = new sql.Request(transaction);
+
+  // 2. Đếm số lần sử dụng thành công (status = PAID) của khách hàng đối với voucher này
+  const useCountResult = await req
     .input("CustomerId", sql.Int, customerId)
-    .input("VoucherId", sql.Int, voucherId).query(`
+    .input("VoucherId", sql.Int, voucherId)
+    .query(`
+      SELECT COUNT(*) AS UseCount
+      FROM Invoices i
+      JOIN Payments p ON i.InvoiceId = p.InvoiceId
+      JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+      WHERE a.CustomerId = @CustomerId
+        AND i.VoucherId = @VoucherId
+        AND p.Status = 'PAID'
+    `);
+  
+  const useCount = useCountResult.recordset[0].UseCount;
+
+  // 3. Nếu dùng từ 3 lần trở lên mới chuyển trạng thái UsedStatus = 1 trong CustomerVouchers
+  if (useCount >= 3) {
+    await req.query(`
       UPDATE CustomerVouchers
       SET
         UsedStatus = 1,
         UsedAt = GETDATE()
       WHERE CustomerId = @CustomerId
         AND VoucherId = @VoucherId
-        AND ISNULL(UsedStatus, 0) = 0
     `);
+  }
 }
 
 async function markAppointmentPaid(transaction, appointmentId) {
@@ -624,9 +644,12 @@ async function processVnpayCallback(query = {}) {
   const secureHash = query.vnp_SecureHash;
   const secretKey = process.env.VNP_HASH_SECRET;
 
-  const vnpParams = { ...query };
-  delete vnpParams.vnp_SecureHash;
-  delete vnpParams.vnp_SecureHashType;
+  const vnpParams = {};
+  for (const key in query) {
+    if (key.startsWith("vnp_") && key !== "vnp_SecureHash" && key !== "vnp_SecureHashType") {
+      vnpParams[key] = query[key];
+    }
+  }
 
   const sortedParams = sortObject(vnpParams);
   const signData = qs.stringify(sortedParams, { encode: false });
@@ -635,7 +658,7 @@ async function processVnpayCallback(query = {}) {
     .update(Buffer.from(signData, "utf-8"))
     .digest("hex");
 
-  if (secureHash !== signed) {
+  if (String(secureHash).toLowerCase() !== String(signed).toLowerCase()) {
     return {
       success: false,
       code: "97",
@@ -1312,6 +1335,78 @@ async function refundPayosPayment(paymentId, userId, reason = "") {
   }
 }
 
+async function applyVoucher(userId, appointmentId, body, isStaff = false) {
+  const pool = await connectDB();
+
+  const voucherId = body.voucherId || null;
+  const rewardPoints = Number(body.rewardPoints || 0);
+
+  // 1. Lấy thông tin hóa đơn hiện tại để xem có voucher nào đang được áp dụng không
+  const oldInvoiceRes = await pool.request()
+    .input("AppointmentId", sql.Int, appointmentId)
+    .query(`
+      SELECT TOP 1 VoucherId
+      FROM Invoices
+      WHERE AppointmentId = @AppointmentId
+      ORDER BY InvoiceId DESC
+    `);
+  const oldVoucherId = oldInvoiceRes.recordset[0]?.VoucherId || null;
+
+  // 2. Tính toán tiền chiết khấu và thực hiện các bước kiểm định
+  const calculation = await getPayableAppointment(userId, appointmentId, voucherId, rewardPoints, isStaff);
+
+  // 3. Ràng buộc số lần sử dụng tối đa của voucher mới (nếu áp dụng voucher mới)
+  if (voucherId && voucherId !== oldVoucherId) {
+    const countRes = await pool.request()
+      .input("CustomerId", sql.Int, calculation.CustomerId)
+      .input("VoucherId", sql.Int, voucherId)
+      .query(`
+        SELECT COUNT(*) AS UseCount
+        FROM Invoices i
+        JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+        WHERE a.CustomerId = @CustomerId
+          AND i.VoucherId = @VoucherId
+          AND a.Status NOT IN ('CANCELLED', 'REFUND_PENDING', 'REFUNDED', 'NO_SHOW')
+      `);
+    if (countRes.recordset[0].UseCount >= 3) {
+      throw new Error("Bạn đã sử dụng voucher này tối đa 3 lần");
+    }
+  }
+
+  // 4. Cập nhật số lượng của voucher trong bảng Vouchers (trừ voucher mới, hoàn voucher cũ)
+  if (oldVoucherId && oldVoucherId !== voucherId) {
+    // Hoàn lại số lượng voucher cũ
+    await pool.request().input("OldVoucherId", sql.Int, oldVoucherId).query(`
+      UPDATE Vouchers
+      SET Quantity = Quantity + 1
+      WHERE VoucherId = @OldVoucherId
+    `);
+  }
+
+  if (voucherId && voucherId !== oldVoucherId) {
+    // Trừ đi số lượng voucher mới
+    await pool.request().input("NewVoucherId", sql.Int, voucherId).query(`
+      UPDATE Vouchers
+      SET Quantity = CASE WHEN Quantity > 0 THEN Quantity - 1 ELSE 0 END
+      WHERE VoucherId = @NewVoucherId
+    `);
+  }
+
+  // 5. Cập nhật hoặc tạo hóa đơn mới trong CSDL
+  await createOrUpdateInvoice(
+    pool,
+    appointmentId,
+    calculation.TotalAmount,
+    calculation.discountAmount,
+    calculation.finalAmount,
+    calculation.voucherId,
+    calculation.rewardPointsUsed,
+    calculation.rewardDiscountAmount
+  );
+
+  return calculation;
+}
+
 module.exports = {
   getMyPayments,
   getPayableAppointment,
@@ -1325,4 +1420,5 @@ module.exports = {
   handlePayosReturn,
   cancelPayosPayment,
   refundPayosPayment,
+  applyVoucher,
 };

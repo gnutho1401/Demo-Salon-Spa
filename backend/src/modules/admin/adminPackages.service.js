@@ -22,7 +22,7 @@ function toInt(v, fallback = 0) {
 }
 
 function toBit(v) {
-  return v === true || v === 1 || v === "1" || v === "true" ? 1 : 0;
+  return v === true || v === 1 || v === "1" || v === "true";
 }
 
 function status(v, fallback = "ACTIVE") {
@@ -102,7 +102,7 @@ async function ensureUniqueName(pool, packageName, excludeId = null) {
       SELECT TOP 1 PackageId
       FROM Packages
       WHERE LOWER(PackageName) = LOWER(@PackageName)
-        AND (@ExcludeId IS NULL OR PackageId <> @ExcludeId)
+        AND (CAST(@ExcludeId AS INT) IS NULL OR PackageId <> CAST(@ExcludeId AS INT))
     `);
 
   if (result.recordset[0]) throw new Error("Tên package đã tồn tại");

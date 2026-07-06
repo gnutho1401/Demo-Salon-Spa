@@ -1,4 +1,5 @@
 const { sql, connectDB } = require("../../config/db");
+const adminServicesService = require("../admin/adminServices.service");
 
 async function getAll() {
   const pool = await connectDB();
@@ -43,4 +44,17 @@ async function getById(id) {
   return result.recordset[0];
 }
 
-module.exports = { getAll, getById };
+async function create(data) {
+  return adminServicesService.create(data);
+}
+
+async function update(id, data) {
+  return adminServicesService.update(id, data);
+}
+
+async function remove(id) {
+  return adminServicesService.remove(id);
+}
+
+module.exports = { getAll, getById, create, update, remove };
+

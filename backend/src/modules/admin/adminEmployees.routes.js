@@ -13,5 +13,7 @@ router.get("/:id", controller.getById);
 router.post("/", controller.create);
 router.put("/:id", controller.update);
 router.patch("/:id/status", controller.changeStatus);
+router.get("/:id/services", controller.getAssignedServices);
+router.put("/:id/services", controller.updateAssignedServices);
 
 module.exports = router;

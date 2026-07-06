@@ -566,8 +566,25 @@ export default function ReceptionistAppointments() {
                     {/* Service */}
                     <td style={{ padding: "14px 18px" }}>
                       <b style={{ color: "#3d2e26", fontSize: 13, display: "block" }}>{a.ServiceName || "-"}</b>
+                      {a.CustomerPackageId && a.CustomerPackageName && (
+                        <div style={{
+                          marginTop: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 6px',
+                          backgroundColor: '#f3e8ff',
+                          color: '#6b21a8',
+                          border: '1px solid #e9d5ff',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '500'
+                        }}>
+                          📦 Combo: {a.CustomerPackageName}
+                        </div>
+                      )}
                       {a.FinalAmount !== undefined && (
-                        <small style={{ color: "#a0573a", fontWeight: 700, fontSize: 11 }}>
+                        <small style={{ color: "#a0573a", fontWeight: 700, fontSize: 11, display: "block", marginTop: 4 }}>
                           {Number(a.FinalAmount).toLocaleString("vi-VN")} đ
                         </small>
                       )}

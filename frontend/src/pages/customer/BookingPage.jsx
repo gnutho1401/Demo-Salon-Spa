@@ -5,6 +5,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 export default function BookingPage() {
   const [services, setServices] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState("");
   const [employees, setEmployees] = useState([]);
   const [bookingType, setBookingType] = useState("SERVICE");
 
@@ -59,13 +61,15 @@ export default function BookingPage() {
         setPageLoading(true);
         setError("");
 
-        const [serviceRes, packageRes, voucherRes] = await Promise.all([
+        const [serviceRes, packageRes, voucherRes, branchRes] = await Promise.all([
           axiosClient.get("/services"),
           axiosClient.get("/packages/my").catch(() => ({ data: { data: [] } })),
           axiosClient.get("/vouchers/my").catch(() => ({ data: { data: [] } })),
+          axiosClient.get("/employees/branches").catch(() => ({ data: { data: [] } })),
         ]);
 
         setServices(serviceRes.data.data || []);
+        setBranches(branchRes.data.data || branchRes.data || []);
 
         const activePkgs = (
           packageRes.data.data ||
@@ -189,11 +193,20 @@ export default function BookingPage() {
       setSelectedPackageId(customerPackageId);
       setStep(1);
     } else if (serviceId && employeeId) {
-      setStep(3);
+      setStep(4); // Go to step 4 (Chọn thời gian)
     } else if (serviceId) {
-      setStep(2);
+      setStep(2); // Go to step 2 (Chọn chi nhánh)
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (form.employeeId && employees.length > 0) {
+      const emp = employees.find(e => String(e.EmployeeId) === String(form.employeeId));
+      if (emp && emp.BranchId) {
+        setSelectedBranchId(emp.BranchId);
+      }
+    }
+  }, [form.employeeId, employees]);
 
   useEffect(() => {
     const customerPackageId = searchParams.get("customerPackageId");
@@ -236,9 +249,10 @@ export default function BookingPage() {
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((e) => {
+      const matchBranch = !selectedBranchId || String(e.BranchId) === String(selectedBranchId);
       const text = employeeKeyword.toLowerCase();
 
-      return (
+      const matchKeyword = (
         String(e.FullName || "")
           .toLowerCase()
           .includes(text) ||
@@ -249,8 +263,10 @@ export default function BookingPage() {
           .toLowerCase()
           .includes(text)
       );
+
+      return matchBranch && matchKeyword;
     });
-  }, [employees, employeeKeyword]);
+  }, [employees, employeeKeyword, selectedBranchId]);
 
   const selectedService = useMemo(() => {
     return services.find((s) => String(s.ServiceId) === String(form.serviceId));
@@ -351,8 +367,9 @@ export default function BookingPage() {
       employeeId: "",
       startTime: "",
     });
+    setSelectedBranchId("");
 
-    setStep(2);
+    setStep(2); // Go to step 2: Chọn chi nhánh
   }
 
   async function selectPackage(pkg) {
@@ -397,8 +414,19 @@ export default function BookingPage() {
       employeeId: "",
       startTime: "",
     });
+    setSelectedBranchId("");
 
-    setStep(2);
+    setStep(2); // Go to step 2: Chọn chi nhánh
+  }
+
+  function chooseBranch(branchId) {
+    setSelectedBranchId(branchId);
+    setForm({
+      ...form,
+      employeeId: "",
+      startTime: "",
+    });
+    setStep(3); // Go to step 3: Chọn kỹ thuật viên
   }
 
   function chooseEmployee(employeeId) {
@@ -411,12 +439,13 @@ export default function BookingPage() {
 
     setAvailableSlots([]);
     setAlternatives([]);
-    setStep(3);
+    setStep(4); // Go to step 4: Chọn thời gian
   }
 
+  // Go to step 5: Xác nhận
   function chooseTime(time) {
     setForm({ ...form, startTime: time });
-    setStep(4);
+    setStep(5);
   }
 
   function handleChange(e) {
@@ -648,10 +677,11 @@ export default function BookingPage() {
 
         <div className="booking-steps">
           {[
-            ["1", "Chọn dịch vụ", "Dịch vụ bạn muốn"],
-            ["2", "Kỹ thuật viên", "Người thực hiện"],
-            ["3", "Thời gian", "Ngày và giờ hẹn"],
-            ["4", "Xác nhận", "Kiểm tra thông tin"],
+            ["1", "Dịch vụ", "Dịch vụ bạn muốn"],
+            ["2", "Chi nhánh", "Địa điểm salon"],
+            ["3", "Kỹ thuật viên", "Người thực hiện"],
+            ["4", "Thời gian", "Ngày và giờ hẹn"],
+            ["5", "Xác nhận", "Kiểm tra thông tin"],
           ].map((item, index) => (
             <div
               key={item[0]}
@@ -902,73 +932,138 @@ export default function BookingPage() {
             <section className="booking-section">
               <div className="booking-section-head">
                 <div>
-                  <h2>2. Chọn kỹ thuật viên</h2>
-                  <p>Chỉ hiển thị kỹ thuật viên phù hợp với dịch vụ đã chọn.</p>
+                  <h2>2. Chọn chi nhánh</h2>
+                  <p>Chọn chi nhánh bạn mong muốn sử dụng dịch vụ.</p>
                 </div>
               </div>
 
-              <input
-                className="booking-input"
-                value={employeeKeyword}
-                onChange={(e) => setEmployeeKeyword(e.target.value)}
-                placeholder="Tìm kiếm kỹ thuật viên theo tên, chuyên môn hoặc vị trí..."
-              />
-
-              {!form.serviceId && (
+              {!form.serviceId ? (
                 <p className="booking-empty">Vui lòng chọn dịch vụ trước.</p>
-              )}
-
-              {employeeLoading && (
-                <p className="booking-empty">
-                  Đang tải kỹ thuật viên phù hợp...
-                </p>
-              )}
-
-              {form.serviceId && !employeeLoading && (
-                <div className="booking-employee-grid">
-                  {filteredEmployees.length > 0 ? (
-                    filteredEmployees.map((item) => (
-                      <button
-                        type="button"
-                        key={item.EmployeeId}
-                        className={`booking-employee-card ${
-                          String(form.employeeId) === String(item.EmployeeId)
-                            ? "selected"
-                            : ""
-                        }`}
-                        onClick={() => chooseEmployee(item.EmployeeId)}
-                      >
-                        <img
-                          src={
-                            resolveFileUrl(item.ImageUrl) ||
-                            "/default-avatar.png"
-                          }
-                          alt={item.FullName}
-                        />
-
-                        <div>
-                          <strong>{item.FullName}</strong>
-                          <span>
-                            {item.Specialization ||
-                              item.Position ||
-                              "Kỹ thuật viên"}
+              ) : (
+                <>
+                  <div className="booking-branch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '16px', marginTop: '16px' }}>
+                    {branches.map((b) => {
+                      const isSelected = String(selectedBranchId) === String(b.BranchId);
+                      return (
+                        <button
+                          type="button"
+                          key={b.BranchId}
+                          className={`booking-branch-card ${isSelected ? "selected" : ""}`}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            padding: '20px',
+                            border: isSelected ? '2px solid #8b5cf6' : '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            backgroundColor: isSelected ? '#f5f3ff' : '#ffffff',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.2s',
+                            width: '100%',
+                            boxShadow: isSelected ? '0 4px 6px -1px rgba(139, 92, 246, 0.1), 0 2px 4px -1px rgba(139, 92, 246, 0.06)' : 'none'
+                          }}
+                          onClick={() => chooseBranch(b.BranchId)}
+                        >
+                          <span style={{ fontSize: '16px', fontWeight: 'bold', color: isSelected ? '#7c3aed' : '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            🏢 {b.BranchName}
                           </span>
+                          <span style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.4', marginBottom: '12px' }}>
+                            📍 {b.Address}
+                          </span>
+                          {b.Phone && (
+                            <span style={{ fontSize: '12px', color: isSelected ? '#8b5cf6' : '#94a3b8', fontWeight: 500 }}>
+                              📞 {b.Phone}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {selectedBranchId && (() => {
+                    const selBranch = branches.find(b => String(b.BranchId) === String(selectedBranchId));
+                    if (selBranch && selBranch.Address) {
+                      return (
+                        <div style={{ marginTop: '24px', borderRadius: '16px', overflow: 'hidden', border: '1px solid #e2e8f0', width: '100%', height: '320px' }}>
+                          <iframe
+                            title="Bản đồ chi nhánh đã chọn"
+                            src={`https://maps.google.com/maps?q=${encodeURIComponent(selBranch.Address)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                            width="100%"
+                            height="100%"
+                            style={{ border: 0, display: "block" }}
+                            allowFullScreen=""
+                            loading="lazy"
+                          />
                         </div>
-                      </button>
-                    ))
-                  ) : (
-                    <p className="booking-empty">
-                      Không tìm thấy kỹ thuật viên phù hợp.
-                    </p>
-                  )}
-                </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </>
               )}
             </section>
 
             <section className="booking-section">
               <div className="booking-section-head">
                 <div>
-                  <h2>3. Chọn thời gian</h2>
+                  <h2>3. Chọn kỹ thuật viên</h2>
+                  <p>Danh sách nhân viên tại chi nhánh phù hợp với dịch vụ của bạn.</p>
+                </div>
+              </div>
+
+              {!form.serviceId ? (
+                <p className="booking-empty">Vui lòng chọn dịch vụ trước.</p>
+              ) : !selectedBranchId ? (
+                <p className="booking-empty">Vui lòng chọn chi nhánh trước.</p>
+              ) : (
+                <>
+                  <input
+                    className="booking-input"
+                    value={employeeKeyword}
+                    onChange={(e) => setEmployeeKeyword(e.target.value)}
+                    placeholder="Tìm kiếm kỹ thuật viên theo tên, chuyên môn..."
+                  />
+
+                  {employeeLoading ? (
+                    <p className="booking-empty">Đang tải kỹ thuật viên phù hợp...</p>
+                  ) : (
+                    <div className="booking-employee-grid">
+                      {filteredEmployees.length > 0 ? (
+                        filteredEmployees.map((item) => (
+                          <button
+                            type="button"
+                            key={item.EmployeeId}
+                            className={`booking-employee-card ${
+                              String(form.employeeId) === String(item.EmployeeId)
+                                ? "selected"
+                                : ""
+                            }`}
+                            onClick={() => chooseEmployee(item.EmployeeId)}
+                          >
+                            <img
+                              src={resolveFileUrl(item.ImageUrl) || "/default-avatar.png"}
+                              alt={item.FullName}
+                            />
+                            <div>
+                              <strong>{item.FullName}</strong>
+                              <span>{item.Specialization || item.Position || "Kỹ thuật viên"}</span>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="booking-empty">Không tìm thấy kỹ thuật viên phù hợp tại chi nhánh này.</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className="booking-section">
+              <div className="booking-section-head">
+                <div>
+                  <h2>4. Chọn thời gian</h2>
                   <p>Chọn ngày và giờ trống từ hệ thống.</p>
                 </div>
               </div>
@@ -1047,7 +1142,7 @@ export default function BookingPage() {
                                     appointmentDate: alt.date,
                                     startTime: alt.startTime,
                                   }));
-                                  setStep(4);
+                                  setStep(5);
                                 }}
                               >
                                 <div className={`alt-badge type-${alt.type}`}>
@@ -1140,7 +1235,7 @@ export default function BookingPage() {
                     </div>
                   ) : (
                     <p className="booking-empty">
-                      Vui lòng chọn dịch vụ, kỹ thuật viên và ngày hẹn.
+                      Vui lòng chọn dịch vụ, chi nhánh, kỹ thuật viên và ngày hẹn.
                     </p>
                   )}
                 </div>
@@ -1150,7 +1245,7 @@ export default function BookingPage() {
             <section className="booking-section">
               <div className="booking-section-head">
                 <div>
-                  <h2>4. Ghi chú</h2>
+                  <h2>5. Ghi chú</h2>
                   <p>Nhập yêu cầu đặc biệt nếu có.</p>
                 </div>
               </div>

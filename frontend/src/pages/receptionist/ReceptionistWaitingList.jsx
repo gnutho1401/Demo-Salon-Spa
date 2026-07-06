@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import axiosClient from "../../api/axiosClient";
+import { useSearchParams } from "react-router-dom";
+import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
 import "../../styles/pages/receptionist.css";
+
+const DEFAULT_AVATAR = "/images/default-avatar.png";
+
+function avatarUrl(url) {
+  return resolveFileUrl(url) || DEFAULT_AVATAR;
+}
 
 const STATUS_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
@@ -13,6 +20,14 @@ const STATUS_OPTIONS = [
   { value: "EXPIRED", label: "Hết hạn giữ slot" },
   { value: "CANCELLED", label: "Đã hủy" },
 ];
+
+const TIME_SLOT_MAP = {
+  ANY: "Linh hoạt cả ngày",
+  MORNING: "Sáng (08:00 - 12:00)",
+  AFTERNOON: "Chiều (13:00 - 17:00)",
+  EVENING: "Tối (18:00 - 21:00)",
+  CUSTOM: "Tự chọn khoảng giờ",
+};
 
 function getArray(res) {
   return res?.data?.data || res?.data || [];
@@ -50,7 +65,13 @@ function HoldCountdown({ expiresAt, onTimeout }) {
   useEffect(() => {
     function update() {
       if (!expiresAt) return;
-      const exp = new Date(expiresAt).getTime();
+      let expObj = new Date(expiresAt);
+      // Nếu thời gian hết hạn lớn hơn thời gian hiện tại quá 30 phút (do lệch múi giờ UTC vs Local)
+      if (expObj.getTime() - Date.now() > 30 * 60 * 1000) {
+        const cleanStr = typeof expiresAt === "string" ? expiresAt.replace(/Z$/, "") : expiresAt;
+        expObj = new Date(cleanStr);
+      }
+      const exp = expObj.getTime();
       const now = Date.now();
       const diff = exp - now;
 
@@ -74,10 +95,12 @@ function HoldCountdown({ expiresAt, onTimeout }) {
 }
 
 export default function ReceptionistWaitingList() {
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [services, setServices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [technicians, setTechnicians] = useState([]);
+  const [convertTechnicians, setConvertTechnicians] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
 
   const [filters, setFilters] = useState({
@@ -91,10 +114,33 @@ export default function ReceptionistWaitingList() {
     customerId: "",
     serviceId: "",
     preferredDate: "",
-    preferredTime: "",
+    flexibleTimeSlot: "ANY",
+    preferredTimeFrom: "",
+    preferredTimeTo: "",
     reason: "Khách muốn chờ nếu có slot trống",
     note: "",
   });
+
+  useEffect(() => {
+    const customerId = searchParams.get("customerId");
+    const serviceId = searchParams.get("serviceId");
+    const date = searchParams.get("date");
+
+    if (customerId || serviceId || date) {
+      setForm((prev) => ({
+        ...prev,
+        customerId: customerId || prev.customerId,
+        serviceId: serviceId || prev.serviceId,
+        preferredDate: date || prev.preferredDate,
+        flexibleTimeSlot: "ANY",
+        preferredTimeFrom: "",
+        preferredTimeTo: "",
+      }));
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }, 300);
+    }
+  }, [searchParams]);
 
   const [convertForm, setConvertForm] = useState({
     waitingId: null,
@@ -168,6 +214,10 @@ export default function ReceptionistWaitingList() {
     };
   }, [items]);
 
+  const selectedConvertEmp = useMemo(() => {
+    return convertTechnicians.find((t) => String(t.EmployeeId || t.TechnicianId) === String(convertForm.technicianId));
+  }, [convertTechnicians, convertForm.technicianId]);
+
   async function createWaiting(e) {
     e.preventDefault();
 
@@ -182,7 +232,9 @@ export default function ReceptionistWaitingList() {
         customerId: "",
         serviceId: "",
         preferredDate: "",
-        preferredTime: "",
+        flexibleTimeSlot: "ANY",
+        preferredTimeFrom: "",
+        preferredTimeTo: "",
         reason: "Khách muốn chờ nếu có slot trống",
         note: "",
       });
@@ -216,14 +268,20 @@ export default function ReceptionistWaitingList() {
   }
 
   async function cancelWaiting(waitingId) {
-    if (!window.confirm("Bạn chắc chắn muốn hủy yêu cầu chờ này?")) return;
+    const reason = window.prompt(
+      "Nhập lý do hủy (không bắt buộc):",
+      "Khách hàng muốn hủy yêu cầu"
+    );
+    if (reason === null) return; // User clicked Cancel in prompt
 
     try {
       setSaving(true);
       setError("");
       setSuccessMsg("");
 
-      await axiosClient.delete(`/receptionist/waiting-list/${waitingId}`);
+      await axiosClient.delete(`/receptionist/waiting-list/${waitingId}`, {
+        params: { cancelReason: reason },
+      });
 
       await load();
       setSuccessMsg("Đã hủy yêu cầu chờ");
@@ -264,22 +322,36 @@ export default function ReceptionistWaitingList() {
   }
 
   async function openConvertForm(item) {
-    const appointmentDate = item.PreferredDate
-      ? String(item.PreferredDate).slice(0, 10)
-      : "";
+    const isMatched = item.Status === "MATCHED";
 
-    const technicianId =
-      item.PreferredEmployeeId || item.EmployeeId || item.TechnicianId || "";
+    const appointmentDate = isMatched
+      ? (item.MatchedDate ? String(item.MatchedDate).slice(0, 10) : "")
+      : (item.PreferredDate ? String(item.PreferredDate).slice(0, 10) : "");
+
+    const technicianId = isMatched
+      ? (item.MatchedEmployeeId || "")
+      : (item.PreferredEmployeeId || item.EmployeeId || item.TechnicianId || "");
+
+    const startTime = isMatched ? String(item.MatchedStartTime || "").slice(0, 5) : "";
 
     const next = {
       waitingId: item.WaitingId,
       technicianId,
       appointmentDate,
-      startTime: "",
+      startTime,
     };
 
     setConvertForm(next);
     setAvailableSlots([]);
+    setConvertTechnicians([]);
+
+    try {
+      const res = await axiosClient.get(`/employees/by-service/${item.ServiceId}`);
+      setConvertTechnicians(res.data?.data || []);
+    } catch (err) {
+      console.error("Lỗi tải KTV theo dịch vụ:", err);
+      setConvertTechnicians(technicians);
+    }
 
     if (appointmentDate) {
       await loadWaitingSlots(item.WaitingId, appointmentDate, technicianId);
@@ -477,15 +549,53 @@ export default function ReceptionistWaitingList() {
             </label>
 
             <label>
-              <span>Giờ mong muốn</span>
-              <input
-                type="time"
-                value={form.preferredTime}
+              <span>Khung giờ mong muốn</span>
+              <select
+                value={form.flexibleTimeSlot}
                 onChange={(e) =>
-                  setForm({ ...form, preferredTime: e.target.value })
+                  setForm({
+                    ...form,
+                    flexibleTimeSlot: e.target.value,
+                    preferredTimeFrom: "",
+                    preferredTimeTo: "",
+                  })
                 }
-              />
+              >
+                <option value="ANY">Linh hoạt cả ngày</option>
+                <option value="MORNING">Buổi sáng 08:00 - 12:00</option>
+                <option value="AFTERNOON">Buổi chiều 13:00 - 17:00</option>
+                <option value="EVENING">Buổi tối 18:00 - 21:00</option>
+                <option value="CUSTOM">Tự chọn khoảng giờ</option>
+              </select>
             </label>
+
+            {form.flexibleTimeSlot === "CUSTOM" && (
+              <>
+                <label>
+                  <span>Từ giờ</span>
+                  <input
+                    type="time"
+                    value={form.preferredTimeFrom}
+                    onChange={(e) =>
+                      setForm({ ...form, preferredTimeFrom: e.target.value })
+                    }
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Đến giờ</span>
+                  <input
+                    type="time"
+                    value={form.preferredTimeTo}
+                    onChange={(e) =>
+                      setForm({ ...form, preferredTimeTo: e.target.value })
+                    }
+                    required
+                  />
+                </label>
+              </>
+            )}
 
             <label className="wl-col-2">
               <span>Lý do</span>
@@ -644,7 +754,7 @@ export default function ReceptionistWaitingList() {
                   required
                 >
                   <option value="">Chọn kỹ thuật viên</option>
-                  {technicians.map((t) => {
+                  {convertTechnicians.map((t) => {
                     const id = t.EmployeeId || t.TechnicianId;
 
                     return (
@@ -655,6 +765,32 @@ export default function ReceptionistWaitingList() {
                   })}
                 </select>
               </label>
+
+              {selectedConvertEmp && (
+                <div style={{ marginTop: "4px", background: "#fffaf4", border: "1px solid #fce8d5", padding: "12px", borderRadius: "12px", display: "flex", flexDirection: "column", gap: "4px", gridColumn: "span 2", width: "100%", boxSizing: "border-box" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#85583f", fontWeight: "bold" }}>
+                    Chi nhánh chuyên viên: {selectedConvertEmp.BranchName || "Chi nhánh chính"}
+                  </span>
+                  {selectedConvertEmp.BranchAddress && (
+                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                      📍 Địa chỉ: {selectedConvertEmp.BranchAddress}
+                    </span>
+                  )}
+                  {selectedConvertEmp.BranchAddress && (
+                    <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #e5e7eb", marginTop: "6px" }}>
+                      <iframe
+                        title="Bản đồ chuyên viên chuyển lịch"
+                        src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedConvertEmp.BranchAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                        width="100%"
+                        height="130"
+                        style={{ border: 0, display: "block" }}
+                        allowFullScreen=""
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <label>
                 <span>Ngày hẹn</span>
@@ -685,13 +821,23 @@ export default function ReceptionistWaitingList() {
               <label className="wl-col-2">
                 <span>Slot trống</span>
                 <select
-                  value={convertForm.startTime}
-                  onChange={(e) =>
+                  value={convertForm.startTime && convertForm.technicianId ? `${convertForm.startTime}|${convertForm.technicianId}` : ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) {
+                      setConvertForm({
+                        ...convertForm,
+                        startTime: "",
+                      });
+                      return;
+                    }
+                    const [startTime, technicianId] = val.split("|");
                     setConvertForm({
                       ...convertForm,
-                      startTime: e.target.value,
-                    })
-                  }
+                      startTime: startTime || "",
+                      technicianId: technicianId || convertForm.technicianId,
+                    });
+                  }}
                   disabled={slotLoading}
                   required
                 >
@@ -699,15 +845,18 @@ export default function ReceptionistWaitingList() {
                     {slotLoading ? "Đang tải slot..." : "Chọn slot trống"}
                   </option>
 
-                  {availableSlots.map((slot) => (
-                    <option
-                      key={`${slot.startTime}-${slot.employeeId}`}
-                      value={slot.startTime}
-                    >
-                      {slot.startTime} - {slot.endTime}
-                      {slot.technicianName ? ` | ${slot.technicianName}` : ""}
-                    </option>
-                  ))}
+                  {availableSlots.map((slot) => {
+                    const id = slot.employeeId || slot.technicianId;
+                    return (
+                      <option
+                        key={`${slot.startTime}-${id}`}
+                        value={`${slot.startTime}|${id}`}
+                      >
+                        {slot.startTime} - {slot.endTime}
+                        {slot.technicianName ? ` | ${slot.technicianName}` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
 
                 {convertForm.appointmentDate &&
@@ -765,7 +914,22 @@ export default function ReceptionistWaitingList() {
                       <td>
                         <div className="wl-customer-cell">
                           <div className="wl-avatar">
-                            {(item.CustomerName || "?").charAt(0)}
+                            {item.CustomerAvatarUrl ? (
+                              <img
+                                src={avatarUrl(item.CustomerAvatarUrl)}
+                                alt={item.CustomerName}
+                                style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  if (e.currentTarget.nextSibling) {
+                                    e.currentTarget.nextSibling.style.display = "flex";
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <span style={{ display: item.CustomerAvatarUrl ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
+                              {(item.CustomerName || "?").charAt(0)}
+                            </span>
                           </div>
 
                           <div>
@@ -804,10 +968,12 @@ export default function ReceptionistWaitingList() {
                         ) : (
                           <>
                             <b>{formatDate(item.PreferredDate)}</b>
-                            <small>
-                              {item.PreferredTime ||
-                                item.PreferredTimeFrom ||
-                                "Linh hoạt"}
+                            <small style={{ display: "block" }}>
+                              {item.FlexibleTimeSlot && item.FlexibleTimeSlot !== "CUSTOM"
+                                ? (TIME_SLOT_MAP[item.FlexibleTimeSlot] || "Linh hoạt cả ngày")
+                                : (item.PreferredTimeFrom && item.PreferredTimeTo
+                                  ? `${String(item.PreferredTimeFrom).slice(0, 5)} - ${String(item.PreferredTimeTo).slice(0, 5)}`
+                                  : (item.PreferredTime || "Linh hoạt"))}
                             </small>
                           </>
                         )}
@@ -825,7 +991,7 @@ export default function ReceptionistWaitingList() {
 
                       <td>
                         <div className="wl-actions">
-                          {item.Status === "WAITING" && (
+                          {["WAITING", "MATCHED"].includes(item.Status) && (
                             <button
                               type="button"
                               className="wl-mini-btn"
@@ -835,6 +1001,20 @@ export default function ReceptionistWaitingList() {
                               disabled={saving}
                             >
                               Đã báo khách
+                            </button>
+                          )}
+
+                          {["MATCHED", "NOTIFIED"].includes(item.Status) && (
+                            <button
+                              type="button"
+                              className="wl-mini-btn warning"
+                              style={{ backgroundColor: "#d97706", color: "#fff" }}
+                              onClick={() =>
+                                updateStatus(item.WaitingId, "SKIPPED")
+                              }
+                              disabled={saving}
+                            >
+                              Bỏ lỡ
                             </button>
                           )}
 

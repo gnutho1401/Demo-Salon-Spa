@@ -4,8 +4,25 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
-function normalizeStatus(value) {
-  return String(value || "").trim().toUpperCase();
+async function getLogFilters() {
+  const pool = await connectDB();
+  const usersRes = await pool.query(`
+    SELECT DISTINCT l.UserId, u.FullName AS UserName
+    FROM SystemLogs l
+    JOIN Users u ON l.UserId = u.UserId
+    WHERE l.UserId IS NOT NULL
+    ORDER BY UserName ASC
+  `);
+  const typesRes = await pool.query(`
+    SELECT DISTINCT ActionType
+    FROM SystemLogs
+    WHERE ActionType IS NOT NULL AND ActionType <> ''
+    ORDER BY ActionType ASC
+  `);
+  return {
+    users: usersRes.recordset,
+    actionTypes: typesRes.recordset.map(r => r.ActionType),
+  };
 }
 
 async function list(filters = {}) {
@@ -14,12 +31,22 @@ async function list(filters = {}) {
   const actionType = normalizeText(filters.actionType);
   const fromDate = filters.fromDate || null;
   const toDate = filters.toDate || null;
+  const userId = filters.userId ? parseInt(filters.userId, 10) : null;
+  const moduleName = normalizeText(filters.module);
+
+  const page = Math.max(1, parseInt(filters.page || 1, 10));
+  const limit = Math.max(1, parseInt(filters.limit || 15, 10));
+  const offset = (page - 1) * limit;
 
   const request = pool.request();
-  if (keyword) request.input("Keyword", sql.NVarChar, `%${keyword}%`);
-  if (actionType) request.input("ActionType", sql.NVarChar, actionType);
-  if (fromDate) request.input("FromDate", sql.Date, fromDate);
-  if (toDate) request.input("ToDate", sql.Date, toDate);
+  request.input("Keyword", sql.NVarChar, keyword ? `%${keyword}%` : null);
+  request.input("ActionType", sql.NVarChar, actionType || null);
+  request.input("FromDate", sql.Date, fromDate || null);
+  request.input("ToDate", sql.Date, toDate || null);
+  request.input("UserId", sql.Int, userId || null);
+  request.input("Module", sql.NVarChar, moduleName ? `%${moduleName}%` : null);
+  request.input("Offset", sql.Int, offset);
+  request.input("Limit", sql.Int, limit);
 
   const result = await request.query(`
     SELECT
@@ -34,7 +61,8 @@ async function list(filters = {}) {
       l.IpAddress,
       l.OldValue,
       l.NewValue,
-      l.CreatedAt
+      l.CreatedAt,
+      COUNT(*) OVER() AS TotalCount
     FROM SystemLogs l
     LEFT JOIN Users u ON l.UserId = u.UserId
     WHERE
@@ -42,10 +70,25 @@ async function list(filters = {}) {
       AND (@ActionType IS NULL OR l.ActionType = @ActionType)
       AND (@FromDate IS NULL OR CAST(l.CreatedAt AS DATE) >= @FromDate)
       AND (@ToDate IS NULL OR CAST(l.CreatedAt AS DATE) <= @ToDate)
+      AND (@UserId IS NULL OR l.UserId = @UserId)
+      AND (@Module IS NULL OR l.ActionName LIKE @Module OR l.Description LIKE @Module)
     ORDER BY l.LogId DESC
+    OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY
   `);
 
-  return result.recordset;
+  const logs = result.recordset;
+  const totalCount = logs.length > 0 ? logs[0].TotalCount : 0;
+
+  return {
+    logs: logs.map(l => {
+      const copy = { ...l };
+      delete copy.TotalCount;
+      return copy;
+    }),
+    totalCount,
+    page,
+    limit,
+  };
 }
 
 async function getById(id) {
@@ -91,4 +134,4 @@ async function writeLog({ userId = null, roleName = null, actionName = "", actio
     `);
 }
 
-module.exports = { list, getById, writeLog };
+module.exports = { list, getById, writeLog, getLogFilters };

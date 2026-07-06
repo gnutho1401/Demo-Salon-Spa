@@ -6,6 +6,13 @@ import TechnicianLayout from "../../layouts/TechnicianLayout";
 const DEFAULT_AVATAR = "/images/default-avatar.png";
 const DEFAULT_SERVICE_IMAGE = "/images/default-service.png";
 
+function formatTime(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (text.includes("T")) return text.split("T")[1]?.slice(0, 5) || "";
+  return text.slice(0, 5);
+}
+
 const STATUS_STEPS = [
   { key: "PENDING_PAYMENT", label: "Chờ thanh toán", icon: "▣" },
   { key: "PAID", label: "Đã thanh toán", icon: "💳" },
@@ -134,27 +141,22 @@ function progressLabel(status) {
 export default function TechnicianAppointmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-
+  const [actionLoading, setActionLoading] = useState("");
+  const [rescheduleRequest, setRescheduleRequest] = useState(null);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rescheduleForm, setRescheduleForm] = useState({
+    requestedDate: "",
+    requestedStartTime: "",
+    requestedEndTime: "",
+    reason: ""
+  });
+  const [slots, setSlots] = useState([]);
+  const [slotLoading, setSlotLoading] = useState(false);
+  const [slotError, setSlotError] = useState("");
 
-  const [actionLoading, setActionLoading] = useState("");
-  const [noteSaving, setNoteSaving] = useState(false);
-
-  const [noteTitle, setNoteTitle] = useState("");
-  const [noteContent, setNoteContent] = useState("");
-  const [productsUsed, setProductsUsed] = useState("");
-  const [recommendation, setRecommendation] = useState("");
-  const [skinCondition, setSkinCondition] = useState("");
-  const [technique, setTechnique] = useState("");
-  const [customerFeedback, setCustomerFeedback] = useState("");
-  const [followUpDate, setFollowUpDate] = useState("");
-  const [progressStatus, setProgressStatus] = useState("IN_PROGRESS");
-
-  const [noteFiles, setNoteFiles] = useState([]);
-  const [uploadingNoteId, setUploadingNoteId] = useState("");
-  const noteFileInputRef = useRef(null);
 
   async function load() {
     try {
@@ -163,12 +165,82 @@ export default function TechnicianAppointmentDetail() {
 
       const res = await axiosClient.get(`/technician/appointments/${id}`);
       setAppointment(res.data.data || null);
+
+      try {
+        const resReq = await axiosClient.get("/reschedule/technician/reschedule-requests");
+        const list = resReq.data?.data || [];
+        const pending = list.find(r => Number(r.AppointmentId) === Number(id) && r.Status === "PENDING");
+        setRescheduleRequest(pending || null);
+      } catch (errReq) {
+        console.warn("Failed to load reschedule requests:", errReq);
+      }
     } catch (err) {
       setError(
         err.response?.data?.message || "Không tải được chi tiết lịch hẹn",
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function submitReschedule(e) {
+    e.preventDefault();
+
+    const [startH, startM] = rescheduleForm.requestedStartTime.split(":").map(Number);
+    const [endH, endM] = rescheduleForm.requestedEndTime.split(":").map(Number);
+    const startMin = startH * 60 + (startM || 0);
+    const endMin = endH * 60 + (endM || 0);
+
+    if (endMin <= startMin) {
+      alert("Giờ kết thúc đề xuất phải sau giờ bắt đầu đề xuất!");
+      return;
+    }
+
+    try {
+      setActionLoading("reschedule");
+      await axiosClient.post(`/reschedule/technician/appointments/${id}/reschedule-request`, rescheduleForm);
+      alert("Gửi yêu cầu đề xuất đổi lịch thành công!");
+      setShowRescheduleModal(false);
+      setRescheduleForm({ requestedDate: "", requestedStartTime: "", requestedEndTime: "", reason: "" });
+      setSlots([]);
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Không thể gửi yêu cầu đề xuất đổi lịch");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  async function loadSlots(selectedDate) {
+    if (!selectedDate || !(detail.TechnicianId || detail.EmployeeId) || services.length === 0) {
+      setSlots([]);
+      setSlotError("");
+      return;
+    }
+    try {
+      setSlotLoading(true);
+      setSlotError("");
+      const res = await axiosClient.get("/appointments/available-slots", {
+        params: {
+          appointmentDate: selectedDate,
+          employeeId: detail.TechnicianId || detail.EmployeeId,
+          serviceId: services[0]?.ServiceId,
+          excludeAppointmentId: id,
+          includeAllSlots: true,
+        },
+      });
+      const data = res.data.data;
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        setSlots(data.slots || []);
+      } else {
+        setSlots(data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load slots:", err);
+      setSlotError(err.response?.data?.message || err.message || "Lỗi tải khung giờ trống");
+      setSlots([]);
+    } finally {
+      setSlotLoading(false);
     }
   }
 
@@ -197,22 +269,7 @@ export default function TechnicianAppointmentDetail() {
   const canComplete = status === "IN_PROGRESS";
   const canNoShow = ["CONFIRMED", "CHECKED_IN", "PAID"].includes(status);
 
-  function resetNoteForm() {
-    setNoteTitle("");
-    setNoteContent("");
-    setProductsUsed("");
-    setRecommendation("");
-    setSkinCondition("");
-    setTechnique("");
-    setCustomerFeedback("");
-    setFollowUpDate("");
-    setProgressStatus("IN_PROGRESS");
-    setNoteFiles([]);
 
-    if (noteFileInputRef.current) {
-      noteFileInputRef.current.value = "";
-    }
-  }
 
   async function runAction(type, url, message) {
     const ok = window.confirm(message);
@@ -229,82 +286,7 @@ export default function TechnicianAppointmentDetail() {
     }
   }
 
-  async function uploadNoteAttachments(noteId, files = noteFiles) {
-    if (!noteId || !files.length) return;
 
-    try {
-      setUploadingNoteId(noteId);
-
-      const formData = new FormData();
-      files.forEach((file) => {
-        formData.append("files", file);
-      });
-
-      await axiosClient.post(
-        `/technician/treatment-notes/${noteId}/attachments`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        },
-      );
-    } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          "Không tải lên được hình ảnh hoặc tài liệu điều trị",
-      );
-    } finally {
-      setUploadingNoteId("");
-    }
-  }
-
-  async function saveNote() {
-    if (!noteContent.trim()) {
-      alert("Vui lòng nhập nội dung ghi chú dịch vụ");
-      return;
-    }
-
-    try {
-      setNoteSaving(true);
-
-      const selectedFiles = [...noteFiles];
-
-      const res = await axiosClient.post(
-        `/technician/appointments/${id}/treatment-notes`,
-        {
-          title: noteTitle.trim() || null,
-          content: noteContent.trim(),
-          noteType: "GENERAL",
-          productsUsed: productsUsed.trim() || null,
-          skinCondition: skinCondition.trim() || null,
-          technique: technique.trim() || null,
-          customerFeedback: customerFeedback.trim() || null,
-          recommendation: recommendation.trim() || null,
-          followUpDate: followUpDate || null,
-          progressStatus,
-        },
-      );
-
-      const createdNote = res.data?.data;
-      const noteId =
-        createdNote?.NoteId ||
-        createdNote?.noteId ||
-        createdNote?.id ||
-        createdNote?.TreatmentNoteId;
-
-      if (noteId && selectedFiles.length > 0) {
-        await uploadNoteAttachments(noteId, selectedFiles);
-      }
-
-      resetNoteForm();
-      await load();
-    } catch (err) {
-      alert(err.response?.data?.message || "Không lưu được ghi chú dịch vụ");
-    } finally {
-      setNoteSaving(false);
-    }
-  }
 
   return (
     <TechnicianLayout>
@@ -481,129 +463,36 @@ export default function TechnicianAppointmentDetail() {
                   </div>
                 </div>
 
-                <div className="tech-apd-card">
-                  <div className="tech-apd-card-head">
-                    <div className="tech-apd-card-title">
-                      Ghi chú dịch vụ ({notes.length})
+                <div className="tech-apd-card" style={{ borderLeft: "4px solid #2f593a" }}>
+                  <div className="tech-apd-card-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div className="tech-apd-card-title" style={{ color: "#2f593a", display: "flex", alignItems: "center", gap: "8px" }}>
+                      📝 Ghi chú & Phác đồ Trị liệu ({notes.length})
                     </div>
-
+                  </div>
+                  <div style={{ marginTop: "12px", color: "#4a5568", fontSize: "0.9rem", lineHeight: "1.5" }}>
+                    <p style={{ margin: "0 0 16px 0" }}>
+                      Hồ sơ ghi chú chi tiết, hình ảnh chụp da/tóc/móng và hướng dẫn chăm sóc sau điều trị của khách hàng được quản lý đồng bộ và tập trung để tối ưu hóa phác đồ điều trị lâu dài.
+                    </p>
                     <button
                       type="button"
-                      onClick={() =>
-                        document.getElementById("tech-add-note")?.focus()
-                      }
+                      onClick={() => navigate(`/technician/treatment-notes?appointmentId=${detail.AppointmentId}`)}
+                      style={{
+                        backgroundColor: "#2f593a",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "8px",
+                        padding: "10px 18px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        transition: "all 0.2s"
+                      }}
+                      className="hover-scale"
                     >
-                      ＋ Thêm ghi chú mới
+                      Viết & Xem chi tiết phác đồ →
                     </button>
-                  </div>
-
-                  <div className="tech-apd-notes-list">
-                    {notes.length === 0 ? (
-                      <div className="tech-apd-empty">
-                        Chưa có ghi chú dịch vụ
-                      </div>
-                    ) : (
-                      notes.map((note) => (
-                        <article className="tech-apd-note" key={note.NoteId}>
-                          <div className="tech-apd-note-avatar">
-                            {initials(note.AuthorName)}
-                          </div>
-
-                          <div>
-                            <h4>
-                              {note.Title ||
-                                note.AuthorName ||
-                                "Ghi chú của kỹ thuật viên"}
-                            </h4>
-
-                            <small>
-                              {translateNoteType(note.NoteType || "GENERAL")} •{" "}
-                              {safeDateTime(note.CreatedAt)}
-                            </small>
-
-                            <p>{note.Content}</p>
-
-                            {note.SkinCondition && (
-                              <p>
-                                <b>Tình trạng da / tóc / móng:</b>{" "}
-                                {note.SkinCondition}
-                              </p>
-                            )}
-
-                            {note.Technique && (
-                              <p>
-                                <b>Kỹ thuật đã áp dụng:</b> {note.Technique}
-                              </p>
-                            )}
-
-                            {note.ProductsUsed && (
-                              <p>
-                                <b>Sản phẩm đã sử dụng:</b> {note.ProductsUsed}
-                              </p>
-                            )}
-
-                            {note.CustomerFeedback && (
-                              <p>
-                                <b>Phản hồi của khách hàng:</b>{" "}
-                                {note.CustomerFeedback}
-                              </p>
-                            )}
-
-                            {note.Recommendation && (
-                              <p>
-                                <b>Khuyến nghị sau dịch vụ:</b>{" "}
-                                {note.Recommendation}
-                              </p>
-                            )}
-
-                            {note.FollowUpDate && (
-                              <p>
-                                <b>Ngày theo dõi lại:</b>{" "}
-                                {safeDate(note.FollowUpDate)}
-                              </p>
-                            )}
-
-                            {note.ProgressStatus && (
-                              <p>
-                                <b>Tình trạng tiến triển:</b>{" "}
-                                {progressLabel(note.ProgressStatus)}
-                              </p>
-                            )}
-
-                            {Array.isArray(note.Attachments) &&
-                              note.Attachments.length > 0 && (
-                                <div className="tech-apd-note-files">
-                                  {note.Attachments.map((file) => (
-                                    <a
-                                      key={
-                                        file.AttachmentId ||
-                                        file.FileUrl ||
-                                        file.FileName
-                                      }
-                                      href={fileUrl(file.FileUrl, "#")}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      {file.FileName || "Tệp đính kèm"}
-                                    </a>
-                                  ))}
-                                </div>
-                              )}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(
-                                `/technician/treatment-notes?appointmentId=${detail.AppointmentId}`,
-                              )
-                            }
-                          >
-                            Xem chi tiết
-                          </button>
-                        </article>
-                      ))
-                    )}
                   </div>
                 </div>
               </main>
@@ -700,6 +589,50 @@ export default function TechnicianAppointmentDetail() {
                   </div>
                 </div>
 
+                {/* Reschedule Request Card */}
+                {["PENDING_PAYMENT", "PENDING", "CONFIRMED", "PAID"].includes(status) && (
+                  <div className="tech-apd-card" style={{ borderLeft: "4px solid #d4a94f" }}>
+                    <div className="tech-apd-card-title" style={{ color: "#7a5e44", display: "flex", alignItems: "center", gap: "8px" }}>
+                      📅 Đề xuất đổi lịch hẹn
+                    </div>
+                    <div style={{ marginTop: "12px", color: "#4a5568", fontSize: "0.9rem", lineHeight: "1.45" }}>
+                      <p style={{ margin: "0 0 16px 0" }}>
+                        Nếu bạn bận đột xuất hoặc khách hàng yêu cầu dời giờ, bạn có thể tạo đề xuất giờ mới để gửi cho Lễ tân duyệt.
+                      </p>
+                      
+                      {rescheduleRequest ? (
+                        <div style={{ background: "#fcf8e3", border: "1px solid #faebcc", color: "#8a6d3b", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
+                          <b style={{ display: "block", marginBottom: "4px" }}>Đang chờ duyệt đổi lịch:</b>
+                          <div>Đề xuất: <b>{safeDate(rescheduleRequest.RequestedDate)}</b> lúc <b>{String(rescheduleRequest.RequestedStartTime).slice(0, 5)}</b></div>
+                          <div style={{ fontSize: "0.75rem", color: "#8a6d3b", opacity: 0.8, marginTop: "6px" }}>
+                            Lý do: {rescheduleRequest.Reason || "—"}
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowRescheduleModal(true)}
+                          style={{
+                            backgroundColor: "#FAF6F0",
+                            color: "#7a5e44",
+                            border: "1px solid #d4a94f",
+                            borderRadius: "10px",
+                            padding: "10px 18px",
+                            fontWeight: "700",
+                            fontSize: "0.85rem",
+                            cursor: "pointer",
+                            width: "100%",
+                            transition: "all 0.2s"
+                          }}
+                          className="hover-scale"
+                        >
+                          Đề xuất đổi lịch →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="tech-apd-card">
                   <div className="tech-apd-card-title">Lịch sử trạng thái</div>
 
@@ -727,160 +660,7 @@ export default function TechnicianAppointmentDetail() {
                   </div>
                 </div>
 
-                <div
-                  className="tech-apd-card tech-apd-note-form-card"
-                  id="note-form-card"
-                >
-                  <div className="tech-apd-card-title">
-                    Thêm ghi chú dịch vụ
-                  </div>
 
-                  <div className="tech-apd-form-section">
-                    <h4>Tóm tắt buổi dịch vụ</h4>
-
-                    <input
-                      type="text"
-                      value={noteTitle}
-                      onChange={(event) => setNoteTitle(event.target.value)}
-                      placeholder="Tiêu đề buổi dịch vụ..."
-                    />
-
-                    <textarea
-                      id="tech-add-note"
-                      rows={5}
-                      value={noteContent}
-                      onChange={(event) => setNoteContent(event.target.value)}
-                      placeholder="Mô tả dịch vụ đã thực hiện, tình trạng khách hàng và kết quả đạt được..."
-                    />
-                  </div>
-
-                  <div className="tech-apd-form-section">
-                    <h4>Chi tiết thực hiện</h4>
-
-                    <textarea
-                      rows={3}
-                      value={skinCondition}
-                      onChange={(event) => setSkinCondition(event.target.value)}
-                      placeholder="Tình trạng da / tóc / móng của khách hàng..."
-                    />
-
-                    <textarea
-                      rows={3}
-                      value={technique}
-                      onChange={(event) => setTechnique(event.target.value)}
-                      placeholder="Kỹ thuật đã áp dụng..."
-                    />
-
-                    <textarea
-                      rows={3}
-                      value={productsUsed}
-                      onChange={(event) => setProductsUsed(event.target.value)}
-                      placeholder="Sản phẩm đã sử dụng..."
-                    />
-                  </div>
-
-                  <div className="tech-apd-form-section">
-                    <h4>Khuyến nghị & chăm sóc sau dịch vụ</h4>
-
-                    <textarea
-                      rows={3}
-                      value={customerFeedback}
-                      onChange={(event) =>
-                        setCustomerFeedback(event.target.value)
-                      }
-                      placeholder="Phản hồi của khách hàng..."
-                    />
-
-                    <textarea
-                      rows={3}
-                      value={recommendation}
-                      onChange={(event) =>
-                        setRecommendation(event.target.value)
-                      }
-                      placeholder="Hướng dẫn chăm sóc sau dịch vụ..."
-                    />
-
-                    <div className="tech-apd-form-row">
-                      <label>
-                        <span>Ngày theo dõi lại</span>
-                        <input
-                          type="date"
-                          value={followUpDate}
-                          onChange={(event) =>
-                            setFollowUpDate(event.target.value)
-                          }
-                        />
-                      </label>
-
-                      <label>
-                        <span>Tình trạng tiến triển</span>
-                        <select
-                          value={progressStatus}
-                          onChange={(event) =>
-                            setProgressStatus(event.target.value)
-                          }
-                        >
-                          <option value="IN_PROGRESS">Đang theo dõi</option>
-                          <option value="IMPROVED">Đã cải thiện</option>
-                          <option value="NEEDS_FOLLOW_UP">
-                            Cần theo dõi lại
-                          </option>
-                          <option value="COMPLETED">Hoàn thành</option>
-                        </select>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="tech-apd-form-section">
-                    <h4>Tệp đính kèm</h4>
-
-                    <label className="tech-apd-upload-box">
-                      <input
-                        ref={noteFileInputRef}
-                        type="file"
-                        multiple
-                        accept="image/*,.pdf"
-                        onChange={(event) =>
-                          setNoteFiles(Array.from(event.target.files || []))
-                        }
-                        hidden
-                      />
-
-                      <strong>📷 Tải lên hình ảnh điều trị hoặc tệp PDF</strong>
-                      <small>
-                        Ảnh trước / sau dịch vụ, báo cáo điều trị hoặc tài liệu
-                        tư vấn
-                      </small>
-                    </label>
-
-                    {noteFiles.length > 0 && (
-                      <div className="tech-apd-file-preview">
-                        {noteFiles.map((file) => (
-                          <span key={`${file.name}-${file.size}`}>
-                            {file.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="tech-apd-note-actions">
-                    <button type="button" onClick={resetNoteForm}>
-                      Xóa nội dung
-                    </button>
-
-                    <button
-                      type="button"
-                      className="save"
-                      disabled={noteSaving || !!uploadingNoteId}
-                      onClick={saveNote}
-                    >
-                      {noteSaving || uploadingNoteId
-                        ? "Đang lưu..."
-                        : "Lưu ghi chú ✚"}
-                    </button>
-                  </div>
-                </div>
               </section>
 
               <aside className="tech-apd-side">
@@ -1033,6 +813,156 @@ export default function TechnicianAppointmentDetail() {
           </>
         ) : (
           <div className="tech-apd-state">Không tìm thấy lịch hẹn.</div>
+        )}
+
+        {/* Reschedule Modal */}
+        {showRescheduleModal && (
+          <div className="modal-overlay" style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000
+          }}>
+            <div className="modal-content" style={{
+              backgroundColor: "#ffffff",
+              padding: "24px",
+              borderRadius: "20px",
+              width: "100%",
+              maxWidth: "450px",
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.15)"
+            }}>
+              <h3 style={{ margin: "0 0 16px 0", color: "#1e3a29", fontSize: "1.2rem", fontWeight: "bold" }}>
+                📅 Đề xuất đổi lịch hẹn mới
+              </h3>
+              <form onSubmit={submitReschedule}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "20px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: "700", color: "#4a5568", textTransform: "uppercase" }}>Chọn ngày đề xuất *</label>
+                    <input
+                      type="date"
+                      value={rescheduleForm.requestedDate}
+                      min={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        setRescheduleForm({ ...rescheduleForm, requestedDate: newDate, requestedStartTime: "", requestedEndTime: "" });
+                        loadSlots(newDate);
+                      }}
+                      required
+                      style={{ padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e0", outline: "none" }}
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: "700", color: "#4a5568", textTransform: "uppercase" }}>Chọn khung giờ trống *</label>
+                    {slotLoading ? (
+                      <div style={{ fontSize: "0.85rem", color: "#718096", padding: "8px 0" }}>Đang tải danh sách giờ trống...</div>
+                    ) : slotError ? (
+                      <div style={{ fontSize: "0.85rem", color: "#e53e3e", padding: "8px 0" }}>Lỗi: {slotError}</div>
+                    ) : !rescheduleForm.requestedDate ? (
+                      <div style={{ fontSize: "0.85rem", color: "#a0aec0", padding: "8px 0" }}>Vui lòng chọn ngày trước</div>
+                    ) : slots.length === 0 ? (
+                      <div style={{ fontSize: "0.85rem", color: "#e53e3e", padding: "8px 0" }}>Không có khung giờ nào trống trong ngày này</div>
+                    ) : (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: "8px", maxHeight: "150px", overflowY: "auto", padding: "4px" }}>
+                        {slots.map((slot) => {
+                          const isSlotAvailable = slot.available !== false;
+                          const formattedStart = formatTime(slot.startTime);
+                          const isActive = rescheduleForm.requestedStartTime === slot.startTime;
+
+                          return (
+                            <button
+                              key={slot.startTime}
+                              type="button"
+                              disabled={!isSlotAvailable}
+                              onClick={() => {
+                                setRescheduleForm({
+                                  ...rescheduleForm,
+                                  requestedStartTime: slot.startTime,
+                                  requestedEndTime: slot.endTime
+                                });
+                              }}
+                              style={{
+                                padding: "8px",
+                                borderRadius: "8px",
+                                border: isActive ? "2.5px solid #2f593a" : "1.5px solid #edf2f7",
+                                background: isActive ? "#2f593a" : isSlotAvailable ? "#ffffff" : "#f7fafc",
+                                color: isActive ? "#ffffff" : isSlotAvailable ? "#2d3748" : "#a0aec0",
+                                fontWeight: isActive ? "700" : "600",
+                                fontSize: "0.8rem",
+                                cursor: isSlotAvailable ? "pointer" : "not-allowed",
+                                textAlign: "center",
+                                transition: "all 0.2s"
+                              }}
+                            >
+                              {formattedStart}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {rescheduleForm.requestedStartTime && (
+                    <div style={{ background: "#edf7ed", color: "#1e4620", padding: "10px 14px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: "600" }}>
+                      ⏰ Đã chọn: {formatTime(rescheduleForm.requestedStartTime)} - {formatTime(rescheduleForm.requestedEndTime)}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: "700", color: "#4a5568", textTransform: "uppercase" }}>Lý do đổi lịch *</label>
+                    <textarea
+                      placeholder="Lý do bận / đổi giờ..."
+                      value={rescheduleForm.reason}
+                      onChange={(e) => setRescheduleForm({ ...rescheduleForm, reason: e.target.value })}
+                      required
+                      rows={3}
+                      style={{ padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e0", outline: "none", resize: "none" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowRescheduleModal(false)}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e0",
+                      backgroundColor: "#ffffff",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={actionLoading === "reschedule"}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "10px",
+                      border: "none",
+                      backgroundColor: "#2f593a",
+                      color: "#ffffff",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      fontWeight: "600"
+                    }}
+                  >
+                    {actionLoading === "reschedule" ? "Đang gửi..." : "Gửi đề xuất"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </div>
     </TechnicianLayout>

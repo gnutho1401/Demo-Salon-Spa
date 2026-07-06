@@ -214,6 +214,24 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
     }
   };
 
+  const handleRepay = async (customerPackageId) => {
+    setActionLoading(true);
+    try {
+      setMessage("");
+      const res = await axiosClient.post(`/packages/my/${customerPackageId}/repay`);
+      const data = res.data.data || res.data;
+      if (data && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        throw new Error("Không nhận được URL thanh toán");
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Lỗi tạo link thanh toán");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading && !detail) {
     return (
       <div className="pkg-detail-panel">
@@ -339,7 +357,42 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
                           </div>
                         </div>
 
-                        {isExhausted ? (
+                        {s.ActiveBookings > 0 && (
+                          <div style={{
+                            margin: '8px 0',
+                            padding: '6px 10px',
+                            backgroundColor: '#fffbeb',
+                            border: '1px solid #fef3c7',
+                            borderRadius: '6px',
+                            fontSize: '11.5px',
+                            color: '#b45309',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontWeight: '500',
+                            lineHeight: '1.4',
+                            textAlign: 'left'
+                          }}>
+                            <span>📅</span>
+                            <span>{s.ActiveBookingDetails}</span>
+                          </div>
+                        )}
+
+                        {d.Status !== "ACTIVE" ? (
+                          <div
+                            style={{
+                              padding: "8px",
+                              textAlign: "center",
+                              background: "#f1f5f9",
+                              color: "#64748b",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              fontWeight: 600
+                            }}
+                          >
+                            🔒 {d.Status === "PENDING_PAYMENT" ? "Chờ thanh toán để sử dụng" : "Không thể sử dụng"}
+                          </div>
+                        ) : isExhausted ? (
                           <div
                             style={{
                               padding: "8px",
@@ -472,6 +525,16 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
                     : "Không giới hạn"}
               </span>
             </div>
+            {d.Status === "PENDING_PAYMENT" && !!d.IsOwner && (
+              <button
+                className="btn primary"
+                style={{ width: "100%", marginTop: "16px", justifyContent: "center" }}
+                onClick={() => handleRepay(d.CustomerPackageId)}
+                disabled={actionLoading}
+              >
+                💳 {actionLoading ? "Đang xử lý..." : "Thanh toán ngay qua VNPay"}
+              </button>
+            )}
           </div>
 
           {/* QUICK BOOK BUTTON */}
@@ -489,12 +552,12 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
 
           {/* FAMILY SHARING DETAILS & SLOTS */}
           <div className="pkg-section">
-            <h3>👨‍👩‍👦 Chia sẻ gia đình ({detail?.Members?.length || 0}/3)</h3>
+            <h3>👨‍👩‍👦 Chia sẻ gia đình ({detail?.Members?.length || 0}/2)</h3>
             <p className="muted" style={{ fontSize: "12px", margin: "-6px 0 12px 0", lineHeight: "1.4" }}>
-              Chia sẻ quyền sử dụng gói dịch vụ này cho tối đa 3 thành viên trong gia đình bạn.
+              Chia sẻ quyền sử dụng gói dịch vụ này cho tối đa 2 thành viên trong gia đình bạn.
             </p>
             <div className="pkg-member-grid">
-              {Array.from({ length: 3 }).map((_, idx) => {
+              {Array.from({ length: 2 }).map((_, idx) => {
                 const m = detail?.Members?.[idx];
                 if (m) {
                   return (
@@ -521,7 +584,8 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
                     </div>
                   );
                 } else {
-                  return !!d.IsOwner ? (
+                  const canAddMember = !!d.IsOwner && d.Status === "ACTIVE";
+                  return canAddMember ? (
                     <div
                       key={`empty-${idx}`}
                       className="pkg-member-slot-empty"
@@ -533,7 +597,9 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
                   ) : (
                     <div key={`empty-${idx}`} className="pkg-member-slot-empty" style={{ cursor: "default" }}>
                       <span className="pkg-member-slot-icon" style={{ opacity: 0.4 }}>👤</span>
-                      <span className="pkg-member-slot-text" style={{ opacity: 0.5, fontWeight: "normal" }}>Trống</span>
+                      <span className="pkg-member-slot-text" style={{ opacity: 0.5, fontWeight: "normal" }}>
+                        {d.Status === "PENDING_PAYMENT" ? "Chờ thanh toán" : "Trống"}
+                      </span>
                     </div>
                   );
                 }
@@ -558,7 +624,7 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
       >
         <div className="pkg-form">
           <p className="muted">
-            Thành viên gia đình có thể đặt lịch sử dụng liệu trình này (tối đa 3 người). 
+            Thành viên gia đình có thể đặt lịch sử dụng liệu trình này (tối đa 2 người). 
             Nhập Họ tên, Số điện thoại hoặc Email để chọn tài khoản gợi ý bên dưới.
           </p>
           <label style={{ position: "relative", display: "block" }}>
@@ -750,9 +816,7 @@ export default function CustomerPackages() {
       const data = res.data.data || res.data;
       window.location.href = data.paymentUrl;
     } catch (err) {
-      setMessage(
-        "❌ " + (err.response?.data?.message || "Không tạo được thanh toán VNPay"),
-      );
+      alert(err.response?.data?.message || "Không tạo được thanh toán VNPay");
     }
   };
 

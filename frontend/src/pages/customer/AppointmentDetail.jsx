@@ -2,9 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import CustomerLayout from "../../components/layout/CustomerLayout";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import "../../styles/pages/customer-appointment-detail-v2.css";
 
 const FALLBACK_SERVICE = "/images/default-service.png";
 const FALLBACK_AVATAR = "/images/default-avatar.png";
+
+const POPULAR_BANKS = [
+  { bin: "970436", name: "VCB - Vietcombank" },
+  { bin: "970415", name: "VietinBank" },
+  { bin: "970407", name: "Techcombank" },
+  { bin: "970418", name: "BIDV" },
+  { bin: "970422", name: "MB Bank" },
+  { bin: "970416", name: "ACB" },
+  { bin: "970423", name: "TPBank" },
+  { bin: "970419", name: "VPBank" },
+  { bin: "970403", name: "Sacombank" },
+  { bin: "970448", name: "OCB" }
+];
 
 function parseJson(value) {
   if (!value) return [];
@@ -148,12 +162,17 @@ function statusClass(status) {
 function canPay(item) {
   const status = String(item?.Status || "").toUpperCase();
   const payment = String(item?.PaymentStatus || "UNPAID").toUpperCase();
-  return status === "PENDING_PAYMENT" && ["UNPAID", "PENDING", "FAILED"].includes(payment);
+  const isBilledUnderPackage = item?.CustomerPackageId != null;
+
+  if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(status)) return false;
+  if (payment === "PAID" || isBilledUnderPackage) return false;
+
+  return ["UNPAID", "PENDING", "FAILED"].includes(payment);
 }
 
 function canCancel(item) {
   const status = String(item?.Status || "").toUpperCase();
-  return ["PENDING_PAYMENT", "CONFIRMED"].includes(status);
+  return ["PENDING", "PENDING_PAYMENT", "CONFIRMED"].includes(status);
 }
 
 function canReschedule(item) {
@@ -165,6 +184,99 @@ function canReview(item, services) {
   const status = String(item?.Status || "").toUpperCase();
   const notReviewed = services.some((s) => !Number(s.HasReviewed || 0));
   return status === "COMPLETED" && notReviewed;
+}
+
+function formatName(name) {
+  if (!name) return "Hệ thống";
+  const lower = String(name).toLowerCase().trim();
+  if (lower === "system") return "Hệ thống";
+  if (lower === "automatch" || lower === "auto-match") return "Hệ thống tự động";
+  if (lower === "scheduler") return "Hệ thống tự động";
+  if (lower === "receptionist") return "Lễ tân";
+  if (lower === "admin") return "Quản trị viên";
+  if (lower === "customer") return "Khách hàng";
+  return name;
+}
+
+function formatReason(reason) {
+  if (!reason) return "Hệ thống tự động cập nhật trạng thái.";
+
+  const lower = String(reason).toLowerCase();
+
+  if (lower.includes("customer created appointment and waiting for payment")) {
+    return "Khách hàng tạo lịch hẹn và đang chờ thanh toán.";
+  }
+  if (lower.includes("receptionist checked in customer")) {
+    return "Lễ tân ghi nhận khách hàng đã check-in.";
+  }
+  if (lower.includes("receptionist started service")) {
+    return "Lễ tân ghi nhận bắt đầu thực hiện dịch vụ.";
+  }
+  if (lower.includes("receptionist completed service")) {
+    return "Lễ tân ghi nhận hoàn thành dịch vụ.";
+  }
+  if (lower.includes("receptionist checked-out customer")) {
+    return "Lễ tân thực hiện checkout (hoàn thành quy trình/ra về) cho khách.";
+  }
+  if (lower.includes("created walk-in appointment by receptionist")) {
+    return "Lễ tân tạo lịch hẹn trực tiếp tại cửa hàng.";
+  }
+  if (lower.includes("created appointment with status pending_payment")) {
+    return "Đăng ký lịch hẹn thành công (Chờ khách hàng thanh toán cọc).";
+  }
+  if (lower.includes("created appointment with status confirmed")) {
+    return "Đăng ký lịch hẹn thành công (Đã xác nhận).";
+  }
+  if (lower.includes("invoice marked paid by receptionist")) {
+    return "Lễ tân xác nhận thanh toán trực tiếp thành công.";
+  }
+  if (lower.includes("walk-in appointment marked confirmed without invoice payment")) {
+    return "Lịch hẹn trực tiếp được xác nhận không cần thanh toán trước.";
+  }
+  if (lower.includes("appointment confirmed by receptionist")) {
+    return "Lễ tân phê duyệt xác nhận lịch hẹn thành công.";
+  }
+  if (lower.includes("payment completed via vnpay")) {
+    return "Thanh toán trực tuyến thành công qua cổng VNPay.";
+  }
+  if (lower.includes("status updated by system auto-expire due to payment failure or timeout")) {
+    return "Hệ thống tự động hủy lịch do hết hạn chờ thanh toán cọc.";
+  }
+  if (lower.includes("status updated by system auto-expire")) {
+    return "Hệ thống tự động hủy lịch do hết hạn chờ thanh toán.";
+  }
+  if (lower.includes("appointment rescheduled")) {
+    return "Dời lịch hẹn sang thời gian mới thành công.";
+  }
+  if (lower.includes("rescheduled successfully")) {
+    return "Dời lịch hẹn sang thời gian mới thành công.";
+  }
+  if (lower.includes("checked in by receptionist")) {
+    return "Khách hàng đã check-in tại quầy chi nhánh.";
+  }
+  if (lower.includes("changed status to in_progress")) {
+    return "Bắt đầu thực hiện liệu trình chăm sóc.";
+  }
+  if (lower.includes("changed status to completed")) {
+    return "Hoàn thành toàn bộ liệu trình dịch vụ.";
+  }
+  if (lower.includes("appointment status updated to no_show")) {
+    return "Khách hàng không đến đúng giờ hẹn (Hệ thống ghi nhận vắng mặt).";
+  }
+  if (lower.includes("appointment cancelled")) {
+    return "Lịch hẹn đã bị hủy.";
+  }
+  if (lower.includes("refund request created")) {
+    return "Gửi yêu cầu hoàn tiền thành công.";
+  }
+  if (lower.includes("refund approved")) {
+    return "Yêu cầu hoàn tiền đã được phê duyệt.";
+  }
+  if (lower.includes("refund completed")) {
+    return "Đã hoàn thành thủ tục trả lại tiền.";
+  }
+
+  return reason;
 }
 
 const STEPS = ["PENDING_PAYMENT", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS", "COMPLETED"];
@@ -181,6 +293,26 @@ export default function AppointmentDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  const [bankList, setBankList] = useState([]);
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+
+  useEffect(() => {
+    fetch("https://api.vietqr.io/v2/banks")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) {
+          setBankList(data.data.map(b => ({ bin: b.bin, name: `${b.shortName} - ${b.name}` })));
+        } else {
+          setBankList(POPULAR_BANKS);
+        }
+      })
+      .catch(() => {
+        setBankList(POPULAR_BANKS);
+      });
+  }, []);
 
   async function load() {
     try {
@@ -229,14 +361,41 @@ export default function AppointmentDetail() {
       setError("Vui lòng nhập lý do hủy lịch");
       return;
     }
+
+    const paymentStatus = String(appointment?.PaymentStatus || "").toUpperCase();
+    const paymentMethod = String(appointment?.PaymentMethod || "").toUpperCase();
+    const hasPaid = paymentStatus === "PAID" && paymentMethod !== "PACKAGE";
+
+    if (hasPaid) {
+      if (!bankCode) {
+        setError("Vui lòng chọn ngân hàng nhận hoàn tiền");
+        return;
+      }
+      if (!accountNumber.trim()) {
+        setError("Vui lòng nhập số tài khoản nhận hoàn tiền");
+        return;
+      }
+      if (!accountName.trim()) {
+        setError("Vui lòng nhập tên chủ tài khoản");
+        return;
+      }
+    }
+
     try {
       setActionLoading(true);
       setError("");
       setMessage("");
-      await axiosClient.delete(`/appointments/${id}`, { data: { reason: cancelReason.trim() } });
+      await axiosClient.delete(`/appointments/${id}`, {
+        data: {
+          reason: cancelReason.trim(),
+          bankCode,
+          accountNumber,
+          accountName: accountName.trim().toUpperCase()
+        }
+      });
       setMessage(
-        String(appointment?.PaymentStatus || "").toUpperCase() === "PAID"
-          ? "Đã hủy lịch và tạo yêu cầu hoàn tiền"
+        hasPaid
+          ? "Đã hủy lịch và gửi yêu cầu hoàn tiền"
           : "Hủy lịch hẹn thành công",
       );
       setCancelReason("");
@@ -244,6 +403,21 @@ export default function AppointmentDetail() {
       await load();
     } catch (err) {
       setError(err.response?.data?.message || "Hủy lịch hẹn thất bại");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleConfirm() {
+    try {
+      setActionLoading(true);
+      setError("");
+      setMessage("");
+      await axiosClient.post(`/appointments/${id}/confirm`);
+      setMessage("Xác nhận lịch hẹn tái khám thành công!");
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Xác nhận lịch hẹn thất bại");
     } finally {
       setActionLoading(false);
     }
@@ -277,16 +451,30 @@ export default function AppointmentDetail() {
 
   return (
     <CustomerLayout>
-      <div className="appointment-detail-pro">
+      <div className="ap-detail-v2-container">
+        
+        {/* ── TOP ACTION BAR ── */}
+        <div className="ap-v2-top-bar">
+          <Link to="/customer/appointments" className="ap-v2-back-link">
+            ← Quay lại lịch hẹn
+          </Link>
 
-        {/* ── TOP NAV ── */}
-        <div className="appointment-detail-top">
-          <Link to="/customer/appointments">← Quay lại lịch hẹn</Link>
+          <div className="ap-v2-actions-wrapper">
+            {appointment?.Status === "PENDING" && (
+              <button
+                type="button"
+                className="ap-btn-v2 primary"
+                onClick={handleConfirm}
+                disabled={actionLoading}
+              >
+                ✓ Xác nhận lịch tái khám
+              </button>
+            )}
 
-          <div className="appointment-detail-actions">
             {canPay(appointment) && (
               <button
                 type="button"
+                className="ap-btn-v2 primary"
                 onClick={() => navigate(`/customer/payment/${appointment.AppointmentId}`)}
               >
                 💳 Thanh toán ngay
@@ -296,7 +484,7 @@ export default function AppointmentDetail() {
             {canReschedule(appointment) && (
               <button
                 type="button"
-                className="soft"
+                className="ap-btn-v2 soft"
                 onClick={() => navigate(`/customer/reschedule/${appointment.AppointmentId}`)}
               >
                 📅 Đổi lịch hẹn
@@ -306,7 +494,7 @@ export default function AppointmentDetail() {
             {canReview(appointment, services) && (
               <button
                 type="button"
-                className="soft"
+                className="ap-btn-v2 soft"
                 onClick={() => navigate(`/customer/reviews?appointmentId=${appointment.AppointmentId}`)}
               >
                 ⭐ Viết đánh giá
@@ -316,7 +504,7 @@ export default function AppointmentDetail() {
             {isCompleted && (
               <button
                 type="button"
-                className="soft"
+                className="ap-btn-v2 soft"
                 onClick={() =>
                   navigate(`/customer/booking?serviceId=${appointment.ServiceId || ""}&employeeId=${appointment.EmployeeId || ""}`)
                 }
@@ -328,7 +516,7 @@ export default function AppointmentDetail() {
             {canCancel(appointment) && (
               <button
                 type="button"
-                className="danger"
+                className="ap-btn-v2 danger"
                 onClick={() => setShowCancel(true)}
               >
                 ✕ Hủy lịch hẹn
@@ -337,459 +525,482 @@ export default function AppointmentDetail() {
           </div>
         </div>
 
-        {message && <div className="appointment-alert success">✓ {message}</div>}
-        {error && <div className="appointment-alert error">⚠ {error}</div>}
+        {/* ── MESSAGE BANNERS ── */}
+        {message && <div className="ap-v2-alert success">✓ {message}</div>}
+        {error && <div className="ap-v2-alert error">⚠ {error}</div>}
 
         {/* ── HERO BANNER ── */}
-        <section className="appointment-hero-pro">
-          <div>
-            <span>Chi tiết lịch hẹn · Luna Salon</span>
+        <section className="ap-v2-hero-card">
+          <div className="ap-v2-hero-info">
+            <span style={{ fontSize: "12px", textTransform: "uppercase", color: "#c084fc", fontWeight: 700, letterSpacing: "1px" }}>
+              Chi tiết lịch hẹn · Luna Salon
+            </span>
             <h1>{code(appointment.AppointmentId)}</h1>
             <p>
-              {appointment.ServiceNames || appointment.ServiceName || "Dịch vụ chăm sóc sắc đẹp"}{" "}
-              · {dateTextShort(appointment.AppointmentDate)}{" "}
-              · {timeText(appointment.StartTime)} – {timeText(appointment.EndTime)}
+              {appointment.ServiceNames || appointment.ServiceName || "Dịch vụ chăm sóc sắc đẹp"}
             </p>
 
-            <div className="appointment-hero-tags">
-              <b className={`status-pill status-${statusClass(appointment.Status)}`}>
+            <div className="ap-v2-hero-badges">
+              <b className={`ap-v2-badge status status-${statusClass(appointment.Status)}`}>
                 {statusEmoji(appointment.Status)} {statusText(appointment.Status)}
               </b>
-              <b className={`payment-pill payment-${statusClass(appointment.PaymentStatus || "UNPAID")}`}>
-                {paymentText(appointment.PaymentStatus)}
+              <b className={`ap-v2-badge payment-${statusClass(appointment.PaymentStatus || "UNPAID")}`}>
+                💳 {paymentText(appointment.PaymentStatus)}
               </b>
               {appointment.CustomerPackageId && (
-                <b className="package-pill">🎁 Dùng combo</b>
+                <b className="ap-v2-badge combo">📦 Combo: {appointment.CustomerPackageName || "Dùng combo"}</b>
               )}
               {appointment.VoucherCode && (
-                <b className="voucher-pill">🏷 {appointment.VoucherCode}</b>
-              )}
-              {appointment.InvoiceId && (
-                <b style={{
-                  display: "inline-flex", alignItems: "center", minHeight: 32,
-                  padding: "0 14px", borderRadius: 999, background: "rgba(255,255,255,0.12)",
-                  color: "#fff", border: "1px solid rgba(255,255,255,0.2)", fontSize: 12, fontWeight: 700
-                }}>
-                  📄 INV{String(appointment.InvoiceId).padStart(5, "0")}
-                </b>
+                <b className="ap-v2-badge voucher">🏷 {appointment.VoucherCode}</b>
               )}
             </div>
           </div>
 
-          <div className="appointment-total-card">
-            <span>Tổng thanh toán</span>
+          <div className="ap-v2-price-glass">
+            <span>Tổng số tiền thanh toán</span>
             <strong>{money(appointment.FinalAmount)}</strong>
-            <small>
-              Tạm tính: {money(appointment.TotalAmount)}
-            </small>
-            {Number(appointment.DiscountAmount) > 0 && (
-              <small style={{ color: "#ffe1ea", marginTop: 2 }}>
-                🏷 Giảm: -{money(appointment.DiscountAmount)}
-              </small>
-            )}
-            {appointment.BranchName && (
-              <small style={{ marginTop: 8, color: "rgba(255,255,255,0.7)" }}>
-                📍 {appointment.BranchName}
-              </small>
-            )}
-          </div>
-        </section>
-
-        {/* ── PROGRESS STEPS ── */}
-        <section className="appointment-progress-pro">
-          {STEPS.map((step, index) => (
-            <div
-              key={step}
-              className={`appointment-progress-step ${
-                isCancelled && index === 1
-                  ? "active cancelled"
-                  : index <= progress && !isCancelled
-                  ? "active"
-                  : ""
-              }`}
-            >
-              <span>{isCancelled && index === 1 ? "✕" : STEP_ICONS[index]}</span>
-              <b>{isCancelled && index === 1 ? statusText(appointment.Status) : statusText(step)}</b>
-            </div>
-          ))}
-        </section>
-
-        {/* ── MAIN GRID ── */}
-        <section className="appointment-detail-grid">
-
-          {/* COL 1: Services (large) */}
-          <div className="appointment-panel large">
-            <div className="panel-head">
-              <div>
-                <span>Dịch vụ</span>
-                <h3>Dịch vụ trong lịch hẹn</h3>
-              </div>
-              <b>{services.length || appointment.ServiceCount || 1} dịch vụ</b>
-            </div>
-
-            <div className="service-detail-list">
-              {services.length ? (
-                services.map((s) => (
-                  <article key={s.AppointmentServiceId || s.ServiceId}>
-                    <img
-                      src={resolveFileUrl(s.ImageUrl) || FALLBACK_SERVICE}
-                      alt={s.ServiceName}
-                    />
-                    <div>
-                      <span style={{ fontSize: "0.75rem", color: "#ef4f83", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        {s.CategoryName || "Beauty Service"}
-                      </span>
-                      <h4>{s.ServiceName}</h4>
-                      <p>{s.Description || "Dịch vụ chăm sóc sắc đẹp tại salon."}</p>
-                      <div className="service-detail-meta">
-                        <b>{money(s.Price)}</b>
-                        <small>⏱ {s.DurationMinutes || 0} phút</small>
-                        {Number(s.HasReviewed || 0) ? (
-                          <small className="reviewed">★ Đã đánh giá</small>
-                        ) : isCompleted ? (
-                          <small
-                            style={{ cursor: "pointer", color: "#ef4f83", background: "#fff0f5", border: "1px solid #ffe1ea" }}
-                            onClick={() => navigate(`/customer/reviews?appointmentId=${appointment.AppointmentId}`)}
-                          >
-                            ✎ Đánh giá ngay
-                          </small>
-                        ) : (
-                          <small>Chưa đánh giá</small>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="appointment-empty-small">
-                  Chưa có dữ liệu dịch vụ.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* COL 2: Technician */}
-          <div className="appointment-panel">
-            <div className="panel-head">
-              <div>
-                <span>Kỹ thuật viên</span>
-                <h3>Người thực hiện</h3>
-              </div>
-            </div>
-
-            <div className="employee-card-pro">
-              <img
-                src={resolveFileUrl(appointment.EmployeeImageUrl) || FALLBACK_AVATAR}
-                alt={appointment.EmployeeName}
-              />
-              <div>
-                <h4>{appointment.EmployeeName || "Chưa phân công"}</h4>
-                <p>{appointment.Specialization || appointment.Position || "Beauty Expert"}</p>
-                {appointment.EmployeePhone && (
-                  <span>📞 {appointment.EmployeePhone}</span>
-                )}
-                {appointment.EmployeeEmail && (
-                  <span>✉ {appointment.EmployeeEmail}</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* COL 2: Time & Booking Info */}
-          <div className="appointment-panel">
-            <div className="panel-head">
-              <div>
-                <span>Thông tin lịch</span>
-                <h3>Thời gian &amp; địa điểm</h3>
-              </div>
-            </div>
-
-            <div className="info-list-pro">
-              <div>
-                <span>📅 Ngày hẹn</span>
-                <b>{dateText(appointment.AppointmentDate)}</b>
-              </div>
-              <div>
-                <span>⏰ Giờ hẹn</span>
-                <b>{timeText(appointment.StartTime)} – {timeText(appointment.EndTime)}</b>
-              </div>
-              <div>
-                <span>⏱ Thời lượng</span>
-                <b>{appointment.TotalDuration || 0} phút</b>
-              </div>
-              <div>
-                <span>📍 Chi nhánh</span>
-                <b>{appointment.BranchName || "Chưa có"}</b>
-              </div>
-              {appointment.CustomerPackageId && (
-                <div>
-                  <span>🎁 Combo dùng</span>
-                  <b style={{ color: "#ef4f83" }}>#{appointment.CustomerPackageId}</b>
-                </div>
-              )}
-              {appointment.Notes && (
-                <div style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
-                  <span>📝 Ghi chú</span>
-                  <b style={{ textAlign: "left", color: "#7c6175" }}>{appointment.Notes}</b>
-                </div>
-              )}
-              <div>
-                <span>🗓 Ngày đặt lịch</span>
-                <b>{dateTimeText(appointment.CreatedAt)}</b>
-              </div>
-            </div>
-          </div>
-
-          {/* COL 2: Payment summary */}
-          <div className="appointment-panel">
-            <div className="panel-head">
-              <div>
-                <span>Hóa đơn</span>
-                <h3>Thanh toán</h3>
-              </div>
-              {appointment.InvoiceId && (
-                <b>INV{String(appointment.InvoiceId).padStart(5, "0")}</b>
-              )}
-            </div>
-
-            <div className="price-box-pro">
-              <div>
-                <span>Tạm tính</span>
-                <b>{money(appointment.TotalAmount)}</b>
+            
+            <div className="ap-v2-price-breakdowns">
+              <div className="ap-v2-price-row">
+                <span>Tạm tính:</span>
+                <span>{money(appointment.TotalAmount)}</span>
               </div>
               {Number(appointment.DiscountAmount) > 0 && (
-                <div>
-                  <span>Giảm giá</span>
-                  <b style={{ color: "#ef4f83" }}>-{money(appointment.DiscountAmount)}</b>
-                </div>
-              )}
-              <div style={{ background: "#fff0f5", borderColor: "#ef4f83" }}>
-                <span style={{ fontWeight: 700 }}>Thành tiền</span>
-                <strong>{money(appointment.FinalAmount)}</strong>
-              </div>
-            </div>
-
-            <div className="info-list-pro compact">
-              {appointment.VoucherCode && (
-                <div>
-                  <span>🏷 Voucher</span>
-                  <b style={{ color: "#ef4f83" }}>{appointment.VoucherCode}</b>
-                </div>
-              )}
-              <div>
-                <span>Trạng thái</span>
-                <b>{paymentText(appointment.PaymentStatus)}</b>
-              </div>
-              {appointment.InvoiceStatus && (
-                <div>
-                  <span>Hóa đơn</span>
-                  <b>{appointment.InvoiceStatus}</b>
-                </div>
-              )}
-              {appointment.InvoiceCreatedAt && (
-                <div>
-                  <span>Ngày xuất HĐ</span>
-                  <b>{dateTimeText(appointment.InvoiceCreatedAt)}</b>
-                </div>
-              )}
-            </div>
-
-            {canPay(appointment) && (
-              <button
-                type="button"
-                style={{
-                  marginTop: 14, width: "100%", padding: "13px",
-                  background: "linear-gradient(135deg, #ef4f83, #ff5ea8)",
-                  color: "#fff", border: "none", borderRadius: 14, fontWeight: 700,
-                  cursor: "pointer", fontSize: "0.95rem",
-                  boxShadow: "0 6px 18px rgba(239,79,131,0.25)",
-                  transition: "all 0.2s"
-                }}
-                onClick={() => navigate(`/customer/payment/${appointment.AppointmentId}`)}
-              >
-                💳 Thanh toán ngay · {money(appointment.FinalAmount)}
-              </button>
-            )}
-          </div>
-
-          {/* COL 1: Payment History Timeline (large) */}
-          <div className="appointment-panel large">
-            <div className="panel-head">
-              <div>
-                <span>Timeline</span>
-                <h3>Lịch sử trạng thái</h3>
-              </div>
-            </div>
-
-            <div className="status-history-pro">
-              {histories.length ? (
-                histories.map((h) => (
-                  <article key={h.HistoryId}>
-                    <div className="history-icon">
-                      {statusEmoji(h.NewStatus) || "✓"}
-                    </div>
-                    <div>
-                      <h4>
-                        {h.OldStatus ? `${statusText(h.OldStatus)} → ` : ""}
-                        {statusText(h.NewStatus)}
-                      </h4>
-                      <p>{h.Reason || "Cập nhật trạng thái lịch hẹn"}</p>
-                      <small>
-                        🕐 {dateTimeText(h.ChangedAt)} · {h.ChangedByName || "Hệ thống"}
-                      </small>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="appointment-empty-small">
-                  Chưa có lịch sử trạng thái.
+                <div className="ap-v2-price-row" style={{ color: "#f472b6" }}>
+                  <span>Giảm giá:</span>
+                  <span>-{money(appointment.DiscountAmount)}</span>
                 </div>
               )}
             </div>
           </div>
+        </section>
 
-          {/* COL 2: Payment transaction timeline */}
-          <div className="appointment-panel">
-            <div className="panel-head">
-              <div>
-                <span>Giao dịch</span>
-                <h3>Lịch sử thanh toán</h3>
-              </div>
-            </div>
-
-            <div className="mini-timeline-pro">
-              {payments.length ? (
-                payments.map((p) => (
-                  <article key={p.PaymentId}>
-                    <span className={`dot payment-${statusClass(p.Status)}`} />
-                    <div>
-                      <h4>{money(p.Amount)} · {paymentText(p.Status)}</h4>
-                      <p>{p.PaymentMethod || "VNPay"} · {dateTimeText(p.PaidAt || p.CreatedAt)}</p>
-                      {p.TransactionCode && <small>💳 Mã GD: {p.TransactionCode}</small>}
-                      {p.VnpTxnRef && <small>🔖 VNP Ref: {p.VnpTxnRef}</small>}
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="appointment-empty-small">
-                  Chưa có giao dịch thanh toán.
+        {/* ── TIMELINE BAR PROGRESS ── */}
+        <section className="ap-v2-progress-timeline">
+          <div className="ap-v2-progress-bar-fill" style={{ width: `${progress * 25}%` }} />
+          {STEPS.map((step, index) => {
+            const isActive = index <= progress && !isCancelled;
+            const isCurrent = index === progress && !isCancelled;
+            const stepClass = isCancelled && index === 1
+              ? "cancelled"
+              : isCurrent
+              ? "active"
+              : isActive
+              ? "completed"
+              : "";
+            
+            return (
+              <div key={step} className={`ap-v2-progress-step ${stepClass}`}>
+                <div className="ap-v2-step-circle">
+                  {isCancelled && index === 1 ? "✕" : STEP_ICONS[index]}
                 </div>
-              )}
-            </div>
-          </div>
+                <span className="ap-v2-step-label">
+                  {isCancelled && index === 1 ? statusText(appointment.Status) : statusText(step)}
+                </span>
+              </div>
+            );
+          })}
+        </section>
 
-          {/* COL 2: Refunds */}
-          {(refunds.length > 0 || isCancelled) && (
-            <div className="appointment-panel">
-              <div className="panel-head">
-                <div>
-                  <span>Hoàn tiền</span>
-                  <h3>Yêu cầu hoàn tiền</h3>
-                </div>
+        {/* ── MAIN CONTENT GRID ── */}
+        <div className="ap-v2-grid">
+          
+          {/* LEFT COLUMN */}
+          <div className="ap-v2-left-col">
+            
+            {/* Services List Panel */}
+            <div className="ap-v2-panel">
+              <div className="ap-v2-panel-title">
+                <h3>💅 Dịch vụ đã chọn</h3>
+                <span>{services.length || appointment.ServiceCount || 1} dịch vụ</span>
               </div>
 
-              <div className="mini-timeline-pro">
-                {refunds.length ? (
-                  refunds.map((r) => (
-                    <article key={r.RefundId}>
-                      <span className={`dot refund-${statusClass(r.Status)}`} />
-                      <div>
-                        <h4>{money(r.RefundAmount)} · {refundText(r.Status)}</h4>
-                        <p>{r.Reason || "Không có lý do"}</p>
-                        {r.BankName && <small>🏦 {r.BankName} – {r.BankAccountNumber}</small>}
-                        <small>🕐 {dateTimeText(r.RefundedAt || r.CreatedAt)}</small>
+              <div className="ap-v2-services-list">
+                {services.length ? (
+                  services.map((s) => (
+                    <article className="ap-v2-service-card" key={s.AppointmentServiceId || s.ServiceId}>
+                      <img
+                        className="ap-v2-service-img"
+                        src={resolveFileUrl(s.ImageUrl) || FALLBACK_SERVICE}
+                        alt={s.ServiceName}
+                      />
+                      <div className="ap-v2-service-info">
+                        <div>
+                          <span className="ap-v2-service-cat">
+                            {s.CategoryName || "Dịch vụ làm đẹp"}
+                          </span>
+                          <h4 className="ap-v2-service-name">{s.ServiceName}</h4>
+                          <p className="ap-v2-service-desc">
+                            {s.Description || "Trải nghiệm liệu trình chăm sóc sắc đẹp cao cấp tại Luna Salon."}
+                          </p>
+                        </div>
+                        
+                        <div className="ap-v2-service-meta">
+                          <span className="ap-v2-service-price">{money(s.Price)}</span>
+                          <span className="ap-v2-service-duration">⏱ {s.DurationMinutes || 0} phút</span>
+                          
+                          {Number(s.HasReviewed || 0) ? (
+                            <span className="ap-v2-review-badge">★ Đã đánh giá</span>
+                          ) : isCompleted ? (
+                            <button
+                              type="button"
+                              className="ap-v2-review-btn"
+                              onClick={() => navigate(`/customer/reviews?appointmentId=${appointment.AppointmentId}`)}
+                            >
+                              ✎ Đánh giá ngay
+                            </button>
+                          ) : (
+                            <span className="ap-v2-service-duration">Chưa thực hiện</span>
+                          )}
+                        </div>
                       </div>
                     </article>
                   ))
                 ) : (
-                  <div className="appointment-empty-small">
-                    Chưa có yêu cầu hoàn tiền.
-                  </div>
+                  <p style={{ color: "var(--ap-text-sub)", textAlign: "center", padding: "20px 0" }}>
+                    Không có thông tin dịch vụ.
+                  </p>
                 )}
               </div>
             </div>
-          )}
 
-          {/* COL 2: Reviews */}
-          <div className="appointment-panel">
-            <div className="panel-head">
-              <div>
-                <span>Đánh giá</span>
-                <h3>Nhận xét dịch vụ</h3>
+            {/* Status History Timeline Panel */}
+            <div className="ap-v2-panel">
+              <div className="ap-v2-panel-title">
+                <h3>🕒 Lịch sử trạng thái</h3>
               </div>
-              {canReview(appointment, services) && (
-                <button
-                  type="button"
-                  className="panel-mini-btn"
-                  onClick={() => navigate(`/customer/reviews?appointmentId=${appointment.AppointmentId}`)}
-                >
-                  ✎ Viết đánh giá
-                </button>
-              )}
-            </div>
 
-            <div className="review-list-pro">
-              {reviews.length ? (
-                reviews.map((r) => (
-                  <article key={r.ReviewId}>
-                    <h4>{r.ServiceName}</h4>
-                    <p>{"★".repeat(Number(r.Rating || 0))}{"☆".repeat(5 - Number(r.Rating || 0))}</p>
-                    <span>{r.Comment || "Không có nội dung đánh giá"}</span>
-                    {r.AdminResponse && (
-                      <small>💬 Salon phản hồi: {r.AdminResponse}</small>
-                    )}
-                  </article>
-                ))
-              ) : (
-                <div className="appointment-empty-small">
-                  {isCompleted
-                    ? "Bạn chưa đánh giá lịch hẹn này. Hãy chia sẻ trải nghiệm!"
-                    : "Chưa có đánh giá."
-                  }
-                </div>
-              )}
+              <div className="ap-v2-timeline">
+                {histories.length ? (
+                  histories.map((h, idx) => (
+                    <div key={h.HistoryId || idx} className={`ap-v2-timeline-node ${idx === 0 ? "active" : ""}`}>
+                      <div className="ap-v2-timeline-bullet" />
+                      <div className="ap-v2-timeline-content">
+                        <h4>
+                          {h.OldStatus ? `${statusText(h.OldStatus)} → ` : ""}
+                          {statusText(h.NewStatus)}
+                        </h4>
+                        <p>{formatReason(h.Reason)}</p>
+                        <span>
+                          🕐 {dateTimeText(h.ChangedAt)} · {formatName(h.ChangedByName)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ color: "var(--ap-text-sub)", textAlign: "center", padding: "10px 0" }}>
+                    Chưa có ghi nhận lịch sử thay đổi.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-        </section>
+          {/* RIGHT COLUMN */}
+          <div className="ap-v2-right-col">
+            
+            {/* Technician Profile Panel */}
+            <div className="ap-v2-panel">
+              <div className="ap-v2-panel-title">
+                <h3>✂ Kỹ thuật viên</h3>
+              </div>
+
+              <div className="ap-v2-tech-profile">
+                <div className="ap-v2-tech-avatar-container">
+                  <img
+                    className="ap-v2-tech-avatar"
+                    src={resolveFileUrl(appointment.EmployeeImageUrl) || FALLBACK_AVATAR}
+                    alt={appointment.EmployeeName}
+                  />
+                </div>
+                <div>
+                  <h4 className="ap-v2-tech-name">{appointment.EmployeeName || "Chưa phân công"}</h4>
+                  <p className="ap-v2-tech-title">
+                    {appointment.Specialization || appointment.Position || "Chuyên gia làm đẹp"}
+                  </p>
+                  <div className="ap-v2-tech-contacts">
+                    {appointment.EmployeePhone && (
+                      <span className="ap-v2-tech-contact-item">
+                        📞 {appointment.EmployeePhone}
+                      </span>
+                    )}
+                    {appointment.EmployeeEmail && (
+                      <span className="ap-v2-tech-contact-item">
+                        ✉ {appointment.EmployeeEmail}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Time & Location (Branch Address) */}
+            <div className="ap-v2-panel">
+              <div className="ap-v2-panel-title">
+                <h3>📍 Thời gian & Địa điểm</h3>
+              </div>
+
+              <div className="ap-v2-details-list">
+                <div className="ap-v2-detail-item">
+                  <div className="ap-v2-detail-icon">📅</div>
+                  <div className="ap-v2-detail-content">
+                    <span className="ap-v2-detail-label">Ngày hẹn thực hiện</span>
+                    <span className="ap-v2-detail-value">{dateText(appointment.AppointmentDate)}</span>
+                  </div>
+                </div>
+
+                <div className="ap-v2-detail-item">
+                  <div className="ap-v2-detail-icon">⏰</div>
+                  <div className="ap-v2-detail-content">
+                    <span className="ap-v2-detail-label">Thời gian làm việc</span>
+                    <span className="ap-v2-detail-value">
+                      {timeText(appointment.StartTime)} – {timeText(appointment.EndTime)}
+                    </span>
+                    <span className="ap-v2-detail-subvalue">⏱ Tổng thời lượng: {appointment.TotalDuration || 0} phút</span>
+                  </div>
+                </div>
+
+                <div className="ap-v2-detail-item">
+                  <div className="ap-v2-detail-icon">🏢</div>
+                  <div className="ap-v2-detail-content">
+                    <span className="ap-v2-detail-label">Chi nhánh thực hiện</span>
+                    <span className="ap-v2-detail-value">{appointment.BranchName || "Chưa chọn chi nhánh"}</span>
+                    {appointment.BranchAddress && (
+                      <span className="ap-v2-detail-subvalue">Địa chỉ: {appointment.BranchAddress}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Google Map Address */}
+              {appointment.BranchAddress && (
+                <div style={{ marginTop: "16px", borderRadius: "16px", overflow: "hidden", border: "1px solid var(--ap-border)", height: "200px" }}>
+                  <iframe
+                    title="Bản đồ chỉ dẫn đường đi"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(appointment.BranchAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0, display: "block" }}
+                    allowFullScreen=""
+                    loading="lazy"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Financial Details (Receipt Layout) */}
+            <div className="ap-v2-panel">
+              <div className="ap-v2-panel-title">
+                <h3>🧾 Hóa đơn chi tiết</h3>
+              </div>
+
+              <div className="ap-v2-receipt">
+                <div className="ap-v2-receipt-header">
+                  <h4>LUNA BEAUTY SALON</h4>
+                  <span>Mã Hóa Đơn: {appointment.InvoiceId ? `INV${String(appointment.InvoiceId).padStart(5, "0")}` : "Chưa xuất"}</span>
+                </div>
+
+                <div className="ap-v2-receipt-list">
+                  <div className="ap-v2-receipt-item">
+                    <span>Tổng tạm tính dịch vụ</span>
+                    <span>{money(appointment.TotalAmount)}</span>
+                  </div>
+                  
+                  {Number(appointment.DiscountAmount) > 0 && (
+                    <div className="ap-v2-receipt-item" style={{ color: "var(--ap-secondary)" }}>
+                      <span>Giảm giá khuyến mãi / Voucher</span>
+                      <span>-{money(appointment.DiscountAmount)}</span>
+                    </div>
+                  )}
+
+                  <div className="ap-v2-receipt-item total">
+                    <span>Số tiền cuối cùng</span>
+                    <span>{money(appointment.FinalAmount)}</span>
+                  </div>
+                </div>
+
+                <div className="ap-v2-receipt-footer">
+                  <p>Trạng thái hóa đơn: {appointment.InvoiceStatus || "Chưa hoàn tất"}</p>
+                  {appointment.InvoiceCreatedAt && (
+                    <p>Ngày xuất: {dateTimeText(appointment.InvoiceCreatedAt)}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Transactions List */}
+            {payments.length > 0 && (
+              <div className="ap-v2-panel">
+                <div className="ap-v2-panel-title">
+                  <h3>💰 Lịch sử thanh toán</h3>
+                </div>
+
+                <div className="ap-v2-trans-list">
+                  {payments.map((p) => (
+                    <div className="ap-v2-trans-card" key={p.PaymentId}>
+                      <div className="ap-v2-trans-left">
+                        <span className="ap-v2-trans-method">💳 {p.PaymentMethod || "VNPay Online"}</span>
+                        <span className="ap-v2-trans-date">{dateTimeText(p.PaidAt || p.CreatedAt)}</span>
+                        {p.TransactionCode && <small style={{ color: "var(--ap-text-sub)" }}>Mã GD: {p.TransactionCode}</small>}
+                      </div>
+                      <div className="ap-v2-trans-right">
+                        <span className="ap-v2-trans-price">{money(p.Amount)}</span>
+                        <div className="ap-v2-trans-status">{paymentText(p.Status)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Refunds Panel if Cancelled/Refunded */}
+            {(refunds.length > 0 || isCancelled) && (
+              <div className="ap-v2-panel">
+                <div className="ap-v2-panel-title">
+                  <h3>🔄 Giao dịch hoàn tiền</h3>
+                </div>
+
+                <div className="ap-v2-trans-list">
+                  {refunds.length ? (
+                    refunds.map((r) => (
+                      <div className="ap-v2-trans-card" key={r.RefundId} style={{ borderLeft: "4px solid var(--ap-warning)", borderRadius: "8px" }}>
+                        <div className="ap-v2-trans-left">
+                          <span className="ap-v2-trans-method">🏦 Nhận qua ngân hàng</span>
+                          {r.BankName && <small style={{ fontWeight: 600 }}>{r.BankName} – {r.BankAccountNumber}</small>}
+                          <span className="ap-v2-trans-date">{dateTimeText(r.RefundedAt || r.CreatedAt)}</span>
+                          <small style={{ color: "var(--ap-text-sub)" }}>Lý do: {r.Reason || "Không ghi"}</small>
+                        </div>
+                        <div className="ap-v2-trans-right">
+                          <span className="ap-v2-trans-price" style={{ color: "var(--ap-warning)" }}>{money(r.RefundAmount)}</span>
+                          <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--ap-warning)" }}>
+                            {refundText(r.Status)}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ color: "var(--ap-text-sub)", textAlign: "center", padding: "10px 0", fontSize: "13px" }}>
+                      Yêu cầu hoàn tiền đang chờ hệ thống xử lý.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Service Review list inside details */}
+            {reviews.length > 0 && (
+              <div className="ap-v2-panel">
+                <div className="ap-v2-panel-title">
+                  <h3>⭐ Đánh giá của bạn</h3>
+                </div>
+
+                <div>
+                  {reviews.map((r) => (
+                    <div className="ap-v2-review-card" key={r.ReviewId}>
+                      <h4>{r.ServiceName}</h4>
+                      <div className="ap-v2-review-stars">
+                        {"★".repeat(Number(r.Rating || 0)) + "☆".repeat(5 - Number(r.Rating || 0))}
+                      </div>
+                      <p className="ap-v2-review-comment">{r.Comment || "Không có nhận xét chi tiết."}</p>
+                      {r.AdminResponse && (
+                        <div className="ap-v2-review-reply">
+                          <strong>Salon phản hồi:</strong> {r.AdminResponse}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ── CANCEL MODAL ── */}
         {showCancel && (
-          <div
-            className="cancel-modal-backdrop"
-            onClick={() => setShowCancel(false)}
-          >
-            <div
-              className="cancel-modal-pro"
-              onClick={(e) => e.stopPropagation()}
-            >
+          <div className="ap-v2-modal-overlay" onClick={() => setShowCancel(false)}>
+            <div className="ap-v2-modal" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
+                className="ap-v2-modal-close"
                 onClick={() => setShowCancel(false)}
-                className="modal-close"
               >
                 ×
               </button>
 
-              <div className="cancel-icon-pro">⚠</div>
-              <h3>Xác nhận hủy lịch hẹn</h3>
-              <p>
-                Nếu lịch đã thanh toán, hệ thống sẽ tạo yêu cầu hoàn tiền để salon xử lý.
+              <div className="ap-v2-modal-warning-icon">⚠</div>
+              <h3 className="ap-v2-modal-title">Xác nhận hủy lịch hẹn</h3>
+              <p className="ap-v2-modal-desc">
+                {String(appointment?.PaymentStatus || "").toUpperCase() === "PAID" && String(appointment?.PaymentMethod || "").toUpperCase() !== "PACKAGE"
+                  ? "Lịch hẹn đã thanh toán. Salon sẽ tạo yêu cầu hoàn trả số tiền đặt cọc vào tài khoản ngân hàng của bạn."
+                  : "Hành động này không thể hoàn tác. Bạn có chắc chắn muốn hủy lịch hẹn này?"}
               </p>
 
+              {/* Bank refund information details if paid */}
+              {String(appointment?.PaymentStatus || "").toUpperCase() === "PAID" && String(appointment?.PaymentMethod || "").toUpperCase() !== "PACKAGE" && (
+                <div className="bank-refund-fields" style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '15px 0', padding: '16px', border: '1px solid #fee2e2', borderRadius: '12px', backgroundColor: '#fef2f2' }}>
+                  <h4 style={{ margin: '0 0 8px 0', color: 'var(--ap-danger)', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Tài khoản nhận hoàn tiền
+                  </h4>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ap-text-sub)' }}>Ngân hàng nhận:</label>
+                    <select
+                      style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--ap-border)', outline: 'none', backgroundColor: 'white', fontSize: '13px' }}
+                      value={bankCode}
+                      onChange={(e) => setBankCode(e.target.value)}
+                    >
+                      <option value="">-- Chọn ngân hàng --</option>
+                      {bankList.map((b) => (
+                        <option key={b.bin} value={b.bin}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ap-text-sub)' }}>Số tài khoản:</label>
+                    <input
+                      type="text"
+                      placeholder="Nhập số tài khoản ngân hàng..."
+                      style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--ap-border)', outline: 'none', fontSize: '13px' }}
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value.replace(/\s/g, ""))}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ap-text-sub)' }}>Tên chủ tài khoản (viết hoa không dấu):</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: NGUYEN VAN A"
+                      style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--ap-border)', outline: 'none', fontSize: '13px' }}
+                      value={accountName}
+                      onChange={(e) => setAccountName(e.target.value.toUpperCase())}
+                    />
+                  </div>
+                </div>
+              )}
+
               <textarea
+                className="ap-v2-modal-textarea"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Nhập lý do hủy lịch..."
-                rows={4}
+                placeholder="Nhập lý do hủy lịch hẹn..."
+                rows={3}
               />
 
-              <div className="cancel-actions-pro">
-                <button type="button" onClick={() => setShowCancel(false)}>
-                  Giữ lịch
+              <div className="ap-v2-modal-actions">
+                <button
+                  type="button"
+                  className="ap-btn-v2 secondary"
+                  onClick={() => setShowCancel(false)}
+                >
+                  Giữ lại lịch
                 </button>
                 <button
                   type="button"
+                  className="ap-btn-v2 danger"
                   disabled={actionLoading}
                   onClick={submitCancel}
                 >

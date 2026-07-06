@@ -4,6 +4,7 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Models to try in order of preference on OpenRouter
 const MODELS = [
+  'openrouter/free',
   'meta-llama/llama-3.3-70b-instruct:free',
   'google/gemma-4-31b-it:free',
   'meta-llama/llama-3.2-3b-instruct:free'
@@ -13,14 +14,16 @@ const MODELS = [
  * Gọi AI hỗ trợ cả Google Gemini trực tiếp (tối ưu nhất) và OpenRouter (dự phòng)
  * @param {string} systemPrompt - System instruction cho AI
  * @param {string} userMessage - Câu hỏi của user
+ * @param {object} options - Tuỳ chọn bổ sung: { jsonMode: bool, maxTokens: number }
  * @returns {Promise<string>} - Response text từ AI
  */
-async function generateContent(systemPrompt, userMessage) {
+async function generateContent(systemPrompt, userMessage, options = {}) {
+  const { jsonMode = false, maxTokens = 4096 } = options;
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
 
-  // 1. Thử gọi Google Gemini trực tiếp nếu có key bắt đầu bằng AIzaSy
-  if (geminiApiKey && geminiApiKey.startsWith('AIzaSy')) {
+  // 1. Thử gọi Google Gemini trực tiếp
+  if (geminiApiKey) {
     try {
       console.log('[AI] Attempting call to direct Google Gemini API...');
       const response = await axios.post(
@@ -36,7 +39,8 @@ async function generateContent(systemPrompt, userMessage) {
             }
           ],
           generationConfig: {
-            maxOutputTokens: 1200
+            maxOutputTokens: maxTokens,
+            ...(jsonMode ? { responseMimeType: 'application/json' } : {})
           }
         },
         {
@@ -73,7 +77,7 @@ async function generateContent(systemPrompt, userMessage) {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage },
           ],
-          max_tokens: 1200,
+          max_tokens: maxTokens,
         },
         {
           headers: {

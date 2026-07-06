@@ -47,7 +47,7 @@ async function ensureUniqueName(pool, levelName, excludeId = null) {
       SELECT TOP 1 MembershipLevelId
       FROM MembershipLevels
       WHERE LOWER(LevelName) = LOWER(@LevelName)
-        AND (@ExcludeId IS NULL OR MembershipLevelId <> @ExcludeId)
+        AND (CAST(@ExcludeId AS INT) IS NULL OR MembershipLevelId <> CAST(@ExcludeId AS INT))
     `);
 
   if (result.recordset[0]) throw new Error("Tên hạng membership đã tồn tại");

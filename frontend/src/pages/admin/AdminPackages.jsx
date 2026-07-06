@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
 const DEFAULT_IMAGE = "/images/packages/acne-package.png";
@@ -54,6 +54,44 @@ export default function AdminPackages() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const gridRef = useRef(null);
+  const shouldScrollRef = useRef(false);
+  const isInitialMount = useRef(true);
+
+  const scrollToGrid = () => {
+    if (gridRef.current) {
+      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const offsetPosition = elementPosition - 180;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+    }
+  };
+
+  const scrollToItem = (id, type = "package") => {
+    setTimeout(() => {
+      const element = document.getElementById(`${type}-card-${id}`);
+      if (element) {
+        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const offsetPosition = elementPosition - 180;
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth"
+        });
+        element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
+        element.style.borderColor = "#d6b57e";
+        element.style.boxShadow = "0 0 25px 6px rgba(214, 181, 126, 0.6)";
+        setTimeout(() => {
+          element.style.borderColor = "";
+          element.style.boxShadow = "";
+        }, 3000);
+      } else {
+        scrollToGrid();
+      }
+    }, 150);
+  };
+
   async function load() {
     try {
       setError("");
@@ -87,8 +125,61 @@ export default function AdminPackages() {
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      load();
+      return;
+    }
+    load().then(() => {
+      if (shouldScrollRef.current) {
+        scrollToGrid();
+        shouldScrollRef.current = false;
+      }
+    });
+  }, [filters.status, filters.packageCategoryId, filters.isHot]);
+
+  const handleKeywordKeyDown = (e) => {
+    if (e.key === "Enter") {
+      shouldScrollRef.current = true;
+      load().then(() => {
+        if (shouldScrollRef.current) {
+          scrollToGrid();
+          shouldScrollRef.current = false;
+        }
+      });
+    }
+  };
+
+  const handleFilterClick = () => {
+    shouldScrollRef.current = true;
+    load().then(() => {
+      if (shouldScrollRef.current) {
+        scrollToGrid();
+        shouldScrollRef.current = false;
+      }
+    });
+  };
+
+  const handleClearFilters = () => {
+    const wasEmpty = filters.status === "" && filters.packageCategoryId === "" && filters.isHot === "";
+    setFilters({
+      keyword: "",
+      status: "",
+      packageCategoryId: "",
+      isHot: "",
+    });
+    if (wasEmpty) {
+      shouldScrollRef.current = true;
+      load().then(() => {
+        if (shouldScrollRef.current) {
+          scrollToGrid();
+          shouldScrollRef.current = false;
+        }
+      });
+    } else {
+      shouldScrollRef.current = true;
+    }
+  };
 
   const selectedServiceList = useMemo(() => {
     return services
@@ -236,14 +327,23 @@ export default function AdminPackages() {
         services: servicesPayload,
       };
 
+      let pId = editingId;
+
       if (editingId) {
         await axiosClient.put(`/admin/packages/${editingId}`, payload);
       } else {
-        await axiosClient.post("/admin/packages", payload);
+        const res = await axiosClient.post("/admin/packages", payload);
+        const created = res.data.data || res.data;
+        pId = created?.PackageId || created?.id;
       }
 
       setShowModal(false);
       await load();
+      if (pId) {
+        scrollToItem(pId, "package");
+      } else {
+        scrollToGrid();
+      }
     } catch (err) {
       setError(
         err?.response?.data?.message || err?.message || "Lưu package thất bại",
@@ -267,6 +367,7 @@ export default function AdminPackages() {
         status: nextStatus,
       });
       await load();
+      scrollToItem(item.PackageId, "package");
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -286,6 +387,7 @@ export default function AdminPackages() {
       setError("");
       await axiosClient.delete(`/admin/packages/${item.PackageId}`);
       await load();
+      scrollToGrid();
     } catch (err) {
       setError(
         err?.response?.data?.message || err?.message || "Xóa package thất bại",
@@ -318,18 +420,910 @@ export default function AdminPackages() {
 
   return (
     <section className="admin-page admin-packages-page">
+      <style>{`
+        .admin-packages-page {
+          padding: 24px;
+          background: #fdfbf9;
+          min-height: 100vh;
+          font-family: 'Outfit', sans-serif;
+        }
+
+        .admin-packages-hero {
+          padding: 32px;
+          border-radius: 24px;
+          background: linear-gradient(135deg, #1f140e 0%, #3a2519 100%);
+          color: #ffffff;
+          display: flex;
+          justify-content: space-between;
+          gap: 24px;
+          align-items: center;
+          box-shadow: 0 12px 30px rgba(31, 20, 14, 0.15);
+          margin-bottom: 24px;
+          position: relative;
+          overflow: hidden;
+          border: 1px solid rgba(214, 181, 126, 0.2);
+        }
+
+        .admin-packages-hero::after {
+          content: "";
+          position: absolute;
+          width: 250px;
+          height: 250px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(214, 181, 126, 0.1) 0%, transparent 70%);
+          right: -50px;
+          bottom: -50px;
+        }
+
+        .admin-packages-hero h1 {
+          margin: 0 0 8px 0;
+          font-size: 32px;
+          font-weight: 700;
+          letter-spacing: -0.5px;
+          background: linear-gradient(to right, #ffffff, #f0dfbf);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .admin-packages-hero p {
+          margin: 0;
+          color: #d8cbb5;
+          font-size: 14.5px;
+          opacity: 0.9;
+          max-width: 600px;
+          line-height: 1.5;
+        }
+
+        .admin-eyebrow {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          color: #d6b57e;
+          font-weight: 700;
+          margin-bottom: 6px;
+        }
+
+        .admin-refresh-btn {
+          border: 0;
+          border-radius: 50px;
+          padding: 12px 28px;
+          font-weight: 700;
+          color: #1f140e;
+          background: linear-gradient(135deg, #d6b57e, #f0dfbf);
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 4px 15px rgba(214, 181, 126, 0.3);
+          white-space: nowrap;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+        }
+
+        .admin-refresh-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(214, 181, 126, 0.4);
+          background: linear-gradient(135deg, #c7a36c, #e2d0ad);
+        }
+
+        .admin-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+
+        .admin-stat-card {
+          background: #ffffff;
+          padding: 24px;
+          border-radius: 20px;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          border: 1px solid #f0f0f0;
+          transition: all 0.3s ease;
+        }
+
+        .admin-stat-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 20px rgba(31, 20, 14, 0.05);
+          border-color: rgba(214, 181, 126, 0.3);
+        }
+
+        .admin-stat-icon {
+          width: 54px;
+          height: 54px;
+          border-radius: 16px;
+          display: grid;
+          place-items: center;
+          background: #fbf9f6;
+          font-size: 26px;
+          box-shadow: inset 0 2px 5px rgba(0,0,0,0.03);
+          color: #3a2519;
+          border: 1px solid #f0e9df;
+        }
+
+        .admin-stat-card p {
+          margin: 0;
+          font-size: 13px;
+          color: #8c7e74;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .admin-stat-card h3 {
+          margin: 4px 0;
+          font-size: 28px;
+          font-weight: 700;
+          color: #1f140e;
+        }
+
+        .admin-stat-card span {
+          font-size: 12px;
+          color: #bfaea3;
+        }
+
+        .admin-filter-panel.admin-packages-filter {
+          background: #ffffff;
+          padding: 20px;
+          border-radius: 20px;
+          box-shadow: 0 10px 30px rgba(31, 20, 14, 0.04);
+          display: grid;
+          grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr auto auto;
+          gap: 12px;
+          align-items: center;
+          margin-bottom: 24px;
+          position: sticky;
+          top: 10px;
+          z-index: 99;
+          border: 1px solid rgba(214, 181, 126, 0.15);
+          backdrop-filter: blur(8px);
+        }
+
+        @media (max-width: 1024px) {
+          .admin-filter-panel.admin-packages-filter {
+            grid-template-columns: 1fr 1fr;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .admin-filter-panel.admin-packages-filter {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        .admin-filter-panel.admin-packages-filter input,
+        .admin-filter-panel.admin-packages-filter select {
+          padding: 11px 16px;
+          border: 1px solid #ebdcc5;
+          border-radius: 10px;
+          font-size: 14.5px;
+          background: #fdfcfb;
+          outline: none;
+          transition: all 0.2s;
+          color: #3a2519;
+        }
+
+        .admin-filter-panel.admin-packages-filter input:focus,
+        .admin-filter-panel.admin-packages-filter select:focus {
+          border-color: #c7a36c;
+          background: #ffffff;
+          box-shadow: 0 0 0 3px rgba(214, 181, 126, 0.15);
+        }
+
+        .admin-packages-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 30px;
+        }
+
+        @media (min-width: 992px) {
+          .admin-packages-grid {
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+          }
+        }
+
+        /* Package Card Premium Layout */
+        .admin-package-card {
+          background: #ffffff;
+          border-radius: 24px;
+          border: 1px solid #f0e9df;
+          overflow: hidden;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 6px 15px rgba(0,0,0,0.02);
+          position: relative;
+        }
+
+        .admin-package-card:hover {
+          transform: translateY(-8px);
+          box-shadow: 0 15px 35px rgba(31, 20, 14, 0.1);
+          border-color: #d6b57e;
+        }
+
+        .admin-package-image {
+          position: relative;
+          height: 200px;
+          overflow: hidden;
+          border-bottom: 3px solid #fcfaf7;
+        }
+
+        .admin-package-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.5s ease;
+        }
+
+        .admin-package-card:hover .admin-package-image img {
+          transform: scale(1.06);
+        }
+
+        .package-hot-badge {
+          position: absolute;
+          top: 16px;
+          left: 16px;
+          background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+          color: #ffffff;
+          padding: 4px 12px;
+          border-radius: 30px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 1px;
+          box-shadow: 0 4px 10px rgba(185, 28, 28, 0.3);
+          z-index: 2;
+          animation: pulseGlow 2s infinite;
+        }
+
+        @keyframes pulseGlow {
+          0% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.4); }
+          70% { box-shadow: 0 0 0 8px rgba(185, 28, 28, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0); }
+        }
+
+        .admin-status {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          padding: 4px 12px;
+          border-radius: 30px;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+          z-index: 2;
+        }
+
+        .admin-status-active { background: #dcfce7; color: #15803d; }
+        .admin-status-inactive { background: #f1f5f9; color: #475569; }
+        .admin-status-hidden { background: #ffedd5; color: #c2410c; }
+
+        .admin-package-body {
+          padding: 24px;
+          flex-grow: 1;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .admin-package-tag {
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 1.5px;
+          color: #c7a36c;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+
+        .admin-package-body h3 {
+          margin: 0 0 10px 0;
+          font-size: 20px;
+          font-weight: 700;
+          color: #1f140e;
+          line-height: 1.3;
+        }
+
+        .admin-package-body p {
+          margin: 0 0 16px 0;
+          font-size: 13.5px;
+          color: #8c7e74;
+          line-height: 1.5;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          height: 40px;
+        }
+
+        .admin-package-price {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 18px;
+          background: #faf8f5;
+          padding: 10px 16px;
+          border-radius: 12px;
+          border: 1px solid #f5ede2;
+        }
+
+        .admin-package-price div {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .admin-package-price span {
+          font-size: 9px;
+          text-transform: uppercase;
+          color: #bfaea3;
+          font-weight: 700;
+        }
+
+        .admin-package-price strong {
+          font-size: 20px;
+          color: #1f140e;
+          font-weight: 800;
+        }
+
+        .admin-package-price del {
+          font-size: 14px;
+          color: #bfaea3;
+          font-weight: 600;
+        }
+
+        .admin-package-info {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 6px;
+          margin-bottom: 18px;
+          text-align: center;
+        }
+
+        .admin-package-info div {
+          display: flex;
+          flex-direction: column;
+          background: #fbf9f6;
+          padding: 8px 4px;
+          border-radius: 10px;
+          border: 1px solid #f5ede2;
+        }
+
+        .admin-package-info span {
+          font-size: 8px;
+          text-transform: uppercase;
+          color: #bfaea3;
+          font-weight: 700;
+          margin-bottom: 2px;
+        }
+
+        .admin-package-info strong {
+          font-size: 13px;
+          color: #3a2519;
+          font-weight: 700;
+        }
+
+        .admin-package-services {
+          font-size: 12.5px;
+          color: #8c7e74;
+          margin-bottom: 20px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          border-top: 1px solid #f5ede2;
+          padding-top: 12px;
+          font-style: italic;
+        }
+
+        .admin-card-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: auto;
+        }
+
+        .card-btn {
+          padding: 8px 14px;
+          border-radius: 10px;
+          border: 1px solid #ebdcc5;
+          background: #ffffff;
+          color: #5c4a3c;
+          font-size: 12.5px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .card-btn:hover {
+          background: #fbf9f6;
+          border-color: #c7a36c;
+          color: #1f140e;
+        }
+
+        .card-btn.primary {
+          background: linear-gradient(135deg, #1f140e 0%, #3a2519 100%);
+          color: #ffffff;
+          border: none;
+        }
+
+        .card-btn.primary:hover {
+          background: linear-gradient(135deg, #322117 0%, #4f3323 100%);
+          box-shadow: 0 4px 10px rgba(31, 20, 14, 0.2);
+        }
+
+        .card-btn.danger {
+          color: #b91c1c;
+          border-color: #fee2e2;
+        }
+
+        .card-btn.danger:hover {
+          background: #fef2f2;
+          border-color: #b91c1c;
+        }
+
+        /* Modal Layouts */
+        .modal-backdrop {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(31, 20, 14, 0.6);
+          backdrop-filter: blur(4px);
+          display: grid;
+          place-items: center;
+          z-index: 999;
+          padding: 20px;
+          animation: fadeIn 0.25s ease-out;
+        }
+
+        .modal-card {
+          background: #ffffff;
+          border-radius: 24px;
+          width: 100%;
+          max-width: 620px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+          position: relative;
+          overflow: hidden;
+          animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          border: 1px solid rgba(214, 181, 126, 0.2);
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+          from { transform: translateY(30px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+
+        .admin-modal-close {
+          position: absolute;
+          top: 18px;
+          right: 18px;
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          background: rgba(31, 20, 14, 0.05);
+          border: 0;
+          font-size: 22px;
+          cursor: pointer;
+          display: grid;
+          place-items: center;
+          color: #5c4a3c;
+          transition: all 0.2s;
+          z-index: 10;
+        }
+
+        .admin-modal-close:hover {
+          background: rgba(31, 20, 14, 0.1);
+          color: #1f140e;
+          transform: rotate(90deg);
+        }
+
+        /* Detail Modal layout */
+        .admin-package-detail-image {
+          width: 100%;
+          height: 240px;
+          object-fit: cover;
+          border-bottom: 4px solid #d6b57e;
+        }
+
+        .admin-detail-title {
+          padding: 24px 24px 12px 24px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .admin-detail-title h3 {
+          margin: 4px 0 0 0;
+          font-size: 24px;
+          font-weight: 700;
+          color: #1f140e;
+        }
+
+        .admin-detail-title span {
+          font-size: 11px;
+          text-transform: uppercase;
+          color: #c7a36c;
+          font-weight: 700;
+          letter-spacing: 1px;
+        }
+
+        .admin-package-detail-desc {
+          padding: 0 24px 16px 24px;
+          margin: 0;
+          font-size: 14px;
+          color: #8c7e74;
+          line-height: 1.6;
+        }
+
+        .admin-detail-grid {
+          padding: 0 24px 24px 24px;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 12px;
+          overflow-y: auto;
+        }
+
+        .admin-detail-grid p {
+          margin: 0;
+          background: #fdfcfb;
+          padding: 10px 14px;
+          border-radius: 12px;
+          border: 1px solid #f5ede2;
+          font-size: 13.5px;
+          color: #5c4a3c;
+        }
+
+        .admin-detail-grid strong {
+          color: #bfaea3;
+          display: block;
+          font-size: 10px;
+          text-transform: uppercase;
+          margin-bottom: 4px;
+          font-weight: 700;
+        }
+
+        /* Luxury Package Editor layout */
+        .luxury-package-editor {
+          max-width: 840px;
+        }
+
+        .package-editor-head {
+          padding: 24px;
+          background: #faf8f5;
+          border-bottom: 1px solid #ebdcc5;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+          .package-editor-head {
+            flex-direction: column;
+            align-items: stretch;
+          }
+        }
+
+        .package-editor-head h3 {
+          margin: 0 0 4px 0;
+          font-size: 20px;
+          font-weight: 700;
+          color: #1f140e;
+        }
+
+        .package-editor-head p {
+          margin: 0;
+          font-size: 12.5px;
+          color: #8c7e74;
+        }
+
+        .package-preview-card {
+          background: linear-gradient(135deg, #1f140e 0%, #3e271a 100%);
+          border-radius: 18px;
+          width: 300px;
+          min-width: 300px;
+          padding: 20px;
+          color: #ffffff;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          box-shadow: 0 8px 20px rgba(31, 20, 14, 0.15);
+          border: 1px solid rgba(214, 181, 126, 0.25);
+        }
+
+        .package-preview-card small {
+          font-size: 8px;
+          font-weight: 700;
+          color: #d6b57e;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+        }
+
+        .package-preview-card strong {
+          font-size: 16px;
+          font-weight: 700;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .package-preview-card b {
+          font-size: 22px;
+          font-weight: 800;
+          color: #ffffff;
+        }
+
+        .package-preview-card span {
+          font-size: 11px;
+          color: #bfaea3;
+        }
+
+        .package-editor-layout {
+          display: grid;
+          grid-template-columns: 1.8fr 1fr;
+          gap: 24px;
+          padding: 24px;
+          overflow-y: auto;
+          flex-grow: 1;
+        }
+
+        @media (max-width: 768px) {
+          .package-editor-layout {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        .package-section-title {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          margin: 16px 0 12px 0;
+          border-bottom: 1px solid #f5ede2;
+          padding-bottom: 8px;
+        }
+
+        .package-section-title:first-of-type {
+          margin-top: 0;
+        }
+
+        .package-section-title span {
+          font-size: 16px;
+          font-weight: 800;
+          color: #d6b57e;
+          background: #fbf9f6;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          border: 1px solid #ebdcc5;
+        }
+
+        .package-section-title h4 {
+          margin: 0;
+          font-size: 14.5px;
+          font-weight: 700;
+          color: #1f140e;
+        }
+
+        .package-section-title p {
+          margin: 0;
+          font-size: 11px;
+          color: #8c7e74;
+        }
+
+        .admin-form-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 16px;
+        }
+
+        .admin-form-grid label {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #5c4a3c;
+        }
+
+        .admin-form-grid label.admin-form-wide {
+          grid-column: 1 / -1;
+        }
+
+        .admin-form-grid input,
+        .admin-form-grid select,
+        .admin-form-grid textarea {
+          padding: 10px 14px;
+          border: 1px solid #ebdcc5;
+          border-radius: 8px;
+          font-size: 14px;
+          outline: none;
+          background: #fdfcfb;
+          transition: all 0.2s;
+          color: #1f140e;
+        }
+
+        .admin-form-grid input:focus,
+        .admin-form-grid select:focus,
+        .admin-form-grid textarea:focus {
+          border-color: #c7a36c;
+          background: #ffffff;
+          box-shadow: 0 0 0 3px rgba(214, 181, 126, 0.1);
+        }
+
+        .package-service-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 280px;
+          overflow-y: auto;
+          padding-right: 4px;
+        }
+
+        .package-service-check {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 14px;
+          background: #fbf9f6;
+          border-radius: 12px;
+          border: 1px solid #f5ede2;
+          transition: all 0.2s ease;
+        }
+
+        .package-service-check.checked {
+          background: #ffffff;
+          border-color: #d6b57e;
+        }
+
+        .package-service-check img {
+          width: 36px;
+          height: 36px;
+          border-radius: 6px;
+          object-fit: cover;
+        }
+
+        .package-service-check div {
+          flex-grow: 1;
+        }
+
+        .package-service-check strong {
+          font-size: 13.5px;
+          color: #1f140e;
+          display: block;
+        }
+
+        .package-service-check span {
+          font-size: 11px;
+          color: #8c7e74;
+        }
+
+        .package-session-input {
+          width: 60px;
+          padding: 6px 8px;
+          border: 1px solid #ebdcc5;
+          border-radius: 6px;
+          font-size: 13px;
+          text-align: center;
+          outline: none;
+        }
+
+        .package-session-input:focus {
+          border-color: #c7a36c;
+        }
+
+        .package-editor-side {
+          background: #faf8f5;
+          border-radius: 16px;
+          padding: 20px;
+          border: 1px solid #ebdcc5;
+          align-self: start;
+        }
+
+        .package-editor-side h4 {
+          margin: 0 0 16px 0;
+          font-size: 14px;
+          font-weight: 700;
+          color: #1f140e;
+          border-bottom: 1px solid #ebdcc5;
+          padding-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .package-summary-card {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 0;
+          border-bottom: 1px dashed #f5ede2;
+          font-size: 13px;
+        }
+
+        .package-summary-card:last-child {
+          border-bottom: none;
+        }
+
+        .package-summary-card span {
+          color: #8c7e74;
+        }
+
+        .package-summary-card strong {
+          color: #1f140e;
+          font-weight: 700;
+          max-width: 60%;
+          text-align: right;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .package-editor-actions {
+          padding: 20px 24px;
+          border-top: 1px solid #ebdcc5;
+          background: #faf8f5;
+          margin-top: 0;
+        }
+
+        .admin-empty {
+          text-align: center;
+          padding: 40px;
+          background: #ffffff;
+          border-radius: 16px;
+          color: #8c7e74;
+          border: 1px dashed #ebdcc5;
+          font-weight: 600;
+        }
+
+        .admin-loading-card {
+          text-align: center;
+          padding: 30px;
+          background: #ffffff;
+          border-radius: 16px;
+          border: 1px solid #f0e9df;
+          color: #d6b57e;
+          font-weight: 700;
+        }
+
+        .admin-error-card {
+          background: #fef2f2;
+          border: 1px solid #fee2e2;
+          color: #b91c1c;
+          padding: 14px 20px;
+          border-radius: 12px;
+          margin-bottom: 24px;
+          font-weight: 600;
+          font-size: 14px;
+        }
+      `}</style>
+
       <div className="admin-packages-hero">
         <div>
           <div className="admin-eyebrow">Packages Management</div>
           <h1>Quản lý gói dịch vụ</h1>
           <p>
-            Quản lý combo/liệu trình theo đúng schema: OriginalPrice, SalePrice,
-            TotalSessions, ValidityDays, IsHot và service session.
+            Quản lý combo, liệu trình trị liệu dài ngày. Thiết lập OriginalPrice, SalePrice,
+            TotalSessions, ValidityDays, IsHot và gán số lượng buổi cho từng dịch vụ con của Luxury Spa.
           </p>
         </div>
 
         <button className="admin-refresh-btn" onClick={openCreate}>
-          + Thêm package
+          <span>➕</span> Thêm package
         </button>
       </div>
 
@@ -348,7 +1342,7 @@ export default function AdminPackages() {
         <article className="admin-stat-card">
           <div className="admin-stat-icon">✓</div>
           <div>
-            <p>Đang bán</p>
+            <p>Đang hoạt động</p>
             <h3>{stats.active}</h3>
             <span>Status ACTIVE</span>
           </div>
@@ -357,7 +1351,7 @@ export default function AdminPackages() {
         <article className="admin-stat-card">
           <div className="admin-stat-icon">🔥</div>
           <div>
-            <p>Hot package</p>
+            <p>Gói Hot</p>
             <h3>{stats.hot}</h3>
             <span>IsHot = true</span>
           </div>
@@ -366,9 +1360,9 @@ export default function AdminPackages() {
         <article className="admin-stat-card">
           <div className="admin-stat-icon">👥</div>
           <div>
-            <p>Customer đã mua</p>
+            <p>Đã bán</p>
             <h3>{stats.customers}</h3>
-            <span>Theo CustomerPackages</span>
+            <span>Tổng lượt mua thực tế</span>
           </div>
         </article>
       </div>
@@ -377,6 +1371,7 @@ export default function AdminPackages() {
         <input
           value={filters.keyword}
           onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+          onKeyDown={handleKeywordKeyDown}
           placeholder="Tìm tên package hoặc mô tả..."
         />
 
@@ -408,42 +1403,36 @@ export default function AdminPackages() {
           value={filters.isHot}
           onChange={(e) => setFilters({ ...filters, isHot: e.target.value })}
         >
-          <option value="">Tất cả Hot</option>
+          <option value="">Tất cả độ hot</option>
           <option value="1">Hot</option>
-          <option value="0">Không hot</option>
+          <option value="0">Bình thường</option>
         </select>
 
-        <button className="admin-refresh-btn" onClick={load}>
+        <button className="admin-refresh-btn" onClick={handleFilterClick}>
           Lọc
         </button>
 
-        <button
-          className="card-btn"
-          onClick={() =>
-            setFilters({
-              keyword: "",
-              status: "",
-              packageCategoryId: "",
-              isHot: "",
-            })
-          }
-        >
+        <button className="card-btn" onClick={handleClearFilters}>
           Xóa lọc
         </button>
       </div>
 
       {loading ? (
-        <div className="admin-loading-card">Đang tải packages...</div>
+        <div className="admin-loading-card">Đang tải danh sách packages...</div>
       ) : null}
 
       {!loading ? (
-        <div className="admin-packages-grid">
+        <div className="admin-packages-grid" ref={gridRef}>
           {items.map((item) => (
-            <article className="admin-package-card" key={item.PackageId}>
+            <article 
+              className="admin-package-card" 
+              id={`package-card-${item.PackageId}`} 
+              key={item.PackageId}
+            >
               <div className="admin-package-image">
                 <img src={image(item.ImageUrl)} alt={item.PackageName} />
                 <span className={statusClass(item.Status)}>{item.Status}</span>
-                {item.IsHot ? <b className="package-hot-badge">HOT</b> : null}
+                {item.IsHot ? <span className="package-hot-badge">🔥 HOT</span> : null}
               </div>
 
               <div className="admin-package-body">
@@ -452,7 +1441,7 @@ export default function AdminPackages() {
                 </div>
 
                 <h3>{item.PackageName}</h3>
-                <p>{item.Description || "Chưa có mô tả package."}</p>
+                <p>{item.Description || "Chưa có mô tả chi tiết cho gói combo này."}</p>
 
                 <div className="admin-package-price">
                   <div>
@@ -464,25 +1453,25 @@ export default function AdminPackages() {
 
                 <div className="admin-package-info">
                   <div>
-                    <span>Sessions</span>
+                    <span>Số buổi</span>
                     <strong>{item.TotalSessions || 0}</strong>
                   </div>
                   <div>
-                    <span>Validity</span>
+                    <span>Thời hạn</span>
                     <strong>{item.ValidityDays || 0} ngày</strong>
                   </div>
                   <div>
-                    <span>Service</span>
+                    <span>Dịch vụ con</span>
                     <strong>{item.ServiceCount || 0}</strong>
                   </div>
                   <div>
-                    <span>Customer</span>
+                    <span>Khách mua</span>
                     <strong>{item.CustomerCount || 0}</strong>
                   </div>
                 </div>
 
                 <div className="admin-package-services">
-                  {item.ServiceNames || "Chưa gán service"}
+                  {item.ServiceNames || "Chưa gán dịch vụ con"}
                 </div>
 
                 <div className="admin-card-actions">
@@ -490,14 +1479,14 @@ export default function AdminPackages() {
                     className="card-btn"
                     onClick={() => setSelected(item)}
                   >
-                    Chi tiết
+                    💡 Chi tiết
                   </button>
 
                   <button
                     className="card-btn primary"
                     onClick={() => openEdit(item)}
                   >
-                    Sửa
+                    ✏️ Sửa
                   </button>
 
                   {item.Status === "ACTIVE" ? (
@@ -505,14 +1494,14 @@ export default function AdminPackages() {
                       className="card-btn"
                       onClick={() => changeStatus(item, "INACTIVE")}
                     >
-                      Tắt
+                      🔕 Tắt
                     </button>
                   ) : (
                     <button
                       className="card-btn"
                       onClick={() => changeStatus(item, "ACTIVE")}
                     >
-                      Bật
+                      <span>🔔</span> Bật
                     </button>
                   )}
 
@@ -520,7 +1509,7 @@ export default function AdminPackages() {
                     className="card-btn danger"
                     onClick={() => remove(item)}
                   >
-                    Xóa
+                    🗑️ Xóa
                   </button>
                 </div>
               </div>
@@ -554,7 +1543,7 @@ export default function AdminPackages() {
 
             <div className="admin-detail-title">
               <div>
-                <span>{selected.PackageCategoryName || "Package"}</span>
+                <span>{selected.PackageCategoryName || "PACKAGE"}</span>
                 <h3>{selected.PackageName}</h3>
               </div>
               <span className={statusClass(selected.Status)}>
@@ -568,47 +1557,55 @@ export default function AdminPackages() {
 
             <div className="admin-detail-grid">
               <p>
-                <strong>OriginalPrice:</strong> {money(selected.OriginalPrice)}
+                <strong>Giá gốc niêm yết</strong>
+                {money(selected.OriginalPrice)}
               </p>
               <p>
-                <strong>SalePrice:</strong> {money(selected.SalePrice)}
+                <strong>Giá khuyến mãi combo</strong>
+                {money(selected.SalePrice)}
               </p>
               <p>
-                <strong>Tiết kiệm:</strong>{" "}
+                <strong>Tiết kiệm khi mua combo</strong>
                 {money(
                   Number(selected.OriginalPrice || 0) -
                     Number(selected.SalePrice || 0),
                 )}
               </p>
               <p>
-                <strong>TotalSessions:</strong> {selected.TotalSessions || 0}
+                <strong>Tổng số buổi trị liệu</strong>
+                {selected.TotalSessions || 0} buổi
               </p>
               <p>
-                <strong>ValidityDays:</strong> {selected.ValidityDays || 0} ngày
+                <strong>Thời hạn liệu trình</strong>
+                {selected.ValidityDays || 0} ngày
               </p>
               <p>
-                <strong>IsHot:</strong> {selected.IsHot ? "Yes" : "No"}
+                <strong>Gói ưu tiên Hot</strong>
+                {selected.IsHot ? "Có" : "Không"}
               </p>
               <p>
-                <strong>Service:</strong> {selected.ServiceCount || 0}
+                <strong>Số lượng dịch vụ con</strong>
+                {selected.ServiceCount || 0} dịch vụ
               </p>
               <p>
-                <strong>Customer đã mua:</strong> {selected.CustomerCount || 0}
+                <strong>Tổng số khách hàng mua</strong>
+                {selected.CustomerCount || 0} khách
               </p>
               <p>
-                <strong>Active customer:</strong>{" "}
-                {selected.ActiveCustomerCount || 0}
+                <strong>Số khách đang kích hoạt</strong>
+                {selected.ActiveCustomerCount || 0} khách
               </p>
               <p>
-                <strong>Tổng giá service:</strong>{" "}
+                <strong>Tổng giá trị dịch vụ lẻ</strong>
                 {money(selected.TotalServicePrice)}
               </p>
               <p>
-                <strong>Tổng thời lượng:</strong>{" "}
+                <strong>Tổng thời gian liệu trình</strong>
                 {selected.TotalDurationMinutes || 0} phút
               </p>
-              <p>
-                <strong>Services:</strong> {selected.ServiceNames || "Chưa gán"}
+              <p className="admin-form-wide">
+                <strong>Danh sách chi tiết dịch vụ đi kèm</strong>
+                {selected.ServiceNames || "Chưa gán dịch vụ"}
               </p>
             </div>
           </div>
@@ -635,9 +1632,8 @@ export default function AdminPackages() {
                 <span>{editingId ? "Edit Package" : "Create Package"}</span>
                 <h3>{editingId ? "Sửa package" : "Thêm package mới"}</h3>
                 <p>
-                  Form này đã sửa đúng DB: OriginalPrice, SalePrice,
-                  TotalSessions, ValidityDays, IsHot và SessionCount cho từng
-                  service.
+                  Thiết lập combo trị liệu: OriginalPrice, SalePrice, TotalSessions,
+                  ValidityDays và session cho từng dịch vụ.
                 </p>
               </div>
 
@@ -646,8 +1642,8 @@ export default function AdminPackages() {
                 <strong>{form.PackageName || "LUXURY SPA COMBO"}</strong>
                 <b>{money(form.SalePrice || 0)}</b>
                 <span>
-                  {Object.keys(selectedServices).length} service •{" "}
-                  {form.ValidityDays || 0} ngày
+                  {Object.keys(selectedServices).length} dịch vụ con •{" "}
+                  {form.ValidityDays || 0} ngày sử dụng
                 </span>
               </div>
             </div>
@@ -655,7 +1651,7 @@ export default function AdminPackages() {
             <div className="package-editor-layout">
               <div className="package-editor-main">
                 <div className="package-section-title">
-                  <span>01</span>
+                  <span>1</span>
                   <div>
                     <h4>Thông tin package</h4>
                     <p>Nhập đúng các cột đang có trong bảng Packages.</p>
@@ -697,13 +1693,14 @@ export default function AdminPackages() {
                     </select>
                   </label>
 
-                  <label>
+                  <label className="admin-form-wide">
                     Tên package *
                     <input
                       value={form.PackageName}
                       onChange={(e) =>
                         setForm({ ...form, PackageName: e.target.value })
                       }
+                      placeholder="Combo Nâng Cơ Trị Mụn Chuyên Sâu"
                       required
                     />
                   </label>
@@ -716,8 +1713,8 @@ export default function AdminPackages() {
                         setForm({ ...form, IsHot: e.target.value === "1" })
                       }
                     >
-                      <option value="0">Không hot</option>
-                      <option value="1">Hot package</option>
+                      <option value="0">Bình thường</option>
+                      <option value="1">Gói Hot 🔥</option>
                     </select>
                   </label>
 
@@ -730,6 +1727,7 @@ export default function AdminPackages() {
                       onChange={(e) =>
                         setForm({ ...form, OriginalPrice: e.target.value })
                       }
+                      placeholder="1200000"
                       required
                     />
                   </label>
@@ -743,6 +1741,7 @@ export default function AdminPackages() {
                       onChange={(e) =>
                         setForm({ ...form, SalePrice: e.target.value })
                       }
+                      placeholder="850000"
                       required
                     />
                   </label>
@@ -756,6 +1755,7 @@ export default function AdminPackages() {
                       onChange={(e) =>
                         setForm({ ...form, TotalSessions: e.target.value })
                       }
+                      placeholder="5"
                       required
                     />
                   </label>
@@ -769,6 +1769,7 @@ export default function AdminPackages() {
                       onChange={(e) =>
                         setForm({ ...form, ValidityDays: e.target.value })
                       }
+                      placeholder="30"
                       required
                     />
                   </label>
@@ -792,15 +1793,16 @@ export default function AdminPackages() {
                       onChange={(e) =>
                         setForm({ ...form, Description: e.target.value })
                       }
+                      placeholder="Nhập mô tả quyền lợi của gói combo trị liệu..."
                     />
                   </label>
                 </div>
 
                 <div className="package-section-title">
-                  <span>02</span>
+                  <span>2</span>
                   <div>
-                    <h4>Service trong package</h4>
-                    <p>Chọn service và nhập số buổi cho từng service.</p>
+                    <h4>Dịch vụ trong package</h4>
+                    <p>Chọn dịch vụ và nhập số buổi cho từng dịch vụ.</p>
                   </div>
                 </div>
 
@@ -859,12 +1861,12 @@ export default function AdminPackages() {
                 </div>
 
                 <div className="package-summary-card">
-                  <span>OriginalPrice</span>
+                  <span>Giá niêm yết</span>
                   <strong>{money(form.OriginalPrice || 0)}</strong>
                 </div>
 
                 <div className="package-summary-card">
-                  <span>SalePrice</span>
+                  <span>Giá bán Combo</span>
                   <strong>{money(form.SalePrice || 0)}</strong>
                 </div>
 
@@ -882,12 +1884,12 @@ export default function AdminPackages() {
                 </div>
 
                 <div className="package-summary-card">
-                  <span>Tổng giá service</span>
+                  <span>Tổng giá dịch vụ lẻ</span>
                   <strong>{money(preview.totalPrice)}</strong>
                 </div>
 
                 <div className="package-summary-card">
-                  <span>Tiết kiệm so với service</span>
+                  <span>Tiết kiệm so với mua lẻ</span>
                   <strong>{money(preview.save)}</strong>
                 </div>
 
@@ -897,13 +1899,13 @@ export default function AdminPackages() {
                 </div>
 
                 <div className="package-summary-card">
-                  <span>Service đã chọn</span>
-                  <strong>{Object.keys(selectedServices).length}</strong>
+                  <span>Dịch vụ đã chọn</span>
+                  <strong>{Object.keys(selectedServices).length} dịch vụ</strong>
                 </div>
 
                 <div className="package-summary-card">
-                  <span>Hot</span>
-                  <strong>{form.IsHot ? "Yes" : "No"}</strong>
+                  <span>Gói ưu tiên Hot</span>
+                  <strong>{form.IsHot ? "Có" : "Không"}</strong>
                 </div>
               </aside>
             </div>

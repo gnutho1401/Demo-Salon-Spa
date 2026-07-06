@@ -11,7 +11,7 @@ function avatarUrl(url) {
 
 export default function ReceptionistLayout({ children }) {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [notiOpen, setNotiOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -25,8 +25,23 @@ export default function ReceptionistLayout({ children }) {
     } catch (_) {}
   }
 
+  async function syncProfile() {
+    try {
+      const res = await axiosClient.get("/receptionist/profile");
+      const profileData = res.data?.data?.profile || res.data?.profile || res.data;
+      if (profileData && typeof updateUser === "function") {
+        updateUser({
+          ...user,
+          FullName: profileData.FullName || user?.FullName,
+          AvatarUrl: profileData.AvatarUrl || user?.AvatarUrl,
+        });
+      }
+    } catch (_) {}
+  }
+
   useEffect(() => {
     loadNotifications();
+    syncProfile();
     const timer = setInterval(loadNotifications, 30000);
     return () => clearInterval(timer);
   }, []);
@@ -59,17 +74,37 @@ export default function ReceptionistLayout({ children }) {
         </div>
 
         <nav className="rx-menu">
-          <NavLink to="/receptionist/dashboard">📊 Dashboard</NavLink>
-          <NavLink to="/receptionist/appointments">📅 Appointments</NavLink>
-          <NavLink to="/receptionist/appointments/create">
-            ➕ New Appointment
-          </NavLink>
-          <NavLink to="/receptionist/customers">👥 Customers</NavLink>
-          <NavLink to="/receptionist/waiting-list">⏳ Waiting List</NavLink>
-          <NavLink to="/receptionist/invoices">🧾 Invoices</NavLink>
-          <NavLink to="/receptionist/reviews">⭐ Reviews</NavLink>
-          <NavLink to="/receptionist/profile">👤 Profile</NavLink>
-          <NavLink to="/receptionist/settings">⚙ Settings</NavLink>
+          <div className="rx-menu-group">
+            <p className="rx-menu-group-title">Nghiệp vụ Salon</p>
+            <NavLink to="/receptionist/dashboard">📊 Tổng quan</NavLink>
+            <NavLink to="/receptionist/appointments">📅 Lịch hẹn</NavLink>
+            <NavLink to="/receptionist/dispatch">⚡ Điều phối KTV</NavLink>
+            <NavLink to="/receptionist/appointments/create">
+              ➕ Tạo lịch hẹn mới
+            </NavLink>
+            <NavLink to="/receptionist/waiting-list">⏳ Hàng chờ</NavLink>
+            <NavLink to="/receptionist/reschedule-requests">📅 Duyệt đổi lịch</NavLink>
+          </div>
+
+          <div className="rx-menu-group">
+            <p className="rx-menu-group-title">Khách hàng & Hóa đơn</p>
+            <NavLink to="/receptionist/customers">👥 Khách hàng</NavLink>
+            <NavLink to="/receptionist/invoices">🧾 Hóa đơn</NavLink>
+          </div>
+
+          <div className="rx-menu-group">
+            <p className="rx-menu-group-title">Tương tác khách hàng</p>
+            <NavLink to="/receptionist/reviews">⭐ Đánh giá</NavLink>
+            <NavLink to="/receptionist/notifications">
+              🔔 Thông báo {unreadCount > 0 && <span style={{ backgroundColor: "#e53e3e", color: "white", padding: "2px 6px", borderRadius: "10px", fontSize: "11px", fontWeight: "bold", marginLeft: "6px" }}>{unreadCount}</span>}
+            </NavLink>
+          </div>
+
+          <div className="rx-menu-group">
+            <p className="rx-menu-group-title">Cài đặt & Cá nhân</p>
+            <NavLink to="/receptionist/profile">👤 Hồ sơ cá nhân</NavLink>
+            <NavLink to="/receptionist/settings">⚙️ Cấu hình hệ thống</NavLink>
+          </div>
         </nav>
 
         <button
@@ -97,33 +132,11 @@ export default function ReceptionistLayout({ children }) {
         <div className="rx-topbar">
           <button
             className="rx-noti-btn"
-            onClick={() => setNotiOpen(!notiOpen)}
+            onClick={() => navigate("/receptionist/notifications")}
           >
             🔔
             {unreadCount > 0 && <span>{unreadCount}</span>}
           </button>
-
-          {notiOpen && (
-            <div className="rx-noti-panel">
-              <h3>Thông báo</h3>
-
-              {notifications.length === 0 && (
-                <p className="rx-noti-empty">Chưa có thông báo</p>
-              )}
-
-              {notifications.map((n) => (
-                <button
-                  key={n.NotificationId}
-                  className={`rx-noti-item ${n.IsRead ? "" : "unread"}`}
-                  onClick={() => readNotification(n)}
-                >
-                  <b>{n.Title}</b>
-                  <p>{n.Content}</p>
-                  <small>{String(n.CreatedAt || "").slice(0, 19)}</small>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {children}

@@ -49,6 +49,21 @@ function statusLabel(status) {
   return map[status] || status || "-";
 }
 
+function formatTime(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (text.includes("T")) return text.split("T")[1]?.slice(0, 5) || "";
+  return text.slice(0, 5);
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value).slice(0, 10)
+    : date.toLocaleDateString("vi-VN");
+}
+
 function statusClass(status) {
   return `rx-badge status-${String(status || "unpaid").toLowerCase()}`;
 }
@@ -64,12 +79,39 @@ function paymentLabel(status) {
   return map[status] || status || "Chưa thanh toán";
 }
 
+const POPULAR_BANKS = [
+  { bin: "970436", name: "VCB - Vietcombank" },
+  { bin: "970415", name: "VietinBank" },
+  { bin: "970407", name: "Techcombank" },
+  { bin: "970418", name: "BIDV" },
+  { bin: "970422", name: "MB Bank" },
+  { bin: "970416", name: "ACB" },
+  { bin: "970423", name: "TPBank" },
+  { bin: "970419", name: "VPBank" },
+  { bin: "970403", name: "Sacombank" },
+  { bin: "970448", name: "OCB" }
+];
+
 export default function ReceptionistAppointmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [item, setItem] = useState(null);
   const [availableTechnicians, setAvailableTechnicians] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [slots, setSlots] = useState([]);
+  const [alternatives, setAlternatives] = useState([]);
+  const [slotLoading, setSlotLoading] = useState(false);
+  const [bankList, setBankList] = useState([]);
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+
+  const [techList, setTechList] = useState([]);
+  const [techLoading, setTechLoading] = useState(false);
+  const [showAssignTech, setShowAssignTech] = useState(false);
+  const [selectedTechId, setSelectedTechId] = useState("");
+  const [techWorkload, setTechWorkload] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -97,6 +139,7 @@ export default function ReceptionistAppointmentDetail() {
   const canCheckIn = status === "CONFIRMED";
   const canStart = status === "CHECKED_IN";
   const canComplete = status === "IN_PROGRESS";
+  const canCheckout = ["IN_PROGRESS", "COMPLETED"].includes(status) && !item?.CheckedOutAt;
   
   const canNoShow = ["CONFIRMED", "PENDING", "PENDING_PAYMENT"].includes(status);
   const canEdit = !["COMPLETED", "CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(status);
@@ -112,6 +155,10 @@ export default function ReceptionistAppointmentDetail() {
     }
     return item?.ServiceNames || "-";
   }, [item]);
+
+  const selectedRescheduleEmp = useMemo(() => {
+    return employees.find((emp) => String(emp.EmployeeId) === String(rescheduleForm.technicianId));
+  }, [employees, rescheduleForm.technicianId]);
 
   async function load() {
     try {
@@ -181,11 +228,89 @@ export default function ReceptionistAppointmentDetail() {
     }
   }
 
-  async function submitCancel(e) {
-    e.preventDefault();
+  async function handleCheckout() {
+    if (!window.confirm("Xác nhận khách hàng đã làm xong và check-out rời salon?")) return;
 
-    if (!cancelReason.trim()) {
-      setError("Vui lòng nhập lý lý hủy lịch");
+    try {
+      setSaving(true);
+      setError("");
+      setSuccess("");
+
+      await axiosClient.post(`/receptionist/appointments/${id}/checkout`);
+      await load();
+      setSuccess("Check-out khách hàng rời salon thành công!");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      setError(err.response?.data?.message || "Check-out thất bại");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCreateInvoice() {
+    try {
+      setSaving(true);
+      setError("");
+      setSuccess("");
+      const res = await axiosClient.post(`/receptionist/appointments/${id}/create-invoice`);
+      const newInvoice = res.data.data || res.data;
+      setSuccess("Tạo hóa đơn thành công!");
+      await load();
+      if (newInvoice && newInvoice.InvoiceId) {
+        navigate(`/receptionist/invoices/${newInvoice.InvoiceId}`);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Tạo hóa đơn thất bại");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function loadTechnicians() {
+    try {
+      setTechLoading(true);
+      setError("");
+      const serviceId = item?.ServiceId || item?.Services?.[0]?.ServiceId;
+      const res = await axiosClient.get("/receptionist/available-technicians", {
+        params: {
+          serviceId,
+          appointmentDate: item?.AppointmentDate ? String(item.AppointmentDate).slice(0, 10) : "",
+          startTime: item?.StartTime ? String(item.StartTime).slice(0, 5) : "",
+        }
+      });
+      setTechList(res.data.data || res.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Không tải được danh sách kỹ thuật viên rảnh");
+    } finally {
+      setTechLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    async function checkWorkload() {
+      if (!selectedTechId) {
+        setTechWorkload(null);
+        return;
+      }
+      try {
+        const dateStr = item?.AppointmentDate ? String(item.AppointmentDate).slice(0, 10) : "";
+        const res = await axiosClient.get(`/receptionist/technicians/${selectedTechId}/workload`, {
+          params: { date: dateStr }
+        });
+        setTechWorkload(res.data.data || res.data);
+      } catch (err) {
+        console.error("Failed to load workload:", err);
+      }
+    }
+    checkWorkload();
+  }, [selectedTechId, item?.AppointmentDate]);
+
+  async function submitAssignTech(e, overrideOverload = false) {
+    if (e) e.preventDefault();
+    if (!selectedTechId) {
+      setError("Vui lòng chọn kỹ thuật viên");
       return;
     }
 
@@ -194,15 +319,77 @@ export default function ReceptionistAppointmentDetail() {
       setError("");
       setSuccess("");
 
+      await axiosClient.put(`/receptionist/appointments/${id}/assign-technician`, {
+        technicianId: Number(selectedTechId),
+        overrideOverload
+      });
+
+      await load();
+      setShowAssignTech(false);
+      setSelectedTechId("");
+      setTechWorkload(null);
+      setSuccess("Điều phối kỹ thuật viên phụ trách thành công!");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      const errMsg = err.response?.data?.message || "";
+      if (errMsg.includes("OVERLOAD_WARNING")) {
+        if (window.confirm("Kỹ thuật viên này đã có nhiều ca làm việc hôm nay (Quá tải). Bạn có chắc chắn muốn tiếp tục phân công không?")) {
+          submitAssignTech(null, true);
+          return;
+        }
+      } else {
+        setError(errMsg || "Điều phối kỹ thuật viên thất bại");
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitCancel(e) {
+    e.preventDefault();
+
+    if (!cancelReason.trim()) {
+      setError("Vui lòng nhập lý do hủy lịch");
+      return;
+    }
+
+    const hasPaid = paymentStatus === "PAID" && itemPaymentMethod !== "PACKAGE";
+
+    if (hasPaid) {
+      if (!bankCode) {
+        setError("Vui lòng chọn ngân hàng nhận hoàn tiền");
+        return;
+      }
+      if (!accountNumber.trim()) {
+        setError("Vui lòng nhập số tài khoản nhận hoàn tiền");
+        return;
+      }
+      if (!accountName.trim()) {
+        setError("Vui lòng nhập tên chủ tài khoản");
+        return;
+      }
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+      setSuccess("");
+
       await axiosClient.put(`/receptionist/appointments/${id}/cancel`, {
-        reason: cancelReason,
+        reason: cancelReason.trim(),
+        bankCode,
+        accountNumber,
+        accountName: accountName.trim().toUpperCase()
       });
 
       await load();
       setCancelReason("");
       setShowCancel(false);
       setSuccess(
-        "Đã hủy lịch hẹn. Nếu đã thanh toán trước, hệ thống đã tự động gửi yêu cầu hoàn tiền.",
+        hasPaid
+          ? "Đã hủy lịch hẹn và gửi yêu cầu hoàn tiền thành công!"
+          : "Đã hủy lịch hẹn thành công!"
       );
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -212,41 +399,89 @@ export default function ReceptionistAppointmentDetail() {
     }
   }
 
-  async function loadTechnicians() {
-    if (
-      !item?.Services?.[0]?.ServiceId ||
-      !rescheduleForm.appointmentDate ||
-      !rescheduleForm.startTime
-    ) {
-      setAvailableTechnicians([]);
-      return;
-    }
-
+  async function loadRescheduleData() {
     try {
-      const res = await axiosClient.get("/receptionist/available-technicians", {
-        params: {
-          serviceId: item.Services[0].ServiceId,
-          appointmentDate: rescheduleForm.appointmentDate,
-          startTime: rescheduleForm.startTime,
-        },
-      });
-
-      setAvailableTechnicians(res.data.data || res.data || []);
+      setError("");
+      const res = await axiosClient.get(`/appointments/${id}/reschedule`);
+      const data = res.data.data || res.data;
+      setEmployees(data.AvailableEmployees || []);
     } catch (err) {
-      setAvailableTechnicians([]);
-      setError(
-        err.response?.data?.message || "Không tải được kỹ thuật viên khả dụng",
-      );
+      setError(err.response?.data?.message || "Không tải được danh sách kỹ thuật viên");
     }
   }
 
   useEffect(() => {
-    if (showReschedule) loadTechnicians();
+    if (showReschedule) {
+      loadRescheduleData();
+    }
+  }, [showReschedule, id]);
+
+  useEffect(() => {
+    async function loadSlots() {
+      const serviceId = item?.ServiceId || item?.Services?.[0]?.ServiceId;
+      if (
+        !serviceId ||
+        !rescheduleForm.appointmentDate ||
+        !rescheduleForm.technicianId
+      ) {
+        setSlots([]);
+        return;
+      }
+
+      try {
+        setSlotLoading(true);
+        setError("");
+
+        const res = await axiosClient.get("/appointments/available-slots", {
+          params: {
+            appointmentDate: rescheduleForm.appointmentDate,
+            employeeId: rescheduleForm.technicianId,
+            serviceId: serviceId,
+            excludeAppointmentId: id,
+            includeAllSlots: true,
+            includeAlternatives: true,
+          },
+        });
+
+        const data = res.data.data;
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          setSlots(data.slots || []);
+          setAlternatives(data.alternatives || []);
+        } else {
+          setSlots(data || []);
+          setAlternatives([]);
+        }
+      } catch (err) {
+        setSlots([]);
+        setError(err.response?.data?.message || "Không tải được slot trống");
+      } finally {
+        setSlotLoading(false);
+      }
+    }
+
+    loadSlots();
   }, [
-    showReschedule,
+    item?.ServiceId,
+    item?.Services,
     rescheduleForm.appointmentDate,
-    rescheduleForm.startTime,
+    rescheduleForm.technicianId,
+    id,
   ]);
+
+  useEffect(() => {
+    fetch("https://api.vietqr.io/v2/banks")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) {
+          setBankList(data.data.map(b => ({ bin: b.bin, name: `${b.shortName} - ${b.name}` })));
+        } else {
+          setBankList(POPULAR_BANKS);
+        }
+      })
+      .catch(() => {
+        setBankList(POPULAR_BANKS);
+      });
+  }, []);
 
   async function submitReschedule(e) {
     e.preventDefault();
@@ -281,6 +516,8 @@ export default function ReceptionistAppointmentDetail() {
       setSaving(false);
     }
   }
+
+  const itemPaymentMethod = String(item?.PaymentMethod || "").toUpperCase();
 
   return (
     <ReceptionistLayout>
@@ -371,6 +608,23 @@ export default function ReceptionistAppointmentDetail() {
                     <div>
                       <label>Các dịch vụ sử dụng</label>
                       <strong style={{ color: "#d91f68" }}>{servicesText}</strong>
+                      {item.CustomerPackageId && item.CustomerPackageName && (
+                        <div style={{
+                          marginTop: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '3px 8px',
+                          backgroundColor: '#f3e8ff',
+                          color: '#6b21a8',
+                          border: '1px solid #e9d5ff',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          📦 Combo: {item.CustomerPackageName}
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -391,6 +645,36 @@ export default function ReceptionistAppointmentDetail() {
                       <strong>
                         {item.StartTime ? String(item.StartTime).slice(0, 5) : "--"} - {item.EndTime ? String(item.EndTime).slice(0, 5) : "--"}
                       </strong>
+                    </div>
+
+                    {item.CheckedOutAt && (
+                      <div>
+                        <label>Thời gian Check-out rời salon</label>
+                        <strong style={{ color: "#d91f68" }}>{formatDateTime(item.CheckedOutAt)}</strong>
+                      </div>
+                    )}
+
+                    <div style={{ gridColumn: "span 2", borderTop: "1px dashed #eee", paddingTop: "12px", marginTop: "4px" }}>
+                      <label>Chi nhánh phục vụ</label>
+                      <strong style={{ color: "#85583f" }}>{item.BranchName || "Chi nhánh chính"}</strong>
+                      {item.BranchAddress && (
+                        <p style={{ color: "#7d837d", margin: "4px 0 8px", fontSize: "0.88rem" }}>
+                          📍 Địa chỉ: {item.BranchAddress}
+                        </p>
+                      )}
+                      {item.BranchAddress && (
+                        <div style={{ borderRadius: "14px", overflow: "hidden", border: "1px solid #f0f2f0", marginTop: "8px" }}>
+                          <iframe
+                            title="Bản đồ chi nhánh lễ tân"
+                            src={`https://maps.google.com/maps?q=${encodeURIComponent(item.BranchAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                            width="100%"
+                            height="160"
+                            style={{ border: 0, display: "block" }}
+                            allowFullScreen=""
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ gridColumn: "span 2" }}>
@@ -469,6 +753,18 @@ export default function ReceptionistAppointmentDetail() {
                 <section className="ra-card">
                   <div className="ra-card-title">
                     <h3>Kỹ thuật viên phụ trách</h3>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAssignTech(true);
+                          loadTechnicians();
+                        }}
+                        style={{ background: "none", border: "none", color: "#d91f68", cursor: "pointer", fontWeight: "bold" }}
+                      >
+                        ✏️ Điều phối
+                      </button>
+                    )}
                   </div>
 
                   <div className="ra-profile-line">
@@ -538,6 +834,18 @@ export default function ReceptionistAppointmentDetail() {
                       style={{ width: "100%", marginTop: "12px", cursor: "pointer", fontWeight: "bold" }}
                     >
                       💳 Thanh toán trực tiếp tại quầy
+                    </button>
+                  ) : null}
+
+                  {!item.InvoiceId && !["CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(status) ? (
+                    <button
+                      className="ra-btn primary"
+                      type="button"
+                      onClick={handleCreateInvoice}
+                      disabled={saving}
+                      style={{ width: "100%", marginTop: "12px", cursor: "pointer", fontWeight: "bold" }}
+                    >
+                      🧾 Tạo hóa đơn mới
                     </button>
                   ) : null}
                 </section>
@@ -660,6 +968,18 @@ export default function ReceptionistAppointmentDetail() {
                   </button>
                 )}
 
+                {canCheckout && (
+                  <button
+                    className="ra-btn primary"
+                    type="button"
+                    disabled={saving}
+                    onClick={handleCheckout}
+                    style={{ background: "#d91f68", color: "#fff", fontWeight: "bold" }}
+                  >
+                    🔔 Check-out & Khách rời salon
+                  </button>
+                )}
+
                 {canEdit && (
                   <button
                     className="ra-btn light"
@@ -738,29 +1058,96 @@ export default function ReceptionistAppointmentDetail() {
             )}
 
             {showCancel && (
-              <div className="ra-modal-backdrop">
-                <form className="ra-modal" onSubmit={submitCancel}>
-                  <h3>Hủy lịch hẹn của khách</h3>
-                  <p>
-                    Lưu ý: Nếu lịch hẹn đã được thanh toán trước đó, hệ thống sẽ tự động tạo yêu cầu hoàn trả tiền tương ứng cho khách.
+              <div className="ra-modal-backdrop" style={{ overflowY: "auto", padding: "20px 0" }}>
+                <form className="ra-modal" onSubmit={submitCancel} style={{ maxWidth: "550px", width: "95%", margin: "auto" }}>
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "4px" }}>Xác nhận hủy lịch hẹn</h3>
+                  <p style={{ color: "#6b7280", fontSize: "0.875rem", marginBottom: "15px" }}>
+                    Xác nhận hủy lịch hẹn cho khách hàng. Vui lòng kiểm tra loại dịch vụ để xử lý hoàn tiền/buổi học chính xác.
                   </p>
 
+                  {/* Cảnh báo phân biệt loại dịch vụ */}
+                  {itemPaymentMethod === "PACKAGE" ? (
+                    <div style={{ padding: "12px", borderRadius: "8px", background: "#fef3c7", border: "1px solid #f59e0b", color: "#b45309", fontSize: "0.875rem", marginBottom: "15px", fontWeight: "bold" }}>
+                      📦 DỊCH VỤ TRONG COMBO/LIỆU TRÌNH:<br />
+                      Lịch này sử dụng gói combo. Sau khi hủy, hệ thống sẽ tự động hoàn trả lại 1 buổi sử dụng vào tài khoản Gói Combo của khách hàng.
+                    </div>
+                  ) : paymentStatus === "PAID" ? (
+                    <div style={{ padding: "12px", borderRadius: "8px", background: "#fee2e2", border: "1px solid #ef4444", color: "#b91c1c", fontSize: "0.875rem", marginBottom: "15px", fontWeight: "bold" }}>
+                      💳 DỊCH VỤ LẺ ĐÃ THANH TOÁN:<br />
+                      Lịch này là dịch vụ lẻ đã thanh toán bằng tiền mặt/chuyển khoản. Sau khi hủy, hệ thống sẽ tạo yêu cầu hoàn tiền. Vui lòng điền thông tin tài khoản ngân hàng của khách hàng ở dưới.
+                    </div>
+                  ) : (
+                    <div style={{ padding: "12px", borderRadius: "8px", background: "#f3f4f6", border: "1px solid #9ca3af", color: "#4b5563", fontSize: "0.875rem", marginBottom: "15px", fontWeight: "bold" }}>
+                      ✏️ DỊCH VỤ LẺ CHƯA THANH TOÁN:<br />
+                      Lịch hẹn này chưa thanh toán. Trạng thái lịch sẽ chuyển sang Đã hủy và không phát sinh yêu cầu hoàn tiền.
+                    </div>
+                  )}
+
+                  {/* Thu thập thông tin ngân hàng nếu dịch vụ lẻ đã thanh toán */}
+                  {paymentStatus === "PAID" && itemPaymentMethod !== "PACKAGE" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px", border: "1px solid #e5e7eb", borderRadius: "8px", backgroundColor: "#fafaf9", marginBottom: "15px" }}>
+                      <h4 style={{ margin: "0 0 4px 0", color: "#85583f", fontSize: "0.9rem", fontWeight: "bold" }}>Tài khoản nhận hoàn tiền</h4>
+                      
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <label style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", textAlign: "left" }}>Ngân hàng nhận:</label>
+                        <select
+                          style={{ height: "38px", padding: "0 8px", borderRadius: "6px", border: "1px solid #d1d5db", outline: "none", fontSize: "0.85rem", background: "#fff" }}
+                          value={bankCode}
+                          onChange={(e) => setBankCode(e.target.value)}
+                          required
+                        >
+                          <option value="">-- Chọn ngân hàng --</option>
+                          {bankList.map((b) => (
+                            <option key={b.bin} value={b.bin}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <label style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", textAlign: "left" }}>Số tài khoản:</label>
+                        <input
+                          type="text"
+                          placeholder="Nhập số tài khoản khách..."
+                          style={{ height: "38px", padding: "0 8px", borderRadius: "6px", border: "1px solid #d1d5db", outline: "none", fontSize: "0.85rem" }}
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value.replace(/\s/g, ""))}
+                          required
+                        />
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <label style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", textAlign: "left" }}>Tên chủ tài khoản (viết hoa không dấu):</label>
+                        <input
+                          type="text"
+                          placeholder="Ví dụ: NGUYEN VAN A"
+                          style={{ height: "38px", padding: "0 8px", borderRadius: "6px", border: "1px solid #d1d5db", outline: "none", fontSize: "0.85rem" }}
+                          value={accountName}
+                          onChange={(e) => setAccountName(e.target.value.toUpperCase())}
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <label style={{ fontSize: "12px", fontWeight: "bold", color: "#374151", display: "block", marginBottom: "6px", textAlign: "left" }}>Lý do hủy lịch</label>
                   <textarea
-                    rows="4"
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
-                    placeholder="Nhập lý do chi tiết hủy lịch..."
+                    placeholder="Nhập lý do khách hàng muốn hủy lịch..."
                     required
-                    style={{ width: "100%", border: "1px solid #ddd", borderRadius: "12px", padding: "10px 14px", marginBottom: "15px", outline: "none" }}
+                    style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: "8px", padding: "10px", marginBottom: "15px", outline: "none", minHeight: "80px", resize: "vertical", fontSize: "0.9rem", boxSizing: "border-box" }}
                   />
 
-                  <div className="ra-modal-actions">
+                  <div className="ra-modal-actions" style={{ borderTop: "1px solid #e5e7eb", paddingTop: "12px" }}>
                     <button
                       className="ra-btn danger"
                       type="submit"
                       disabled={saving}
+                      style={{ background: "#d32232", color: "#fff" }}
                     >
-                      {saving ? "Đang hủy..." : "Xác nhận hủy lịch"}
+                      {saving ? "Đang xử lý..." : "Xác nhận hủy lịch"}
                     </button>
                     <button
                       className="ra-btn light"
@@ -775,74 +1162,293 @@ export default function ReceptionistAppointmentDetail() {
             )}
 
             {showReschedule && (
-              <div className="ra-modal-backdrop">
-                <form className="ra-modal wide" onSubmit={submitReschedule}>
-                  <h3>Đổi lịch / đổi chuyên viên</h3>
-                  <p style={{ color: "#6f766f", marginBottom: "15px" }}>Chọn thời gian mới và kỹ thuật viên khả dụng tương ứng</p>
-
-                  <div className="ra-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" }}>
-                    <label style={{ display: "grid", gap: "6px", fontWeight: "bold" }}>
-                      Ngày hẹn mới
-                      <input
-                        type="date"
-                        min={new Date().toISOString().slice(0, 10)}
-                        value={rescheduleForm.appointmentDate}
-                        onChange={(e) =>
-                          setRescheduleForm((p) => ({
-                            ...p,
-                            appointmentDate: e.target.value,
-                          }))
-                        }
-                        style={{ height: "42px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ddd", outline: "none" }}
-                      />
-                    </label>
-
-                    <label style={{ display: "grid", gap: "6px", fontWeight: "bold" }}>
-                      Giờ hẹn mới
-                      <input
-                        type="time"
-                        value={rescheduleForm.startTime}
-                        onChange={(e) =>
-                          setRescheduleForm((p) => ({
-                            ...p,
-                            startTime: e.target.value,
-                          }))
-                        }
-                        style={{ height: "42px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ddd", outline: "none" }}
-                      />
-                    </label>
-
-                    <label style={{ display: "grid", gap: "6px", fontWeight: "bold", gridColumn: "span 2" }}>
-                      Kỹ thuật viên đang rảnh ca trực
-                      <select
-                        value={rescheduleForm.technicianId}
-                        onChange={(e) =>
-                          setRescheduleForm((p) => ({
-                            ...p,
-                            technicianId: e.target.value,
-                          }))
-                        }
-                        style={{ height: "42px", padding: "0 10px", borderRadius: "8px", border: "1px solid #ddd", outline: "none" }}
-                      >
-                        <option value="">Chọn kỹ thuật viên khả dụng</option>
-                        {availableTechnicians.map((t) => (
-                          <option key={t.EmployeeId} value={t.EmployeeId}>
-                            {t.TechnicianName} {t.Position ? `- ${t.Position}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <p style={{ fontSize: "13px", color: "#28a745", fontWeight: "bold", margin: "10px 0 15px" }}>
-                    ✓ Tìm thấy {availableTechnicians.length} kỹ thuật viên phù hợp.
+              <div className="ra-modal-backdrop" style={{ overflowY: "auto", padding: "20px 0" }}>
+                <form className="ra-modal wide" onSubmit={submitReschedule} style={{ maxWidth: "800px", width: "95%", margin: "auto" }}>
+                  <style>{`
+                    .rx-reschedule-step {
+                      margin-bottom: 24px;
+                      border-bottom: 1px solid #f3f4f6;
+                      padding-bottom: 20px;
+                    }
+                    .rx-reschedule-step:last-of-type {
+                      border-bottom: none;
+                      padding-bottom: 0;
+                    }
+                    .rx-reschedule-step-title {
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 12px;
+                    }
+                    .rx-reschedule-step-num {
+                      background: #85583f;
+                      color: #fff;
+                      width: 24px;
+                      height: 24px;
+                      border-radius: 50%;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 0.8rem;
+                      font-weight: bold;
+                    }
+                    .rx-reschedule-step-text {
+                      font-size: 1rem;
+                      font-weight: bold;
+                      color: #111827;
+                    }
+                    .rx-reschedule-employee-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                      gap: 12px;
+                      margin-top: 10px;
+                    }
+                    .rx-reschedule-employee-card {
+                      display: flex;
+                      gap: 12px;
+                      align-items: center;
+                      padding: 12px;
+                      border-radius: 12px;
+                      border: 1.5px solid #e5e7eb;
+                      background: #fff;
+                      text-align: left;
+                      cursor: pointer;
+                      transition: all 0.2s ease;
+                      width: 100%;
+                    }
+                    .rx-reschedule-employee-card:hover {
+                      border-color: #c5ac6b;
+                      background: #faf6ee;
+                    }
+                    .rx-reschedule-employee-card.active {
+                      border-color: #92733a;
+                      background: #f5edd6;
+                      box-shadow: 0 0 0 2px #e6d7b8;
+                    }
+                    .rx-reschedule-employee-card img {
+                      width: 48px;
+                      height: 48px;
+                      border-radius: 50%;
+                      object-fit: cover;
+                    }
+                    .rx-reschedule-employee-card b {
+                      display: block;
+                      color: #1f2937;
+                      font-size: 0.95rem;
+                    }
+                    .rx-reschedule-employee-card span {
+                      display: block;
+                      font-size: 0.8rem;
+                      color: #4b5563;
+                    }
+                    .rx-reschedule-employee-card small {
+                      display: block;
+                      font-size: 0.75rem;
+                      color: #6b7280;
+                    }
+                    .rx-reschedule-slot-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                      gap: 8px;
+                      margin-top: 10px;
+                    }
+                    .rx-reschedule-slot-btn {
+                      padding: 10px;
+                      border-radius: 8px;
+                      border: 1.5px solid #e5e7eb;
+                      background: #fff;
+                      text-align: center;
+                      cursor: pointer;
+                      font-size: 0.85rem;
+                      transition: all 0.2s ease;
+                    }
+                    .rx-reschedule-slot-btn:hover:not(:disabled) {
+                      border-color: #c5ac6b;
+                      background: #faf6ee;
+                    }
+                    .rx-reschedule-slot-btn.active {
+                      border-color: #92733a;
+                      background: #92733a;
+                      color: #fff;
+                      font-weight: bold;
+                    }
+                    .rx-reschedule-slot-btn:disabled {
+                      background: #f3f4f6;
+                      color: #9ca3af;
+                      cursor: not-allowed;
+                      border-color: #e5e7eb;
+                    }
+                    .rx-reschedule-slot-empty {
+                      padding: 20px;
+                      text-align: center;
+                      background: #f9fafb;
+                      border-radius: 8px;
+                      color: #6b7280;
+                      font-size: 0.9rem;
+                    }
+                    /* Override pink primary button locally inside this modal */
+                    .ra-modal .ra-btn.primary {
+                      background: linear-gradient(135deg, #85583f, #66412c) !important;
+                      box-shadow: 0 8px 16px rgba(102, 65, 44, 0.2) !important;
+                      color: #fff !important;
+                    }
+                    .ra-modal .ra-btn.primary:hover:not(:disabled) {
+                      background: linear-gradient(135deg, #754b34, #573623) !important;
+                      transform: translateY(-2px) !important;
+                    }
+                  `}</style>
+                  
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "4px" }}>Đổi lịch / đổi chuyên viên</h3>
+                  <p style={{ color: "#6b7280", fontSize: "0.875rem", marginBottom: "20px" }}>
+                    Cập nhật thời gian hẹn mới và phân công kỹ thuật viên cho lịch hẹn này.
                   </p>
 
-                  <div className="ra-modal-actions">
+                  {/* BƯỚC 1: CHỌN NGÀY */}
+                  <div className="rx-reschedule-step">
+                    <div className="rx-reschedule-step-title">
+                      <div className="rx-reschedule-step-num">1</div>
+                      <div className="rx-reschedule-step-text">Chọn ngày hẹn mới</div>
+                    </div>
+                    <input
+                      type="date"
+                      min={new Date().toISOString().slice(0, 10)}
+                      value={rescheduleForm.appointmentDate}
+                      onChange={(e) =>
+                        setRescheduleForm((p) => ({
+                          ...p,
+                          appointmentDate: e.target.value,
+                          startTime: "", // Reset start time when date changes
+                        }))
+                      }
+                      style={{ width: "100%", maxWidth: "300px", height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #d1d5db", outline: "none", fontSize: "0.95rem" }}
+                    />
+                  </div>
+
+                  {/* BƯỚC 2: CHỌN KỸ THUẬT VIÊN */}
+                  <div className="rx-reschedule-step">
+                    <div className="rx-reschedule-step-title">
+                      <div className="rx-reschedule-step-num">2</div>
+                      <div className="rx-reschedule-step-text">Chọn kỹ thuật viên ({employees.length} người phù hợp)</div>
+                    </div>
+                    {employees.length === 0 ? (
+                      <div style={{ color: "#6b7280", fontSize: "0.9rem", padding: "10px 0" }}>
+                        Không có kỹ thuật viên nào khả dụng hoặc chưa chọn ngày.
+                      </div>
+                    ) : (
+                      <div className="rx-reschedule-employee-grid">
+                        {employees.map((emp) => (
+                          <button
+                            type="button"
+                            key={emp.EmployeeId}
+                            className={`rx-reschedule-employee-card ${
+                              String(rescheduleForm.technicianId) === String(emp.EmployeeId) ? "active" : ""
+                            }`}
+                            onClick={() =>
+                              setRescheduleForm((p) => ({
+                                ...p,
+                                technicianId: String(emp.EmployeeId),
+                                startTime: "", // Reset start time when technician changes
+                              }))
+                            }
+                          >
+                            <img
+                              src={resolveFileUrl(emp.ImageUrl) || DEFAULT_AVATAR}
+                              alt={emp.EmployeeName}
+                            />
+                            <div>
+                              <b>{emp.EmployeeName}</b>
+                              <span>{emp.Specialization || emp.Position || "Kỹ thuật viên"}</span>
+                              <small>⭐ {Number(emp.AverageRating || 0).toFixed(1)} · {emp.ReviewCount || 0} đánh giá</small>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedRescheduleEmp && (
+                      <div style={{ marginTop: "12px", background: "#fdfbf7", border: "1px solid #f5ebd6", padding: "12px", borderRadius: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <span style={{ fontSize: "0.85rem", color: "#85583f", fontWeight: "bold" }}>
+                          Chi nhánh hoạt động của chuyên viên: {selectedRescheduleEmp.BranchName || "Chi nhánh chính"}
+                        </span>
+                        {selectedRescheduleEmp.BranchAddress && (
+                          <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                            📍 Địa chỉ: {selectedRescheduleEmp.BranchAddress}
+                          </span>
+                        )}
+                        {selectedRescheduleEmp.BranchAddress && (
+                          <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #e5e7eb", marginTop: "6px" }}>
+                            <iframe
+                              title="Bản đồ chuyên viên đổi lịch"
+                              src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedRescheduleEmp.BranchAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                              width="100%"
+                              height="120"
+                              style={{ border: 0, display: "block" }}
+                              allowFullScreen=""
+                              loading="lazy"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* BƯỚC 3: CHỌN SLOT TRỐNG */}
+                  <div className="rx-reschedule-step">
+                    <div className="rx-reschedule-step-title">
+                      <div className="rx-reschedule-step-num">3</div>
+                      <div className="rx-reschedule-step-text">
+                        Chọn khung giờ trống {slotLoading && <span style={{ fontSize: "0.85rem", color: "#6b7280", marginLeft: "10px", fontWeight: "normal" }}>Đang tải...</span>}
+                      </div>
+                    </div>
+
+                    {!rescheduleForm.appointmentDate || !rescheduleForm.technicianId ? (
+                      <div className="rx-reschedule-slot-empty">
+                        Vui lòng chọn ngày hẹn và kỹ thuật viên trước để xem các khung giờ trống.
+                      </div>
+                    ) : slotLoading ? (
+                      <div className="rx-reschedule-slot-empty">Đang tìm kiếm khung giờ trống...</div>
+                    ) : slots.length === 0 ? (
+                      <div className="rx-reschedule-slot-empty">
+                        Không tìm thấy khung giờ nào trống cho kỹ thuật viên này vào ngày đã chọn.
+                      </div>
+                    ) : (
+                      <div className="rx-reschedule-slot-grid">
+                        {slots.map((slot) => {
+                          const isAvailable = slot.available !== false;
+                          const formattedStart = formatTime(slot.startTime);
+                          const isActive = formatTime(rescheduleForm.startTime) === formattedStart;
+                          return (
+                            <button
+                              key={slot.startTime}
+                              type="button"
+                              disabled={!isAvailable}
+                              className={`rx-reschedule-slot-btn ${isActive ? "active" : ""}`}
+                              onClick={() => {
+                                if (isAvailable) {
+                                  setRescheduleForm((p) => ({
+                                    ...p,
+                                    startTime: slot.startTime,
+                                  }));
+                                }
+                              }}
+                            >
+                              <strong style={{ display: "block" }}>{formattedStart}</strong>
+                              <span style={{ display: "block", fontSize: "0.75rem", opacity: 0.8 }}>
+                                {formatTime(slot.endTime)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* MODAL ACTIONS */}
+                  <div className="ra-modal-actions" style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}>
                     <button
                       className="ra-btn primary"
                       type="submit"
-                      disabled={saving}
+                      disabled={saving || !rescheduleForm.appointmentDate || !rescheduleForm.startTime || !rescheduleForm.technicianId}
                     >
                       {saving ? "Đang cập nhật..." : "Cập nhật thay đổi"}
                     </button>
@@ -850,6 +1456,87 @@ export default function ReceptionistAppointmentDetail() {
                       className="ra-btn light"
                       type="button"
                       onClick={() => setShowReschedule(false)}
+                    >
+                      Đóng cửa sổ
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {showAssignTech && (
+              <div className="ra-modal-backdrop" style={{ overflowY: "auto", padding: "20px 0" }}>
+                <form className="ra-modal" onSubmit={(e) => submitAssignTech(e, false)} style={{ maxWidth: "550px", width: "95%", margin: "auto" }}>
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: "bold", marginBottom: "4px" }}>Điều phối Kỹ thuật viên</h3>
+                  <p style={{ color: "#6b7280", fontSize: "0.875rem", marginBottom: "15px" }}>
+                    Chọn kỹ thuật viên rảnh phù hợp cho dịch vụ này. Hệ thống sẽ tự động phát hiện tình trạng lịch nghỉ phép hoặc quá tải.
+                  </p>
+
+                  {techLoading ? (
+                    <div style={{ padding: "20px 0", textAlign: "center", color: "#6b7280" }}>
+                      ⏳ Đang quét danh sách kỹ thuật viên rảnh...
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
+                      <select
+                        style={{ height: "40px", padding: "0 10px", borderRadius: "8px", border: "1px solid #d1d5db", outline: "none", fontSize: "0.9rem", width: "100%" }}
+                        value={selectedTechId}
+                        onChange={(e) => setSelectedTechId(e.target.value)}
+                        required
+                      >
+                        <option value="">-- Chọn kỹ thuật viên --</option>
+                        {techList.map((t) => (
+                          <option key={t.EmployeeId} value={t.EmployeeId}>
+                            {t.TechnicianName || t.FullName} ({t.Position || "Kỹ thuật viên"})
+                          </option>
+                        ))}
+                      </select>
+
+                      {techWorkload && (
+                        <div style={{
+                          padding: "12px",
+                          borderRadius: "8px",
+                          background: techWorkload.isOverloaded || techWorkload.isConsecutiveOverloaded ? "#fef3c7" : "#ecfdf5",
+                          border: techWorkload.isOverloaded || techWorkload.isConsecutiveOverloaded ? "1px solid #f59e0b" : "1px solid #10b981",
+                          color: techWorkload.isOverloaded || techWorkload.isConsecutiveOverloaded ? "#b45309" : "#065f46",
+                          fontSize: "0.875rem",
+                          textAlign: "left"
+                        }}>
+                          <strong>📊 Tải trọng công việc hôm nay:</strong>
+                          <ul style={{ margin: "5px 0 0 15px", padding: 0 }}>
+                            <li>Tổng số ca hẹn đã gán: <strong>{techWorkload.totalAppointments} ca</strong></li>
+                            {techWorkload.isOverloaded && (
+                              <li style={{ color: "#ef4444", fontWeight: "bold" }}>⚠️ Cảnh báo: Kỹ thuật viên quá tải ca (&gt;= 5 ca/ngày)</li>
+                            )}
+                            {techWorkload.isConsecutiveOverloaded && (
+                              <li style={{ color: "#ef4444", fontWeight: "bold" }}>⚠️ Cảnh báo: Có &gt;= 3 ca làm việc liên tiếp không nghỉ</li>
+                            )}
+                            {!techWorkload.isOverloaded && !techWorkload.isConsecutiveOverloaded && (
+                              <li>Tải trọng công việc: Bình thường (Hợp lý)</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="ra-modal-actions" style={{ borderTop: "1px solid #e5e7eb", paddingTop: "12px" }}>
+                    <button
+                      className="ra-btn primary"
+                      type="submit"
+                      disabled={saving || techLoading}
+                      style={{ background: "#d91f68", color: "#fff" }}
+                    >
+                      {saving ? "Đang xử lý..." : "Xác nhận điều phối"}
+                    </button>
+                    <button
+                      className="ra-btn light"
+                      type="button"
+                      onClick={() => {
+                        setShowAssignTech(false);
+                        setSelectedTechId("");
+                        setTechWorkload(null);
+                      }}
                     >
                       Đóng cửa sổ
                     </button>

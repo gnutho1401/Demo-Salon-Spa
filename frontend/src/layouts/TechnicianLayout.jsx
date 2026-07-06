@@ -1,19 +1,98 @@
-import { useEffect, useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../api/axiosClient";
 import { useAuth } from "../context/AuthContext";
 import "../styles/pages/technician.css";
 
 const DEFAULT_AVATAR = "/images/default-avatar.png";
 
+const menuGroups = [
+  {
+    title: "",
+    items: [
+      { to: "/technician", icon: "🏠", label: "Trang chủ", end: true },
+    ]
+  },
+  {
+    title: "LỊCH LÀM VIỆC",
+    items: [
+      { to: "/technician/schedule", icon: "📅", label: "Lịch làm việc" },
+      { to: "/technician/attendance", icon: "⏰", label: "Ca làm & Đăng ký" },
+      { to: "/technician/appointments", icon: "🧾", label: "Lịch hẹn của tôi" },
+    ]
+  },
+  {
+    title: "KHÁCH HÀNG",
+    items: [
+      { to: "/technician/customers", icon: "👥", label: "Khách hàng" },
+      { to: "/technician/reviews", icon: "⭐", label: "Đánh giá" },
+    ]
+  },
+  {
+    title: "THU NHẬP",
+    items: [
+      { to: "/technician/earnings", icon: "💰", label: "Doanh thu" },
+    ]
+  },
+  {
+    title: "PHÁC ĐỒ & GHI CHÚ",
+    items: [
+      { to: "/technician/treatment-notes", icon: "📝", label: "Ghi chú trị liệu" },
+    ]
+  },
+  {
+    title: "THIẾT LẬP",
+    items: [
+      { to: "/technician/profile", icon: "👤", label: "Hồ sơ cá nhân" },
+      { to: "/technician/settings", icon: "⚙️", label: "Cài đặt" },
+      { to: "/technician/notifications", icon: "🔔", label: "Thông báo" },
+    ]
+  }
+];
+
 export default function TechnicianLayout({ children }) {
   const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState(null);
+  const sidebarRef = useRef(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  async function loadUnreadCount() {
+    try {
+      const res = await axiosClient.get("/notifications/my");
+      const list = res.data?.data || [];
+      const count = list.filter(n => !n.IsRead).length;
+      setUnreadCount(count);
+    } catch (_) {}
+  }
+
+  useEffect(() => {
+    loadUnreadCount();
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  useEffect(() => {
+    // Restore sidebar scroll position
+    const savedScrollTop = sessionStorage.getItem("tech-sidebar-scroll");
+    if (savedScrollTop && sidebarRef.current) {
+      sidebarRef.current.scrollTop = Number(savedScrollTop);
+    } else {
+      const activeLink = sidebarRef.current?.querySelector(".tech-nav-link.active");
+      if (activeLink) {
+        activeLink.scrollIntoView({ block: "nearest", behavior: "auto" });
+      }
+    }
+  }, [location.pathname]);
+
+  const handleSidebarScroll = (e) => {
+    sessionStorage.setItem("tech-sidebar-scroll", e.currentTarget.scrollTop);
   };
 
   useEffect(() => {
@@ -37,7 +116,7 @@ export default function TechnicianLayout({ children }) {
           }
         }
       } catch (_) {
-        // Nếu không tải được profile thì vẫn dùng user trong localStorage.
+        // Fallback to user context in localStorage
       }
     }
 
@@ -66,7 +145,11 @@ export default function TechnicianLayout({ children }) {
 
   return (
     <div className="tech-shell">
-      <aside className="tech-sidebar">
+      <aside
+        ref={sidebarRef}
+        onScroll={handleSidebarScroll}
+        className="tech-sidebar"
+      >
         <div className="tech-brand">
           <div className="tech-logo">✿</div>
           <h2>LUNA SALON</h2>
@@ -74,16 +157,41 @@ export default function TechnicianLayout({ children }) {
         </div>
 
         <nav className="tech-menu">
-          <NavLink to="/technician" end>
-            Trang chủ
-          </NavLink>
-          <NavLink to="/technician/schedule">Lịch làm việc</NavLink>
-          <NavLink to="/technician/appointments">Lịch hẹn</NavLink>
-          <NavLink to="/technician/customers">Khách hàng</NavLink>
-          <NavLink to="/technician/treatment-notes">Lịch sử điều trị</NavLink>
-          <NavLink to="/technician/earnings">Báo cáo thu nhập</NavLink>
-          <NavLink to="/technician/profile">Hồ sơ cá nhân</NavLink>
-          <NavLink to="/technician/settings">Cài đặt</NavLink>
+          {menuGroups.map((group) => (
+            <div className="tech-menu-group" key={group.title}>
+              <p className="tech-menu-group-title">{group.title}</p>
+              <div style={{ display: "grid", gap: "6px" }}>
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      isActive ? "tech-nav-link active" : "tech-nav-link"
+                    }
+                  >
+                    <span className="tech-nav-icon">{item.icon}</span>
+                    <b className="tech-nav-label">
+                      {item.label}
+                      {item.to === "/technician/notifications" && unreadCount > 0 && (
+                        <span style={{
+                          backgroundColor: "#e53e3e",
+                          color: "white",
+                          padding: "2px 6px",
+                          borderRadius: "10px",
+                          fontSize: "11px",
+                          marginLeft: "8px",
+                          fontWeight: "bold"
+                        }}>
+                          {unreadCount}
+                        </span>
+                      )}
+                    </b>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="tech-user-card">

@@ -38,4 +38,7 @@ router.patch(
 // Xóa / hủy lịch hẹn
 router.delete("/:id", authMiddleware, controller.remove);
 
+// Khách hàng xác nhận lịch hẹn tái khám
+router.post("/:id/confirm", authMiddleware, controller.confirm);
+
 module.exports = router;

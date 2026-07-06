@@ -4,6 +4,7 @@ const authMiddleware = require("../../middlewares/auth.middleware");
 const allowRoles = require("../../middlewares/role.middleware");
 
 router.get("/by-service/:serviceId", controller.getByService);
+router.get("/branches", controller.getBranches);
 router.get("/", controller.getAll);
 router.get("/:id", controller.getById);
 

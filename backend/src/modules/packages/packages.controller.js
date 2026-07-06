@@ -17,7 +17,13 @@ async function getCategories(req, res) {
 }
 async function getMine(req, res) {
   try {
-    return success(res, await service.getMine(req.user.userId));
+    let userId = req.user.userId;
+    let customerId = null;
+    const userRole = String(req.user?.role || "").toUpperCase();
+    if (["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) && req.query.customerId) {
+      customerId = Number(req.query.customerId);
+    }
+    return success(res, await service.getMine(userId, customerId));
   } catch (err) {
     return error(res, err.message, 400);
   }
@@ -217,11 +223,18 @@ async function getUsageHistoryPaginated(req, res) {
 
 async function getMyPackageDetail(req, res) {
   try {
+    let userId = req.user.userId;
+    let customerId = null;
+    const userRole = String(req.user?.role || "").toUpperCase();
+    if (["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) && req.query.customerId) {
+      customerId = Number(req.query.customerId);
+    }
     return success(
       res,
       await service.getMyPackageDetail(
-        req.user.userId,
+        userId,
         req.params.customerPackageId,
+        customerId,
       ),
     );
   } catch (err) {
@@ -249,6 +262,27 @@ async function approveRequest(req, res) {
         action,
       ),
       "Xử lý yêu cầu thành công",
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function repayCustomerPackage(req, res) {
+  try {
+    const ipAddr =
+      req.headers["x-forwarded-for"] ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      req.connection.socket.remoteAddress;
+
+    return success(
+      res,
+      await service.createVnpayRepayUrl(
+        req.user.userId,
+        req.params.customerPackageId,
+        ipAddr,
+      ),
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -296,4 +330,5 @@ module.exports = {
   approveRequest,
   getPackageReport,
   findMember,
+  repayCustomerPackage,
 };

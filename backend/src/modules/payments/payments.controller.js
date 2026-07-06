@@ -247,6 +247,25 @@ async function remove(req, res) {
   }
 }
 
+async function applyVoucher(req, res) {
+  try {
+    const userRole = String(req.user?.role || "").toUpperCase();
+    const isStaff = ["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole);
+    return success(
+      res,
+      await service.applyVoucher(
+        req.user.userId,
+        req.params.appointmentId,
+        req.body,
+        isStaff
+      ),
+      "Áp dụng voucher thành công"
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
   getAll,
   getMine,
@@ -266,5 +285,6 @@ module.exports = {
   create,
   update,
   remove,
+  applyVoucher,
 };
 

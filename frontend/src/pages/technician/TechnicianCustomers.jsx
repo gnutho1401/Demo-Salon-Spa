@@ -102,6 +102,89 @@ export default function TechnicianCustomers() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // Booking Appointment states
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [techServices, setTechServices] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [bookingForm, setBookingForm] = useState({
+    customerId: "",
+    customerName: "",
+    serviceId: "",
+    appointmentDate: new Date().toISOString().slice(0, 10),
+    startTime: "",
+    note: ""
+  });
+
+  const loadTechServices = async () => {
+    try {
+      const res = await axiosClient.get("/technician/schedule");
+      setTechServices(res.data?.data?.services || []);
+    } catch (err) {
+      console.error("Load services failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadTechServices();
+  }, []);
+
+  // Fetch available slots when date or service changes
+  useEffect(() => {
+    if (!bookingForm.appointmentDate || !bookingForm.serviceId) {
+      setAvailableSlots([]);
+      return;
+    }
+    const selectedService = techServices.find(s => s.ServiceId === Number(bookingForm.serviceId));
+    const duration = selectedService ? selectedService.Duration : 60;
+
+    const fetchSlots = async () => {
+      try {
+        setSlotsLoading(true);
+        const res = await axiosClient.get("/technician/schedule/available-slots", {
+          params: {
+            date: bookingForm.appointmentDate,
+            duration: duration
+          }
+        });
+        setAvailableSlots(res.data?.data || []);
+      } catch (err) {
+        console.error("Load slots failed:", err);
+        setAvailableSlots([]);
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+    fetchSlots();
+  }, [bookingForm.appointmentDate, bookingForm.serviceId, techServices]);
+
+  const handleBookAppointment = async (e) => {
+    e.preventDefault();
+    if (!bookingForm.startTime) {
+      alert("Vui lòng chọn khung giờ trống");
+      return;
+    }
+    try {
+      const payload = {
+        customerId: Number(bookingForm.customerId),
+        serviceIds: [Number(bookingForm.serviceId)],
+        appointmentDate: bookingForm.appointmentDate,
+        startTime: bookingForm.startTime,
+        note: bookingForm.note,
+        paymentStatus: "UNPAID",
+        paymentMethod: "CASH"
+      };
+      await axiosClient.post("/technician/appointments", payload);
+      alert("Đặt lịch dịch vụ thành công!");
+      setShowBookModal(false);
+      if (selected === bookingForm.customerId) {
+        loadDetail(selected);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Đặt lịch thất bại");
+    }
+  };
+
   const [summary, setSummary] = useState({});
   const [customers, setCustomers] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -445,10 +528,18 @@ export default function TechnicianCustomers() {
 
                               <button
                                 type="button"
-                                title="Xem lịch trình"
+                                title="Đặt lịch hẹn dịch vụ"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate("/technician/schedule");
+                                  setBookingForm({
+                                    customerId: c.CustomerId,
+                                    customerName: c.FullName || "Khách hàng",
+                                    serviceId: techServices[0]?.ServiceId || "",
+                                    appointmentDate: new Date().toISOString().slice(0, 10),
+                                    startTime: "",
+                                    note: ""
+                                  });
+                                  setShowBookModal(true);
                                 }}
                               >
                                 📅
@@ -599,7 +690,7 @@ export default function TechnicianCustomers() {
                             `/technician/appointments/${nextAppointment.AppointmentId}`,
                           );
                         } else {
-                          navigate("/technician/treatment-notes");
+                          navigate(`/technician/treatment-notes?customerId=${detailCustomer.CustomerId}`);
                         }
                       }}
                     >
@@ -921,7 +1012,7 @@ export default function TechnicianCustomers() {
                         <button
                           type="button"
                           onClick={() =>
-                            navigate("/technician/treatment-notes")
+                            navigate(`/technician/treatment-notes?customerId=${detailCustomer.CustomerId}`)
                           }
                         >
                           + Thêm ghi chú
@@ -1064,6 +1155,219 @@ export default function TechnicianCustomers() {
             </aside>
           )}
         </section>
+
+        {showBookModal && (
+          <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(12px)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+            padding: "20px"
+          }}>
+            <div style={{
+              backgroundColor: "#16161e",
+              border: "1px solid rgba(212, 175, 55, 0.35)",
+              borderRadius: "16px",
+              padding: "28px",
+              width: "100%",
+              maxWidth: "520px",
+              boxShadow: "0 10px 40px rgba(212, 175, 55, 0.15)",
+              position: "relative"
+            }}>
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" }}>
+                <h3 style={{ margin: 0, color: "#d4af37", fontSize: "1.3rem", fontWeight: "bold" }}>
+                  📅 Đặt lịch dịch vụ cho ${bookingForm.customerName}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowBookModal(false)}
+                  style={{
+                    backgroundColor: "transparent",
+                    border: "none",
+                    color: "#9ca3af",
+                    fontSize: "1.5rem",
+                    cursor: "pointer",
+                    outline: "none"
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleBookAppointment}>
+                {/* Service Selection */}
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ display: "block", color: "#9ca3af", fontSize: "0.85rem", marginBottom: "6px" }}>
+                    Chọn dịch vụ thực hiện
+                  </label>
+                  <select
+                    value={bookingForm.serviceId}
+                    onChange={e => setBookingForm({ ...bookingForm, serviceId: e.target.value, startTime: "" })}
+                    style={{
+                      width: "100%",
+                      backgroundColor: "#22222b",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      color: "white",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      outline: "none"
+                    }}
+                    required
+                  >
+                    <option value="" disabled>-- Chọn dịch vụ --</option>
+                    {techServices.map(s => (
+                      <option key={s.ServiceId} value={s.ServiceId}>
+                        {s.ServiceName} ({s.Duration} phút)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date Selection */}
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ display: "block", color: "#9ca3af", fontSize: "0.85rem", marginBottom: "6px" }}>
+                    Chọn ngày hẹn
+                  </label>
+                  <input
+                    type="date"
+                    value={bookingForm.appointmentDate}
+                    onChange={e => setBookingForm({ ...bookingForm, appointmentDate: e.target.value, startTime: "" })}
+                    min={new Date().toISOString().slice(0, 10)}
+                    style={{
+                      width: "100%",
+                      backgroundColor: "#22222b",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      color: "white",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      outline: "none"
+                    }}
+                    required
+                  />
+                </div>
+
+                {/* Available Slots suggestions */}
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={{ display: "block", color: "#9ca3af", fontSize: "0.85rem", marginBottom: "8px" }}>
+                    Gợi ý khung giờ khả dụng (Không bị trùng lắp)
+                  </label>
+
+                  {slotsLoading ? (
+                    <div style={{ color: "#d4af37", fontSize: "0.9rem", fontStyle: "italic", textAlign: "center", padding: "10px 0" }}>
+                      🌀 Đang tìm các khung giờ trống...
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <div style={{ color: "#ef4444", fontSize: "0.85rem", fontStyle: "italic", textAlign: "center", padding: "10px 0" }}>
+                      ❌ Kỹ thuật viên không có ca làm việc hoặc không còn giờ trống trong ngày đã chọn.
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "8px",
+                      maxHeight: "150px",
+                      overflowY: "auto",
+                      backgroundColor: "#22222b",
+                      padding: "12px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(255,255,255,0.05)"
+                    }}>
+                      {availableSlots.map(slot => {
+                        const isSelected = bookingForm.startTime === slot;
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            onClick={() => setBookingForm({ ...bookingForm, startTime: slot })}
+                            style={{
+                              backgroundColor: isSelected ? "#d4af37" : "#1a1a24",
+                              color: isSelected ? "black" : "#e5e7eb",
+                              border: `1px solid ${isSelected ? "#d4af37" : "rgba(255,255,255,0.1)"}`,
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                              fontSize: "0.85rem",
+                              fontWeight: isSelected ? "bold" : "normal",
+                              cursor: "pointer",
+                              textAlign: "center",
+                              transition: "all 0.2s ease"
+                            }}
+                          >
+                            {slot}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes Input */}
+                <div style={{ marginBottom: "24px" }}>
+                  <label style={{ display: "block", color: "#9ca3af", fontSize: "0.85rem", marginBottom: "6px" }}>
+                    Ghi chú đặc biệt
+                  </label>
+                  <textarea
+                    value={bookingForm.note}
+                    onChange={e => setBookingForm({ ...bookingForm, note: e.target.value })}
+                    placeholder="Khách có yêu cầu đặc biệt gì không..."
+                    style={{
+                      width: "100%",
+                      backgroundColor: "#22222b",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      color: "white",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      outline: "none",
+                      height: "60px",
+                      resize: "none"
+                    }}
+                  />
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowBookModal(false)}
+                    style={{
+                      backgroundColor: "transparent",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      color: "#e5e7eb",
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      fontWeight: "bold",
+                      cursor: "pointer"
+                    }}
+                  >
+                    HỦY
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      backgroundColor: "#d4af37",
+                      color: "black",
+                      padding: "10px 24px",
+                      borderRadius: "8px",
+                      fontWeight: "bold",
+                      border: "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    XÁC NHẬN ĐẶT LỊCH
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </TechnicianLayout>
   );

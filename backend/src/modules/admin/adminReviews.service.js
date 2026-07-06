@@ -65,7 +65,14 @@ async function list(filters = {}) {
         a.AppointmentDate,
         a.StartTime,
         a.EndTime,
-        a.Status AS AppointmentStatus
+        a.Status AS AppointmentStatus,
+        (
+          SELECT ri.ReviewImageId, ri.ImageUrl, ri.CreatedAt
+          FROM ReviewImages ri
+          WHERE ri.ReviewId = r.ReviewId
+          ORDER BY ri.ReviewImageId ASC
+          FOR JSON PATH
+        ) AS ImagesJson
       FROM Reviews r
       LEFT JOIN Customers c ON r.CustomerId = c.CustomerId
       LEFT JOIN Users cu ON c.UserId = cu.UserId
@@ -87,7 +94,15 @@ async function list(filters = {}) {
       ORDER BY r.CreatedAt DESC, r.ReviewId DESC
     `);
 
-  return result.recordset;
+  return result.recordset.map(row => {
+    try {
+      row.ReviewImages = row.ImagesJson ? JSON.parse(row.ImagesJson) : [];
+    } catch {
+      row.ReviewImages = [];
+    }
+    delete row.ImagesJson;
+    return row;
+  });
 }
 
 async function getById(id) {
@@ -120,7 +135,14 @@ async function getById(id) {
         a.AppointmentDate,
         a.StartTime,
         a.EndTime,
-        a.Status AS AppointmentStatus
+        a.Status AS AppointmentStatus,
+        (
+          SELECT ri.ReviewImageId, ri.ImageUrl, ri.CreatedAt
+          FROM ReviewImages ri
+          WHERE ri.ReviewId = r.ReviewId
+          ORDER BY ri.ReviewImageId ASC
+          FOR JSON PATH
+        ) AS ImagesJson
       FROM Reviews r
       LEFT JOIN Customers c ON r.CustomerId = c.CustomerId
       LEFT JOIN Users cu ON c.UserId = cu.UserId
@@ -133,6 +155,12 @@ async function getById(id) {
 
   const row = result.recordset[0];
   if (!row) throw new Error("Không tìm thấy review");
+  try {
+    row.ReviewImages = row.ImagesJson ? JSON.parse(row.ImagesJson) : [];
+  } catch {
+    row.ReviewImages = [];
+  }
+  delete row.ImagesJson;
   return row;
 }
 

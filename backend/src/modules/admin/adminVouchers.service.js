@@ -100,7 +100,7 @@ async function ensureUniqueCode(pool, code, excludeId = null) {
       SELECT TOP 1 VoucherId
       FROM Vouchers
       WHERE UPPER(Code) = UPPER(@Code)
-        AND (@ExcludeId IS NULL OR VoucherId <> @ExcludeId)
+        AND (CAST(@ExcludeId AS INT) IS NULL OR VoucherId <> CAST(@ExcludeId AS INT))
     `);
 
   if (result.recordset[0]) throw new Error("Mã voucher đã tồn tại");
@@ -330,8 +330,7 @@ async function remove(id) {
 
   await pool.request().input("VoucherId", sql.Int, Number(id)).query(`
       UPDATE Vouchers
-      SET Status = 'INACTIVE',
-          UpdatedAt = GETDATE()
+      SET Status = 'INACTIVE'
       WHERE VoucherId = @VoucherId
     `);
 

@@ -37,13 +37,15 @@ function createVnpHash(params) {
 }
 
 function verifyVnpParams(query) {
-  const params = { ...query };
-  const secureHash = params.vnp_SecureHash;
+  const params = {};
+  for (const key in query) {
+    if (key.startsWith("vnp_") && key !== "vnp_SecureHash" && key !== "vnp_SecureHashType") {
+      params[key] = query[key];
+    }
+  }
 
-  delete params.vnp_SecureHash;
-  delete params.vnp_SecureHashType;
-
-  return createVnpHash(params) === secureHash;
+  const generated = createVnpHash(params);
+  return String(generated).toLowerCase() === String(query.vnp_SecureHash).toLowerCase();
 }
 
 async function getCustomerByUserId(pool, userId) {
@@ -219,10 +221,15 @@ async function getById(id) {
   return item;
 }
 
-async function getMine(userId) {
+async function getMine(userId, customerId = null) {
   const pool = await connectDB();
 
-  const customer = await getCustomerByUserId(pool, userId);
+  let customer;
+  if (customerId) {
+    customer = { CustomerId: customerId };
+  } else {
+    customer = await getCustomerByUserId(pool, userId);
+  }
   if (!customer) return [];
 
   const result = await pool
@@ -418,7 +425,7 @@ async function createCustomerPackageTransaction(
         @CustomerId,
         @PackageId,
         CAST(GETDATE() AS DATE),
-        DATEADD(DAY, @ValidityDays, CAST(GETDATE() AS DATE)),
+        CAST(GETDATE() AS DATE) + CAST(@ValidityDays AS INT),
         @TotalSessions,
         0,
         @RemainingSessions,
@@ -451,7 +458,7 @@ async function createCustomerPackageTransaction(
         @PaymentMethod,
         @Status,
         @TransactionCode,
-        CASE WHEN @Status = 'PAID' THEN GETDATE() ELSE NULL END
+        CASE WHEN CAST(@Status AS VARCHAR) = 'PAID' THEN GETDATE() ELSE NULL END
       )
     `);
 
@@ -475,6 +482,27 @@ async function createCustomerPackageTransaction(
   };
 }
 
+async function checkExistingPackage(pool, customerId, packageId) {
+  const existingPkg = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("PackageId", sql.Int, packageId)
+    .query(`
+      SELECT TOP 1 Status
+      FROM CustomerPackages
+      WHERE CustomerId = @CustomerId 
+        AND PackageId = @PackageId 
+        AND Status IN ('ACTIVE', 'PENDING_PAYMENT', 'FROZEN')
+    `);
+  if (existingPkg.recordset.length > 0) {
+    const status = existingPkg.recordset[0].Status;
+    if (status === 'PENDING_PAYMENT') {
+      throw new Error("Bạn đã đăng ký combo này và đang chờ thanh toán. Vui lòng thanh toán gói hiện tại hoặc hủy để đăng ký lại.");
+    } else {
+      throw new Error("Bạn đang sở hữu combo này ở trạng thái hoạt động hoặc tạm khóa.");
+    }
+  }
+}
+
 async function buyPackage(userId, packageId, payload = {}) {
   const pool = await connectDB();
 
@@ -484,6 +512,9 @@ async function buyPackage(userId, packageId, payload = {}) {
   const pkg = await getActivePackage(pool, packageId);
   if (!pkg)
     throw new Error("Combo / liệu trình không tồn tại hoặc đã ngừng bán");
+
+  // Cho phép mua một combo nhiều lần, không chặn khi đang sở hữu gói hoạt động/tạm khóa nữa
+  // await checkExistingPackage(pool, customer.CustomerId, packageId);
 
   const transaction = new sql.Transaction(pool);
 
@@ -533,6 +564,9 @@ async function createVnpayPackageUrl(
   if (!pkg)
     throw new Error("Combo / liệu trình không tồn tại hoặc đã ngừng bán");
 
+  // Cho phép mua một combo nhiều lần qua VNPAY, không chặn khi đang sở hữu gói hoạt động/tạm khóa nữa
+  // await checkExistingPackage(pool, customer.CustomerId, packageId);
+
   const prices = calcDiscount(pkg.OriginalPrice, pkg.SalePrice);
   const txnRef = `PKG${packageId}_${Date.now()}`;
 
@@ -566,6 +600,101 @@ async function createVnpayPackageUrl(
     vnp_CurrCode: "VND",
     vnp_TxnRef: txnRef,
     vnp_OrderInfo: `Thanh toan combo lieu trinh ${packageId}`,
+    vnp_OrderType: "other",
+    vnp_Locale: "vn",
+    vnp_ReturnUrl: returnUrl,
+    vnp_IpAddr: ipAddr,
+    vnp_CreateDate: formatVnpDate(),
+  };
+
+  const sorted = sortObject(params);
+  sorted.vnp_SecureHash = createVnpHash(sorted);
+
+  return {
+    paymentUrl: `${vnpUrl}?${buildQuery(sorted)}`,
+    amount: prices.finalPrice,
+    transactionCode: txnRef,
+  };
+}
+
+async function createVnpayRepayUrl(
+  userId,
+  customerPackageId,
+  ipAddr = "127.0.0.1",
+) {
+  const vnpUrl =
+    process.env.VNP_URL || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+  const tmnCode = process.env.VNP_TMN_CODE;
+  const returnUrl =
+    process.env.VNP_PACKAGE_RETURN_URL ||
+    `${process.env.BACKEND_URL || "http://localhost:5000"}/api/packages/vnpay-return`;
+
+  if (!tmnCode) throw new Error("Thiếu VNP_TMN_CODE trong file .env");
+
+  const pool = await connectDB();
+
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
+
+  // Lấy chi tiết liệu trình hiện tại và kiểm tra quyền sở hữu
+  const pkgResult = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, customerPackageId)
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT cp.*, p.PackageName, p.OriginalPrice, p.SalePrice
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE cp.CustomerPackageId = @CustomerPackageId AND cp.CustomerId = @CustomerId
+    `);
+
+  const cp = pkgResult.recordset[0];
+  if (!cp) {
+    throw new Error("Không tìm thấy liệu trình này hoặc bạn không có quyền sở hữu");
+  }
+
+  if (cp.Status !== "PENDING_PAYMENT") {
+    throw new Error("Liệu trình này không ở trạng thái chờ thanh toán");
+  }
+
+  const prices = calcDiscount(cp.OriginalPrice, cp.SalePrice);
+  const txnRef = `REPKG${customerPackageId}_${Date.now()}`;
+
+  // Tạo một bản ghi thanh toán PENDING mới cho lần thanh toán này
+  await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, customerPackageId)
+    .input("Amount", sql.Decimal(18, 2), prices.finalPrice)
+    .input("PaymentMethod", sql.NVarChar, "VNPAY")
+    .input("Status", sql.NVarChar, "PENDING")
+    .input("TransactionCode", sql.NVarChar, txnRef).query(`
+      INSERT INTO PackagePayments
+      (
+        CustomerPackageId,
+        Amount,
+        PaymentMethod,
+        Status,
+        TransactionCode,
+        PaidAt
+      )
+      VALUES
+      (
+        @CustomerPackageId,
+        @Amount,
+        @PaymentMethod,
+        @Status,
+        @TransactionCode,
+        NULL
+      )
+    `);
+
+  const params = {
+    vnp_Version: "2.1.0",
+    vnp_Command: "pay",
+    vnp_TmnCode: tmnCode,
+    vnp_Amount: Math.round(Number(prices.finalPrice || 0) * 100),
+    vnp_CurrCode: "VND",
+    vnp_TxnRef: txnRef,
+    vnp_OrderInfo: `Thanh toan lai combo lieu trinh ${customerPackageId}`,
     vnp_OrderType: "other",
     vnp_Locale: "vn",
     vnp_ReturnUrl: returnUrl,
@@ -677,7 +806,7 @@ async function handleVnpayReturn(query) {
           SET
             Status = 'ACTIVE',
             StartDate = CAST(GETDATE() AS DATE),
-            EndDate = DATEADD(DAY, @ValidityDays, CAST(GETDATE() AS DATE)),
+            EndDate = CAST(GETDATE() AS DATE) + CAST(@ValidityDays AS INT),
             TotalSessions = @TotalSessions,
             RemainingSessions = @TotalSessions,
             UpdatedAt = GETDATE()
@@ -975,15 +1104,15 @@ async function addFamilyMember(userId, customerPackageId, phoneOrEmail, relation
     throw new Error("Liệu trình phải ở trạng thái ACTIVE hoặc FROZEN");
   }
 
-  // Kiểm tra số lượng thành viên gia đình (tối đa 3 người)
+  // Kiểm tra số lượng thành viên gia đình (tối đa 2 người)
   const countResult = await pool
     .request()
     .input("CustomerPackageId", sql.Int, customerPackageId).query(`
       SELECT COUNT(*) AS TotalCount FROM PackageMembers
       WHERE CustomerPackageId = @CustomerPackageId
     `);
-  if (countResult.recordset[0].TotalCount >= 3) {
-    throw new Error("Liệu trình này chỉ được chia sẻ tối đa cho 3 thành viên gia đình");
+  if (countResult.recordset[0].TotalCount >= 2) {
+    throw new Error("Liệu trình này chỉ được chia sẻ tối đa cho 2 thành viên gia đình");
   }
 
   // Tìm Customer theo phone hoặc email
@@ -1024,9 +1153,9 @@ async function addFamilyMember(userId, customerPackageId, phoneOrEmail, relation
     .input("FamilyCustomerId", sql.Int, familyCustomer.CustomerId)
     .input("Relationship", sql.NVarChar, relationship).query(`
       INSERT INTO PackageMembers
-      (CustomerPackageId, FamilyCustomerId, Relationship)
+      (CustomerPackageId, FamilyCustomerId, Relationship, AddedAt)
       OUTPUT INSERTED.*
-      VALUES (@CustomerPackageId, @FamilyCustomerId, @Relationship)
+      VALUES (@CustomerPackageId, @FamilyCustomerId, @Relationship, GETDATE())
     `);
 
   return result.recordset[0];
@@ -1148,9 +1277,14 @@ async function getUsageHistoryPaginated(userId, customerPackageId, page = 1, lim
 /**
  * Lấy chi tiết liệu trình enterprise (bao gồm members, freeze history, extension history)
  */
-async function getMyPackageDetail(userId, customerPackageId) {
+async function getMyPackageDetail(userId, customerPackageId, customerId = null) {
   const pool = await connectDB();
-  const customer = await getCustomerByUserId(pool, userId);
+  let customer;
+  if (customerId) {
+    customer = { CustomerId: customerId };
+  } else {
+    customer = await getCustomerByUserId(pool, userId);
+  }
   if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
 
   // Lấy thông tin gói
@@ -1194,7 +1328,7 @@ async function getMyPackageDetail(userId, customerPackageId) {
     .request()
     .input("CustomerPackageId", sql.Int, customerPackageId).query(`
       SELECT pm.PackageMemberId, pm.FamilyCustomerId, pm.Relationship, pm.AddedAt,
-        u.FullName, u.Email, u.Phone
+        u.FullName, u.Email, u.Phone, u.AvatarUrl
       FROM PackageMembers pm
       JOIN Customers c ON pm.FamilyCustomerId = c.CustomerId
       JOIN Users u ON c.UserId = u.UserId
@@ -1257,7 +1391,39 @@ async function getMyPackageDetail(userId, customerPackageId) {
           WHERE u.CustomerPackageId = @CustomerPackageId
             AND u.ServiceId = ps.ServiceId
             AND u.Status <> 'CANCELLED'
-        ) AS UsedSessions
+        ) AS UsedSessions,
+        (
+          SELECT COUNT(*)
+          FROM Appointments a
+          JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+          WHERE a.CustomerPackageId = @CustomerPackageId
+            AND aps.ServiceId = ps.ServiceId
+            AND a.Status IN ('PENDING', 'PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+        ) AS ActiveBookings,
+        (
+          SELECT TOP 1 u.FullName
+          FROM Appointments a
+          JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+          JOIN Customers c ON a.CustomerId = c.CustomerId
+          JOIN Users u ON c.UserId = u.UserId
+          WHERE a.CustomerPackageId = @CustomerPackageId
+            AND aps.ServiceId = ps.ServiceId
+            AND a.Status IN ('PENDING', 'PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+        ) AS ActiveBookingName,
+        (
+          SELECT STRING_AGG(CONCAT(activeGroup.FullName, N' đặt ', activeGroup.ActiveCount, N' buổi'), N', ')
+          FROM (
+            SELECT u.FullName, COUNT(*) AS ActiveCount
+            FROM Appointments a
+            JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+            JOIN Customers c ON a.CustomerId = c.CustomerId
+            JOIN Users u ON c.UserId = u.UserId
+            WHERE a.CustomerPackageId = @CustomerPackageId
+              AND aps.ServiceId = ps.ServiceId
+              AND a.Status IN ('PENDING', 'PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+            GROUP BY u.FullName
+          ) activeGroup
+        ) AS ActiveBookingDetails
       FROM PackageServices ps
       JOIN Services s ON ps.ServiceId = s.ServiceId
       WHERE ps.PackageId = @PackageId
@@ -1400,7 +1566,7 @@ async function getPackageReport(filters = {}) {
         SUM(CASE WHEN cp.Status = 'EXPIRED' THEN 1 ELSE 0 END) AS ExpiredPackages,
         SUM(CASE WHEN cp.Status = 'CANCELLED' THEN 1 ELSE 0 END) AS CancelledPackages,
         SUM(CASE WHEN cp.EndDate >= CAST(GETDATE() AS DATE) 
-                  AND cp.EndDate <= DATEADD(DAY, 7, CAST(GETDATE() AS DATE))
+                  AND cp.EndDate <= CAST(GETDATE() AS DATE) + 7
                   AND cp.Status = 'ACTIVE' THEN 1 ELSE 0 END) AS ExpiringSoonPackages,
         ISNULL(SUM(pp.Amount), 0) AS TotalRevenue,
         CASE WHEN COUNT(*) > 0
@@ -1413,8 +1579,8 @@ async function getPackageReport(filters = {}) {
         END AS UsageRate
       FROM CustomerPackages cp
       LEFT JOIN PackagePayments pp ON cp.CustomerPackageId = pp.CustomerPackageId AND pp.Status = 'PAID'
-      WHERE (@StartDate IS NULL OR cp.CreatedAt >= @StartDate)
-        AND (@EndDate IS NULL OR cp.CreatedAt <= DATEADD(DAY, 1, @EndDate))
+      WHERE (CAST(@StartDate AS DATE) IS NULL OR cp.CreatedAt >= @StartDate)
+        AND (CAST(@EndDate AS DATE) IS NULL OR cp.CreatedAt <= CAST(@EndDate AS DATE) + 1)
     `);
 
   // Top packages by revenue
@@ -1432,8 +1598,8 @@ async function getPackageReport(filters = {}) {
       FROM Packages p
       LEFT JOIN CustomerPackages cp ON p.PackageId = cp.PackageId
       LEFT JOIN PackagePayments pp ON cp.CustomerPackageId = pp.CustomerPackageId AND pp.Status = 'PAID'
-      WHERE (@StartDate IS NULL OR cp.CreatedAt >= @StartDate)
-        AND (@EndDate IS NULL OR cp.CreatedAt <= DATEADD(DAY, 1, @EndDate))
+      WHERE (CAST(@StartDate AS DATE) IS NULL OR cp.CreatedAt >= @StartDate)
+        AND (CAST(@EndDate AS DATE) IS NULL OR cp.CreatedAt <= CAST(@EndDate AS DATE) + 1)
       GROUP BY p.PackageId, p.PackageName
       ORDER BY Revenue DESC
     `);
@@ -1467,6 +1633,7 @@ module.exports = {
   getUsageHistory,
   buyPackage,
   createVnpayPackageUrl,
+  createVnpayRepayUrl,
   handleVnpayReturn,
   create,
   update,

@@ -13,25 +13,49 @@ function normalizeStatus(value, fallback = "ACTIVE") {
   return String(value || fallback).trim().toUpperCase();
 }
 
-async function list() {
+async function ensureUniqueName(pool, name, excludeId = null) {
+  if (!name) return;
+  const result = await pool.request()
+    .input("CategoryName", sql.NVarChar, name)
+    .input("ExcludeId", sql.Int, excludeId)
+    .query(`
+      SELECT TOP 1 CategoryId
+      FROM ServiceCategories
+      WHERE UPPER(TRIM(CategoryName)) = UPPER(TRIM(@CategoryName))
+        AND (CAST(@ExcludeId AS INT) IS NULL OR CategoryId <> CAST(@ExcludeId AS INT))
+    `);
+  if (result.recordset[0]) {
+    throw new Error("Tên category đã tồn tại");
+  }
+}
+
+async function list(filters = {}) {
   const pool = await connectDB();
-  const result = await pool.request().query(`
-    SELECT
-      c.CategoryId,
-      c.CategoryName,
-      c.Description,
-      c.ImageUrl,
-      c.Status,
-      ISNULL(svc.ServiceCount, 0) AS ServiceCount,
-      CASE WHEN ISNULL(svc.ServiceCount, 0) > 0 THEN 1 ELSE 0 END AS HasServices
-    FROM ServiceCategories c
-    OUTER APPLY (
-      SELECT COUNT(*) AS ServiceCount
-      FROM Services s
-      WHERE s.CategoryId = c.CategoryId
-    ) svc
-    ORDER BY c.CategoryId DESC
-  `);
+  const keyword = normalizeText(filters.keyword);
+  const status = filters.status ? normalizeStatus(filters.status) : null;
+
+  const result = await pool.request()
+    .input("Keyword", sql.NVarChar, keyword ? `%${keyword}%` : null)
+    .input("Status", sql.NVarChar, status)
+    .query(`
+      SELECT
+        c.CategoryId,
+        c.CategoryName,
+        c.Description,
+        c.ImageUrl,
+        c.Status,
+        ISNULL(svc.ServiceCount, 0) AS ServiceCount,
+        CASE WHEN ISNULL(svc.ServiceCount, 0) > 0 THEN 1 ELSE 0 END AS HasServices
+      FROM ServiceCategories c
+      OUTER APPLY (
+        SELECT COUNT(*) AS ServiceCount
+        FROM Services s
+        WHERE s.CategoryId = c.CategoryId
+      ) svc
+      WHERE (@Keyword IS NULL OR c.CategoryName LIKE @Keyword OR c.Description LIKE @Keyword)
+        AND (@Status IS NULL OR c.Status = @Status)
+      ORDER BY c.CategoryId DESC
+    `);
 
   return result.recordset.map((row) => ({
     ...row,
@@ -72,6 +96,8 @@ async function create(data) {
   const status = normalizeStatus(data.Status || data.status || "ACTIVE");
 
   if (!categoryName) throw new Error("CategoryName không được để trống");
+  
+  await ensureUniqueName(pool, categoryName);
 
   const result = await pool.request()
     .input("CategoryName", sql.NVarChar, categoryName)
@@ -96,6 +122,8 @@ async function update(id, data) {
   const status = normalizeStatus(data.Status || data.status || current.Status);
 
   if (!categoryName) throw new Error("CategoryName không được để trống");
+  
+  await ensureUniqueName(pool, categoryName, id);
 
   await pool.request()
     .input("CategoryId", sql.Int, id)
@@ -149,3 +177,4 @@ async function toggleActive(id) {
 }
 
 module.exports = { list, getById, create, update, remove, toggleActive };
+

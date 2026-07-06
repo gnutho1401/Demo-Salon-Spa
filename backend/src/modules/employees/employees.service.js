@@ -130,17 +130,19 @@ async function getById(id) {
     .request()
     .input("EmployeeId", sql.Int, Number(id)).query(`
       SELECT TOP 7
-        ShiftId,
-        ShiftDate,
-        CONVERT(VARCHAR(5), StartTime, 108) AS StartTime,
-        CONVERT(VARCHAR(5), EndTime, 108) AS EndTime,
-        ShiftType,
-        IsDayOff,
-        Notes
-      FROM WorkShifts
-      WHERE EmployeeId = @EmployeeId
-        AND ShiftDate >= CAST(GETDATE() AS DATE)
-      ORDER BY ShiftDate ASC
+        ws.ShiftId,
+        ws.ShiftDate,
+        CONVERT(VARCHAR(5), ws.StartTime, 108) AS StartTime,
+        CONVERT(VARCHAR(5), ws.EndTime, 108) AS EndTime,
+        ws.ShiftName AS ShiftType,
+        CAST(0 AS BIT) AS IsDayOff,
+        NULL AS Notes
+      FROM ShiftRegistrations sr
+      JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
+      WHERE sr.TechnicianId = @EmployeeId
+        AND sr.Status = 'APPROVED'
+        AND ws.ShiftDate >= CAST(GETDATE() AS DATE)
+      ORDER BY ws.ShiftDate ASC
     `);
 
   return {
@@ -169,7 +171,9 @@ async function getByService(serviceId) {
         e.YearsOfExperience,
         e.Bio,
         e.Status,
+        e.BranchId,
         b.BranchName,
+        b.Address AS BranchAddress,
         ISNULL(r.ReviewCount, 0) AS ReviewCount,
         ISNULL(r.AverageRating, 0) AS AverageRating
       FROM EmployeeServices es
@@ -192,4 +196,15 @@ async function getByService(serviceId) {
   return result.recordset;
 }
 
-module.exports = { getAll, getById, getByService };
+async function getBranches() {
+  const pool = await connectDB();
+  const result = await pool.request().query(`
+    SELECT BranchId, BranchName, Address, Phone, Status
+    FROM Branches
+    WHERE Status = 'ACTIVE'
+    ORDER BY BranchName ASC
+  `);
+  return result.recordset;
+}
+
+module.exports = { getAll, getById, getByService, getBranches };

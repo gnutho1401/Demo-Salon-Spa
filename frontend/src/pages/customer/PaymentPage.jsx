@@ -53,7 +53,9 @@ function isVoucherUsable(voucher, amount) {
     voucher.MinOrderAmount || voucher.minOrderAmount || 0,
   );
 
-  if (used) return false;
+  const useCount = Number(voucher.UseCount || 0);
+
+  if (used || useCount >= 3) return false;
   if (status && status !== "ACTIVE") return false;
   if (minOrder > 0 && Number(amount || 0) < minOrder) return false;
 
@@ -138,9 +140,19 @@ export default function PaymentPage() {
       // Xóa sau khi đọc để không bị reuse lần tải sau (không phải lần đặt lịch mới nhất)
       sessionStorage.removeItem("bookingCreatedAt");
     } else {
-      createdMs = appointment.CreatedAt
-        ? new Date(appointment.CreatedAt).getTime()
-        : Date.now();
+      const createdAt = appointment.CreatedAt;
+      if (createdAt) {
+        const dateWithZ = new Date(createdAt);
+        // Nếu dateWithZ lớn hơn thời gian hiện tại nhiều hơn thời gian tự hủy (do lệch múi giờ UTC vs Local)
+        if (dateWithZ.getTime() - Date.now() > AUTO_CANCEL_MINUTES * 60 * 1000) {
+          const cleanStr = typeof createdAt === "string" ? createdAt.replace(/Z$/, "") : createdAt;
+          createdMs = new Date(cleanStr).getTime();
+        } else {
+          createdMs = dateWithZ.getTime();
+        }
+      } else {
+        createdMs = Date.now();
+      }
     }
 
 
@@ -161,6 +173,28 @@ export default function PaymentPage() {
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [appointment]);
+
+  // Khôi phục voucher và điểm thưởng đã lưu trên hóa đơn lịch hẹn
+  useEffect(() => {
+    if (!appointment) return;
+    
+    if (appointment.VoucherId) {
+      setVoucherId(appointment.VoucherId);
+      setVoucherCode(appointment.VoucherCode || "");
+      setDiscount(Number(appointment.DiscountAmount || 0));
+      
+      if (myVouchers.length > 0) {
+        const found = myVouchers.find(
+          (v) => String(v.VoucherId || v.voucherId) === String(appointment.VoucherId)
+        );
+        if (found) setSelectedVoucher(found);
+      }
+    }
+    
+    if (appointment.RewardPointsUsed) {
+      setRewardPoints(appointment.RewardPointsUsed);
+    }
+  }, [appointment, myVouchers]);
 
 
   const subtotal = Number(
@@ -249,7 +283,23 @@ export default function PaymentPage() {
       });
   }, [myVouchers, voucherBaseAmount]);
 
-  function applyQuickVoucher(voucher) {
+  async function savePointsToDb(points) {
+    try {
+      setError("");
+      setMessage("");
+      await axiosClient.post(
+        `/payments/appointment/${appointmentId}/apply-voucher`,
+        {
+          voucherId,
+          rewardPoints: Number(points || 0),
+        }
+      );
+    } catch (err) {
+      setError(err.response?.data?.message || "Không thể áp dụng điểm thưởng");
+    }
+  }
+
+  async function applyQuickVoucher(voucher) {
     const discountAmount = calcVoucherDiscount(voucher, voucherBaseAmount);
 
     if (discountAmount <= 0) {
@@ -257,20 +307,50 @@ export default function PaymentPage() {
       return;
     }
 
-    setVoucherId(voucher.VoucherId || voucher.voucherId);
-    setVoucherCode(voucher.Code || voucher.code || "");
-    setDiscount(discountAmount);
-    setSelectedVoucher(voucher);
-    setMessage(`Đã áp dụng voucher ${voucher.Code || voucher.code}.`);
-    setError("");
+    try {
+      setError("");
+      setMessage("");
+      const vid = voucher.VoucherId || voucher.voucherId;
+      
+      await axiosClient.post(
+        `/payments/appointment/${appointmentId}/apply-voucher`,
+        {
+          voucherId: vid,
+          rewardPoints: Number(rewardPoints || 0),
+        }
+      );
+      
+      setVoucherId(vid);
+      setVoucherCode(voucher.Code || voucher.code || "");
+      setDiscount(discountAmount);
+      setSelectedVoucher(voucher);
+      setMessage(`Đã áp dụng voucher ${voucher.Code || voucher.code}.`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Không thể áp dụng voucher");
+    }
   }
 
-  function removeVoucher() {
-    setVoucherId(null);
-    setVoucherCode("");
-    setDiscount(0);
-    setSelectedVoucher(null);
-    setMessage("Đã bỏ voucher khỏi hóa đơn.");
+  async function removeVoucher() {
+    try {
+      setError("");
+      setMessage("");
+      
+      await axiosClient.post(
+        `/payments/appointment/${appointmentId}/apply-voucher`,
+        {
+          voucherId: null,
+          rewardPoints: Number(rewardPoints || 0),
+        }
+      );
+      
+      setVoucherId(null);
+      setVoucherCode("");
+      setDiscount(0);
+      setSelectedVoucher(null);
+      setMessage("Đã bỏ voucher khỏi hóa đơn.");
+    } catch (err) {
+      setError(err.response?.data?.message || "Không thể xóa voucher");
+    }
   }
 
   async function applyVoucher() {
@@ -278,26 +358,35 @@ export default function PaymentPage() {
       setError("");
       setMessage("");
 
-      const res = await axiosClient.post("/vouchers/validate", {
+      // Validate voucher first on backend
+      const resVal = await axiosClient.post("/vouchers/validate", {
         code: voucherCode,
         totalAmount: voucherBaseAmount,
       });
 
-      const data = res.data?.data || res.data;
+      const dataVal = resVal.data?.data || resVal.data;
+      const vid = dataVal.VoucherId || dataVal.voucherId;
+
+      // Apply to appointment invoice
+      await axiosClient.post(
+        `/payments/appointment/${appointmentId}/apply-voucher`,
+        {
+          voucherId: vid,
+          rewardPoints: Number(rewardPoints || 0),
+        }
+      );
 
       const foundVoucher =
         myVouchers.find(
           (v) =>
-            String(v.VoucherId || v.voucherId) ===
-              String(data.VoucherId || data.voucherId) ||
-            String(v.Code || v.code).toUpperCase() ===
-              String(data.Code || voucherCode).toUpperCase(),
-        ) || data;
+            String(v.VoucherId || v.voucherId) === String(vid) ||
+            String(v.Code || v.code).toUpperCase() === String(voucherCode).toUpperCase(),
+        ) || dataVal;
 
-      setVoucherId(data.VoucherId || data.voucherId);
-      setDiscount(Number(data.discountAmount || data.DiscountAmount || 0));
+      setVoucherId(vid);
+      setDiscount(Number(dataVal.discountAmount || dataVal.DiscountAmount || 0));
       setSelectedVoucher(foundVoucher);
-      setMessage(`Đã áp dụng voucher ${data.Code || voucherCode}`);
+      setMessage(`Đã áp dụng voucher ${dataVal.Code || voucherCode}`);
     } catch (err) {
       setDiscount(0);
       setVoucherId(null);
@@ -559,6 +648,9 @@ export default function PaymentPage() {
                               Đơn tối thiểu {money(minOrder)} · Giảm được{" "}
                               {money(voucher.QuickDiscountAmount)}
                             </small>
+                            <small style={{ display: "block", color: "#64748b", marginTop: 4 }}>
+                              Lượt dùng cá nhân: {voucher.UseCount >= 3 ? "Đã dùng hết (3/3)" : `Còn ${3 - (voucher.UseCount || 0)}/3 lần`} · Còn lại: {voucher.Quantity}
+                            </small>
                           </div>
                         </div>
 
@@ -607,13 +699,17 @@ export default function PaymentPage() {
                   max={calc.maxUsablePoints}
                   value={rewardPoints}
                   onChange={(e) => setRewardPoints(e.target.value)}
+                  onBlur={() => savePointsToDb(rewardPoints)}
                   placeholder="Nhập điểm muốn dùng"
                 />
 
                 <button
                   type="button"
                   className="outline"
-                  onClick={() => setRewardPoints(calc.maxUsablePoints)}
+                  onClick={() => {
+                    setRewardPoints(calc.maxUsablePoints);
+                    savePointsToDb(calc.maxUsablePoints);
+                  }}
                 >
                   Dùng tối đa
                 </button>

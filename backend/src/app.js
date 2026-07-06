@@ -5,7 +5,8 @@ const errorMiddleware = require("./middlewares/error.middleware");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/images", express.static(path.join(__dirname, "../public/images")));
 
@@ -14,6 +15,8 @@ app.get("/", (req, res) => res.json({ message: "Beauty Salon Management API" }))
 app.use("/api/auth", require("./modules/auth/auth.routes"));
 app.use("/api/customers", require("./modules/customers/customers.routes"));
 app.use("/api/technician", require("./modules/technician/technician.routes"));
+app.use("/api/attendance", require("./modules/technician/attendance.routes"));
+app.use("/api/timesheet", require("./modules/technician/timesheet.routes"));
 app.use("/api/employees", require("./modules/employees/employees.routes"));
 app.use("/api/services", require("./modules/services/services.routes"));
 app.use("/api/packages", require("./modules/packages/packages.routes"));
@@ -38,9 +41,12 @@ app.use("/api/admin/feedbacks", require("./modules/admin/adminFeedbacks.routes")
 app.use("/api/admin/reports", require("./modules/admin/adminReports.routes"));
 app.use("/api/admin/system-logs", require("./modules/admin/adminSystemLogs.routes"));
 app.use("/api/admin/ai-monitoring", require("./modules/admin/adminAIMonitoring.routes"));
+app.use("/api/admin/customers", require("./modules/admin/adminCustomers.routes"));
 app.use("/api/receptionist", require("./modules/receptionist/receptionist.routes"));
 app.use("/api/vouchers", require("./modules/vouchers/vouchers.routes"));
 app.use("/api/waiting-list", require("./modules/waiting-list/waiting-list.routes"));
+app.use("/api/v2/treatment-notes", require("./modules/treatment-notes-v2/treatment-notes-v2.routes"));
+app.use("/api/reschedule", require("./modules/reschedule/reschedule.routes"));
 
 app.use(errorMiddleware);
 module.exports = app;

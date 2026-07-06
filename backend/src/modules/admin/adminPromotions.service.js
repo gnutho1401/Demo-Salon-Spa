@@ -405,8 +405,7 @@ async function remove(id) {
 
   await pool.request().input("PromotionId", sql.Int, Number(id)).query(`
       UPDATE Promotions
-      SET Status = 'INACTIVE',
-          UpdatedAt = GETDATE()
+      SET Status = 'INACTIVE'
       WHERE PromotionId = @PromotionId
     `);
 

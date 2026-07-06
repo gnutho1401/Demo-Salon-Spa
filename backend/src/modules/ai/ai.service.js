@@ -78,15 +78,16 @@ async function buildSalonContext(pool, userId) {
 
   // 1.6. Lấy ca trực của kỹ thuật viên trong 3 ngày tới
   const shiftsResult = await pool.request().query(`
-    SELECT EmployeeId, 
-           CONVERT(VARCHAR(10), ShiftDate, 120) AS ShiftDate,
-           CONVERT(VARCHAR(5), StartTime, 108) AS StartTime,
-           CONVERT(VARCHAR(5), EndTime, 108) AS EndTime
-    FROM WorkShifts
-    WHERE ShiftDate >= CAST(GETDATE() AS DATE)
-      AND ShiftDate <= DATEADD(day, 2, GETDATE())
-      AND IsDayOff = 0
-    ORDER BY ShiftDate ASC, StartTime ASC
+    SELECT sr.TechnicianId AS EmployeeId, 
+           CONVERT(VARCHAR(10), ws.ShiftDate, 120) AS ShiftDate,
+           CONVERT(VARCHAR(5), ws.StartTime, 108) AS StartTime,
+           CONVERT(VARCHAR(5), ws.EndTime, 108) AS EndTime
+    FROM ShiftRegistrations sr
+    JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
+    WHERE sr.Status = 'APPROVED'
+      AND ws.ShiftDate >= CAST(GETDATE() AS DATE)
+      AND ws.ShiftDate <= DATEADD(day, 2, GETDATE())
+    ORDER BY ws.ShiftDate ASC, ws.StartTime ASC
   `);
 
   // 1.7. Lấy danh sách chi nhánh của salon
@@ -134,7 +135,13 @@ async function buildSalonContext(pool, userId) {
     : 'Chưa có lịch sử sử dụng dịch vụ.';
 
   const chatContext = recentChats.length > 0
-    ? recentChats.map(c => `Khách: ${c.Question}\nAI: ${c.Answer}`).join('\n')
+    ? recentChats.map(c => {
+        const cleanAns = String(c.Answer || '')
+          .replace(/\[\[WIDGET:[^\]]+\]\]/g, '')
+          .replace(/\[\[SUGGESTIONS:[^\]]+\]\]/g, '')
+          .trim();
+        return `Khách: ${c.Question}\nAI: ${cleanAns}`;
+      }).join('\n')
     : '';
 
   // Map shifts to employees
@@ -198,7 +205,11 @@ async function chat(userId, question) {
 - Khi khách hàng muốn xem danh sách lịch hẹn sắp tới hoặc hủy lịch (ví dụ: "lịch hẹn của tôi", "tôi đã đặt lịch nào", "xem lịch hẹn", "hủy lịch"), bạn hãy trả lời lịch sự và bắt buộc chèn dòng này ở cuối câu trả lời (phải trên dòng riêng biệt): [[WIDGET:MY_APPOINTMENTS]]
 - Khi khách hàng muốn xem danh sách voucher ưu đãi của họ (ví dụ: "tôi có voucher nào không", "xem voucher của tôi", "mã giảm giá"), bạn hãy trả lời lịch sự và bắt buộc chèn dòng này ở cuối câu trả lời (phải trên dòng riêng biệt): [[WIDGET:MY_VOUCHERS]]
 - Khi khách hàng muốn đặt lịch trực tiếp, hỏi giờ trống hoặc có ý định đặt hẹn cho một dịch vụ cụ thể (ví dụ: "đặt lịch uốn tóc", "tìm giờ trống làm nail ngày mai", "tôi muốn đặt lịch gội đầu", "có giờ trống nào cho nhuộm tóc không"), bạn hãy trả lời lịch sự và bắt buộc chèn dòng này ở cuối câu trả lời (phải trên dòng riêng biệt): [[WIDGET:SLOTS|ServiceID|StylistID|YYYY-MM-DD]] (ví dụ: nếu đặt Uốn tóc ID: 9 với stylist ID: 9 vào ngày 2026-06-21, hãy chèn: [[WIDGET:SLOTS|9|9|2026-06-21]]). Phải chuyển đổi các cụm từ chỉ ngày (như "ngày mai", "hôm nay", "thứ hai tới") thành định dạng YYYY-MM-DD dựa trên ngày hôm nay là ${todayStr}. Nếu khách chưa chọn stylist, hãy để trống StylistID (ví dụ: [[WIDGET:SLOTS|9||2026-06-21]] hoặc [[WIDGET:SLOTS|9||]]). Nếu khách chưa chọn ngày, hãy để trống ngày (ví dụ: [[WIDGET:SLOTS|9|9|]] hoặc [[WIDGET:SLOTS|9||]]). LUÔN chèn widget này ngay khi khách nhắc tới ý định đặt lịch làm dịch vụ để khách có thể thao tác chọn nhanh chóng và trực tiếp.
+- Khi khách hàng muốn tìm kiếm các dịch vụ làm đẹp hoặc muốn biết tiệm có dịch vụ nào (ví dụ: "tìm dịch vụ mụn", "ở đây có dịch vụ tóc nào không", "tìm dịch vụ dưới 300k", "dưỡng ẩm da", "dịch vụ làm sạch"), bạn hãy trả lời lịch sự và bắt buộc chèn dòng này ở cuối câu trả lời (phải trên dòng riêng biệt): [[WIDGET:SEARCH_SERVICES|Từ khóa tìm kiếm]] (ví dụ: [[WIDGET:SEARCH_SERVICES|mụn]] hoặc [[WIDGET:SEARCH_SERVICES|tóc]]). Nếu khách hỏi toàn bộ dịch vụ, hãy để trống từ khóa: [[WIDGET:SEARCH_SERVICES|]].
+- Khi khách hàng muốn tìm kiếm hoặc hỏi về các chuyên viên, kỹ thuật viên làm đẹp (ví dụ: "ai uốn tóc đẹp", "tìm kỹ thuật viên uốn tóc", "các stylist ở đây là ai", "chuyên viên trị mụn"), bạn hãy trả lời lịch sự và bắt buộc chèn dòng này ở cuối câu trả lời (phải trên dòng riêng biệt): [[WIDGET:SEARCH_STYLISTS|Từ khóa tìm kiếm]] (ví dụ: [[WIDGET:SEARCH_STYLISTS|uốn]] hoặc [[WIDGET:SEARCH_STYLISTS|Nguyễn Văn A]]). Nếu hỏi chung chung, hãy để trống từ khóa: [[WIDGET:SEARCH_STYLISTS|]].
 - Khi khách hàng muốn xem lịch sử sử dụng dịch vụ hoặc các dịch vụ đã từng làm trước đây (ví dụ: "lịch sử dịch vụ", "tôi đã từng làm dịch vụ nào", "xem lịch sử làm đẹp"), bạn hãy trả lời lịch sự và bắt buộc chèn dòng này ở cuối câu trả lời (phải trên dòng riêng biệt): [[WIDGET:SERVICE_HISTORY]]
+
+11. LUÔN LUÔN chèn dòng này ở cuối cùng của mỗi câu trả lời (trên dòng riêng biệt, sau bất kỳ WIDGET nào) chứa từ 2 đến 3 câu gợi ý hỏi tiếp theo có liên quan đến ngữ cảnh chat, viết theo góc nhìn của khách hàng: [[SUGGESTIONS:Câu hỏi gợi ý 1|Câu hỏi gợi ý 2|Câu hỏi gợi ý 3]] (ví dụ: [[SUGGESTIONS:Tôi muốn xem giờ trống làm tóc|Tìm stylist chuyên làm nail|Voucher ưu đãi của tôi là gì?]] hoặc [[SUGGESTIONS:Xem lịch hẹn đã đặt|Giá dịch vụ trị mụn là bao nhiêu?|Hủy lịch hẹn của tôi]]).
 
 ## Danh sách dịch vụ hiện có:
 ${servicesList}
@@ -256,23 +267,32 @@ ${historyText}
 async function getFallbackAnswer(pool, userId, text) {
   const lower = text.toLowerCase();
 
+  // Helper to safely match keyword without substring collisions (e.g. uốn vs muốn)
+  const match = (keywords, exclusions = []) => {
+    return keywords.some(kw => {
+      if (!lower.includes(kw)) return false;
+      if (exclusions.some(exc => lower.includes(exc))) return false;
+      return true;
+    });
+  };
+
   // 1. Voucher/Khuyến mãi
-  if (lower.includes('voucher') || lower.includes('mã giảm') || lower.includes('khuyến mãi') || lower.includes('discount')) {
+  if (match(['voucher', 'mã giảm', 'khuyến mãi', 'discount'])) {
     return '🎁 Dưới đây là danh sách các voucher ưu đãi hiện tại của bạn. Nhấp vào mã để sao chép:\n\n[[WIDGET:MY_VOUCHERS]]';
   }
 
   // 2. Lịch sử dịch vụ
-  if (lower.includes('lịch sử') || lower.includes('dịch vụ đã làm') || lower.includes('đã sử dụng') || lower.includes('từng làm')) {
+  if (match(['lịch sử', 'dịch vụ đã làm', 'đã sử dụng', 'từng làm'])) {
     return '📜 Dưới đây là lịch sử các dịch vụ làm đẹp bạn đã thực hiện tại salon của chúng tôi:\n\n[[WIDGET:SERVICE_HISTORY]]';
   }
 
   // 3. Danh sách lịch hẹn / Hủy / Đổi lịch
-  if (lower.includes('lịch hẹn') || lower.includes('đã đặt') || lower.includes('hủy lịch') || lower.includes('đổi lịch') || lower.includes('lịch của tôi')) {
+  if (match(['lịch hẹn', 'đã đặt', 'hủy lịch', 'đổi lịch', 'lịch của tôi'])) {
     return '📅 Dưới đây là các lịch hẹn sắp tới của bạn. Bạn có thể thay đổi thời gian (đổi lịch trực tiếp) hoặc hủy lịch hẹn ngay tại đây:\n\n[[WIDGET:MY_APPOINTMENTS]]';
   }
 
   // 4. Đặt lịch / Giờ trống
-  if (lower.includes('đặt') || lower.includes('giờ trống') || lower.includes('lịch') || lower.includes('slot') || lower.includes('booking') || lower.includes('làm')) {
+  if (match(['đặt', 'giờ trống', 'lịch', 'slot', 'booking', 'làm'], ['hủy lịch', 'đổi lịch', 'lịch sử', 'lịch hẹn'])) {
     try {
       // Tìm dịch vụ phù hợp trong DB
       const servicesResult = await pool.request().query("SELECT ServiceId, ServiceName FROM Services WHERE Status = 'AVAILABLE'");
@@ -282,7 +302,7 @@ async function getFallbackAnswer(pool, userId, text) {
       let matchedService = null;
       for (const s of services) {
         const nameLower = s.ServiceName.toLowerCase();
-        if (lower.includes(nameLower) || nameLower.includes(lower.replace(/(đặt lịch|đặt|giờ trống|lịch|slot|booking)/g, '').trim())) {
+        if (lower.includes(nameLower)) {
           matchedService = s;
           break;
         }
@@ -290,13 +310,13 @@ async function getFallbackAnswer(pool, userId, text) {
       
       // Nếu không khớp trực tiếp, thử tìm từ khóa thông thường
       if (!matchedService) {
-        if (lower.includes('tóc') || lower.includes('cắt') || lower.includes('uốn') || lower.includes('nhuộm') || lower.includes('gội')) {
+        if (match(['tóc', 'cắt', 'uốn', 'nhuộm', 'gội'], ['muốn', 'cuốn'])) {
           matchedService = services.find(s => s.ServiceName.toLowerCase().includes('tóc') || s.ServiceName.toLowerCase().includes('cắt') || s.ServiceName.toLowerCase().includes('uốn') || s.ServiceName.toLowerCase().includes('gội'));
-        } else if (lower.includes('nail') || lower.includes('móng') || lower.includes('sơn')) {
+        } else if (match(['nail', 'móng', 'sơn'])) {
           matchedService = services.find(s => s.ServiceName.toLowerCase().includes('nail') || s.ServiceName.toLowerCase().includes('móng') || s.ServiceName.toLowerCase().includes('sơn'));
-        } else if (lower.includes('massage') || lower.includes('spa') || lower.includes('body')) {
+        } else if (match(['massage', 'spa', 'body'])) {
           matchedService = services.find(s => s.ServiceName.toLowerCase().includes('massage') || s.ServiceName.toLowerCase().includes('spa') || s.ServiceName.toLowerCase().includes('body'));
-        } else if (lower.includes('da') || lower.includes('mặt') || lower.includes('skincare') || lower.includes('mụn')) {
+        } else if (match(['da', 'mặt', 'skincare', 'mụn'])) {
           matchedService = services.find(s => s.ServiceName.toLowerCase().includes('da') || s.ServiceName.toLowerCase().includes('mặt') || s.ServiceName.toLowerCase().includes('skincare') || s.ServiceName.toLowerCase().includes('mụn'));
         }
       }
@@ -309,14 +329,68 @@ async function getFallbackAnswer(pool, userId, text) {
     }
   }
 
+  // 5. Tìm kiếm dịch vụ dựa trên triệu chứng hoặc nhu cầu đặc biệt (đau lưng, mụn, tóc xơ, v.v.)
+  try {
+    const servicesResult = await pool.request().query("SELECT ServiceId, ServiceName, Description, Price, DurationMinutes FROM Services WHERE Status = 'AVAILABLE'");
+    const services = servicesResult.recordset;
+
+    let matchedServices = [];
+    let symptomTitle = "";
+    if (match(['đau lưng', 'vai gáy', 'mỏi cổ', 'nhức mỏi', 'mệt mỏi', 'massage', 'đá nóng', 'stress', 'mỏi lưng'])) {
+      symptomTitle = "giảm đau nhức mỏi cơ và thư giãn";
+      matchedServices = services.filter(s => 
+        s.ServiceName.toLowerCase().includes('massage') || 
+        s.ServiceName.toLowerCase().includes('body') ||
+        s.Description?.toLowerCase().includes('massage') ||
+        s.Description?.toLowerCase().includes('thư giãn') ||
+        s.Description?.toLowerCase().includes('vai gáy')
+      );
+    } else if (match(['mụn', 'skincare', 'thâm', 'nám', 'sạch da', 'da mặt', 'hút chì', 'da dầu', 'da khô', 'rửa mặt'])) {
+      symptomTitle = "chăm sóc và trị liệu da mặt chuyên sâu";
+      matchedServices = services.filter(s => 
+        s.ServiceName.toLowerCase().includes('da') || 
+        s.ServiceName.toLowerCase().includes('mặt') ||
+        s.ServiceName.toLowerCase().includes('mụn') ||
+        s.ServiceName.toLowerCase().includes('tẩy') ||
+        s.Description?.toLowerCase().includes('da') ||
+        s.Description?.toLowerCase().includes('mụn') ||
+        s.Description?.toLowerCase().includes('skincare')
+      );
+    } else if (match(['gội', 'da đầu', 'gàu', 'dưỡng sinh', 'thảo dược', 'rụng tóc', 'ngứa đầu'])) {
+      symptomTitle = "chăm sóc da đầu và gội dưỡng sinh thảo dược";
+      matchedServices = services.filter(s => 
+        s.ServiceName.toLowerCase().includes('gội') || 
+        s.ServiceName.toLowerCase().includes('đầu') ||
+        s.Description?.toLowerCase().includes('gội') ||
+        s.Description?.toLowerCase().includes('da đầu')
+      );
+    } else if (match(['uốn', 'nhuộm', 'cắt tóc', 'tạo kiểu', 'duỗi', 'phục hồi tóc', 'chẻ ngọn', 'tóc xơ'], ['muốn', 'cuốn'])) {
+      symptomTitle = "cắt tạo kiểu và phục hồi tóc chuyên sâu";
+      matchedServices = services.filter(s => 
+        s.ServiceName.toLowerCase().includes('uốn') || 
+        s.ServiceName.toLowerCase().includes('nhuộm') ||
+        s.ServiceName.toLowerCase().includes('tóc') ||
+        s.ServiceName.toLowerCase().includes('cắt') ||
+        s.Description?.toLowerCase().includes('tóc')
+      );
+    }
+
+    if (matchedServices.length > 0) {
+      const listText = matchedServices.map(s => `- **${s.ServiceName}** (${Number(s.Price).toLocaleString('vi-VN')}đ • ${s.DurationMinutes} phút)`).join('\n');
+      return `💆 Rất chia sẻ với tình trạng hiện tại của bạn. Salon gợi ý các liệu trình **${symptomTitle}** phù hợp nhất dành cho bạn dưới đây:\n\n${listText}\n\nBạn có thể nhấp vào bảng giờ trống hoặc đặt lịch nhanh cho các dịch vụ này ngay dưới đây:\n\n[[WIDGET:SEARCH_SERVICES|${matchedServices[0].ServiceName.split(' ')[0]}]]\n\n[[SUGGESTIONS:Xem giờ trống dịch vụ này|Voucher ưu đãi của tôi|Hỏi đáp dịch vụ khác]]`;
+    }
+  } catch (err) {
+    console.error('Symptoms fallback lookup failed:', err.message);
+  }
+
   // Fallback thông thường khác
-  if (lower.includes('nail') || lower.includes('móng')) return '💅 Với dịch vụ nail, bạn có thể chọn các gói làm móng cao cấp, sơn gel hoặc đính đá nghệ thuật. Bạn nên đặt lịch hẹn trực tiếp bằng cách nhắn tin "đặt lịch làm nail" tại đây.';
-  if (lower.includes('hair') || lower.includes('tóc')) return '💇 Về tóc, salon có cắt tạo kiểu nam/nữ, nhuộm màu thời trang, uốn xoăn và hấp phục hồi collagen. Hãy gõ "đặt lịch làm tóc" để chọn giờ hẹn trống nhé.';
-  if (lower.includes('massage') || lower.includes('spa')) return '💆 Massage body đá nóng và chăm sóc sức khỏe của chúng tôi sẽ giúp bạn thư giãn tốt nhất. Hãy nhắn "đặt lịch massage" để đặt chỗ.';
-  if (lower.includes('da') || lower.includes('skincare')) return '✨ Chúng tôi có các liệu trình chăm sóc da mặt chuyên sâu, hút chì thải độc và trị liệu mụn chuyên nghiệp. Hãy gõ "đặt lịch skincare" để tiến hành đặt chỗ.';
-  if (lower.includes('giá') || lower.includes('bao nhiêu')) return '💰 Bảng giá của từng dịch vụ được niêm yết công khai tại mục Dịch vụ. Bạn cũng có thể xem giá trực tiếp khi chọn dịch vụ đặt lịch trong khung chat này.';
+  if (match(['nail', 'móng'])) return '💅 Với dịch vụ nail, bạn có thể chọn các gói làm móng cao cấp, sơn gel hoặc đính đá nghệ thuật. Bạn nên đặt lịch hẹn trực tiếp bằng cách nhắn tin "đặt lịch làm nail" tại đây.\n\n[[WIDGET:SEARCH_SERVICES|nail]]\n\n[[SUGGESTIONS:Đặt lịch sơn gel móng|Xem voucher của tôi|Tư vấn chăm sóc da]]';
+  if (match(['hair', 'tóc'])) return '💇 Về tóc, salon có cắt tạo kiểu nam/nữ, nhuộm màu thời trang, uốn xoăn và hấp phục hồi collagen. Hãy chọn dịch vụ uốn/cắt/nhuộm tóc trực tiếp bên dưới:\n\n[[WIDGET:SEARCH_SERVICES|tóc]]\n\n[[SUGGESTIONS:Xem giờ trống làm tóc|Tìm stylist uốn tóc đẹp|Khuyến mãi combo tóc]]';
+  if (match(['massage', 'spa'])) return '💆 Massage body đá nóng và chăm sóc sức khỏe của chúng tôi sẽ giúp bạn thư giãn tốt nhất. Chọn dịch vụ massage bên dưới để xem giờ trống:\n\n[[WIDGET:SEARCH_SERVICES|massage]]\n\n[[SUGGESTIONS:Đặt lịch Massage Body|Xem các chuyên viên massage|Voucher áp dụng]]';
+  if (match(['da', 'skincare'], ['đá'])) return '✨ Chúng tôi có các liệu trình chăm sóc da mặt chuyên sâu, hút chì thải độc và trị liệu mụn chuyên nghiệp. Hãy chọn dịch vụ chăm sóc da bên dưới:\n\n[[WIDGET:SEARCH_SERVICES|da]]\n\n[[SUGGESTIONS:Đặt lịch nặn mụn|Xem chuyên viên chăm sóc da|Giá dịch vụ hút chì]]';
+  if (match(['giá', 'bao nhiêu'])) return '💰 Bảng giá của từng dịch vụ được niêm yết công khai tại mục Dịch vụ. Bạn cũng có thể xem giá trực tiếp khi chọn dịch vụ đặt lịch trong khung chat này:\n\n[[WIDGET:SEARCH_SERVICES|]]\n\n[[SUGGESTIONS:Xem voucher giảm giá|Đặt lịch cắt tóc nam|Liên hệ chi nhánh]]';
   
-  return '😊 Xin chào! Hiện tại tôi có thể hỗ trợ bạn trực tiếp các việc sau:\n- Đặt lịch hẹn mới (ví dụ: gõ "tôi muốn đặt lịch uốn tóc")\n- Xem lịch hẹn sắp tới & đổi lịch/hủy lịch (gõ "xem lịch hẹn của tôi")\n- Xem các voucher ưu đãi (gõ "voucher của tôi")\n- Xem lịch sử làm đẹp (gõ "lịch sử dịch vụ")';
+  return '😊 Xin chào! Hiện tại tôi có thể hỗ trợ bạn trực tiếp các việc sau:\n- Tư vấn & đặt lịch dịch vụ (ví dụ: gõ "tôi bị đau lưng", "tôi muốn làm nail")\n- Xem lịch hẹn sắp tới & đổi lịch/hủy lịch (gõ "lịch hẹn của tôi")\n- Xem các voucher ưu đãi (gõ "voucher của tôi")\n- Xem lịch sử làm đẹp (gõ "lịch sử dịch vụ")\n\n[[SUGGESTIONS:Tôi bị đau lưng mỏi cổ|Tôi muốn tư vấn trị mụn|Xem voucher giảm giá của tôi]]';
 }
 
 async function getChatHistory(userId) {
@@ -358,4 +432,444 @@ async function remove(id) {
   return { RecommendationId: Number(id) };
 }
 
-module.exports = { getAll, getMine, chat, getChatHistory, getById, create, update, remove };
+function ruleBasedChurnPrediction(customerData) {
+  const CURRENT_DATE = new Date('2026-06-27');
+  const results = [];
+
+  for (const c of customerData) {
+    let risk_score = 15; // base score
+    const reason = [];
+    const recommended_action = [];
+
+    // Check no-shows
+    if (c.no_show_count > 0) {
+      risk_score += c.no_show_count * 20;
+      reason.push(`Số lần đặt lịch nhưng không đến (no-show) cao: ${c.no_show_count} lần`);
+    }
+
+    // Check cancellations
+    if (c.cancellation_count > 0) {
+      risk_score += Math.min(c.cancellation_count * 4, 30);
+      reason.push(`Tần suất hủy lịch hẹn nhiều: ${c.cancellation_count} lần`);
+    }
+
+    // Check feedback rating
+    if (c.feedback_rating !== null && c.feedback_rating < 3.5) {
+      risk_score += (3.5 - c.feedback_rating) * 20 + 10;
+      reason.push(`Đánh giá mức độ hài lòng thấp: ${c.feedback_rating}/5 sao`);
+    }
+
+    // Check recency
+    if (c.last_visit_date) {
+      const lastVisit = new Date(c.last_visit_date);
+      const daysSinceLast = Math.round((CURRENT_DATE - lastVisit) / (1000 * 60 * 60 * 24));
+
+      if (c.avg_days_between_visits) {
+        if (daysSinceLast > c.avg_days_between_visits * 2) {
+          risk_score += 35;
+          reason.push(`Đã ${daysSinceLast} ngày chưa quay lại, vượt xa tần suất trung bình (${c.avg_days_between_visits} ngày)`);
+        } else if (daysSinceLast > c.avg_days_between_visits * 1.3) {
+          risk_score += 20;
+          reason.push(`Đã ${daysSinceLast} ngày chưa quay lại, lâu hơn tần suất trung bình (${c.avg_days_between_visits} ngày)`);
+        }
+      } else {
+        if (daysSinceLast > 60) {
+          risk_score += 25;
+          reason.push(`Đã ${daysSinceLast} ngày kể từ lần ghé thăm duy nhất`);
+        } else if (daysSinceLast > 30) {
+          risk_score += 15;
+          reason.push(`Đã ${daysSinceLast} ngày kể từ lần ghé thăm duy nhất`);
+        }
+      }
+    } else {
+      risk_score += 15;
+      reason.push("Đăng ký tài khoản nhưng chưa thực hiện dịch vụ nào");
+    }
+
+    risk_score = Math.min(Math.max(Math.round(risk_score), 0), 100);
+
+    let risk_level = 'LOW_RISK';
+    if (risk_score >= 70) {
+      risk_level = 'HIGH_RISK';
+    } else if (risk_score >= 40) {
+      risk_level = 'MEDIUM_RISK';
+    }
+
+    if (risk_level === 'HIGH_RISK') {
+      recommended_action.push("Gọi điện thoại trực tiếp để tìm hiểu lý do và chăm sóc khách hàng");
+      recommended_action.push("Gửi mã voucher giảm giá 20% cho toàn bộ dịch vụ");
+      recommended_action.push("Tặng kèm một suất gội đầu thảo dược hoặc massage cổ vai gáy miễn phí cho lần hẹn tới");
+    } else if (risk_level === 'MEDIUM_RISK') {
+      recommended_action.push("Gửi tin nhắn Zalo/SMS nhắc hẹn và hỏi thăm trải nghiệm");
+      recommended_action.push("Tặng voucher giảm giá 15% cho dịch vụ yêu thích");
+      if (c.favorite_services && c.favorite_services.length > 0) {
+        recommended_action.push(`Đề xuất combo dịch vụ có chứa ${c.favorite_services[0]}`);
+      }
+    } else {
+      recommended_action.push("Tích lũy điểm thưởng và gửi lời chúc mừng/ưu đãi sinh nhật");
+      recommended_action.push("Đề xuất nâng cấp lên gói thẻ thành viên VIP để nhận ưu đãi dài hạn");
+      if (c.favorite_services && c.favorite_services.length > 0) {
+        recommended_action.push(`Giới thiệu dịch vụ nâng cấp/dịch vụ mới liên quan đến ${c.favorite_services[0]}`);
+      }
+    }
+
+    results.push({
+      customer_id: c.customer_id,
+      name: c.name,
+      risk_level,
+      risk_score,
+      reason: reason.length > 0 ? reason : ["Khách hàng có lịch sử hoạt động bình thường, ổn định."],
+      recommended_action
+    });
+  }
+
+  const high = results.filter(r => r.risk_level === 'HIGH_RISK').length;
+  const med = results.filter(r => r.risk_level === 'MEDIUM_RISK').length;
+  const low = results.filter(r => r.risk_level === 'LOW_RISK').length;
+
+  return {
+    summary: `Hệ thống tự động ghi nhận tổng cộng ${results.length} khách hàng đang hoạt động. Trong đó, có ${high} khách hàng xếp hạng rủi ro cao (HIGH_RISK), ${med} khách hàng rủi ro trung bình (MEDIUM_RISK), và ${low} khách hàng ổn định (LOW_RISK).`,
+    customers: results.sort((a, b) => b.risk_score - a.risk_score)
+  };
+}
+
+async function predictCustomersChurn(executorUserId) {
+  const pool = await connectDB();
+  
+  // 1. Get all customers
+  const customersResult = await pool.request().query(`
+    SELECT c.CustomerId, u.FullName, u.Phone, c.CreatedAt
+    FROM Customers c
+    JOIN Users u ON c.UserId = u.UserId
+  `);
+  const customers = customersResult.recordset;
+
+  // Get all appointments
+  const appResult = await pool.request().query(`
+    SELECT a.AppointmentId, a.CustomerId, a.AppointmentDate, a.Status,
+           i.InvoiceId, p.Amount, p.Status AS PaymentStatus
+    FROM Appointments a
+    LEFT JOIN Invoices i ON i.AppointmentId = a.AppointmentId
+    LEFT JOIN Payments p ON p.InvoiceId = i.InvoiceId
+    ORDER BY a.CustomerId, a.AppointmentDate ASC
+  `);
+  const appointments = appResult.recordset;
+
+  // Get all appointment services to identify services used
+  const appServicesResult = await pool.request().query(`
+    SELECT aps.AppointmentId, s.ServiceName
+    FROM AppointmentServices aps
+    JOIN Services s ON aps.ServiceId = s.ServiceId
+  `);
+  const appServices = appServicesResult.recordset;
+  const servicesByApp = {};
+  appServices.forEach(s => {
+    if (!servicesByApp[s.AppointmentId]) servicesByApp[s.AppointmentId] = [];
+    servicesByApp[s.AppointmentId].push(s.ServiceName);
+  });
+
+  // Query customer packages count
+  const pkgsResult = await pool.request().query(`
+    SELECT CustomerId, COUNT(*) AS PackageCount
+    FROM CustomerPackages
+    GROUP BY CustomerId
+  `);
+  const packageCountMap = new Map(pkgsResult.recordset.map(row => [row.CustomerId, row.PackageCount]));
+
+  // Get all reviews
+  const reviewsResult = await pool.request().query(`
+    SELECT CustomerId, Rating
+    FROM Reviews
+  `);
+  const reviews = reviewsResult.recordset;
+
+  // Map data
+  const customerData = customers.map(cust => {
+    const custApps = appointments.filter(a => a.CustomerId === cust.CustomerId);
+    const custReviews = reviews.filter(r => r.CustomerId === cust.CustomerId);
+    
+    const completedApps = custApps.filter(a => a.Status === 'COMPLETED');
+    const total_visits = completedApps.length;
+    const package_count = packageCountMap.get(cust.CustomerId) || 0;
+    
+    const lastVisit = completedApps.length > 0 ? completedApps[completedApps.length - 1] : null;
+    const last_visit_date = lastVisit ? new Date(lastVisit.AppointmentDate).toISOString().split('T')[0] : null;
+
+    // Compute avg_days_between_visits
+    let avg_days_between_visits = null;
+    if (completedApps.length > 1) {
+      let diffSum = 0;
+      for (let i = 1; i < completedApps.length; i++) {
+        const d1 = new Date(completedApps[i - 1].AppointmentDate);
+        const d2 = new Date(completedApps[i].AppointmentDate);
+        const diffDays = (d2 - d1) / (1000 * 60 * 60 * 24);
+        diffSum += diffDays;
+      }
+      avg_days_between_visits = Math.round(diffSum / (completedApps.length - 1));
+    }
+
+    // Compute total spent (sum of paid invoices)
+    const total_spent = custApps
+      .filter(a => a.PaymentStatus === 'PAID')
+      .reduce((sum, a) => sum + (a.Amount || 0), 0);
+
+    // Favorite services
+    const serviceCounts = {};
+    custApps.forEach(a => {
+      const svcs = servicesByApp[a.AppointmentId] || [];
+      svcs.forEach(s => {
+        serviceCounts[s] = (serviceCounts[s] || 0) + 1;
+      });
+    });
+    const favorite_services = Object.entries(serviceCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(entry => entry[0]);
+
+    // Cancellation and no show counts
+    const cancellation_count = custApps.filter(a => a.Status.includes('CANCEL') || a.Status === 'CANCELLED').length;
+    const no_show_count = custApps.filter(a => a.Status === 'NO_SHOW').length;
+
+    // Feedback rating
+    const avgRating = custReviews.length > 0
+      ? parseFloat((custReviews.reduce((sum, r) => sum + r.Rating, 0) / custReviews.length).toFixed(1))
+      : null;
+
+    // Booking history simplified (last 5 bookings)
+    const booking_history = custApps.slice(-5).map(a => ({
+      date: new Date(a.AppointmentDate).toISOString().split('T')[0],
+      status: a.Status,
+      services: servicesByApp[a.AppointmentId] || []
+    }));
+
+    return {
+      customer_id: cust.CustomerId.toString(),
+      name: cust.FullName,
+      phone: cust.Phone || null,
+      total_visits,
+      last_visit_date,
+      avg_days_between_visits,
+      total_spent,
+      favorite_services,
+      booking_history,
+      cancellation_count,
+      no_show_count,
+      feedback_rating: avgRating,
+      package_count
+    };
+  }).filter(c => c.total_visits > 0 || c.cancellation_count > 0 || c.no_show_count > 0);
+
+  let resultPayload;
+  let isFallback = false;
+
+  const systemPrompt = `Bạn là một AI phân tích hành vi khách hàng cho hệ thống quản lý salon làm đẹp.
+Nhiệm vụ của bạn là dự đoán khách hàng nào có nguy cơ không quay lại (churn) và đề xuất hành động giữ chân khách hàng.
+
+## TIÊU CHÍ PHÂN TÍCH
+Bạn cần dựa vào các tín hiệu sau:
+- Nếu last_visit_date quá xa so với avg_days_between_visits → tăng rủi ro
+- Nếu cancellation_count cao → tăng rủi ro
+- Nếu no_show_count cao → tăng rủi ro
+- Nếu tổng chi tiêu giảm dần → tăng rủi ro
+- Nếu feedback_rating thấp (< 3.5) → tăng rủi ro
+- Nếu tần suất đặt lịch giảm → tăng rủi ro
+
+## OUTPUT BẮT BUỘC
+Trả về JSON theo format:
+{
+  "summary": "Tổng quan về tình trạng khách hàng",
+  "customers": [
+    {
+      "customer_id": "...",
+      "name": "...",
+      "risk_level": "LOW_RISK | MEDIUM_RISK | HIGH_RISK",
+      "risk_score": 0-100,
+      "reason": [
+        "Lý do 1",
+        "Lý do 2"
+      ],
+      "recommended_action": [
+        "Gợi ý hành động giữ khách 1",
+        "Gợi ý hành động giữ khách 2"
+      ]
+    }
+  ]
+}
+
+## GỢI Ý HÀNH ĐỘNG
+Đề xuất các hành động cụ thể như: gửi voucher giảm giá 10–20%, gửi SMS/Zalo nhắc quay lại, combo dịch vụ phù hợp, ưu đãi khách VIP, gọi điện chăm sóc nếu HIGH_RISK, hoặc tặng dịch vụ miễn phí nhỏ (gội đầu / massage).
+
+## QUY TẮC QUAN TRỌNG
+- Không được trả lời ngoài JSON. Không có thẻ markdown \`\`\`json ngoài kết quả.
+- Không được giải thích dài dòng.
+- Mỗi khách phải có risk_score rõ ràng.
+- reasoning phải ngắn gọn, đúng dữ liệu.`;
+
+  try {
+    const aiResponse = await generateContent(systemPrompt, JSON.stringify(customerData));
+    let cleanAnswer = aiResponse.trim();
+    if (cleanAnswer.startsWith('```')) {
+      cleanAnswer = cleanAnswer.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    }
+    resultPayload = JSON.parse(cleanAnswer);
+  } catch (err) {
+    console.warn('[AI] predictCustomersChurn failed, falling back to rule-based logic:', err.message);
+    resultPayload = ruleBasedChurnPrediction(customerData);
+    isFallback = true;
+  }
+
+  try {
+    // 1. Ghi nhận vào AIPredictions
+    await pool.request()
+      .input('PredictionType', sql.NVarChar, 'CUSTOMER_CHURN')
+      .input('Result', sql.NVarChar, resultPayload.summary)
+      .query('INSERT INTO AIPredictions (PredictionType, Result) VALUES (@PredictionType, @Result)');
+
+    // 2. Ghi nhận vào AIAuditLogs
+    await pool.request()
+      .input('UserId', sql.Int, executorUserId || null)
+      .input('FeatureName', sql.NVarChar, 'Customer Churn Prediction')
+      .input('Prompt', sql.NVarChar, 'Phân tích rủi ro churn dựa trên dữ liệu khách hàng')
+      .input('AIResponse', sql.NVarChar, JSON.stringify(resultPayload))
+      .input('ModelName', sql.NVarChar, isFallback ? 'rule-based-fallback' : 'gemini-2.5-flash')
+      .input('InputToken', sql.Int, 1200)
+      .input('OutputToken', sql.Int, 800)
+      .input('Cost', sql.Decimal(18, 4), isFallback ? 0 : 0.0150)
+      .query(`
+        INSERT INTO AIAuditLogs (UserId, FeatureName, Prompt, AIResponse, ModelName, InputToken, OutputToken, Cost)
+        VALUES (@UserId, @FeatureName, @Prompt, @AIResponse, @ModelName, @InputToken, @OutputToken, @Cost)
+      `);
+  } catch (dbLogErr) {
+    console.error('[AI] DB logging prediction/audit failed:', dbLogErr.message);
+  }
+
+  // Enrich result payload with dynamic segment tags and raw metrics for dashboard
+  const enrichedCustomers = resultPayload.customers.map(c => {
+    const orig = customerData.find(o => o.customer_id === c.customer_id);
+    const segments = [];
+    if (orig) {
+      if (orig.total_spent >= 5000000 || orig.total_visits >= 10) {
+        segments.push("Khách VIP");
+      }
+      if (c.risk_level === 'HIGH_RISK' || c.risk_score >= 60) {
+        segments.push("Nguy cơ rời bỏ");
+      }
+      if (orig.last_visit_date) {
+        const lastVisit = new Date(orig.last_visit_date);
+        const daysSinceLast = Math.round((new Date('2026-06-27') - lastVisit) / (1000 * 60 * 60 * 24));
+        if (daysSinceLast > 45) {
+          segments.push("Lâu chưa quay lại");
+        }
+      }
+      if (orig.cancellation_count >= 2 || orig.no_show_count >= 1) {
+        segments.push("Hay hủy lịch");
+      }
+      if (orig.total_spent >= 1000000 && orig.package_count === 0) {
+        segments.push("Tiềm năng mua gói");
+      }
+    }
+    if (segments.length === 0) {
+      segments.push("Khách hàng phổ thông");
+    }
+    return {
+      ...c,
+      segments,
+      total_visits: orig ? orig.total_visits : 0,
+      total_spent: orig ? orig.total_spent : 0,
+      last_visit_date: orig ? orig.last_visit_date : null,
+      cancellation_count: orig ? orig.cancellation_count : 0,
+      no_show_count: orig ? orig.no_show_count : 0,
+      feedback_rating: orig ? orig.feedback_rating : null
+    };
+  });
+
+  resultPayload.customers = enrichedCustomers.sort((a, b) => b.risk_score - a.risk_score);
+
+  return resultPayload;
+}
+
+async function sendVoucherToCustomer(customerId, voucherId) {
+  const pool = await connectDB();
+  
+  const custRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query("SELECT c.CustomerId, u.FullName, u.UserId FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+  const customer = custRes.recordset[0];
+  if (!customer) throw new Error("Khách hàng không tồn tại");
+
+  const vouchRes = await pool.request()
+    .input("VoucherId", sql.Int, voucherId)
+    .query("SELECT VoucherId, Code, DiscountValue, DiscountType FROM Vouchers WHERE VoucherId = @VoucherId AND Status = 'ACTIVE'");
+  const voucher = vouchRes.recordset[0];
+  if (!voucher) throw new Error("Voucher không tồn tại hoặc đã hết hạn/bị vô hiệu hóa");
+
+  const existRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("VoucherId", sql.Int, voucherId)
+    .query("SELECT UsedStatus FROM CustomerVouchers WHERE CustomerId = @CustomerId AND VoucherId = @VoucherId");
+  
+  if (existRes.recordset.length > 0) {
+    const usage = existRes.recordset[0];
+    if (usage.UsedStatus === 0) {
+      throw new Error(`Khách hàng ${customer.FullName} đã sở hữu Voucher này và chưa sử dụng.`);
+    }
+  }
+
+  await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("VoucherId", sql.Int, voucherId)
+    .query(`
+      MERGE INTO CustomerVouchers AS target
+      USING (SELECT @CustomerId AS CustomerId, @VoucherId AS VoucherId) AS source
+      ON (target.CustomerId = source.CustomerId AND target.VoucherId = source.VoucherId)
+      WHEN MATCHED THEN
+        UPDATE SET UsedStatus = 0
+      WHEN NOT MATCHED THEN
+        INSERT (CustomerId, VoucherId, UsedStatus) VALUES (@CustomerId, @VoucherId, 0);
+    `);
+
+  const title = "🎁 Bạn nhận được quà tặng Voucher từ Salon!";
+  const content = `Beauty Salon thân tặng quý khách voucher ưu đãi: ${voucher.Code} (Giảm ${voucher.DiscountType === 'PERCENTAGE' ? `${Number(voucher.DiscountValue)}%` : `${Number(voucher.DiscountValue).toLocaleString('vi-VN')}đ`}). Trân trọng kính mời quý khách đặt lịch hẹn trải nghiệm dịch vụ.`;
+  
+  await pool.request()
+    .input("UserId", sql.Int, customer.UserId)
+    .input("Title", sql.NVarChar, title)
+    .input("Content", sql.NVarChar, content)
+    .input("Type", sql.NVarChar, "PROMOTION")
+    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+
+  return { message: `Đã gửi tặng Voucher ${voucher.Code} thành công cho khách hàng ${customer.FullName}.` };
+}
+
+async function sendReminderToCustomer(customerId, message) {
+  const pool = await connectDB();
+
+  const custRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query("SELECT c.CustomerId, u.FullName, u.UserId FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+  const customer = custRes.recordset[0];
+  if (!customer) throw new Error("Khách hàng không tồn tại");
+
+  await pool.request()
+    .input("UserId", sql.Int, customer.UserId)
+    .input("Title", sql.NVarChar, "Chăm sóc khách hàng (Beauty Salon)")
+    .input("Content", sql.NVarChar, message)
+    .input("Type", sql.NVarChar, "PROMOTION")
+    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+
+  return { message: `Đã gửi nhắc nhở chăm sóc thành công tới khách hàng ${customer.FullName}.` };
+}
+
+module.exports = { 
+  getAll, 
+  getMine, 
+  chat, 
+  getChatHistory, 
+  getById, 
+  create, 
+  update, 
+  remove, 
+  predictCustomersChurn,
+  sendVoucherToCustomer,
+  sendReminderToCustomer
+};

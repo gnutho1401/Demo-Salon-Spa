@@ -9,9 +9,9 @@ const VALID_SLOT = ["ANY", "MORNING", "AFTERNOON", "EVENING", "CUSTOM"];
 function formatTimeOnly(val) {
   if (!val) return null;
   if (val instanceof Date) {
-    const hh = String(val.getHours()).padStart(2, '0');
-    const mm = String(val.getMinutes()).padStart(2, '0');
-    const ss = String(val.getSeconds()).padStart(2, '0');
+    const hh = String(val.getUTCHours()).padStart(2, '0');
+    const mm = String(val.getUTCMinutes()).padStart(2, '0');
+    const ss = String(val.getUTCSeconds()).padStart(2, '0');
     return `${hh}:${mm}:${ss}`;
   }
   if (typeof val === "object") {
@@ -369,7 +369,7 @@ function parsePayload(data = {}, existed = {}) {
     data.contactMethod ||
       data.ContactMethod ||
       existed.ContactMethod ||
-      "PHONE",
+      "EMAIL",
   ).toUpperCase();
 
   const contactPhone = nullableText(
@@ -637,18 +637,46 @@ async function create(userId, data = {}) {
   const duplicate = await pool
     .request()
     .input("CustomerId", sql.Int, customer.CustomerId)
-    .input("ServiceId", sql.Int, payload.serviceId).query(`
+    .input("ServiceId", sql.Int, payload.serviceId)
+    .input("PreferredDate", sql.VarChar, payload.preferredDate || null).query(`
       SELECT TOP 1 WaitingId
       FROM WaitingList
       WHERE CustomerId = @CustomerId
         AND ServiceId = @ServiceId
-        AND Status IN ('WAITING', 'NOTIFIED')
+        AND (
+          (@PreferredDate IS NULL AND PreferredDate IS NULL)
+          OR (CONVERT(VARCHAR(10), PreferredDate, 120) = @PreferredDate)
+        )
+        AND Status IN ('WAITING', 'MATCHED', 'NOTIFIED')
     `);
 
   if (duplicate.recordset[0]) {
     throw new Error(
-      "Bạn đã có yêu cầu hàng chờ đang hoạt động cho dịch vụ này.",
+      "Bạn đã có yêu cầu hàng chờ đang hoạt động cho dịch vụ này trong ngày đã chọn.",
     );
+  }
+
+  if (payload.preferredDate) {
+    const activeAppt = await pool
+      .request()
+      .input("CustomerId", sql.Int, customer.CustomerId)
+      .input("ServiceId", sql.Int, payload.serviceId)
+      .input("PreferredDate", sql.VarChar, payload.preferredDate)
+      .query(`
+        SELECT TOP 1 a.AppointmentId
+        FROM Appointments a
+        INNER JOIN AppointmentServices asvc ON asvc.AppointmentId = a.AppointmentId
+        WHERE a.CustomerId = @CustomerId
+          AND asvc.ServiceId = @ServiceId
+          AND CONVERT(VARCHAR(10), a.AppointmentDate, 120) = @PreferredDate
+          AND a.Status IN ('PENDING_PAYMENT', 'PENDING', 'PAID', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+      `);
+
+    if (activeAppt.recordset[0]) {
+      throw new Error(
+        "Bạn đã có lịch hẹn hoạt động cho dịch vụ này trong ngày đã chọn.",
+      );
+    }
   }
 
   const result = await pool
@@ -657,7 +685,7 @@ async function create(userId, data = {}) {
     .input("ServiceId", sql.Int, payload.serviceId)
     .input("PreferredEmployeeId", sql.Int, payload.preferredEmployeeId)
     .input("PreferredBranchId", sql.Int, payload.preferredBranchId)
-    .input("PreferredDate", sql.Date, payload.preferredDate)
+    .input("PreferredDate", sql.VarChar, payload.preferredDate)
     .input("PreferredTime", sql.VarChar, payload.preferredTimeFrom)
     .input("PreferredTimeFrom", sql.VarChar, payload.preferredTimeFrom)
     .input("PreferredTimeTo", sql.VarChar, payload.preferredTimeTo)
@@ -721,12 +749,6 @@ async function create(userId, data = {}) {
     `);
 
   const inserted = result.recordset[0];
-  if (inserted && inserted.PreferredDate) {
-    const dateStr = inserted.PreferredDate instanceof Date
-      ? inserted.PreferredDate.toISOString().slice(0, 10)
-      : String(inserted.PreferredDate).slice(0, 10);
-    runAutoMatch(dateStr).catch(err => console.error("Auto match failed on create:", err.message));
-  }
   return inserted;
 }
 
@@ -774,19 +796,47 @@ async function update(userId, waitingId, data = {}) {
     .request()
     .input("WaitingId", sql.Int, id)
     .input("CustomerId", sql.Int, customer.CustomerId)
-    .input("ServiceId", sql.Int, payload.serviceId).query(`
+    .input("ServiceId", sql.Int, payload.serviceId)
+    .input("PreferredDate", sql.VarChar, payload.preferredDate || null).query(`
       SELECT TOP 1 WaitingId
       FROM WaitingList
       WHERE WaitingId <> @WaitingId
         AND CustomerId = @CustomerId
         AND ServiceId = @ServiceId
-        AND Status IN ('WAITING', 'NOTIFIED')
+        AND (
+          (@PreferredDate IS NULL AND PreferredDate IS NULL)
+          OR (CONVERT(VARCHAR(10), PreferredDate, 120) = @PreferredDate)
+        )
+        AND Status IN ('WAITING', 'MATCHED', 'NOTIFIED')
     `);
 
   if (duplicate.recordset[0]) {
     throw new Error(
-      "Bạn đã có yêu cầu hàng chờ đang hoạt động cho dịch vụ này.",
+      "Bạn đã có yêu cầu hàng chờ đang hoạt động cho dịch vụ này trong ngày đã chọn.",
     );
+  }
+
+  if (payload.preferredDate) {
+    const activeAppt = await pool
+      .request()
+      .input("CustomerId", sql.Int, customer.CustomerId)
+      .input("ServiceId", sql.Int, payload.serviceId)
+      .input("PreferredDate", sql.VarChar, payload.preferredDate)
+      .query(`
+        SELECT TOP 1 a.AppointmentId
+        FROM Appointments a
+        INNER JOIN AppointmentServices asvc ON asvc.AppointmentId = a.AppointmentId
+        WHERE a.CustomerId = @CustomerId
+          AND asvc.ServiceId = @ServiceId
+          AND CONVERT(VARCHAR(10), a.AppointmentDate, 120) = @PreferredDate
+          AND a.Status IN ('PENDING_PAYMENT', 'PENDING', 'PAID', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+      `);
+
+    if (activeAppt.recordset[0]) {
+      throw new Error(
+        "Bạn đã có lịch hẹn hoạt động cho dịch vụ này trong ngày đã chọn.",
+      );
+    }
   }
 
   const result = await pool
@@ -796,7 +846,7 @@ async function update(userId, waitingId, data = {}) {
     .input("ServiceId", sql.Int, payload.serviceId)
     .input("PreferredEmployeeId", sql.Int, payload.preferredEmployeeId)
     .input("PreferredBranchId", sql.Int, payload.preferredBranchId)
-    .input("PreferredDate", sql.Date, payload.preferredDate)
+    .input("PreferredDate", sql.VarChar, payload.preferredDate)
     .input("PreferredTime", sql.VarChar, payload.preferredTimeFrom)
     .input("PreferredTimeFrom", sql.VarChar, payload.preferredTimeFrom)
     .input("PreferredTimeTo", sql.VarChar, payload.preferredTimeTo)
@@ -828,20 +878,30 @@ async function update(userId, waitingId, data = {}) {
         AcceptOtherTechnician = @AcceptOtherTechnician,
         AcceptOtherTimeSlots = @AcceptOtherTimeSlots,
         ExpireAt = @ExpireAt,
-        Status = CASE WHEN Status = 'NOTIFIED' THEN 'WAITING' ELSE Status END,
+        Status = CASE WHEN Status IN ('NOTIFIED', 'MATCHED') THEN 'WAITING' ELSE Status END,
+        MatchedEmployeeId = CASE WHEN Status IN ('NOTIFIED', 'MATCHED') THEN NULL ELSE MatchedEmployeeId END,
+        MatchedDate = CASE WHEN Status IN ('NOTIFIED', 'MATCHED') THEN NULL ELSE MatchedDate END,
+        MatchedStartTime = CASE WHEN Status IN ('NOTIFIED', 'MATCHED') THEN NULL ELSE MatchedStartTime END,
+        MatchedEndTime = CASE WHEN Status IN ('NOTIFIED', 'MATCHED') THEN NULL ELSE MatchedEndTime END,
+        HoldExpiresAt = CASE WHEN Status IN ('NOTIFIED', 'MATCHED') THEN NULL ELSE HoldExpiresAt END,
         UpdatedAt = GETDATE()
       OUTPUT INSERTED.*
       WHERE WaitingId = @WaitingId
         AND CustomerId = @CustomerId
     `);
 
+  const oldMatchedDate = item.MatchedDate;
+  const oldStatus = item.Status;
+
   const updated = result.recordset[0];
-  if (updated && updated.PreferredDate) {
-    const dateStr = updated.PreferredDate instanceof Date
-      ? updated.PreferredDate.toISOString().slice(0, 10)
-      : String(updated.PreferredDate).slice(0, 10);
-    runAutoMatch(dateStr).catch(err => console.error("Auto match failed on update:", err.message));
+
+  if (oldMatchedDate && (oldStatus === 'MATCHED' || oldStatus === 'NOTIFIED')) {
+    const oldDateStr = oldMatchedDate instanceof Date
+      ? oldMatchedDate.toISOString().slice(0, 10)
+      : String(oldMatchedDate).slice(0, 10);
+    runAutoMatch(oldDateStr).catch(err => console.error("Auto match failed on old date after update:", err.message));
   }
+
   return updated;
 }
 
@@ -906,14 +966,14 @@ async function runAutoMatch(dateStr) {
   const pool = await connectDB();
 
   const candidatesResult = await pool.request()
-    .input("PreferredDate", sql.Date, date)
+    .input("PreferredDate", sql.VarChar, date)
     .query(`
-      SELECT w.*, s.ServiceName, s.DurationMinutes, u.UserId, u.FullName AS CustomerName
+      SELECT w.*, s.ServiceName, s.DurationMinutes, u.UserId, u.FullName AS CustomerName, u.Email
       FROM WaitingList w
       INNER JOIN Services s ON s.ServiceId = w.ServiceId
       INNER JOIN Customers c ON c.CustomerId = w.CustomerId
       INNER JOIN Users u ON u.UserId = c.UserId
-      WHERE w.PreferredDate = @PreferredDate
+      WHERE CONVERT(VARCHAR(10), w.PreferredDate, 120) = @PreferredDate
         AND w.Status = 'WAITING'
     `);
   const candidates = candidatesResult.recordset;
@@ -928,7 +988,7 @@ async function runAutoMatch(dateStr) {
   const qualifications = empServicesResult.recordset;
 
   const employeesResult = await pool.request().query(`
-    SELECT e.EmployeeId, u.FullName, COALESCE(e.ImageUrl, u.AvatarUrl) AS ImageUrl
+    SELECT e.EmployeeId, e.BranchId, u.FullName, COALESCE(e.ImageUrl, u.AvatarUrl) AS ImageUrl
     FROM Employees e
     INNER JOIN Users u ON u.UserId = e.UserId
     WHERE e.Status = 'ACTIVE'
@@ -945,6 +1005,8 @@ async function runAutoMatch(dateStr) {
   for (const svcId of serviceIds) {
     const serviceCandidates = candidates.filter(c => c.ServiceId === svcId);
     const qualifiedEmps = employees.filter(e => canDoService(e.EmployeeId, svcId));
+
+    const potentialMatches = [];
 
     for (const emp of qualifiedEmps) {
       let freeSlots = [];
@@ -963,7 +1025,6 @@ async function runAutoMatch(dateStr) {
       for (const slot of freeSlots) {
         const startTime = `${slot.startTime}:00`;
         const endTime = `${slot.endTime}:00`;
-        const compatibleCandidates = [];
 
         for (const cand of serviceCandidates) {
           if (cand.Status !== 'WAITING') continue;
@@ -972,6 +1033,10 @@ async function runAutoMatch(dateStr) {
           const techOk = !cand.PreferredEmployeeId || isPreferredTech || cand.AcceptOtherTechnician;
 
           if (!techOk) continue;
+
+          // Branch validation: Employee's branch must match the candidate's preferred branch (if set)
+          const branchOk = !cand.PreferredBranchId || String(emp.BranchId) === String(cand.PreferredBranchId);
+          if (!branchOk) continue;
 
           let isExactTime = false;
           let timeOk = false;
@@ -993,65 +1058,131 @@ async function runAutoMatch(dateStr) {
           }
 
           if (techOk && timeOk) {
-            compatibleCandidates.push({
+            potentialMatches.push({
               cand,
-              isExactTechnician: isPreferredTech ? 1 : 0,
-              isExactTimeSlot: isExactTime ? 1 : 0
+              emp,
+              slot,
+              startTime,
+              endTime,
+              isExactTime: isExactTime ? 1 : 0,
+              isExactTech: isPreferredTech ? 1 : 0,
+              priorityWeight: cand.PriorityLevel === 'URGENT' ? 3 : (cand.PriorityLevel === 'HIGH' ? 2 : 1)
             });
           }
         }
+      }
+    }
 
-        if (compatibleCandidates.length > 0) {
-          compatibleCandidates.sort((a, b) => {
-            if (a.isExactTechnician !== b.isExactTechnician) {
-              return b.isExactTechnician - a.isExactTechnician;
-            }
-            if (a.isExactTimeSlot !== b.isExactTimeSlot) {
-              return b.isExactTimeSlot - a.isExactTimeSlot;
-            }
-            return new Date(a.cand.CreatedAt) - new Date(b.cand.CreatedAt);
-          });
+    // Sort matching pairs by priority:
+    // 1. Exact time range match
+    // 2. Exact technician match
+    // 3. Priority level weight
+    // 4. Oldest request first (FIFO)
+    potentialMatches.sort((a, b) => {
+      if (a.isExactTime !== b.isExactTime) {
+        return b.isExactTime - a.isExactTime;
+      }
+      if (a.isExactTech !== b.isExactTech) {
+        return b.isExactTech - a.isExactTech;
+      }
+      if (a.priorityWeight !== b.priorityWeight) {
+        return b.priorityWeight - a.priorityWeight;
+      }
+      return new Date(a.cand.CreatedAt) - new Date(b.cand.CreatedAt);
+    });
 
-          const best = compatibleCandidates[0].cand;
-          console.log(`[AutoMatch] Matching candidate ${best.CustomerName} (WaitingId: ${best.WaitingId}) to KTV ${emp.FullName} at ${slot.startTime} on ${date}`);
+    const assignedCandidateIds = new Set();
+    const assignedSlots = new Set();
 
-          const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    for (const match of potentialMatches) {
+      if (match.cand.Status !== 'WAITING') continue;
+      if (assignedCandidateIds.has(match.cand.WaitingId)) continue;
 
-          await pool.request()
-            .input("WaitingId", sql.Int, best.WaitingId)
-            .input("MatchedEmployeeId", sql.Int, emp.EmployeeId)
-            .input("MatchedDate", sql.Date, date)
-            .input("MatchedStartTime", sql.VarChar, startTime)
-            .input("MatchedEndTime", sql.VarChar, endTime)
-            .input("HoldExpiresAt", sql.DateTime, holdExpiresAt)
-            .query(`
-              UPDATE WaitingList
-              SET Status = 'MATCHED',
-                  MatchedEmployeeId = @MatchedEmployeeId,
-                  MatchedDate = @MatchedDate,
-                  MatchedStartTime = CAST(@MatchedStartTime AS TIME),
-                  MatchedEndTime = CAST(@MatchedEndTime AS TIME),
-                  HoldExpiresAt = @HoldExpiresAt,
-                  UpdatedAt = GETDATE()
-              WHERE WaitingId = @WaitingId
-            `);
+      const slotKey = `${match.emp.EmployeeId}_${match.slot.startTime}`;
+      if (assignedSlots.has(slotKey)) continue;
 
-          best.Status = 'MATCHED';
+      const best = match.cand;
+      const emp = match.emp;
+      const slot = match.slot;
+      const startTime = match.startTime;
+      const endTime = match.endTime;
 
-          const notificationsService = require("../notifications/notifications.service");
-          const dateText = new Date(date).toLocaleDateString("vi-VN");
-          const timeRangeText = `${slot.startTime} - ${slot.endTime}`;
-          const content = `Đã tìm thấy lịch phù hợp cho dịch vụ ${best.ServiceName}. Kỹ thuật viên: ${emp.FullName}. Ngày: ${dateText}. Giờ: ${timeRangeText}. Bạn có 15 phút để Xác nhận hoặc Từ chối lịch hẹn này.`;
+      console.log(`[AutoMatch] Matching candidate ${best.CustomerName} (WaitingId: ${best.WaitingId}) to KTV ${emp.FullName} at ${slot.startTime} on ${date} (Exact Time: ${match.isExactTime}, Exact Tech: ${match.isExactTech})`);
 
-          await notificationsService.create({
-            userId: best.UserId,
-            title: "Đã tìm thấy lịch phù hợp từ hàng chờ",
-            content: content,
-            type: "WAITING_LIST_MATCH"
-          });
+      const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-          break;
+      try {
+        await pool.request()
+          .input("WaitingId", sql.Int, best.WaitingId)
+          .input("MatchedEmployeeId", sql.Int, emp.EmployeeId)
+          .input("MatchedDate", sql.Date, date)
+          .input("MatchedStartTime", sql.VarChar, startTime)
+          .input("MatchedEndTime", sql.VarChar, endTime)
+          .input("HoldExpiresAt", sql.DateTime, holdExpiresAt)
+          .query(`
+            UPDATE WaitingList
+            SET Status = 'MATCHED',
+                MatchedEmployeeId = @MatchedEmployeeId,
+                MatchedDate = @MatchedDate,
+                MatchedStartTime = CAST(@MatchedStartTime AS TIME),
+                MatchedEndTime = CAST(@MatchedEndTime AS TIME),
+                HoldExpiresAt = @HoldExpiresAt,
+                UpdatedAt = GETDATE()
+            WHERE WaitingId = @WaitingId
+          `);
+
+        best.Status = 'MATCHED';
+        assignedCandidateIds.add(best.WaitingId);
+        assignedSlots.add(slotKey);
+
+        const notificationsService = require("../notifications/notifications.service");
+        const dateText = new Date(date).toLocaleDateString("vi-VN");
+        const timeRangeText = `${slot.startTime} - ${slot.endTime}`;
+        const content = `Đã tìm thấy lịch phù hợp cho dịch vụ ${best.ServiceName}. Kỹ thuật viên: ${emp.FullName}. Ngày: ${dateText}. Giờ: ${timeRangeText}. Bạn có 15 phút để Xác nhận hoặc Từ chối lịch hẹn này.`;
+
+        await notificationsService.create({
+          userId: best.UserId,
+          title: "Đã tìm thấy lịch phù hợp từ hàng chờ",
+          content: content,
+          type: "WAITING_LIST_MATCH"
+        });
+
+        if (best.Email) {
+          try {
+            const { sendMail } = require("../../utils/sendMail");
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const confirmUrl = `${frontendUrl}/customer/waiting-list`;
+            await sendMail({
+              to: best.Email,
+              subject: "Đã tìm thấy lịch phù hợp từ hàng chờ - Beauty Salon",
+              html: `
+                <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+                  <h2 style="color:#ef4f83;">Tìm thấy lịch phù hợp từ hàng chờ!</h2>
+                  <p>Xin chào <strong>${best.CustomerName}</strong>,</p>
+                  <p>Hệ thống Beauty Salon đã tìm thấy khung giờ trống phù hợp với yêu cầu hàng chờ của bạn:</p>
+                  <ul>
+                    <li><strong>Dịch vụ:</strong> ${best.ServiceName}</li>
+                    <li><strong>Kỹ thuật viên:</strong> ${emp.FullName}</li>
+                    <li><strong>Ngày:</strong> ${dateText}</li>
+                    <li><strong>Khung giờ:</strong> ${timeRangeText}</li>
+                  </ul>
+                  <p>Bạn vui lòng truy cập vào hệ thống để <strong>Xác nhận</strong> hoặc <strong>Từ chối</strong> lịch hẹn này. Lưu ý khung giờ này sẽ chỉ được giữ chỗ trong vòng <strong>15 phút</strong>.</p>
+                  <p style="margin-top:20px;">
+                    <a href="${confirmUrl}" style="background-color:#ef4f83;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;font-weight:bold;">
+                      Xác nhận lịch hẹn ngay
+                    </a>
+                  </p>
+                  <p style="color:#777;font-size:12px;margin-top:30px;">Nếu bạn không xác nhận trong vòng 15 phút, yêu cầu hàng chờ sẽ tự động quay trở lại danh sách chờ ghép.</p>
+                </div>
+              `
+            });
+            console.log(`[AutoMatch] Notification email sent to ${best.Email} for WaitingId ${best.WaitingId}`);
+          } catch (mailErr) {
+            console.error(`[AutoMatch] Failed to send notification email to ${best.Email}:`, mailErr.message);
+          }
         }
+      } catch (err) {
+        console.error(`[AutoMatch] Failed to save match for WaitingId ${best.WaitingId}:`, err.message);
       }
     }
   }
@@ -1246,8 +1377,8 @@ function startWaitingListHoldScheduler(intervalMs = 60 * 1000) {
       const expiredHoldsResult = await pool.request().query(`
         SELECT WaitingId, MatchedDate
         FROM WaitingList
-        WHERE Status = 'MATCHED'
-          AND HoldExpiresAt <= GETDATE()
+        WHERE Status IN ('MATCHED', 'NOTIFIED')
+          AND HoldExpiresAt <= GETUTCDATE()
       `);
 
       for (const row of expiredHoldsResult.recordset) {
@@ -1274,7 +1405,7 @@ function startWaitingListHoldScheduler(intervalMs = 60 * 1000) {
         SET Status = 'EXPIRED',
             UpdatedAt = GETDATE()
         WHERE Status = 'WAITING'
-          AND ExpireAt <= GETDATE()
+          AND ExpireAt <= GETUTCDATE()
       `);
 
     } catch (err) {

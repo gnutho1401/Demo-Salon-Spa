@@ -57,10 +57,11 @@ async function processRefund(refundId, adminId, manual = false) {
       .input("RefundId", sql.Int, refundId)
       .query(`
         SELECT r.RefundId, r.PaymentId, r.Status, r.RefundAmount, r.BankCode, r.AccountNumber, r.AccountName, 
-               p.InvoiceId, p.PaymentMethod, i.AppointmentId
+               p.InvoiceId, p.PaymentMethod, i.AppointmentId, a.AppointmentDate
         FROM Refunds r
         JOIN Payments p ON r.PaymentId = p.PaymentId
         JOIN Invoices i ON p.InvoiceId = i.InvoiceId
+        JOIN Appointments a ON i.AppointmentId = a.AppointmentId
         WHERE r.RefundId = @RefundId
       `);
 
@@ -142,6 +143,19 @@ async function processRefund(refundId, adminId, manual = false) {
       `);
 
     await transaction.commit();
+
+    if (refund.AppointmentDate) {
+      try {
+        const { runAutoMatch } = require("../waiting-list/waiting-list.service");
+        const dateStr = refund.AppointmentDate instanceof Date
+          ? refund.AppointmentDate.toISOString().slice(0, 10)
+          : String(refund.AppointmentDate).slice(0, 10);
+        runAutoMatch(dateStr).catch(err => console.error("Auto match failed after admin refund complete:", err.message));
+      } catch (err) {
+        console.error("Auto match trigger failed after admin refund complete:", err.message);
+      }
+    }
+
     return { success: true, message: "Đã xác nhận hoàn tiền thành công" };
   } catch (error) {
     await transaction.rollback();

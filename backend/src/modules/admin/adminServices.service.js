@@ -344,8 +344,7 @@ async function remove(id) {
 
   await pool.request().input("ServiceId", sql.Int, Number(id)).query(`
       UPDATE Services
-      SET Status = 'UNAVAILABLE',
-          UpdatedAt = GETDATE()
+      SET Status = 'INACTIVE'
       WHERE ServiceId = @ServiceId
     `);
 

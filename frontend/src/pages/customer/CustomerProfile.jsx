@@ -1,10 +1,26 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CustomerLayout from '../../components/layout/CustomerLayout';
 import axiosClient, { resolveFileUrl } from '../../api/axiosClient';
 import { useAuth } from '../../context/AuthContext';
 
 export default function CustomerProfile() {
   const { login, updateUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  
+  // Tab control: 'profile' or 'password'
+  const [activeTab, setActiveTab] = useState(tabParam === 'password' ? 'password' : 'profile');
+
+  // Sync activeTab when query param tab changes dynamically
+  useEffect(() => {
+    if (tabParam === 'password') {
+      setActiveTab('password');
+    } else {
+      setActiveTab('profile');
+    }
+  }, [tabParam]);
+
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -17,11 +33,22 @@ export default function CustomerProfile() {
     membershipLevel: 'Normal'
   });
 
+  // Password change states
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const formatDate = (value) => value ? value.substring(0, 10) : '';
 
@@ -124,85 +151,289 @@ export default function CustomerProfile() {
     }
   };
 
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordMessage('');
+    setPasswordError('');
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const res = await axiosClient.put('/auth/change-password', {
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword
+      });
+      setPasswordMessage(res.data.message || 'Đổi mật khẩu thành công');
+      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setPasswordError(err.response?.data?.message || 'Đổi mật khẩu thất bại');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const avatarSrc = form.avatarUrl ? resolveFileUrl(form.avatarUrl) : '';
+
+  const getCardLevelClass = (level) => {
+    const lvl = String(level || 'Normal').toLowerCase();
+    if (lvl.includes('silver')) return 'level-silver';
+    if (lvl.includes('gold')) return 'level-gold';
+    if (lvl.includes('diamond') || lvl.includes('platinum')) return 'level-diamond';
+    return 'level-normal';
+  };
 
   return (
     <CustomerLayout>
-      <div className="section-head">
-        <div>
-          <div className="eyebrow">Customer Profile</div>
-          <h2 className="section-title">Hồ sơ cá nhân</h2>
+      <div className="prof-page">
+        {/* Ambient background glow blooms */}
+        <div className="prof-ambient-bg">
+          <div className="prof-blob prof-blob-1"></div>
+          <div className="prof-blob prof-blob-2"></div>
         </div>
-      </div>
 
-      {loading ? (
-        <div className="dashboard-card">Đang tải hồ sơ...</div>
-      ) : (
-        <div className="profile-grid">
-          <div className="profile-card">
-            <div className="profile-avatar image-avatar">
-              {avatarSrc ? <img src={avatarSrc} alt="Avatar" /> : (form.fullName ? form.fullName.charAt(0).toUpperCase() : 'K')}
-            </div>
-            <h3>{form.fullName || 'Khách hàng'}</h3>
-            <p className="muted">{form.email}</p>
-
-            <label className="btn outline avatar-upload">
-              {uploading ? 'Đang tải ảnh...' : 'Đổi ảnh đại diện'}
-              <input type="file" accept="image/*" onChange={handleAvatarChange} hidden />
-            </label>
-
-            <div className="profile-info-list">
-              <div><span>Hạng thành viên</span><strong>{form.membershipLevel}</strong></div>
-              <div><span>Điểm thưởng</span><strong>{form.loyaltyPoints}</strong></div>
-            </div>
+        {/* Section Title */}
+        <div className="section-head" style={{ border: 'none', padding: 0, margin: 0, position: 'relative', zIndex: 1 }}>
+          <div>
+            <div className="eyebrow">Quản lý tài khoản</div>
+            <h2 className="section-title">Hồ sơ cá nhân</h2>
           </div>
-
-          <form className="profile-form dashboard-card" onSubmit={handleSubmit}>
-            {message && <div className="alert success">{message}</div>}
-            {error && <div className="alert error">{error}</div>}
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Họ và tên</label>
-                <input name="fullName" value={form.fullName} onChange={handleChange} placeholder="Nhập họ tên" />
-              </div>
-              <div className="form-group">
-                <label>Email</label>
-                <input name="email" value={form.email} disabled />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Số điện thoại</label>
-                <input name="phone" value={form.phone} onChange={handleChange} placeholder="Nhập số điện thoại" />
-              </div>
-              <div className="form-group">
-                <label>Giới tính</label>
-                <select name="gender" value={form.gender} onChange={handleChange}>
-                  <option value="">Chọn giới tính</option>
-                  <option value="Male">Nam</option>
-                  <option value="Female">Nữ</option>
-                  <option value="Other">Khác</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Ngày sinh</label>
-                <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={handleChange} />
-              </div>
-              <div className="form-group">
-                <label>Địa chỉ</label>
-                <input name="address" value={form.address} onChange={handleChange} placeholder="Nhập địa chỉ" />
-              </div>
-            </div>
-
-            <button className="btn primary" type="submit" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
-          </form>
         </div>
-      )}
+
+        {loading ? (
+          <div className="dashboard-card" style={{ position: 'relative', zIndex: 1, padding: '36px', textAlign: 'center' }}>
+            ⏳ Đang tải thông tin hồ sơ cá nhân...
+          </div>
+        ) : (
+          <div className="prof-grid">
+            {/* Left Panel: VIP Card, Loyalty points and tab selectors */}
+            <div className="prof-left-panel">
+              <div className={`prof-vip-card ${getCardLevelClass(form.membershipLevel)}`}>
+                <div className="prof-vip-header">
+                  <span className="prof-vip-badge">{form.membershipLevel} Pass</span>
+                  <div className="prof-vip-chip"></div>
+                </div>
+
+                <label className="prof-vip-avatar-container">
+                  <div className="prof-vip-avatar">
+                    {avatarSrc ? (
+                      <img src={avatarSrc} alt="Avatar" />
+                    ) : (
+                      form.fullName ? form.fullName.charAt(0).toUpperCase() : 'K'
+                    )}
+                  </div>
+                  <div className="prof-avatar-overlay">
+                    {uploading ? '⏳' : '📸'}
+                  </div>
+                  <input type="file" accept="image/*" onChange={handleAvatarChange} />
+                </label>
+
+                <div className="prof-vip-footer">
+                  <h3 className="prof-vip-name">{form.fullName || 'Khách hàng'}</h3>
+                  <span className="prof-vip-id">VIP MEMBER</span>
+                </div>
+              </div>
+
+              {/* Loyalty points info card */}
+              <div className="prof-points-card">
+                <div className="prof-points-left">
+                  <span className="prof-points-icon">👑</span>
+                  <div className="prof-points-info">
+                    <span className="prof-points-label">Điểm tích lũy</span>
+                    <span className="prof-points-value">{form.loyaltyPoints} PTS</span>
+                  </div>
+                </div>
+                {form.membershipLevel !== 'Normal' && (
+                  <span className="prof-discount-tag">VIP Member</span>
+                )}
+              </div>
+
+              {/* Tab Navigation Menu */}
+              <div className="prof-nav-menu">
+                <button
+                  type="button"
+                  className={`prof-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('profile');
+                    setMessage('');
+                    setError('');
+                  }}
+                >
+                  <span>👤</span> Hồ sơ của tôi
+                </button>
+                <button
+                  type="button"
+                  className={`prof-nav-btn ${activeTab === 'password' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('password');
+                    setPasswordMessage('');
+                    setPasswordError('');
+                  }}
+                >
+                  <span>🔒</span> Bảo mật tài khoản
+                </button>
+              </div>
+            </div>
+
+            {/* Right Panel Workspace content */}
+            {activeTab === 'profile' ? (
+              <div className="prof-right-panel">
+                <div className="prof-section-header">
+                  <h2>Thông tin cá nhân</h2>
+                  <p>Quản lý thông tin cá nhân của bạn để nhận dịch vụ chăm sóc tốt nhất từ chúng tôi.</p>
+                </div>
+
+                <form className="prof-form" onSubmit={handleSubmit}>
+                  {message && <div className="prof-alert prof-alert-success">✨ {message}</div>}
+                  {error && <div className="prof-alert prof-alert-error">⚠️ {error}</div>}
+
+                  <div className="prof-form-row">
+                    <div className="prof-form-group">
+                      <label>Họ và tên</label>
+                      <input
+                        className="prof-input"
+                        name="fullName"
+                        value={form.fullName}
+                        onChange={handleChange}
+                        placeholder="Nhập họ và tên của bạn"
+                        required
+                      />
+                    </div>
+                    <div className="prof-form-group">
+                      <label>Địa chỉ email</label>
+                      <input
+                        className="prof-input"
+                        name="email"
+                        value={form.email}
+                        disabled
+                        placeholder="chua_co_email@domain.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="prof-form-row">
+                    <div className="prof-form-group">
+                      <label>Số điện thoại</label>
+                      <input
+                        className="prof-input"
+                        name="phone"
+                        value={form.phone}
+                        onChange={handleChange}
+                        placeholder="Nhập số điện thoại liên lạc"
+                      />
+                    </div>
+                    <div className="prof-form-group">
+                      <label>Giới tính</label>
+                      <select
+                        className="prof-select"
+                        name="gender"
+                        value={form.gender}
+                        onChange={handleChange}
+                      >
+                        <option value="">Chọn giới tính</option>
+                        <option value="Male">Nam</option>
+                        <option value="Female">Nữ</option>
+                        <option value="Other">Khác</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="prof-form-row">
+                    <div className="prof-form-group">
+                      <label>Ngày sinh</label>
+                      <input
+                        type="date"
+                        className="prof-input"
+                        name="dateOfBirth"
+                        value={form.dateOfBirth}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    <div className="prof-form-group">
+                      <label>Địa chỉ thường trú</label>
+                      <input
+                        className="prof-input"
+                        name="address"
+                        value={form.address}
+                        onChange={handleChange}
+                        placeholder="Nhập địa chỉ nhà riêng của bạn"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="prof-submit-btn"
+                    disabled={saving}
+                  >
+                    {saving ? '⏳ Đang lưu...' : '💾 Lưu thông tin'}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="prof-right-panel">
+                <div className="prof-section-header">
+                  <h2>Bảo mật tài khoản</h2>
+                  <p>Cập nhật mật khẩu thường xuyên để bảo vệ an toàn thông tin tài khoản.</p>
+                </div>
+
+                <form className="prof-form" onSubmit={handlePasswordSubmit}>
+                  {passwordMessage && <div className="prof-alert prof-alert-success">✨ {passwordMessage}</div>}
+                  {passwordError && <div className="prof-alert prof-alert-error">⚠️ {passwordError}</div>}
+
+                  <div className="prof-form-group">
+                    <label>Mật khẩu hiện tại</label>
+                    <input
+                      type="password"
+                      className="prof-input"
+                      value={passwordForm.oldPassword}
+                      onChange={e => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                      placeholder="Nhập mật khẩu hiện tại đang sử dụng"
+                      required
+                    />
+                  </div>
+
+                  <div className="prof-form-row">
+                    <div className="prof-form-group">
+                      <label>Mật khẩu mới</label>
+                      <input
+                        type="password"
+                        className="prof-input"
+                        value={passwordForm.newPassword}
+                        onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                        placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                        required
+                      />
+                    </div>
+                    <div className="prof-form-group">
+                      <label>Xác nhận mật khẩu mới</label>
+                      <input
+                        type="password"
+                        className="prof-input"
+                        value={passwordForm.confirmPassword}
+                        onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                        placeholder="Nhập lại mật khẩu mới để xác nhận"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="prof-submit-btn"
+                    disabled={changingPassword}
+                  >
+                    {changingPassword ? '⏳ Đang lưu...' : '🔑 Đổi mật khẩu'}
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </CustomerLayout>
   );
 }

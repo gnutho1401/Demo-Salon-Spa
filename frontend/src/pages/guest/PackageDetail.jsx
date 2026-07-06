@@ -39,7 +39,7 @@ export default function PackageDetail() {
       await axiosClient.post(`/packages/${id}/buy`, { paymentMethod: method });
       navigate('/customer/packages?paid=1');
     } catch (err) {
-      setMessage(err.response?.data?.message || 'Không mua được combo / liệu trình');
+      alert(err.response?.data?.message || 'Không mua được combo / liệu trình');
     } finally {
       setPaying(false);
     }

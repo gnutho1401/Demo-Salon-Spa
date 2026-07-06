@@ -13,6 +13,8 @@ const navItems = [
   { to: "/admin/packages", label: "Packages" },
   { to: "/admin/service-categories", label: "Service Categories" },
   { to: "/admin/users", label: "Users" },
+  { to: "/admin/customers", label: "Customers" },
+  { to: "/admin/ai-crm", label: "AI CRM / Churn" },
   { to: "/admin/reviews", label: "Reviews" },
   { to: "/admin/feedbacks", label: "Feedbacks" },
   { to: "/admin/refunds", label: "Refunds" },

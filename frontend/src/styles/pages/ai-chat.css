@@ -861,3 +861,131 @@
   align-items: center;
   gap: 6px;
 }
+
+/* Service Search & Stylist Search Widgets */
+.ai-widget-service-list,
+.ai-widget-stylist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-widget-service-item,
+.ai-widget-stylist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff9fb;
+  border: 1px solid #fcedf2;
+}
+
+.ai-widget-service-info,
+.ai-widget-stylist-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.ai-widget-service-info h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #151827;
+}
+
+.ai-widget-service-info p {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.ai-widget-service-meta {
+  font-size: 11.5px;
+  color: var(--pink);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.ai-widget-service-action,
+.ai-widget-stylist-action {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ai-widget-service-action button,
+.ai-widget-stylist-action button {
+  padding: 6px 12px;
+  font-size: 11px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.ai-widget-service-action button.book-btn,
+.ai-widget-stylist-action button.book-btn {
+  background: linear-gradient(135deg, #ff4778, #e8396c);
+  color: white;
+}
+
+.ai-widget-service-action button.slots-btn,
+.ai-widget-stylist-action button.slots-btn {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.ai-widget-service-action button:hover,
+.ai-widget-stylist-action button:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.95);
+}
+
+.ai-widget-stylist-item {
+  flex-direction: row;
+}
+
+.ai-widget-stylist-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.ai-widget-stylist-profile img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid #fff;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+}
+
+.ai-widget-stylist-details h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #151827;
+}
+
+.ai-widget-stylist-details span {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.ai-widget-stylist-details small {
+  display: block;
+  font-size: 10.5px;
+  color: #ffa200;
+  font-weight: 700;
+  margin-top: 2px;
+}

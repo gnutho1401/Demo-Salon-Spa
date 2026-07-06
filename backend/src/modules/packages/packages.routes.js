@@ -48,6 +48,11 @@ router.post(
   authMiddleware,
   controller.addFamilyMember,
 );
+router.post(
+  "/my/:customerPackageId/repay",
+  authMiddleware,
+  controller.repayCustomerPackage,
+);
 router.delete(
   "/my/:customerPackageId/members/:memberId",
   authMiddleware,

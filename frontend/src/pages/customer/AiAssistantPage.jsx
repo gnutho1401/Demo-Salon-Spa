@@ -47,8 +47,165 @@ function parseMessageWidget(text) {
   return { type, args, rawTag: match[0] };
 }
 
-function AiChatWidget({ type, args }) {
+function parseMessageSuggestions(text) {
+  if (!text) return [];
+  const match = text.match(/\[\[SUGGESTIONS:([^\]]+)\]\]/);
+  if (!match) return [];
+  return match[1].split('|').map(s => s.trim()).filter(Boolean);
+}
+
+function AiChatWidget({ type: initialType, args: initialArgs }) {
   const navigate = useNavigate();
+  const [type, setType] = useState(initialType);
+  const [args, setArgs] = useState(initialArgs);
+
+  useEffect(() => {
+    setType(initialType);
+    setArgs(initialArgs);
+  }, [initialType, initialArgs]);
+
+  // Widget: SEARCH_SERVICES
+  if (type === 'SEARCH_SERVICES') {
+    const keyword = args[0] ? String(args[0]).toLowerCase().trim() : '';
+    const [services, setServices] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      const fetchServices = async () => {
+        try {
+          const res = await axiosClient.get('/services');
+          let list = res.data?.data || res.data || [];
+          if (keyword) {
+            list = list.filter(
+              (s) =>
+                s.ServiceName.toLowerCase().includes(keyword) ||
+                s.Description?.toLowerCase().includes(keyword)
+            );
+          }
+          setServices(list.slice(0, 5));
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchServices();
+    }, [keyword]);
+
+    if (loading) return <div className="ai-chat-widget">⌛ Đang tìm dịch vụ...</div>;
+    return (
+      <div className="ai-chat-widget">
+        <div className="ai-widget-title">🔍 Kết quả tìm kiếm dịch vụ</div>
+        {services.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#6b4f5a' }}>Không tìm thấy dịch vụ nào phù hợp.</div>
+        ) : (
+          <div className="ai-widget-service-list">
+            {services.map((s) => (
+              <div className="ai-widget-service-item" key={s.ServiceId}>
+                <div className="ai-widget-service-info">
+                  <h4>{s.ServiceName}</h4>
+                  <p>{s.Description || 'Không có mô tả chi tiết.'}</p>
+                  <div className="ai-widget-service-meta">
+                    {Number(s.Price || 0).toLocaleString('vi-VN')}đ • {s.DurationMinutes} phút
+                  </div>
+                </div>
+                <div className="ai-widget-service-action">
+                  <button
+                    type="button"
+                    className="slots-btn"
+                    onClick={() => {
+                      setType('SLOTS');
+                      setArgs([String(s.ServiceId), '', '']);
+                    }}
+                  >
+                    Xem giờ trống
+                  </button>
+                  <button
+                    type="button"
+                    className="book-btn"
+                    onClick={() => navigate(`/customer/booking?serviceId=${s.ServiceId}`)}
+                  >
+                    Đặt lịch ngay
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Widget: SEARCH_STYLISTS
+  if (type === 'SEARCH_STYLISTS') {
+    const keyword = args[0] ? String(args[0]).toLowerCase().trim() : '';
+    const [stylists, setStylists] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      const fetchStylists = async () => {
+        try {
+          const res = await axiosClient.get('/waiting-list/options');
+          const data = res.data?.data || res.data || {};
+          let list = data.employees || [];
+          if (keyword) {
+            list = list.filter(
+              (e) =>
+                e.FullName.toLowerCase().includes(keyword) ||
+                (e.Specialization && e.Specialization.toLowerCase().includes(keyword)) ||
+                (e.Position && e.Position.toLowerCase().includes(keyword))
+            );
+          }
+          setStylists(list.slice(0, 5));
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchStylists();
+    }, [keyword]);
+
+    if (loading) return <div className="ai-chat-widget">⌛ Đang tìm chuyên viên...</div>;
+    return (
+      <div className="ai-chat-widget">
+        <div className="ai-widget-title">💇 Danh sách chuyên viên/stylist</div>
+        {stylists.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#6b4f5a' }}>Không tìm thấy chuyên viên nào phù hợp.</div>
+        ) : (
+          <div className="ai-widget-stylist-list">
+            {stylists.map((emp) => (
+              <div className="ai-widget-stylist-item" key={emp.EmployeeId}>
+                <div className="ai-widget-stylist-profile">
+                  <img
+                    src={resolveFileUrl(emp.ImageUrl) || DEFAULT_AVATAR}
+                    alt={emp.FullName}
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_AVATAR;
+                    }}
+                  />
+                  <div className="ai-widget-stylist-details">
+                    <h4>{emp.FullName}</h4>
+                    <span>{emp.Specialization || emp.Position || 'Kỹ thuật viên'}</span>
+                    <small>⭐ {Number(emp.AverageRating || 0).toFixed(1)} / 5</small>
+                  </div>
+                </div>
+                <div className="ai-widget-stylist-action">
+                  <button
+                    type="button"
+                    className="book-btn"
+                    onClick={() => navigate(`/customer/booking?employeeId=${emp.EmployeeId}`)}
+                  >
+                    Đặt lịch ngay
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // Widget 1: MY_APPOINTMENTS
   if (type === 'MY_APPOINTMENTS') {
@@ -772,9 +929,17 @@ export default function AiAssistantPage() {
                 </div>
               )}
 
-              {messages.map((m) => {
+              {messages.map((m, idx) => {
                 const widget = parseMessageWidget(m.Answer);
-                const cleanAnswer = widget ? m.Answer.replace(widget.rawTag, '').trim() : m.Answer;
+                let cleanAnswer = widget ? m.Answer.replace(widget.rawTag, '').trim() : m.Answer;
+
+                let suggestions = [];
+                if (cleanAnswer) {
+                  suggestions = parseMessageSuggestions(cleanAnswer);
+                  cleanAnswer = cleanAnswer.replace(/\[\[SUGGESTIONS:[^\]]+\]\]/g, '').trim();
+                }
+
+                const isLast = idx === messages.length - 1;
 
                 return (
                   <div key={m.ChatId || `${m.Question}-${m.CreatedAt}`}>
@@ -799,6 +964,22 @@ export default function AiAssistantPage() {
                     {/* Widget if exists */}
                     {widget && (
                       <AiChatWidget type={widget.type} args={widget.args} />
+                    )}
+
+                    {/* Suggestions chips */}
+                    {isLast && !loading && suggestions.length > 0 && (
+                      <div className="ai-quick-suggestions" style={{ marginLeft: '46px', marginTop: '8px' }}>
+                        {suggestions.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className="ai-suggestion-chip"
+                            onClick={() => handleSuggestion(s)}
+                          >
+                            💬 {s}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 );
