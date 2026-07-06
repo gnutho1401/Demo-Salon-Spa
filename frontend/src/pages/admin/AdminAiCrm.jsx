@@ -1130,7 +1130,7 @@ export default function AdminAiCrm() {
                                 vouchers.map((v) => (
                                   <option key={v.VoucherId} value={v.VoucherId}>
                                     {v.Code} - Giảm{" "}
-                                    {v.DiscountType === "PERCENTAGE"
+                                    {String(v.DiscountType).toUpperCase().startsWith("PERCENT")
                                       ? `${Number(v.DiscountValue)}%`
                                       : formatVND(v.DiscountValue)}
                                   </option>

@@ -920,9 +920,36 @@ async function giftFreeService(customerId, serviceName) {
   const customer = custRes.recordset[0];
   if (!customer) throw new Error("Khách hàng không tồn tại");
 
-  const giftCode = `GIFT-${customerId}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const serviceRes = await pool.request()
+    .input("ServiceName", sql.NVarChar, `%${serviceName.slice(0, 7)}%`)
+    .query("SELECT TOP 1 Price FROM Services WHERE ServiceName LIKE @ServiceName AND Status = 'AVAILABLE'");
+  
+  let giftValue = 150000;
+  if (serviceRes.recordset.length > 0) {
+    giftValue = Number(serviceRes.recordset[0].Price);
+  }
+
+  const cleanCode = serviceName.includes("Gội đầu") 
+    ? `FREEGD${customerId}${Math.floor(1000 + Math.random() * 9000)}` 
+    : `FREEMS${customerId}${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const voucherInsert = await pool.request()
+    .input("Code", sql.NVarChar, cleanCode)
+    .input("DiscountValue", sql.Decimal(18, 2), giftValue)
+    .query(`
+      INSERT INTO Vouchers (Code, DiscountType, DiscountValue, MinOrderAmount, StartDate, EndDate, Quantity, Status)
+      OUTPUT INSERTED.VoucherId
+      VALUES (@Code, 'AMOUNT', @DiscountValue, 0, CAST(GETDATE() AS DATE), CAST(DATEADD(month, 3, GETDATE()) AS DATE), 1, 'ACTIVE')
+    `);
+  const newVoucherId = voucherInsert.recordset[0].VoucherId;
+
+  await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("VoucherId", sql.Int, newVoucherId)
+    .query("INSERT INTO CustomerVouchers (CustomerId, VoucherId, UsedStatus) VALUES (@CustomerId, @VoucherId, 0)");
+
   const title = `💆 Quà tặng dịch vụ miễn phí: ${serviceName}!`;
-  const content = `Beauty Salon thân tặng quý khách ${customer.FullName} một suất ${serviceName} hoàn toàn miễn phí cho lần ghé thăm tiếp theo. Mã nhận quà tại quầy lễ tân: ${giftCode}.`;
+  const content = `Beauty Salon thân tặng quý khách ${customer.FullName} một suất ${serviceName} miễn phí. Mã Voucher ưu đãi đã được nạp trực tiếp vào tài khoản của bạn: ${cleanCode} (Trị giá ${giftValue.toLocaleString('vi-VN')}đ). Bạn có thể áp dụng mã này khi đặt lịch hoặc đưa cho lễ tân khi thanh toán.`;
 
   await pool.request()
     .input("UserId", sql.Int, customer.UserId)
@@ -931,7 +958,7 @@ async function giftFreeService(customerId, serviceName) {
     .input("Type", sql.NVarChar, "PROMOTION")
     .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
 
-  return { message: `Đã tặng quà miễn phí (${serviceName}) thành công cho ${customer.FullName}.` };
+  return { message: `Đã tặng quà miễn phí (${serviceName}) thành công cho ${customer.FullName}. Mã voucher: ${cleanCode}` };
 }
 
 async function addLoyaltyPoints(customerId, points) {
