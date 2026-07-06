@@ -35,6 +35,39 @@ async function sendReminderToCustomer(req, res) {
   }
 }
 
+async function upgradeVipCustomer(req, res) {
+  try {
+    const customerId = Number(req.params.id);
+    const data = await service.upgradeToVIP(customerId);
+    return success(res, data, "Nâng cấp VIP thành công!");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function giftFreeServiceToCustomer(req, res) {
+  try {
+    const customerId = Number(req.params.id);
+    const { serviceName } = req.body;
+    if (!serviceName) throw new Error("Vui lòng chỉ định tên dịch vụ tặng");
+    const data = await service.giftFreeService(customerId, serviceName);
+    return success(res, data, "Tặng dịch vụ miễn phí thành công!");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function addPointsToCustomer(req, res) {
+  try {
+    const customerId = Number(req.params.id);
+    const { points } = req.body;
+    const data = await service.addLoyaltyPoints(customerId, Number(points || 200));
+    return success(res, data, "Cộng điểm tích lũy thành công!");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = { 
   getAll, 
   getMine, 
@@ -46,5 +79,8 @@ module.exports = {
   remove, 
   predictChurn,
   sendVoucherToCustomer,
-  sendReminderToCustomer
+  sendReminderToCustomer,
+  upgradeVipCustomer,
+  giftFreeServiceToCustomer,
+  addPointsToCustomer
 };

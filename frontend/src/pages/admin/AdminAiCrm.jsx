@@ -144,6 +144,58 @@ export default function AdminAiCrm() {
     }
   }
 
+  async function handleExecuteRecommendedAction(actionStr) {
+    if (!selectedCust) return;
+    const isVoucher = actionStr.includes("Voucher") || actionStr.includes("voucher");
+    const isGift = actionStr.includes("Gội đầu") || actionStr.includes("Massage") || actionStr.includes("Tặng kèm") || actionStr.includes("suất");
+    const isUpgrade = actionStr.includes("nâng cấp") || actionStr.includes("VIP");
+    const isPoints = actionStr.includes("điểm tích lũy") || actionStr.includes("điểm thưởng") || actionStr.includes("Nhân đôi");
+
+    try {
+      setActionLoading(true);
+      if (isVoucher) {
+        const details = recommendedVoucherDetails;
+        if (!details) {
+          showToast("Không xác định được ưu đãi voucher cần tặng từ khuyến nghị.", "error");
+          return;
+        }
+        const matchingVoucher = vouchers.find(
+          (v) =>
+            v.DiscountType === "PERCENTAGE" &&
+            Number(v.DiscountValue) === details.discount
+        );
+        if (!matchingVoucher) {
+          showToast(`Không tìm thấy Voucher giảm giá ${details.discount}% hoạt động trong hệ thống. Vui lòng tạo voucher này trước.`, "error");
+          return;
+        }
+        const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/send-voucher`, {
+          voucherId: matchingVoucher.VoucherId,
+        });
+        showToast(res.data?.message || `Đã tặng thành công Voucher ${matchingVoucher.Code}!`, "success");
+      } else if (isUpgrade) {
+        const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/upgrade-vip`);
+        showToast(res.data?.message || "Đã đặc cách nâng cấp VIP thành công!", "success");
+      } else if (isGift) {
+        const giftName = actionStr.includes("Gội đầu") ? "Gội đầu thảo dược dưỡng sinh" : "Massage cổ vai gáy miễn phí";
+        const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/gift-free-service`, {
+          serviceName: giftName
+        });
+        showToast(res.data?.message || `Đã tặng quà miễn phí (${giftName})!`, "success");
+      } else if (isPoints) {
+        const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/add-points`, {
+          points: 200
+        });
+        showToast(res.data?.message || "Đã cộng +200 điểm thưởng tích lũy thành công!", "success");
+      } else {
+        showToast("Hành động này không yêu cầu kích hoạt phần mềm.", "info");
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || "Không thể thực hiện hành động này", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   // Format currency
   function formatVND(amount) {
     return Number(amount || 0).toLocaleString("vi-VN") + "đ";
@@ -920,171 +972,247 @@ export default function AdminAiCrm() {
                       ⚡ Thực hiện Hành động Giữ chân ngay lập tức
                     </h4>
 
-                    {/* Action row 1: Send voucher */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        backgroundColor: "#faf8f5",
-                        padding: "16px",
-                        borderRadius: "12px",
-                        border: "1px solid #ebdcc5",
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <label
-                          style={{
-                            display: "block",
-                            fontSize: "0.75rem",
-                            fontWeight: "bold",
-                            color: "#666",
-                            marginBottom: "6px",
-                          }}
-                        >
-                          1. CHỌN VOUCHER ƯU ĐÃI TỪ SALON
-                        </label>
-                        {recommendedVoucherDetails && (
+                    {/* Dynamic Action Buttons from Recommendations */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {(selectedCust.recommended_action || []).map((action, idx) => {
+                        const isVoucher = action.includes("Voucher") || action.includes("voucher");
+                        const isCall = action.includes("điện thoại") || action.includes("Gọi điện") || action.includes("Liên hệ");
+                        const isMessage = action.includes("tin nhắn") || action.includes("Zalo/SMS") || action.includes("Gửi tin nhắn");
+                        const isGift = action.includes("Tặng kèm") || action.includes("miễn phí") || action.includes("suất");
+                        const isUpgrade = action.includes("nâng cấp") || action.includes("VIP");
+                        const isPoints = action.includes("điểm tích lũy") || action.includes("điểm thưởng") || action.includes("Nhân đôi");
+
+                        let btnText = "Thực hiện ngay";
+                        let btnIcon = "⚡";
+                        let handleExecute = null;
+                        let helperText = "";
+
+                        if (isVoucher) {
+                          const details = recommendedVoucherDetails;
+                          btnText = `Tự động Tặng Voucher ${details ? details.text : ""}`;
+                          btnIcon = "🎁";
+                          helperText = "Hệ thống tự động tìm và gửi voucher phù hợp từ danh sách voucher.";
+                          handleExecute = () => handleExecuteRecommendedAction(action);
+                        } else if (isCall) {
+                          btnText = "Gọi điện chăm sóc";
+                          btnIcon = "📞";
+                          helperText = `SĐT khách hàng: ${selectedCust.phone || "Chưa cập nhật"}`;
+                          handleExecute = () => {
+                            if (selectedCust.phone) {
+                              window.location.href = `tel:${selectedCust.phone}`;
+                            } else {
+                              showToast("Khách hàng không có số điện thoại", "error");
+                            }
+                          };
+                        } else if (isMessage) {
+                          btnText = "Xem tin nhắn mẫu";
+                          btnIcon = "✉️";
+                          helperText = "Cuộn xuống khung soạn thảo tin nhắn Zalo/SMS mẫu phía dưới.";
+                          handleExecute = () => {
+                            const el = document.getElementById("retention-textarea");
+                            if (el) {
+                              el.scrollIntoView({ behavior: "smooth" });
+                              el.focus();
+                            }
+                          };
+                        } else if (isGift) {
+                          const giftName = action.includes("Gội đầu") ? "Gội đầu thảo dược dưỡng sinh" : "Massage cổ vai gáy miễn phí";
+                          btnText = `Tặng suất ${giftName}`;
+                          btnIcon = "💆";
+                          helperText = "Gửi tặng dịch vụ miễn phí vào tài khoản khách hàng để họ trải nghiệm.";
+                          handleExecute = () => handleExecuteRecommendedAction(action);
+                        } else if (isUpgrade) {
+                          btnText = "Đặc cách lên VIP";
+                          btnIcon = "👑";
+                          helperText = "Cấp quyền thành viên VIP, hưởng chiết khấu trọn đời.";
+                          handleExecute = () => handleExecuteRecommendedAction(action);
+                        } else if (isPoints) {
+                          btnText = "Tặng +200 điểm Loyalty";
+                          btnIcon = "🌟";
+                          helperText = "Cộng trực tiếp 200 điểm Loyalty Points vào tài khoản khách.";
+                          handleExecute = () => handleExecuteRecommendedAction(action);
+                        } else {
+                          // Default handler for general recommendations
+                          btnText = "Xử lý thủ công";
+                          btnIcon = "🔧";
+                          helperText = "Đọc kỹ khuyến nghị để thực hiện hỗ trợ khách.";
+                        }
+
+                        return (
                           <div
+                            key={idx}
                             style={{
-                              display: "inline-block",
-                              fontSize: "0.72rem",
-                              backgroundColor: "#fffbeb",
-                              color: "#d97706",
-                              border: "1px solid #fef3c7",
-                              padding: "4px 8px",
-                              borderRadius: "6px",
-                              marginBottom: "8px",
-                              fontWeight: "bold",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              backgroundColor: "#faf8f5",
+                              padding: "14px 18px",
+                              borderRadius: "12px",
+                              border: "1px solid #ebdcc5",
+                              gap: "16px",
                             }}
                           >
-                            🤖 AI đề xuất: Tặng Voucher {recommendedVoucherDetails.text}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: "0.88rem", fontWeight: "bold", color: "#3f2817", marginBottom: "4px" }}>
+                                {action}
+                              </div>
+                              <div style={{ fontSize: "0.75rem", color: "#8c7e74" }}>
+                                {helperText}
+                              </div>
+                            </div>
+                            {handleExecute && (
+                              <button
+                                type="button"
+                                onClick={handleExecute}
+                                disabled={actionLoading}
+                                style={{
+                                  backgroundColor: "#1b3d2f",
+                                  color: "#fff",
+                                  border: "none",
+                                  padding: "8px 16px",
+                                  borderRadius: "8px",
+                                  fontWeight: "bold",
+                                  fontSize: "0.8rem",
+                                  cursor: actionLoading ? "not-allowed" : "pointer",
+                                  opacity: actionLoading ? 0.6 : 1,
+                                  whiteSpace: "nowrap",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  transition: "all 0.2s",
+                                }}
+                              >
+                                <span>{btnIcon}</span>
+                                <span>{btnText}</span>
+                              </button>
+                            )}
                           </div>
-                        )}
-                        <select
-                          value={selectedVoucherId}
-                          onChange={(e) => setSelectedVoucherId(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "8px 12px",
-                            borderRadius: "8px",
-                            border: "1px solid #ebdcc5",
-                            fontSize: "0.85rem",
-                            outline: "none",
-                            backgroundColor: "#fff",
-                          }}
-                        >
-                          {vouchers.length > 0 ? (
-                            vouchers.map((v) => (
-                              <option key={v.VoucherId} value={v.VoucherId}>
-                                {v.Code} - Giảm{" "}
-                                {v.DiscountType === "PERCENTAGE"
-                                  ? `${Number(v.DiscountValue)}%`
-                                  : formatVND(v.DiscountValue)}
-                              </option>
-                            ))
-                          ) : (
-                            <option value="">Không có voucher khả dụng</option>
-                          )}
-                        </select>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleSendVoucher}
-                        disabled={actionLoading || !selectedVoucherId}
-                        style={{
-                          backgroundColor: "#1b3d2f",
-                          color: "#fff",
-                          border: "none",
-                          padding: "10px 16px",
-                          borderRadius: "8px",
-                          fontWeight: "bold",
-                          fontSize: "0.85rem",
-                          marginTop: "20px",
-                          cursor: actionLoading || !selectedVoucherId ? "not-allowed" : "pointer",
-                          opacity: actionLoading || !selectedVoucherId ? 0.6 : 1,
-                        }}
-                      >
-                        🎁 Gửi tặng ngay
-                      </button>
+                        );
+                      })}
                     </div>
 
-                    {/* Action row 2: Send custom template reminder */}
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px",
-                        backgroundColor: "#faf8f5",
-                        padding: "16px",
-                        borderRadius: "12px",
-                        border: "1px solid #ebdcc5",
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: "0.75rem",
-                          fontWeight: "bold",
-                          color: "#666",
-                        }}
-                      >
-                        2. SOẠN TIN NHẮN ZALO / SMS CHĂM SÓC (ĐỒNG NHẤT 100% VỚI KHUYẾN NGHỊ AI)
-                      </label>
-                      <textarea
-                        value={customMessage}
-                        onChange={(e) => setCustomMessage(e.target.value)}
-                        rows={6}
-                        style={{
-                          width: "100%",
-                          padding: "10px 14px",
-                          borderRadius: "8px",
-                          border: "1px solid #ebdcc5",
-                          fontSize: "0.85rem",
-                          outline: "none",
-                          resize: "none",
-                          fontFamily: "monospace",
-                          lineHeight: "1.4",
-                        }}
-                      />
-                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-                        {selectedCust.phone && (
-                          <a
-                            href={`tel:${selectedCust.phone}`}
+                    {/* Manual Override Section */}
+                    <div style={{ borderTop: "1px dashed #ebdcc5", marginTop: "10px", paddingTop: "15px" }}>
+                      <h5 style={{ margin: "0 0 12px 0", color: "#8a653a", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        🛠️ Công cụ gửi thủ công / Dự phòng
+                      </h5>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                        {/* Send Custom Voucher manually */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            backgroundColor: "#fffdf9",
+                            padding: "14px",
+                            borderRadius: "10px",
+                            border: "1.5px solid #ebdcc5",
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "bold", color: "#666", marginBottom: "4px" }}>
+                              GỬI VOUCHER TỰ CHỌN
+                            </label>
+                            <select
+                              value={selectedVoucherId}
+                              onChange={(e) => setSelectedVoucherId(e.target.value)}
+                              style={{
+                                width: "100%",
+                                padding: "8px 12px",
+                                borderRadius: "8px",
+                                border: "1px solid #ebdcc5",
+                                fontSize: "0.82rem",
+                                outline: "none",
+                                backgroundColor: "#fff",
+                              }}
+                            >
+                              {vouchers.length > 0 ? (
+                                vouchers.map((v) => (
+                                  <option key={v.VoucherId} value={v.VoucherId}>
+                                    {v.Code} - Giảm{" "}
+                                    {v.DiscountType === "PERCENTAGE"
+                                      ? `${Number(v.DiscountValue)}%`
+                                      : formatVND(v.DiscountValue)}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="">Không có voucher khả dụng</option>
+                              )}
+                            </select>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSendVoucher}
+                            disabled={actionLoading || !selectedVoucherId}
                             style={{
                               backgroundColor: "#b45309",
                               color: "#fff",
-                              padding: "8px 16px",
+                              border: "none",
+                              padding: "10px 14px",
                               borderRadius: "8px",
                               fontWeight: "bold",
                               fontSize: "0.8rem",
-                              textDecoration: "none",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
+                              cursor: actionLoading || !selectedVoucherId ? "not-allowed" : "pointer",
+                              opacity: actionLoading || !selectedVoucherId ? 0.6 : 1,
                             }}
                           >
-                            📞 Gọi điện thoại
-                          </a>
-                        )}
-                        <button
-                          type="button"
-                          onClick={handleSendReminder}
-                          disabled={actionLoading || !customMessage.trim()}
+                            🎁 Gửi thủ công
+                          </button>
+                        </div>
+
+                        {/* Send Custom Text Message manually */}
+                        <div
                           style={{
-                            backgroundColor: "#1b3d2f",
-                            color: "#fff",
-                            border: "none",
-                            padding: "8px 16px",
-                            borderRadius: "8px",
-                            fontWeight: "bold",
-                            fontSize: "0.8rem",
-                            cursor: actionLoading || !customMessage.trim() ? "not-allowed" : "pointer",
-                            opacity: actionLoading || !customMessage.trim() ? 0.6 : 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px",
+                            backgroundColor: "#fffdf9",
+                            padding: "14px",
+                            borderRadius: "10px",
+                            border: "1.5px solid #ebdcc5",
                           }}
                         >
-                          ✉️ Gửi tin nhắn chăm sóc
-                        </button>
+                          <label style={{ display: "block", fontSize: "0.72rem", fontWeight: "bold", color: "#666" }}>
+                            SOẠN VÀ GỬI TIN NHẮN ZALO / SMS CHĂM SÓC
+                          </label>
+                          <textarea
+                            id="retention-textarea"
+                            value={customMessage}
+                            onChange={(e) => setCustomMessage(e.target.value)}
+                            rows={4}
+                            style={{
+                              width: "100%",
+                              padding: "10px 14px",
+                              borderRadius: "8px",
+                              border: "1px solid #ebdcc5",
+                              fontSize: "0.82rem",
+                              outline: "none",
+                              resize: "none",
+                              fontFamily: "monospace",
+                              lineHeight: "1.4",
+                            }}
+                          />
+                          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                            <button
+                              type="button"
+                              onClick={handleSendReminder}
+                              disabled={actionLoading || !customMessage.trim()}
+                              style={{
+                                backgroundColor: "#1b3d2f",
+                                color: "#fff",
+                                border: "none",
+                                padding: "8px 14px",
+                                borderRadius: "8px",
+                                fontWeight: "bold",
+                                fontSize: "0.8rem",
+                                cursor: actionLoading || !customMessage.trim() ? "not-allowed" : "pointer",
+                                opacity: actionLoading || !customMessage.trim() ? 0.6 : 1,
+                              }}
+                            >
+                              ✉️ Gửi tin nhắn chăm sóc
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

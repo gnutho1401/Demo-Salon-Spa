@@ -872,6 +872,93 @@ async function sendReminderToCustomer(customerId, message) {
   return { message: `Đã gửi nhắc nhở chăm sóc thành công tới khách hàng ${customer.FullName}.` };
 }
 
+async function upgradeToVIP(customerId) {
+  const pool = await connectDB();
+  
+  const levelRes = await pool.request()
+    .query("SELECT MembershipLevelId, LevelName FROM MembershipLevels WHERE LevelName = 'VIP' OR LevelName = 'Gold' ORDER BY MinPoints DESC");
+  let vipLevelId = null;
+  if (levelRes.recordset.length > 0) {
+    vipLevelId = levelRes.recordset[0].MembershipLevelId;
+  } else {
+    const allLevels = await pool.request().query("SELECT TOP 1 MembershipLevelId FROM MembershipLevels ORDER BY MinPoints DESC");
+    if (allLevels.recordset.length > 0) {
+      vipLevelId = allLevels.recordset[0].MembershipLevelId;
+    }
+  }
+  
+  if (!vipLevelId) throw new Error("Không thể tìm thấy cấp độ thành viên VIP/cao cấp để nâng cấp");
+
+  await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("LevelId", sql.Int, vipLevelId)
+    .query("UPDATE Customers SET MembershipLevelId = @LevelId WHERE CustomerId = @CustomerId");
+    
+  const custRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query("SELECT u.FullName, u.UserId FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+  const customer = custRes.recordset[0];
+
+  const title = "👑 Chúc mừng! Bạn đã được nâng cấp hạng thành viên VIP!";
+  const content = `Beauty Salon trân trọng thông báo quý khách ${customer.FullName} đã được nâng cấp lên hạng thành viên VIP với ưu đãi chiết khấu trọn đời trên mọi dịch vụ.`;
+  
+  await pool.request()
+    .input("UserId", sql.Int, customer.UserId)
+    .input("Title", sql.NVarChar, title)
+    .input("Content", sql.NVarChar, content)
+    .input("Type", sql.NVarChar, "SYSTEM")
+    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+
+  return { message: `Đã nâng cấp khách hàng ${customer.FullName} lên VIP và gửi thông báo thành công!` };
+}
+
+async function giftFreeService(customerId, serviceName) {
+  const pool = await connectDB();
+  const custRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query("SELECT u.FullName, u.UserId FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+  const customer = custRes.recordset[0];
+  if (!customer) throw new Error("Khách hàng không tồn tại");
+
+  const giftCode = `GIFT-${customerId}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const title = `💆 Quà tặng dịch vụ miễn phí: ${serviceName}!`;
+  const content = `Beauty Salon thân tặng quý khách ${customer.FullName} một suất ${serviceName} hoàn toàn miễn phí cho lần ghé thăm tiếp theo. Mã nhận quà tại quầy lễ tân: ${giftCode}.`;
+
+  await pool.request()
+    .input("UserId", sql.Int, customer.UserId)
+    .input("Title", sql.NVarChar, title)
+    .input("Content", sql.NVarChar, content)
+    .input("Type", sql.NVarChar, "PROMOTION")
+    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+
+  return { message: `Đã tặng quà miễn phí (${serviceName}) thành công cho ${customer.FullName}.` };
+}
+
+async function addLoyaltyPoints(customerId, points) {
+  const pool = await connectDB();
+  await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("Points", sql.Int, points)
+    .query("UPDATE Customers SET LoyaltyPoints = LoyaltyPoints + @Points WHERE CustomerId = @CustomerId");
+
+  const custRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query("SELECT u.FullName, u.UserId, c.LoyaltyPoints FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+  const customer = custRes.recordset[0];
+
+  const title = `🌟 Điểm thưởng tích lũy tăng thêm: +${points} điểm!`;
+  const content = `Chúc mừng quý khách ${customer.FullName} đã được cộng thêm ${points} điểm tích lũy thành viên từ hệ thống chăm sóc khách hàng. Tổng điểm hiện tại của bạn là: ${customer.LoyaltyPoints} điểm.`;
+
+  await pool.request()
+    .input("UserId", sql.Int, customer.UserId)
+    .input("Title", sql.NVarChar, title)
+    .input("Content", sql.NVarChar, content)
+    .input("Type", sql.NVarChar, "SYSTEM")
+    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+
+  return { message: `Đã tặng +${points} điểm tích lũy thành công cho khách hàng ${customer.FullName}.` };
+}
+
 module.exports = { 
   getAll, 
   getMine, 
@@ -883,5 +970,8 @@ module.exports = {
   remove, 
   predictCustomersChurn,
   sendVoucherToCustomer,
-  sendReminderToCustomer
+  sendReminderToCustomer,
+  upgradeToVIP,
+  giftFreeService,
+  addLoyaltyPoints
 };

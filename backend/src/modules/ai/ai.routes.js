@@ -33,6 +33,24 @@ router.post(
   allowRoles("Admin", "Manager"),
   controller.sendReminderToCustomer
 );
+router.post(
+  "/customers/:id/upgrade-vip",
+  authMiddleware,
+  allowRoles("Admin", "Manager"),
+  controller.upgradeVipCustomer
+);
+router.post(
+  "/customers/:id/gift-free-service",
+  authMiddleware,
+  allowRoles("Admin", "Manager"),
+  controller.giftFreeServiceToCustomer
+);
+router.post(
+  "/customers/:id/add-points",
+  authMiddleware,
+  allowRoles("Admin", "Manager"),
+  controller.addPointsToCustomer
+);
 router.get(
   "/:id",
   authMiddleware,
