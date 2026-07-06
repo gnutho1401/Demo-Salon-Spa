@@ -20,15 +20,60 @@ export default function AdminAiCrm() {
     fetchVouchers();
   }, []);
 
-  // Synchronize pre-populated template message with the AI's actual recommended actions list
+  // Helper to extract recommended voucher discount details
+  const recommendedVoucherDetails = useMemo(() => {
+    if (!selectedCust || !selectedCust.recommended_action) return null;
+    const actionsText = selectedCust.recommended_action.join(" ");
+    if (actionsText.includes("20%")) {
+      return { discount: 20, text: "giảm 20%" };
+    }
+    if (actionsText.includes("15%")) {
+      return { discount: 15, text: "giảm 15%" };
+    }
+    if (actionsText.includes("10%")) {
+      return { discount: 10, text: "giảm 10%" };
+    }
+    return null;
+  }, [selectedCust]);
+
+  // Synchronize pre-selected voucher based on AI recommendation
+  useEffect(() => {
+    if (selectedCust && vouchers.length > 0) {
+      const details = recommendedVoucherDetails;
+      if (details) {
+        const matchingVoucher = vouchers.find(
+          (v) =>
+            v.DiscountType === "PERCENTAGE" &&
+            Number(v.DiscountValue) === details.discount
+        );
+        if (matchingVoucher) {
+          setSelectedVoucherId(matchingVoucher.VoucherId);
+          return;
+        }
+      }
+      // Fallback: select the first voucher
+      setSelectedVoucherId(vouchers[0].VoucherId);
+    }
+  }, [selectedCust, vouchers, recommendedVoucherDetails]);
+
+  // Synchronize pre-populated client-facing template message with the AI's actual recommended actions list
   useEffect(() => {
     if (selectedCust) {
-      const actionsText = (selectedCust.recommended_action || [])
-        .map((action) => `• ${action}`)
-        .join("\n");
-      
-      const emailTemplate = `Xin chào ${selectedCust.name},\n\nBeauty Salon gửi tới bạn chương trình tri ân khách hàng đặc biệt từ hệ thống CRM:\n${actionsText}\n\nTrân trọng kính mời bạn đặt lịch hẹn trực tiếp qua website hoặc hotline để trải nghiệm những dịch vụ tốt nhất!`;
-      setCustomMessage(emailTemplate);
+      const risk = selectedCust.risk_level;
+      const favService = (selectedCust.favorite_services && selectedCust.favorite_services.length > 0)
+        ? selectedCust.favorite_services[0]
+        : null;
+
+      let msg = "";
+      if (risk === "HIGH_RISK") {
+        msg = `Kính gửi Anh/Chị ${selectedCust.name},\n\nĐã lâu rồi Beauty Salon chưa có cơ hội được đón tiếp và chăm sóc sắc đẹp cho Anh/Chị. Chúng em luôn trân quý sự đồng hành của Anh/Chị và rất mong muốn được cải thiện chất lượng dịch vụ tốt hơn.\n\nĐể bày tỏ lòng tri ân sâu sắc, Beauty Salon xin gửi tặng riêng Anh/Chị:\n💝 01 Voucher ưu đãi giảm giá 20% áp dụng cho toàn bộ dịch vụ.\n🎁 Đặc biệt: Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh hoặc Massage cổ vai gáy hoàn toàn miễn phí cho lần hẹn tới.\n\nChúng em rất mong được gặp lại Anh/Chị. Anh/Chị có thể đặt lịch hẹn trực tiếp qua website hoặc liên hệ hotline của salon nhé ạ!\n\nTrân trọng,\nBeauty Salon`;
+      } else if (risk === "MEDIUM_RISK") {
+        const serviceIntro = favService ? ` dịch vụ ${favService} cũng như các` : "";
+        msg = `Kính chào Anh/Chị ${selectedCust.name},\n\nĐã một khoảng thời gian kể từ lần cuối Beauty Salon có cơ hội được phục vụ Anh/Chị. Salon rất nhớ bạn và hy vọng bạn vẫn đang có những trải nghiệm tuyệt vời.\n\nĐể hỗ trợ bạn tiếp tục duy trì vẻ đẹp và sự tự tin, chúng em xin gửi tặng ưu đãi đặc biệt:\n🎫 01 Voucher giảm giá 15% cho${serviceIntro} dịch vụ yêu thích tại Salon.\n\nAnh/Chị đặt lịch hẹn ngay hôm nay để nhận thêm nhiều ưu đãi làm đẹp tốt nhất nhé. Rất mong được đón tiếp bạn trở lại!\n\nThân ái,\nBeauty Salon`;
+      } else {
+        msg = `Xin chào Anh/Chị ${selectedCust.name},\n\nBeauty Salon chân thành cảm ơn sự tin tưởng và yêu mến của Anh/Chị trong suốt thời gian qua. Sự hài lòng của Anh/Chị chính là niềm hạnh phúc lớn nhất của chúng em.\n\nNhư một món quà nhỏ tri ân, Beauty Salon xin gửi tới Anh/Chị:\n🌟 Chương trình tích lũy điểm thưởng gấp đôi cho lần ghé thăm tiếp theo.\n💎 Cơ hội nâng cấp lên thẻ thành viên VIP nhận ưu đãi chiết khấu lâu dài.\n\nHẹn sớm gặp lại Anh/Chị tại Salon để tận hưởng những phút giây thư giãn tuyệt vời nhất!\n\nTrân trọng,\nBeauty Salon`;
+      }
+      setCustomMessage(msg);
     }
   }, [selectedCust]);
 
@@ -899,6 +944,23 @@ export default function AdminAiCrm() {
                         >
                           1. CHỌN VOUCHER ƯU ĐÃI TỪ SALON
                         </label>
+                        {recommendedVoucherDetails && (
+                          <div
+                            style={{
+                              display: "inline-block",
+                              fontSize: "0.72rem",
+                              backgroundColor: "#fffbeb",
+                              color: "#d97706",
+                              border: "1px solid #fef3c7",
+                              padding: "4px 8px",
+                              borderRadius: "6px",
+                              marginBottom: "8px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            🤖 AI đề xuất: Tặng Voucher {recommendedVoucherDetails.text}
+                          </div>
+                        )}
                         <select
                           value={selectedVoucherId}
                           onChange={(e) => setSelectedVoucherId(e.target.value)}

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">24.67% </span>
+                <span class="strong">23.03% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>38/154</span>
+                <span class='fraction'>38/165</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">36.36% </span>
+                <span class="strong">19.04% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>4/11</span>
+                <span class='fraction'>4/21</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">34.78% </span>
+                <span class="strong">34.04% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>16/46</span>
+                <span class='fraction'>16/47</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">24.5% </span>
+                <span class="strong">23.27% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>37/151</span>
+                <span class='fraction'>37/159</span>
             </div>
         
             
@@ -644,7 +644,28 @@
 <a name='L579'></a><a href='#L579'>579</a>
 <a name='L580'></a><a href='#L580'>580</a>
 <a name='L581'></a><a href='#L581'>581</a>
-<a name='L582'></a><a href='#L582'>582</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L582'></a><a href='#L582'>582</a>
+<a name='L583'></a><a href='#L583'>583</a>
+<a name='L584'></a><a href='#L584'>584</a>
+<a name='L585'></a><a href='#L585'>585</a>
+<a name='L586'></a><a href='#L586'>586</a>
+<a name='L587'></a><a href='#L587'>587</a>
+<a name='L588'></a><a href='#L588'>588</a>
+<a name='L589'></a><a href='#L589'>589</a>
+<a name='L590'></a><a href='#L590'>590</a>
+<a name='L591'></a><a href='#L591'>591</a>
+<a name='L592'></a><a href='#L592'>592</a>
+<a name='L593'></a><a href='#L593'>593</a>
+<a name='L594'></a><a href='#L594'>594</a>
+<a name='L595'></a><a href='#L595'>595</a>
+<a name='L596'></a><a href='#L596'>596</a>
+<a name='L597'></a><a href='#L597'>597</a>
+<a name='L598'></a><a href='#L598'>598</a>
+<a name='L599'></a><a href='#L599'>599</a>
+<a name='L600'></a><a href='#L600'>600</a>
+<a name='L601'></a><a href='#L601'>601</a>
+<a name='L602'></a><a href='#L602'>602</a>
+<a name='L603'></a><a href='#L603'>603</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1171,7 +1192,28 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1752,7 +1794,28 @@ async function <span class="fstat-no" title="function not covered" >transferAppo
   }
 }
 &nbsp;
+async function <span class="fstat-no" title="function not covered" >getSmartBookingSuggestions(</span>req, res) {
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const { customerId, serviceId, branchId, appointmentDate, preferredStartTime } = <span class="cstat-no" title="statement not covered" >req.query;</span>
+<span class="cstat-no" title="statement not covered" >    if (!serviceId) <span class="cstat-no" title="statement not covered" >throw new Error("Vui lòng chọn dịch vụ");</span></span>
+<span class="cstat-no" title="statement not covered" >    if (!branchId) <span class="cstat-no" title="statement not covered" >throw new Error("Vui lòng chọn chi nhánh");</span></span>
+<span class="cstat-no" title="statement not covered" >    if (!appointmentDate) <span class="cstat-no" title="statement not covered" >throw new Error("Vui lòng chọn ngày hẹn");</span></span>
+&nbsp;
+    const data = <span class="cstat-no" title="statement not covered" >await service.getSmartBookingSuggestions({</span>
+      customerId: customerId ? Number(customerId) : null,
+      serviceId: Number(serviceId),
+      branchId: Number(branchId),
+      appointmentDate,
+      preferredStartTime: preferredStartTime || null
+    });
+<span class="cstat-no" title="statement not covered" >    return success(res, data, "Lấy đề xuất đặt lịch thành công");</span>
+  } catch (err) {
+<span class="cstat-no" title="statement not covered" >    return error(res, err.message, 400);</span>
+  }
+}
+&nbsp;
 module.exports = {
+  getSmartBookingSuggestions,
   getDashboard,
 &nbsp;
   getAppointments,
@@ -1813,7 +1876,7 @@ module.exports = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-05T15:58:02.537Z
+                at 2026-07-06T15:28:59.063Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

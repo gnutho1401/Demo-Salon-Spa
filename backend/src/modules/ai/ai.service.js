@@ -496,20 +496,20 @@ function ruleBasedChurnPrediction(customerData) {
     }
 
     if (risk_level === 'HIGH_RISK') {
-      recommended_action.push("Gọi điện thoại trực tiếp để tìm hiểu lý do và chăm sóc khách hàng");
-      recommended_action.push("Gửi mã voucher giảm giá 20% cho toàn bộ dịch vụ");
-      recommended_action.push("Tặng kèm một suất gội đầu thảo dược hoặc massage cổ vai gáy miễn phí cho lần hẹn tới");
+      recommended_action.push("📞 Liên hệ trực tiếp qua điện thoại hỏi thăm trải nghiệm và lắng nghe phản hồi.");
+      recommended_action.push("💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.");
+      recommended_action.push("🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh hoặc Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.");
     } else if (risk_level === 'MEDIUM_RISK') {
-      recommended_action.push("Gửi tin nhắn Zalo/SMS nhắc hẹn và hỏi thăm trải nghiệm");
-      recommended_action.push("Tặng voucher giảm giá 15% cho dịch vụ yêu thích");
+      recommended_action.push("✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.");
+      recommended_action.push("🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.");
       if (c.favorite_services && c.favorite_services.length > 0) {
-        recommended_action.push(`Đề xuất combo dịch vụ có chứa ${c.favorite_services[0]}`);
+        recommended_action.push(`🔥 Đề xuất combo dịch vụ có giá ưu đãi chứa ${c.favorite_services[0]}.`);
       }
     } else {
-      recommended_action.push("Tích lũy điểm thưởng và gửi lời chúc mừng/ưu đãi sinh nhật");
-      recommended_action.push("Đề xuất nâng cấp lên gói thẻ thành viên VIP để nhận ưu đãi dài hạn");
+      recommended_action.push("🌟 Nhân đôi điểm tích lũy thưởng và gửi ưu đãi nhân ngày sinh nhật/dịp lễ.");
+      recommended_action.push("💎 Đề xuất đặc quyền nâng cấp lên gói thẻ thành viên VIP để nhận ưu đãi chiết khấu lâu dài.");
       if (c.favorite_services && c.favorite_services.length > 0) {
-        recommended_action.push(`Giới thiệu dịch vụ nâng cấp/dịch vụ mới liên quan đến ${c.favorite_services[0]}`);
+        recommended_action.push(`✨ Giới thiệu liệu trình làm đẹp mới hoặc dịch vụ nâng cấp liên quan đến ${c.favorite_services[0]}.`);
       }
     }
 
@@ -663,7 +663,7 @@ async function predictCustomersChurn(executorUserId) {
   let isFallback = false;
 
   const systemPrompt = `Bạn là một AI phân tích hành vi khách hàng cho hệ thống quản lý salon làm đẹp.
-Nhiệm vụ của bạn là dự đoán khách hàng nào có nguy cơ không quay lại (churn) và đề xuất hành động giữ chân khách hàng.
+Nhiệm vụ của bạn là dự đoán khách hàng nào có nguy cơ không quay lại (churn) và đề xuất hành động giữ chân khách hàng phù hợp.
 
 ## TIÊU CHÍ PHÂN TÍCH
 Bạn cần dựa vào các tín hiệu sau:
@@ -685,19 +685,31 @@ Trả về JSON theo format:
       "risk_level": "LOW_RISK | MEDIUM_RISK | HIGH_RISK",
       "risk_score": 0-100,
       "reason": [
-        "Lý do 1",
-        "Lý do 2"
+        "Lý do rủi ro 1",
+        "Lý do rủi ro 2"
       ],
       "recommended_action": [
-        "Gợi ý hành động giữ khách 1",
-        "Gợi ý hành động giữ khách 2"
+        "Đề xuất hành động giữ chân 1",
+        "Đề xuất hành động giữ chân 2"
       ]
     }
   ]
 }
 
-## GỢI Ý HÀNH ĐỘNG
-Đề xuất các hành động cụ thể như: gửi voucher giảm giá 10–20%, gửi SMS/Zalo nhắc quay lại, combo dịch vụ phù hợp, ưu đãi khách VIP, gọi điện chăm sóc nếu HIGH_RISK, hoặc tặng dịch vụ miễn phí nhỏ (gội đầu / massage).
+## QUY TẮC ĐỀ XUẤT HÀNH ĐỘNG (RECOMMENDED_ACTION)
+Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghiệp theo phân nhóm rủi ro:
+1. HIGH_RISK (Rủi ro cao):
+   - 📞 Liên hệ trực tiếp qua điện thoại hỏi thăm trải nghiệm và lắng nghe phản hồi.
+   - 💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.
+   - 🎁 Tặng kèm 01 suất Gội đầu thảo duyệt dưỡng sinh hoặc Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.
+2. MEDIUM_RISK (Rủi ro trung bình):
+   - ✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.
+   - 🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.
+   - 🔥 Đề xuất combo dịch vụ có giá ưu đãi chứa dịch vụ ưa thích.
+3. LOW_RISK (Rủi ro thấp / Ổn định):
+   - 🌟 Nhân đôi điểm tích lũy thưởng và gửi ưu đãi nhân ngày sinh nhật/dịp lễ.
+   - 💎 Đề xuất đặc quyền nâng cấp lên gói thẻ thành viên VIP để nhận ưu đãi chiết khấu lâu dài.
+   - ✨ Giới thiệu liệu trình làm đẹp mới hoặc dịch vụ nâng cấp liên quan đến dịch vụ khách hay dùng.
 
 ## QUY TẮC QUAN TRỌNG
 - Không được trả lời ngoài JSON. Không có thẻ markdown \`\`\`json ngoài kết quả.
