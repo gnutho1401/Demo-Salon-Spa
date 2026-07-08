@@ -1,18 +1,19 @@
-const Replicate = require("replicate");
+const axios = require("axios");
 
 async function editHair(imageUrl, prompt) {
   const token = process.env.REPLICATE_API_TOKEN;
   const normalizedPrompt = String(prompt || '').toLowerCase();
 
-  // 1. Nếu có token Replicate trong file .env, gọi thực tế đến model InstructPix2Pix
+  // 1. Nếu có token Replicate trong file .env, gọi thực tế đến model InstructPix2Pix qua Axios REST API
   if (token) {
     try {
-      console.log("[AI Hair Try-on] Found Replicate API Token. Starting real inference...");
-      const replicate = new Replicate({ auth: token });
+      console.log("[AI Hair Try-on] Found Replicate API Token. Starting real inference via Axios...");
       
-      const output = await replicate.run(
-        "timbrooks/instruct-pix2pix:30c1d0b916a6f8efce20f144d7b3c6c31934a772458ddaf597be6e576fc9e614",
+      // Gửi yêu cầu khởi tạo prediction
+      const startResponse = await axios.post(
+        "https://api.replicate.com/v1/predictions",
         {
+          version: "30c1d0b916a6f8efce20f144d7b3c6c31934a772458ddaf597be6e576fc9e614",
           input: {
             image: imageUrl,
             prompt: prompt,
@@ -21,20 +22,41 @@ async function editHair(imageUrl, prompt) {
             image_guidance_scale: 1.5,
             num_inference_steps: 25
           }
+        },
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json"
+          },
+          timeout: 10000
         }
       );
 
-      if (output && output.length > 0) {
-        console.log("[AI Hair Try-on] Real Replicate call successful:", output[0]);
+      let prediction = startResponse.data;
+      const getUrl = prediction.urls.get;
+
+      // Poll kiểm tra trạng thái kết quả (tối đa 30 giây)
+      let attempts = 0;
+      while (prediction.status !== "succeeded" && prediction.status !== "failed" && attempts < 30) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const checkResponse = await axios.get(getUrl, {
+          headers: { Authorization: `Token ${token}` }
+        });
+        prediction = checkResponse.data;
+        attempts++;
+      }
+
+      if (prediction.status === "succeeded" && prediction.output && prediction.output.length > 0) {
+        console.log("[AI Hair Try-on] Real Replicate call successful:", prediction.output[0]);
         return {
           success: true,
-          edited_image_url: output[0],
+          edited_image_url: prediction.output[0],
           is_mock: false
         };
       }
-      throw new Error("Không nhận được ảnh kết quả từ Replicate API.");
+      throw new Error(`Trạng thái xử lý của Replicate: ${prediction.status}`);
     } catch (err) {
-      console.error("[AI Hair Try-on Replicate Error, falling back to mock]:", err.message);
+      console.error("[AI Hair Try-on Replicate Axios Error, falling back to mock]:", err.message);
     }
   }
 
