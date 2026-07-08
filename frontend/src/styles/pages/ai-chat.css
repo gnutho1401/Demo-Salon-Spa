@@ -1536,8 +1536,8 @@
 .ai-chat-page-sidebar {
   width: 260px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, #181417 0%, #282025 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background: #fdf8fa;
+  border-right: 1px solid #f6edf0;
   display: flex;
   flex-direction: column;
   padding: 20px;
@@ -1554,7 +1554,7 @@
   border: none;
   border-radius: 10px;
   cursor: pointer;
-  box-shadow: 0 4px 15px rgba(255, 71, 120, 0.3);
+  box-shadow: 0 4px 15px rgba(255, 71, 120, 0.2);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: center;
 }
@@ -1562,7 +1562,7 @@
 .ai-chat-page-new-btn:hover {
   opacity: 0.95;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 71, 120, 0.45);
+  box-shadow: 0 6px 20px rgba(255, 71, 120, 0.35);
   filter: brightness(1.05);
 }
 
@@ -1579,7 +1579,7 @@
 }
 
 .ai-chat-page-sessions-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(232, 57, 108, 0.12);
   border-radius: 4px;
 }
 
@@ -1593,20 +1593,19 @@
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.25s ease;
-  color: rgba(255, 255, 255, 0.75);
+  color: #3f4254;
 }
 
 .ai-chat-page-session-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: #ffeef2;
   color: #ff4778;
   transform: translateX(2px);
 }
 
 .ai-chat-page-session-item.active {
-  background: rgba(255, 71, 120, 0.15);
-  border-color: rgba(255, 71, 120, 0.3);
-  color: #ff4778;
-  text-shadow: 0 0 10px rgba(255, 71, 120, 0.2);
+  background: #ffe3e8;
+  border-color: #ffccd6;
+  color: #e8396c;
 }
 
 .ai-chat-page-session-item.active .session-title-text {
@@ -1615,12 +1614,12 @@
 
 .ai-chat-page-session-item .delete-session-btn {
   opacity: 0;
-  color: rgba(255, 255, 255, 0.4) !important;
+  color: rgba(0, 0, 0, 0.3) !important;
   transition: all 0.2s ease;
 }
 
 .ai-chat-page-session-item:hover .delete-session-btn {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .ai-chat-page-session-item .delete-session-btn:hover {

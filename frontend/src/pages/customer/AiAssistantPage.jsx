@@ -931,6 +931,7 @@ export default function AiAssistantPage() {
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
+  const [showRecs, setShowRecs] = useState(true);
   
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1230,10 +1231,33 @@ export default function AiAssistantPage() {
         {/* Cửa sổ chat chính bên phải */}
         <div className="ai-chat-page-main">
           {/* Header */}
-          <div className="ai-chat-header">
-            <div className="eyebrow">✨ AI Assistant</div>
-            <h2 className="section-title">Trợ lý AI Beauty Salon</h2>
-            <p className="subtitle">Hỏi bất kỳ điều gì về dịch vụ, giá cả, đặt lịch — AI sẽ tư vấn cho bạn!</p>
+          <div className="ai-chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <div className="eyebrow">✨ AI Assistant</div>
+              <h2 className="section-title" style={{ margin: '4px 0 0 0' }}>Trợ lý AI Beauty Salon</h2>
+              <p className="subtitle" style={{ margin: '4px 0 0 0' }}>Hỏi bất kỳ điều gì về dịch vụ, giá cả, đặt lịch — AI sẽ tư vấn cho bạn!</p>
+            </div>
+            {recommendations.length > 0 && (
+              <button 
+                type="button" 
+                className="ai-toggle-recs-btn"
+                onClick={() => setShowRecs(!showRecs)}
+                style={{
+                  padding: '8px 16px',
+                  background: '#ffeef2',
+                  border: '1px solid #ffccd7',
+                  borderRadius: '20px',
+                  color: '#e8396c',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 8px rgba(232, 57, 108, 0.05)'
+                }}
+              >
+                {showRecs ? "✕ Ẩn gợi ý" : "💡 Hiện gợi ý dịch vụ"}
+              </button>
+            )}
           </div>
 
           <div className="ai-chat-container">
@@ -1369,7 +1393,7 @@ export default function AiAssistantPage() {
             </div>
 
             {/* Recommendations */}
-            {recommendations.length > 0 && (
+            {recommendations.length > 0 && showRecs && (
               <div className="ai-recommendations">
                 <h3>💡 Gợi ý dịch vụ cho bạn</h3>
                 <div className="ai-rec-grid">
