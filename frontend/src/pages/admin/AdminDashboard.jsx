@@ -1,8 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  BarChart,
+  Bar
+} from "recharts";
 
 const DEFAULT_AVATAR = "/images/default-avatar.png";
 
+// Helper Formatters
 function formatMoney(value) {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -35,41 +51,18 @@ function safeAvatar(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
 }
 
-function StatCard({ label, value, note, icon }) {
+// Modern Metric Card Component
+function StatCard({ label, value, note, icon, trend, colorClass }) {
   return (
-    <article className="admin-stat-card">
-      <div className="admin-stat-icon">{icon}</div>
-      <div>
-        <p>{label}</p>
-        <h3>{value}</h3>
-        {note ? <span>{note}</span> : null}
+    <article className={`admin-stat-card-new ${colorClass || ""}`}>
+      <div className="card-header-row">
+        <span className="card-label">{label}</span>
+        <span className="card-icon">{icon}</span>
       </div>
+      <h3 className="card-value">{value}</h3>
+      {note && <div className="card-note">{note}</div>}
+      {trend && <span className="card-trend">{trend}</span>}
     </article>
-  );
-}
-
-function MiniBarChart({ items }) {
-  const max = Math.max(...items.map((item) => Number(item.revenue || 0)), 1);
-
-  return (
-    <div className="admin-mini-chart">
-      {items.map((item) => {
-        const height = Math.max(10, (Number(item.revenue || 0) / max) * 100);
-
-        return (
-          <div className="admin-chart-item" key={item.date}>
-            <div className="admin-chart-track">
-              <div
-                className="admin-chart-bar"
-                style={{ height: `${height}%` }}
-                title={formatMoney(item.revenue)}
-              />
-            </div>
-            <span>{String(item.date).slice(5)}</span>
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
@@ -78,6 +71,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [activeSubTab, setActiveSubTab] = useState("overview"); // "overview", "staff", "appointments", "feedback"
 
   async function loadDashboard(isRefresh = false) {
     try {
@@ -105,390 +99,569 @@ export default function AdminDashboard() {
 
   const summary = data?.summary || {};
 
-  const maxServiceCount = useMemo(() => {
-    const values =
-      data?.topServices?.map((item) => item.appointmentCount) || [];
-    return Math.max(...values, 1);
+  // Formatter for Recharts money axis
+  const formatYAxisMoney = (value) => {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+    return value;
+  };
+
+  // 1. Prepare Revenue Data
+  const revenueChartData = useMemo(() => {
+    if (!data?.revenueByDay) return [];
+    return data.revenueByDay.map((item) => ({
+      name: new Date(item.date).toLocaleDateString("vi-VN", { weekday: "short", day: "numeric" }),
+      DoanhThu: Number(item.revenue || 0),
+      rawDate: item.date
+    }));
+  }, [data]);
+
+  // 2. Prepare Appointment Status Data for Donut
+  const appointmentStatusData = useMemo(() => {
+    if (!data?.appointmentStatus) return [];
+    const statusMap = {
+      COMPLETED: { label: "Đã hoàn thành", color: "#10b981" },
+      CONFIRMED: { label: "Đã xác nhận", color: "#3b82f6" },
+      PENDING: { label: "Chờ duyệt", color: "#f59e0b" },
+      CANCELLED: { label: "Đã hủy", color: "#ef4444" }
+    };
+
+    return data.appointmentStatus.map((item) => {
+      const config = statusMap[item.status] || { label: item.status, color: "#6366f1" };
+      return {
+        name: config.label,
+        value: item.count,
+        color: config.color
+      };
+    });
+  }, [data]);
+
+  // 3. Prepare Payment Status Data for Donut
+  const paymentStatusData = useMemo(() => {
+    if (!data?.paymentStatus) return [];
+    const statusMap = {
+      PAID: { label: "Đã thanh toán", color: "#10b981" },
+      PENDING: { label: "Chờ thanh toán", color: "#f59e0b" },
+      FAILED: { label: "Thanh toán lỗi", color: "#ef4444" }
+    };
+
+    return data.paymentStatus.map((item) => {
+      const config = statusMap[item.status] || { label: item.status, color: "#6366f1" };
+      return {
+        name: config.label,
+        value: item.count,
+        color: config.color
+      };
+    });
+  }, [data]);
+
+  // 4. Prepare Top Services Data
+  const topServicesData = useMemo(() => {
+    if (!data?.topServices) return [];
+    return [...data.topServices]
+      .sort((a, b) => b.appointmentCount - a.appointmentCount)
+      .slice(0, 5)
+      .map(item => ({
+        name: item.serviceName.length > 20 ? `${item.serviceName.slice(0, 20)}...` : item.serviceName,
+        "Lượt đặt": item.appointmentCount,
+        "Doanh thu": item.revenue
+      }));
   }, [data]);
 
   return (
-    <section className="admin-dashboard admin-page">
-      <div className="admin-dashboard-hero">
-        <div>
-          <div className="admin-eyebrow">Admin Overview</div>
-          <h1>Dashboard quản trị Beauty Salon</h1>
+    <section className="admin-dashboard admin-page-new">
+      
+      {/* Upper Dashboard Hero */}
+      <header className="dashboard-new-header">
+        <div className="header-meta">
+          <span className="eyebrow-accent">⚡ HỆ THỐNG QUẢN TRỊ SALON CAO CẤP</span>
+          <h1>Chào mừng trở lại, Admin</h1>
           <p>
-            Theo dõi doanh thu, lịch hẹn, thanh toán, đánh giá, phản hồi và hiệu
-            suất kỹ thuật viên theo dữ liệu thật từ database.
+            Báo cáo trực quan và số liệu tổng hợp thời gian thực từ cơ sở dữ liệu hệ thống.
           </p>
         </div>
 
-        <button
-          type="button"
-          className="admin-refresh-btn"
-          onClick={() => loadDashboard(true)}
-          disabled={refreshing}
-        >
-          {refreshing ? "Đang cập nhật..." : "Làm mới"}
-        </button>
-      </div>
+        <div className="header-actions">
+          <button
+            type="button"
+            className="refresh-btn-new"
+            onClick={() => loadDashboard(true)}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <>
+                <span className="btn-spinner" /> Đang cập nhật...
+              </>
+            ) : (
+              <>
+                <span>🔄</span> Làm mới dữ liệu
+              </>
+            )}
+          </button>
+        </div>
+      </header>
 
-      {loading ? (
-        <div className="admin-loading-card">Đang tải dữ liệu dashboard...</div>
-      ) : null}
+      {/* Loading & Error Blocks */}
+      {loading && (
+        <div className="dashboard-loading-overlay">
+          <div className="spinner-large" />
+          <p>Đang đồng bộ số liệu và dựng biểu đồ...</p>
+        </div>
+      )}
 
-      {error ? <div className="admin-error-card">{error}</div> : null}
+      {error && (
+        <div className="dashboard-error-banner">
+          <span>⚠️</span> {error}
+        </div>
+      )}
 
-      {!loading && data ? (
+      {!loading && data && (
         <>
-          <div className="admin-stat-grid">
+          {/* 1. Stat Cards Grid */}
+          <section className="dashboard-stats-grid">
             <StatCard
-              icon="₫"
-              label="Doanh thu hôm nay"
+              label="DOANH THU HÔM NAY"
               value={formatMoney(summary.revenueToday)}
-              note="Tổng payment PAID trong ngày"
+              note="Từ các giao dịch thanh toán thành công"
+              icon="💰"
+              colorClass="stat-revenue-today"
             />
             <StatCard
-              icon="↗"
-              label="Doanh thu tháng này"
+              label="DOANH THU THÁNG NÀY"
               value={formatMoney(summary.revenueThisMonth)}
-              note="Tổng doanh thu đã thanh toán"
+              note="Tổng tích lũy tháng hiện tại"
+              icon="📈"
+              colorClass="stat-revenue-month"
             />
             <StatCard
-              icon="📅"
-              label="Lịch hẹn hôm nay"
+              label="LỊCH HẸN HÔM NAY"
               value={summary.appointmentsToday}
-              note={`${summary.totalAppointments || 0} lịch hẹn toàn hệ thống`}
+              note={`Tổng số ${summary.totalAppointments || 0} lịch đặt`}
+              icon="📅"
+              colorClass="stat-appointments"
             />
             <StatCard
-              icon="👥"
-              label="Khách hàng"
+              label="TỔNG SỐ KHÁCH HÀNG"
               value={summary.totalCustomers}
-              note={`${summary.activeUsers || 0} tài khoản đang active`}
+              note={`${summary.activeUsers || 0} tài khoản đang hoạt động`}
+              icon="👥"
+              colorClass="stat-customers"
             />
-            <StatCard
-              icon="💆"
-              label="Nhân viên"
-              value={summary.totalEmployees}
-              note="Bao gồm technician/receptionist/admin"
-            />
-            <StatCard
-              icon="✨"
-              label="Dịch vụ đang bán"
-              value={summary.activeServices}
-              note={`${summary.inactiveServices || 0} dịch vụ không active`}
-            />
-            <StatCard
-              icon="💳"
-              label="Payment cần xử lý"
-              value={summary.pendingPayments}
-              note={`${summary.failedPayments || 0} payment thất bại`}
-            />
-            <StatCard
-              icon="💬"
-              label="Review / Feedback chờ xử lý"
-              value={`${summary.pendingReviews || 0} / ${
-                summary.pendingFeedbacks || 0
-              }`}
-              note="Cần admin kiểm tra"
-            />
-          </div>
+          </section>
 
-          <div className="admin-dashboard-layout">
-            <article className="admin-panel admin-panel-large">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Doanh thu 7 ngày gần nhất</h2>
-                  <p>Theo các payment có trạng thái PAID.</p>
-                </div>
-              </div>
+          {/* 2. Secondary Mini Metrics */}
+          <section className="dashboard-mini-metrics-row">
+            <div className="mini-metric">
+              <span className="label">Nhân sự hệ thống</span>
+              <strong>{summary.totalEmployees} nhân viên</strong>
+            </div>
+            <div className="mini-metric">
+              <span className="label">Danh mục dịch vụ</span>
+              <strong>{summary.activeServices} active ({summary.inactiveServices || 0} ẩn)</strong>
+            </div>
+            <div className="mini-metric">
+              <span className="label">Thanh toán chờ duyệt</span>
+              <strong>{summary.pendingPayments || 0} pending</strong>
+            </div>
+            <div className="mini-metric">
+              <span className="label">Đánh giá mới</span>
+              <strong>{summary.pendingReviews || 0} review chưa đọc</strong>
+            </div>
+          </section>
 
-              <MiniBarChart items={data.revenueByDay || []} />
-            </article>
+          {/* 3. Navigation Tabs */}
+          <nav className="dashboard-subtab-nav">
+            <button
+              className={`subtab-btn ${activeSubTab === "overview" ? "active" : ""}`}
+              onClick={() => setActiveSubTab("overview")}
+            >
+              📊 Biểu đồ tổng quan
+            </button>
+            <button
+              className={`subtab-btn ${activeSubTab === "staff" ? "active" : ""}`}
+              onClick={() => setActiveSubTab("staff")}
+            >
+              💆 Hiệu suất & Dịch vụ
+            </button>
+            <button
+              className={`subtab-btn ${activeSubTab === "appointments" ? "active" : ""}`}
+              onClick={() => setActiveSubTab("appointments")}
+            >
+              📋 Nhật ký lịch hẹn mới
+            </button>
+            <button
+              className={`subtab-btn ${activeSubTab === "feedback" ? "active" : ""}`}
+              onClick={() => setActiveSubTab("feedback")}
+            >
+              💬 Feedback & Đánh giá
+            </button>
+          </nav>
 
-            <article className="admin-panel admin-panel-large">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Thống kê hàng chờ thông minh (Smart Waiting List)</h2>
-                  <p>Phân tích tỷ lệ chuyển đổi và trạng thái hàng chờ hệ thống.</p>
-                </div>
-              </div>
-
-              <div className="admin-waitlist-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', padding: '16px 0' }}>
-                <div style={{ padding: '20px', borderRadius: '20px', background: '#fff7fb', border: '1px solid #ffe0eb', textAlign: 'center' }}>
-                  <span style={{ fontSize: '28px' }}>⏳</span>
-                  <p style={{ margin: '8px 0 4px', color: '#7b6874', fontSize: '13px', fontWeight: 'bold' }}>Tổng lượt tham gia hàng chờ</p>
-                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#2d2430' }}>{summary.totalWaitingCount || 0}</h3>
-                </div>
-
-                <div style={{ padding: '20px', borderRadius: '20px', background: '#fdf2f8', border: '1px solid #fbcfe8', textAlign: 'center' }}>
-                  <span style={{ fontSize: '28px' }}>⚡</span>
-                  <p style={{ margin: '8px 0 4px', color: '#db2777', fontSize: '13px', fontWeight: 'bold' }}>Lượt khớp slot thành công</p>
-                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#db2777' }}>{summary.matchedWaitingCount || 0}</h3>
-                </div>
-
-                <div style={{ padding: '20px', borderRadius: '20px', background: '#f0fdf4', border: '1px solid #bbf7d0', textAlign: 'center' }}>
-                  <span style={{ fontSize: '28px' }}>✅</span>
-                  <p style={{ margin: '8px 0 4px', color: '#16a34a', fontSize: '13px', fontWeight: 'bold' }}>Lượt đặt lịch thành công</p>
-                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#16a34a' }}>{summary.bookedWaitingCount || 0}</h3>
-                </div>
-
-                <div style={{ padding: '20px', borderRadius: '20px', background: '#f9fafb', border: '1px solid #e5e7eb', textAlign: 'center' }}>
-                  <span style={{ fontSize: '28px' }}>📆</span>
-                  <p style={{ margin: '8px 0 4px', color: '#4b5563', fontSize: '13px', fontWeight: 'bold' }}>Lượt hết hạn / Bỏ lỡ</p>
-                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#4b5563' }}>{summary.expiredWaitingCount || 0}</h3>
-                </div>
-
-                <div style={{ padding: '20px', borderRadius: '20px', background: '#eff6ff', border: '1px solid #bfdbfe', textAlign: 'center' }}>
-                  <span style={{ fontSize: '28px' }}>📈</span>
-                  <p style={{ margin: '8px 0 4px', color: '#2563eb', fontSize: '13px', fontWeight: 'bold' }}>Tỷ lệ chuyển đổi thành công</p>
-                  <h3 style={{ margin: 0, fontSize: '28px', fontWeight: '850', color: '#2563eb' }}>
-                    {summary.totalWaitingCount
-                      ? ((summary.bookedWaitingCount / summary.totalWaitingCount) * 100).toFixed(1)
-                      : "0.0"}%
-                  </h3>
-                </div>
-              </div>
-            </article>
-
-            <article className="admin-panel">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Trạng thái lịch hẹn</h2>
-                  <p>Tổng hợp toàn bộ appointment.</p>
-                </div>
-              </div>
-
-              <div className="admin-status-list">
-                {(data.appointmentStatus || []).map((item) => (
-                  <div className="admin-status-row" key={item.status}>
-                    <span className={statusClass(item.status)}>
-                      {item.status}
-                    </span>
-                    <strong>{item.count}</strong>
+          {/* Tab Contents */}
+          <main className="dashboard-tab-content">
+            
+            {/* SUBTAB: OVERVIEW */}
+            {activeSubTab === "overview" && (
+              <div className="overview-tab-layout">
+                
+                {/* Line area Chart */}
+                <article className="chart-card large-chart">
+                  <div className="chart-header">
+                    <h3>Xu hướng doanh thu 7 ngày gần nhất</h3>
+                    <p>Thống kê theo các hóa đơn đã hoàn tất thanh toán thành công (PAID)</p>
                   </div>
-                ))}
-
-                {!data.appointmentStatus?.length ? (
-                  <p className="admin-empty">Chưa có lịch hẹn.</p>
-                ) : null}
-              </div>
-            </article>
-
-            <article className="admin-panel">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Trạng thái thanh toán</h2>
-                  <p>Theo bảng Payments.</p>
-                </div>
-              </div>
-
-              <div className="admin-status-list">
-                {(data.paymentStatus || []).map((item) => (
-                  <div className="admin-status-row" key={item.status}>
-                    <span className={statusClass(item.status)}>
-                      {item.status}
-                    </span>
-                    <strong>{item.count}</strong>
+                  <div className="chart-container" style={{ width: '100%', height: 350 }}>
+                    <ResponsiveContainer>
+                      <AreaChart data={revenueChartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#e8396c" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="#e8396c" stopOpacity={0.0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0e2e5" />
+                        <XAxis dataKey="name" stroke="#a38f9d" tickLine={false} axisLine={false} style={{ fontSize: 12 }} />
+                        <YAxis stroke="#a38f9d" tickLine={false} axisLine={false} tickFormatter={formatYAxisMoney} style={{ fontSize: 12 }} />
+                        <Tooltip 
+                          formatter={(value) => [formatMoney(value), "Doanh thu"]}
+                          contentStyle={{ background: "#ffffff", border: "1px solid #ffdce3", borderRadius: "12px", boxShadow: "0 8px 24px rgba(0,0,0,0.05)" }}
+                        />
+                        <Area type="monotone" dataKey="DoanhThu" stroke="#e8396c" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
+                </article>
 
-                {!data.paymentStatus?.length ? (
-                  <p className="admin-empty">Chưa có payment.</p>
-                ) : null}
-              </div>
-            </article>
+                {/* Donut Charts Block */}
+                <div className="donut-charts-row">
+                  {/* Donut 1 */}
+                  <article className="chart-card">
+                    <div className="chart-header">
+                      <h3>Phân bố Trạng thái Lịch hẹn</h3>
+                      <p>Cơ cấu theo tổng số lịch đặt trong hệ thống</p>
+                    </div>
+                    <div className="donut-chart-wrapper" style={{ width: '100%', height: 220, position: 'relative' }}>
+                      <ResponsiveContainer>
+                        <PieChart>
+                          <Pie
+                            data={appointmentStatusData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {appointmentStatusData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => [`${value} lịch hẹn`, "Số lượng"]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="chart-custom-legend">
+                      {appointmentStatusData.map((item, idx) => (
+                        <div className="legend-item" key={idx}>
+                          <span className="legend-dot" style={{ backgroundColor: item.color }} />
+                          <span className="legend-label">{item.name}: <strong>{item.value}</strong></span>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
 
-            <article className="admin-panel admin-panel-large">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Dịch vụ bán chạy</h2>
-                  <p>Top dịch vụ theo số lịch hẹn và doanh thu.</p>
+                  {/* Donut 2 */}
+                  <article className="chart-card">
+                    <div className="chart-header">
+                      <h3>Cơ cấu Trạng thái Giao dịch</h3>
+                      <p>Thống kê theo các lượt thanh toán (Payments)</p>
+                    </div>
+                    <div className="donut-chart-wrapper" style={{ width: '100%', height: 220, position: 'relative' }}>
+                      <ResponsiveContainer>
+                        <PieChart>
+                          <Pie
+                            data={paymentStatusData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {paymentStatusData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => [`${value} giao dịch`, "Số lượng"]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="chart-custom-legend">
+                      {paymentStatusData.map((item, idx) => (
+                        <div className="legend-item" key={idx}>
+                          <span className="legend-dot" style={{ backgroundColor: item.color }} />
+                          <span className="legend-label">{item.name}: <strong>{item.value}</strong></span>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
                 </div>
               </div>
+            )}
 
-              <div className="admin-service-rank">
-                {(data.topServices || []).map((item, index) => {
-                  const width = Math.max(
-                    8,
-                    (item.appointmentCount / maxServiceCount) * 100,
-                  );
+            {/* SUBTAB: STAFF & SERVICES */}
+            {activeSubTab === "staff" && (
+              <div className="staff-services-tab-layout">
+                
+                {/* Horizontal Bar Chart for Services */}
+                <article className="chart-card services-chart">
+                  <div className="chart-header">
+                    <h3>Top 5 dịch vụ được đặt nhiều nhất</h3>
+                    <p>Theo số lượng lịch hẹn và tổng doanh thu thu về</p>
+                  </div>
+                  <div className="chart-container" style={{ width: '100%', height: 320 }}>
+                    <ResponsiveContainer>
+                      <BarChart
+                        data={topServicesData}
+                        layout="vertical"
+                        margin={{ top: 20, right: 30, left: 40, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f0e2e5" />
+                        <XAxis type="number" stroke="#a38f9d" tickLine={false} axisLine={false} />
+                        <YAxis dataKey="name" type="category" stroke="#a38f9d" tickLine={false} axisLine={false} width={120} style={{ fontSize: 11 }} />
+                        <Tooltip formatter={(value) => [`${value} lượt đặt`, "Số lượng"]} />
+                        <Bar dataKey="Lượt đặt" fill="#e8396c" radius={[0, 8, 8, 0]} barSize={20}>
+                          {topServicesData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={index === 0 ? "#ff4778" : index === 1 ? "#ff6992" : index === 2 ? "#ffa1ba" : "#ffd1dc"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </article>
 
-                  return (
-                    <div className="admin-rank-item" key={item.serviceId}>
-                      <div className="admin-rank-index">{index + 1}</div>
-                      <div className="admin-rank-main">
-                        <div className="admin-rank-title">
-                          <strong>{item.serviceName}</strong>
-                          <span>{item.categoryName || "Chưa có danh mục"}</span>
-                        </div>
-                        <div className="admin-rank-bar">
-                          <div style={{ width: `${width}%` }} />
-                        </div>
+                {/* Smart Waiting List Panel */}
+                <article className="chart-card waiting-list-panel">
+                  <div className="chart-header">
+                    <h3>Hiệu suất hàng chờ thông minh (Smart Waiting List)</h3>
+                    <p>Phân tích chuyển đổi từ danh sách hàng chờ tự động</p>
+                  </div>
+                  <div className="waiting-conversion-funnel">
+                    <div className="funnel-metrics-grid">
+                      <div className="funnel-card">
+                        <span className="funnel-icon">⏳</span>
+                        <h4>Lượt chờ</h4>
+                        <div className="val">{summary.totalWaitingCount || 0}</div>
                       </div>
-                      <div className="admin-rank-meta">
-                        <strong>{item.appointmentCount}</strong>
-                        <span>{formatMoney(item.revenue)}</span>
+                      <div className="funnel-card active">
+                        <span className="funnel-icon">⚡</span>
+                        <h4>Khớp slot</h4>
+                        <div className="val">{summary.matchedWaitingCount || 0}</div>
+                      </div>
+                      <div className="funnel-card success">
+                        <span className="funnel-icon">✅</span>
+                        <h4>Đặt lịch</h4>
+                        <div className="val">{summary.bookedWaitingCount || 0}</div>
+                      </div>
+                      <div className="funnel-card fail">
+                        <span className="funnel-icon">📅</span>
+                        <h4>Hết hạn</h4>
+                        <div className="val">{summary.expiredWaitingCount || 0}</div>
                       </div>
                     </div>
-                  );
-                })}
 
-                {!data.topServices?.length ? (
-                  <p className="admin-empty">Chưa có dữ liệu dịch vụ.</p>
-                ) : null}
-              </div>
-            </article>
-
-            <article className="admin-panel">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Top kỹ thuật viên</h2>
-                  <p>Hiệu suất theo lịch hẹn, doanh thu và rating.</p>
-                </div>
-              </div>
-
-              <div className="admin-tech-list">
-                {(data.topTechnicians || []).map((item) => (
-                  <div className="admin-tech-card" key={item.employeeId}>
-                    <img src={safeAvatar(item.avatarUrl)} alt={item.fullName} />
-                    <div>
-                      <strong>{item.fullName}</strong>
-                      <span>
-                        {item.specialization || item.position || "Technician"}
-                      </span>
-                      <small>
-                        {item.appointmentCount} lịch •{" "}
-                        {item.avgRating
-                          ? `${item.avgRating.toFixed(1)}★`
-                          : "Chưa có rating"}{" "}
-                        • {formatMoney(item.revenue)}
-                      </small>
+                    <div className="funnel-conversion-rate-box">
+                      <div className="rate-circle">
+                        <span className="percentage">
+                          {summary.totalWaitingCount
+                            ? ((summary.bookedWaitingCount / summary.totalWaitingCount) * 100).toFixed(1)
+                            : "0.0"}%
+                        </span>
+                        <span className="lbl">Tỷ lệ chuyển đổi</span>
+                      </div>
+                      <div className="funnel-text-summary">
+                        <p>
+                          Hệ thống đã tự động kết nối và lắp đầy các khung giờ trống bằng khách hàng đăng ký hàng chờ.
+                          Giúp tăng tối đa công suất làm việc của chi nhánh.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                ))}
+                </article>
 
-                {!data.topTechnicians?.length ? (
-                  <p className="admin-empty">Chưa có kỹ thuật viên.</p>
-                ) : null}
-              </div>
-            </article>
-
-            <article className="admin-panel admin-panel-large">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Lịch hẹn mới nhất</h2>
-                  <p>Theo thời gian mới nhất đến cũ hơn.</p>
-                </div>
-              </div>
-
-              <div className="admin-table-wrap">
-                <table className="admin-mini-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Khách hàng</th>
-                      <th>Kỹ thuật viên</th>
-                      <th>Ngày giờ</th>
-                      <th>Trạng thái</th>
-                      <th>Payment</th>
-                      <th>Tổng tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data.latestAppointments || []).map((item) => (
-                      <tr key={item.appointmentId}>
-                        <td>#{item.appointmentId}</td>
-                        <td>{item.customerName || "N/A"}</td>
-                        <td>{item.employeeName || "Chưa phân công"}</td>
-                        <td>
-                          {formatDate(item.appointmentDate)}{" "}
-                          {timeText(item.startTime)}
-                        </td>
-                        <td>
-                          <span className={statusClass(item.status)}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={statusClass(item.paymentStatus)}>
-                            {item.paymentStatus}
-                          </span>
-                        </td>
-                        <td>{formatMoney(item.finalAmount)}</td>
-                      </tr>
+                {/* Top Technicians List */}
+                <article className="chart-card technicians-card" style={{ gridColumn: 'span 2' }}>
+                  <div className="chart-header">
+                    <h3>Bảng xếp hạng năng suất Kỹ thuật viên</h3>
+                    <p>Dựa trên xếp hạng trung bình (Rating), số lịch phục vụ và doanh thu đem lại</p>
+                  </div>
+                  <div className="tech-ranking-grid">
+                    {(data.topTechnicians || []).map((item, idx) => (
+                      <div className="tech-ranking-row" key={item.employeeId}>
+                        <div className="rank-badge">{idx + 1}</div>
+                        <img className="tech-avatar" src={safeAvatar(item.avatarUrl)} alt={item.fullName} />
+                        <div className="tech-details">
+                          <h4>{item.fullName}</h4>
+                          <span className="spec">{item.specialization || item.position || "Kỹ thuật viên"}</span>
+                        </div>
+                        <div className="tech-stat">
+                          <span className="lbl">Lịch hẹn</span>
+                          <strong>{item.appointmentCount}</strong>
+                        </div>
+                        <div className="tech-stat">
+                          <span className="lbl">Đánh giá</span>
+                          <strong style={{ color: "#f59e0b" }}>{item.avgRating ? `${item.avgRating.toFixed(1)} ★` : "N/A"}</strong>
+                        </div>
+                        <div className="tech-stat">
+                          <span className="lbl">Tổng doanh số</span>
+                          <strong style={{ color: "#e8396c" }}>{formatMoney(item.revenue)}</strong>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-
-                {!data.latestAppointments?.length ? (
-                  <p className="admin-empty">Chưa có lịch hẹn.</p>
-                ) : null}
-              </div>
-            </article>
-
-            <article className="admin-panel">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Review mới nhất</h2>
-                  <p>Đánh giá từ khách hàng.</p>
-                </div>
-              </div>
-
-              <div className="admin-review-list">
-                {(data.latestReviews || []).map((item) => (
-                  <div className="admin-review-card" key={item.reviewId}>
-                    <div className="admin-review-top">
-                      <strong>{item.customerName}</strong>
-                      <span>{item.rating}/5 ★</span>
-                    </div>
-                    <p>{item.comment || "Không có nội dung đánh giá."}</p>
-                    <small>
-                      {item.serviceName} • {item.employeeName || "N/A"} •{" "}
-                      {formatDateTime(item.createdAt)}
-                    </small>
+                    {!data.topTechnicians?.length && (
+                      <p className="no-data-text">Chưa ghi nhận dữ liệu kỹ thuật viên.</p>
+                    )}
                   </div>
-                ))}
+                </article>
 
-                {!data.latestReviews?.length ? (
-                  <p className="admin-empty">Chưa có review.</p>
-                ) : null}
               </div>
-            </article>
+            )}
 
-            <article className="admin-panel">
-              <div className="admin-panel-head">
-                <div>
-                  <h2>Feedback mới nhất</h2>
-                  <p>Phản hồi cần admin theo dõi.</p>
+            {/* SUBTAB: APPOINTMENTS LOGS */}
+            {activeSubTab === "appointments" && (
+              <article className="chart-card full-width-panel">
+                <div className="chart-header">
+                  <h3>Nhật ký lịch hẹn đăng ký mới nhất</h3>
+                  <p>Hiển thị các lịch hẹn được tạo gần đây trên toàn hệ thống</p>
                 </div>
-              </div>
+                <div className="table-responsive-new">
+                  <table className="premium-admin-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Khách hàng</th>
+                        <th>Kỹ thuật viên</th>
+                        <th>Ngày phục vụ</th>
+                        <th>Giờ bắt đầu</th>
+                        <th>Trạng thái lịch</th>
+                        <th>Thanh toán</th>
+                        <th style={{ textAlign: 'right' }}>Tổng hóa đơn</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.latestAppointments || []).map((item) => (
+                        <tr key={item.appointmentId}>
+                          <td><strong>#{item.appointmentId}</strong></td>
+                          <td>
+                            <div className="client-cell">
+                              <strong>{item.customerName || "Vô danh"}</strong>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="staff-assign-badge">
+                              {item.employeeName || "⚠️ Chưa phân công"}
+                            </div>
+                          </td>
+                          <td>{formatDate(item.appointmentDate)}</td>
+                          <td><strong>{timeText(item.startTime)}</strong></td>
+                          <td>
+                            <span className={statusClass(item.status)}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={statusClass(item.paymentStatus)}>
+                              {item.paymentStatus}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#e8396c' }}>
+                            {formatMoney(item.finalAmount)}
+                          </td>
+                        </tr>
+                      ))}
+                      {!data.latestAppointments?.length && (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: "center", padding: "40px 0", color: "#a38f9d" }}>
+                            Chưa ghi nhận lịch hẹn nào trong hệ thống.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            )}
 
-              <div className="admin-feedback-list">
-                {(data.recentFeedbacks || []).map((item) => (
-                  <div className="admin-feedback-card" key={item.feedbackId}>
-                    <div>
-                      <strong>{item.subject}</strong>
-                      <span className={statusClass(item.status)}>
-                        {item.status}
-                      </span>
-                    </div>
-                    <p>{item.content}</p>
-                    <small>
-                      {item.customerName || "Khách hàng"} •{" "}
-                      {formatDateTime(item.createdAt)}
-                    </small>
+            {/* SUBTAB: FEEDBACK & REVIEWS */}
+            {activeSubTab === "feedback" && (
+              <div className="feedback-reviews-tab-layout">
+                
+                {/* Customer Reviews Card */}
+                <article className="chart-card">
+                  <div className="chart-header">
+                    <h3>Đánh giá dịch vụ gần đây (Reviews)</h3>
+                    <p>Ý kiến phản hồi công khai từ khách hàng sau khi hoàn tất dịch vụ</p>
                   </div>
-                ))}
+                  <div className="premium-reviews-feed">
+                    {(data.latestReviews || []).map((item) => (
+                      <div className="premium-review-card-new" key={item.reviewId}>
+                        <div className="review-top-bar">
+                          <strong>{item.customerName}</strong>
+                          <span className="rating-stars">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <span key={i} style={{ color: i < item.rating ? "#f59e0b" : "#e2e8f0" }}>★</span>
+                            ))}
+                          </span>
+                        </div>
+                        <p className="comment">{item.comment || "Khách hàng không để lại bình luận chữ."}</p>
+                        <div className="review-bottom-meta">
+                          <span className="service">{item.serviceName}</span>
+                          <span className="dot" />
+                          <span className="tech">Thực hiện: {item.employeeName || "N/A"}</span>
+                          <span className="dot" />
+                          <span className="date">{formatDateTime(item.createdAt)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {!data.latestReviews?.length && (
+                      <p className="no-data-text">Chưa ghi nhận đánh giá nào.</p>
+                    )}
+                  </div>
+                </article>
 
-                {!data.recentFeedbacks?.length ? (
-                  <p className="admin-empty">Chưa có feedback.</p>
-                ) : null}
+                {/* Customer Feedbacks (Góp ý hệ thống) */}
+                <article className="chart-card">
+                  <div className="chart-header">
+                    <h3>Phản hồi góp ý hệ thống (Feedbacks)</h3>
+                    <p>Các hòm thư đóng góp ý kiến hoặc phản hồi khẩn cấp cần Admin xử lý</p>
+                  </div>
+                  <div className="premium-feedbacks-feed">
+                    {(data.recentFeedbacks || []).map((item) => (
+                      <div className="premium-feedback-card-new" key={item.feedbackId}>
+                        <div className="feedback-top-bar">
+                          <h4>{item.subject}</h4>
+                          <span className={statusClass(item.status)}>{item.status}</span>
+                        </div>
+                        <p className="content">{item.content}</p>
+                        <div className="feedback-bottom-meta">
+                          <strong>Người gửi: {item.customerName || "Ẩn danh"}</strong>
+                          <span className="date">{formatDateTime(item.createdAt)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {!data.recentFeedbacks?.length && (
+                      <p className="no-data-text">Chưa có hòm thư góp ý cần xử lý.</p>
+                    )}
+                  </div>
+                </article>
+
               </div>
-            </article>
-          </div>
+            )}
+
+          </main>
         </>
-      ) : null}
+      )}
+
     </section>
   );
 }
