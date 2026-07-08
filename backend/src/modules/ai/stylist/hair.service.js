@@ -1,5 +1,6 @@
 const axios = require("axios");
 
+// Trigger nodemon reload for REPLICATE_API_TOKEN env
 async function editHair(imageUrl, prompt) {
   const token = process.env.REPLICATE_API_TOKEN;
   const normalizedPrompt = String(prompt || '').toLowerCase();
@@ -13,7 +14,7 @@ async function editHair(imageUrl, prompt) {
       const startResponse = await axios.post(
         "https://api.replicate.com/v1/predictions",
         {
-          version: "30c1d0b916a6f8efce20f144d7b3c6c31934a772458ddaf597be6e576fc9e614",
+          version: "30c1d0b916a6f8efce20493f5d61ee27491ab2a60437c13c588468b9810ec23f",
           input: {
             image: imageUrl,
             prompt: prompt,
