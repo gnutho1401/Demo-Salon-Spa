@@ -64,6 +64,7 @@ export default function AiStylistAdvisor() {
   const [tryonResult, setTryonResult] = useState("");
   const [tryonLoading, setTryonLoading] = useState(false);
   const [tryonError, setTryonError] = useState("");
+  const [isMockResult, setIsMockResult] = useState(false);
 
   const fetchHistory = async () => {
     try {
@@ -191,6 +192,7 @@ export default function AiStylistAdvisor() {
       });
       if (res.data?.data?.edited_image_url || res.data?.edited_image_url) {
         setTryonResult(res.data.data.edited_image_url || res.data.edited_image_url);
+        setIsMockResult(res.data.data.is_mock || false);
       } else {
         throw new Error("Không nhận được hình ảnh kết quả từ server.");
       }
@@ -1135,6 +1137,28 @@ export default function AiStylistAdvisor() {
                       <h3 style={{ fontSize: "14.5px", color: "#e8396c", marginBottom: 16, fontWeight: 700, marginTop: 0 }}>
                         📸 So sánh kết quả biến đổi
                       </h3>
+                      
+                      {isMockResult && !tryonLoading && (
+                        <div style={{
+                          background: "#fff9e6",
+                          border: "1px solid #ffe28c",
+                          borderRadius: "12px",
+                          padding: "12px 16px",
+                          marginBottom: 16,
+                          fontSize: "13px",
+                          color: "#856404",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          textAlign: "left",
+                          lineHeight: "1.4"
+                        }}>
+                          <span style={{ fontSize: "18px" }}>💡</span>
+                          <span>
+                            <strong>Chế độ Mô phỏng:</strong> Do chưa cấu hình khóa API thật `REPLICATE_API_TOKEN` ở backend, hệ thống đang hiển thị ảnh minh họa mẫu tương tự từ thư viện. Khi được cấu hình, AI thật sẽ thay thế kiểu tóc trực tiếp trên chính khuôn mặt bạn!
+                          </span>
+                        </div>
+                      )}
                       
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                         {/* Before */}
