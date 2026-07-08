@@ -177,8 +177,18 @@ export default function BookingPage() {
     const dateParam =
       searchParams.get("date") || searchParams.get("appointmentDate");
     const customerPackageId = searchParams.get("customerPackageId");
+    const hairPrompt = searchParams.get("hairPrompt");
+    const hairImage = searchParams.get("hairImage");
 
-    if (!serviceId && !employeeId && !dateParam && !customerPackageId) return;
+    if (!serviceId && !employeeId && !dateParam && !customerPackageId && !hairPrompt && !hairImage) return;
+
+    let prefilledNotes = "";
+    if (hairPrompt) {
+      prefilledNotes += `[Yêu cầu thiết kế tóc AI]: ${hairPrompt}`;
+    }
+    if (hairImage) {
+      prefilledNotes += `\n[Link ảnh mẫu tóc thiết kế]: ${hairImage}`;
+    }
 
     setForm((prev) => ({
       ...prev,
@@ -186,6 +196,7 @@ export default function BookingPage() {
       employeeId: employeeId || prev.employeeId,
       appointmentDate: dateParam || prev.appointmentDate,
       customerPackageId: customerPackageId || prev.customerPackageId,
+      notes: prefilledNotes ? (prev.notes ? `${prev.notes}\n${prefilledNotes}` : prefilledNotes) : prev.notes,
     }));
 
     if (customerPackageId) {

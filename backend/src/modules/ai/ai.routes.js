@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const controller = require("./ai.controller");
 const stylistController = require("./stylist/stylist.controller");
+const hairController = require("./stylist/hair.controller");
 const authMiddleware = require("../../middlewares/auth.middleware");
 const allowRoles = require("../../middlewares/role.middleware");
 const { verifyToken } = require("../../utils/jwt");
@@ -26,6 +27,7 @@ router.get("/my/chat", authMiddleware, controller.getChatHistory);
 router.post("/chat", optionalAuthMiddleware, controller.chat);
 router.delete("/my/chat", authMiddleware, controller.clearMyChatHistory);
 router.post("/stylist/analyze", authMiddleware, stylistController.analyze);
+router.post("/stylist/tryon", authMiddleware, hairController.tryOn);
 router.get("/stylist/history", authMiddleware, stylistController.getHistory);
 router.get(
   "/",

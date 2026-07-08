@@ -21,6 +21,17 @@ const SAMPLE_PORTRAITS = [
   }
 ];
 
+const TRYON_PRESETS = [
+  { label: "💇 Layer ngắn", prompt: "Cắt tóc layer ngắn, tạo độ phồng ôm sát khuôn mặt" },
+  { label: "💇 Tóc Bob cụp", prompt: "Cắt tóc bob ngắn ngang cằm, uốn cụp phần đuôi trẻ trung" },
+  { label: "💇 Undercut nam", prompt: "Cắt tóc undercut cạo sát hai bên, phần trên vuốt ngược lịch lãm" },
+  { label: "🎨 Nhuộm hồng khói", prompt: "Nhuộm tóc thành màu hồng khói trendy cá tính" },
+  { label: "🎨 Nhuộm xanh rêu", prompt: "Nhuộm tóc thành màu xanh rêu lạnh thời thượng tôn da" },
+  { label: "🎨 Nhuộm bạch kim", prompt: "Nhuộm tóc thành màu vàng bạch kim sang chảnh nổi bật" },
+  { label: "🎨 Nhuộm hạt dẻ", prompt: "Nhuộm tóc thành màu nâu hạt dẻ ấm áp tự nhiên" },
+  { label: "🌀 Uốn xoăn sóng", prompt: "Làm tóc uốn xoăn sóng bồng bềnh quyến rũ" }
+];
+
 // Helper to guess a matching color hex for beauty visual preview
 function getColorHex(colorName) {
   if (!colorName) return "#d6b57e";
@@ -47,6 +58,12 @@ export default function AiStylistAdvisor() {
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState("morphology"); // "morphology", "styling", "offers"
   const [history, setHistory] = useState([]);
+
+  // AI Hair Try-on states
+  const [tryonPrompt, setTryonPrompt] = useState("");
+  const [tryonResult, setTryonResult] = useState("");
+  const [tryonLoading, setTryonLoading] = useState(false);
+  const [tryonError, setTryonError] = useState("");
 
   const fetchHistory = async () => {
     try {
@@ -149,6 +166,42 @@ export default function AiStylistAdvisor() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTryon = async (e) => {
+    if (e) e.preventDefault();
+    if (!tryonPrompt.trim()) {
+      setTryonError("Vui lòng nhập mô tả hoặc chọn một gợi ý nhanh bên dưới.");
+      return;
+    }
+    if (!imageUrl) {
+      setTryonError("Vui lòng tải lên ảnh chân dung và bấm phân tích trước.");
+      return;
+    }
+
+    setTryonLoading(true);
+    setTryonError("");
+    setTryonResult("");
+
+    try {
+      const res = await axiosClient.post("/ai/stylist/tryon", {
+        image_url: imageUrl,
+        prompt: tryonPrompt.trim()
+      });
+      if (res.data?.data?.edited_image_url || res.data?.edited_image_url) {
+        setTryonResult(res.data.data.edited_image_url || res.data.edited_image_url);
+      } else {
+        throw new Error("Không nhận được hình ảnh kết quả từ server.");
+      }
+    } catch (err) {
+      setTryonError(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Gặp lỗi khi xử lý biến đổi kiểu tóc."
+      );
+    } finally {
+      setTryonLoading(false);
     }
   };
 
@@ -989,6 +1042,187 @@ export default function AiStylistAdvisor() {
                     </div>
                   </div>
                 )}
+
+                {/* AI HAIR CUSTOMIZER SECTION */}
+                <div className="glowing-card" style={{ marginTop: 24, border: "1px solid #ffdce3", background: "#fffbfc" }}>
+                  <h2 style={{ display: "flex", alignItems: "center", gap: 10, color: "#e8396c", fontSize: "18px", margin: "0 0 12px 0" }}>
+                    <span>🔮</span> AI Hair Customizer (Thử Tóc Ảo)
+                  </h2>
+                  <p style={{ color: "#675464", fontSize: "13.5px", marginTop: 0, marginBottom: 20, lineHeight: 1.5 }}>
+                    Tự thiết kế mái tóc mơ ước của bạn! Chọn một gợi ý nhanh bên dưới hoặc tự nhập mô tả để thay đổi kiểu tóc/màu tóc trên ảnh gốc.
+                  </p>
+
+                  {/* Preset chips */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                    {TRYON_PRESETS.map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setTryonPrompt(p.prompt);
+                          setTryonError("");
+                        }}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          borderRadius: "20px",
+                          border: tryonPrompt === p.prompt ? "1px solid #e8396c" : "1px solid #ffe0eb",
+                          background: tryonPrompt === p.prompt ? "#ffeef2" : "#ffffff",
+                          color: tryonPrompt === p.prompt ? "#e8396c" : "#675464",
+                          fontWeight: tryonPrompt === p.prompt ? "700" : "500",
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Prompt Textarea */}
+                  <form onSubmit={handleTryon} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <textarea
+                      value={tryonPrompt}
+                      onChange={(e) => {
+                        setTryonPrompt(e.target.value);
+                        setTryonError("");
+                      }}
+                      placeholder="Mô tả kiểu tóc hoặc màu sắc bạn muốn thử (ví dụ: làm tóc ngang vai màu xám khói, cắt mái ngố)..."
+                      style={{
+                        width: "100%",
+                        height: "80px",
+                        padding: "12px",
+                        borderRadius: "12px",
+                        border: "1px solid #ffdce3",
+                        outline: "none",
+                        fontSize: "13px",
+                        resize: "none",
+                        fontFamily: "inherit",
+                        color: "#2d2430",
+                        boxSizing: "border-box"
+                      }}
+                    />
+
+                    {tryonError && (
+                      <div style={{ color: "#ff3366", fontSize: "12px", fontWeight: "700" }}>
+                        ⚠️ {tryonError}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={tryonLoading || !tryonPrompt.trim()}
+                      style={{
+                        padding: "12px",
+                        background: tryonLoading ? "#b9a8b4" : "linear-gradient(135deg, #ff4778, #e8396c)",
+                        color: "white",
+                        fontWeight: "700",
+                        fontSize: "13.5px",
+                        border: "none",
+                        borderRadius: "12px",
+                        cursor: "pointer",
+                        transition: "all 0.3s",
+                        boxShadow: tryonLoading ? "none" : "0 4px 15px rgba(232, 57, 108, 0.2)"
+                      }}
+                    >
+                      {tryonLoading ? "⏳ AI đang thiết kế mái tóc mới..." : "🔮 Bắt Đầu Biến Đổi Tóc"}
+                    </button>
+                  </form>
+
+                  {/* Before / After results panel */}
+                  {(tryonResult || tryonLoading) && (
+                    <div style={{ marginTop: 24, borderTop: "1px dashed #ffdce3", paddingTop: 20 }}>
+                      <h3 style={{ fontSize: "14.5px", color: "#e8396c", marginBottom: 16, fontWeight: 700, marginTop: 0 }}>
+                        📸 So sánh kết quả biến đổi
+                      </h3>
+                      
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                        {/* Before */}
+                        <div style={{ textAlign: "center" }}>
+                          <span style={{ fontSize: "11px", color: "#a38f9d", fontWeight: "700", display: "block", marginBottom: 6 }}>
+                            ẢNH GỐC
+                          </span>
+                          <div style={{ width: "100%", height: "200px", borderRadius: "12px", overflow: "hidden", border: "1px solid #f3e6e8" }}>
+                            <img src={imageUrl} alt="Before" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          </div>
+                        </div>
+
+                        {/* After */}
+                        <div style={{ textAlign: "center" }}>
+                          <span style={{ fontSize: "11px", color: "#e8396c", fontWeight: "700", display: "block", marginBottom: 6 }}>
+                            ẢNH BIẾN ĐỔI (AI)
+                          </span>
+                          <div style={{ 
+                            width: "100%", 
+                            height: "200px", 
+                            borderRadius: "12px", 
+                            overflow: "hidden", 
+                            border: "1px solid #ffccd7", 
+                            background: "#faf6f7",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            position: "relative"
+                          }}>
+                            {tryonLoading ? (
+                              <div style={{ textAlign: "center" }}>
+                                <div className="tryon-spinner" style={{
+                                  width: "32px",
+                                  height: "32px",
+                                  border: "3px solid #ffeef2",
+                                  borderTop: "3px solid #e8396c",
+                                  borderRadius: "50%",
+                                  animation: "spin 1s linear infinite",
+                                  margin: "0 auto 10px"
+                                }} />
+                                <span style={{ fontSize: "12px", color: "#e8396c", fontWeight: 600 }}>AI đang xử lý...</span>
+                              </div>
+                            ) : (
+                              <img src={tryonResult} alt="After" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Booking Action */}
+                      {!tryonLoading && tryonResult && (
+                        <div style={{ marginTop: 24, textAlign: "center", background: "#ffeef2", padding: "16px", borderRadius: "12px", border: "1px solid #ffccd7" }}>
+                          <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#e8396c", fontWeight: 800 }}>
+                            😍 Bạn hài lòng với kiểu tóc này?
+                          </h4>
+                          <p style={{ margin: "0 0 14px 0", fontSize: "12.5px", color: "#675464", lineHeight: 1.4 }}>
+                            Đăng ký làm tóc và nhuộm màu này ngay hôm nay để nhận tư vấn trực tiếp từ stylist hàng đầu!
+                          </p>
+                          <a
+                            href={`/customer/booking?serviceId=${data.booking_suggestion?.recommended_service_id || ""}&employeeId=${data.booking_suggestion?.suggested_stylist_id || ""}&hairPrompt=${encodeURIComponent(tryonPrompt)}&hairImage=${encodeURIComponent(tryonResult)}`}
+                            style={{
+                              display: "inline-block",
+                              padding: "10px 24px",
+                              background: "linear-gradient(135deg, #ff4778, #e8396c)",
+                              color: "white",
+                              borderRadius: "24px",
+                              fontWeight: "700",
+                              fontSize: "13px",
+                              textDecoration: "none",
+                              boxShadow: "0 4px 10px rgba(232, 57, 108, 0.2)",
+                              transition: "all 0.2s"
+                            }}
+                          >
+                            📅 Đặt Lịch Làm Tóc Kiểu Này
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add keyframe spinner css if needed */}
+                  <style>{`
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `}</style>
+                </div>
               </>
             ) : (
               // Empty initial dashboard view
