@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import {
@@ -358,7 +358,7 @@ export default function AdminDashboard() {
               note={`Tổng: ${summary.totalAppointments ?? 0} lịch đặt`}
               icon="📅"
               colorClass="stat-appointments"
-              onClick={() => navigate("/receptionist/appointments")}
+              onClick={() => navigate("/admin/reports")}
             />
             <StatCard
               label="TỔNG KHÁCH HÀNG"
@@ -432,7 +432,7 @@ export default function AdminDashboard() {
               </span>
               {summary.pendingAppointments > 0 && (
                 <span
-                  onClick={() => navigate("/receptionist/appointments")}
+                  onClick={() => navigate("/admin/reports")}
                   style={{
                     background: "#fef3c7",
                     color: "#92400e",
@@ -448,7 +448,7 @@ export default function AdminDashboard() {
               )}
               {summary.pendingPayments > 0 && (
                 <span
-                  onClick={() => navigate("/receptionist/invoices")}
+                  onClick={() => navigate("/admin/reports")}
                   style={{
                     background: "#fef3c7",
                     color: "#92400e",
@@ -623,7 +623,7 @@ export default function AdminDashboard() {
                         <h3>Trạng thái Lịch hẹn</h3>
                         <p>Toàn bộ trong hệ thống</p>
                       </div>
-                      <button onClick={() => navigate("/receptionist/appointments")} style={quickLinkStyle}>Quản lý →</button>
+                      <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Quản lý →</button>
                     </div>
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
@@ -666,7 +666,7 @@ export default function AdminDashboard() {
                         <h3>Trạng thái Thanh toán</h3>
                         <p>Theo bảng Payments trong CSDL</p>
                       </div>
-                      <button onClick={() => navigate("/receptionist/invoices")} style={quickLinkStyle}>Xem hóa đơn →</button>
+                      <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Xem hóa đơn →</button>
                     </div>
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
@@ -719,7 +719,7 @@ export default function AdminDashboard() {
                     <InfoRow label="Không hoạt động" value={summary.inactiveUsers ?? 0} />
                     <InfoRow label="Bị khóa (Banned)" value={summary.bannedUsers ?? 0} valueColor="#ef4444" />
                   </MiniPanel>
-                  <MiniPanel title="Chi Tiết Lịch Hẹn" icon="📅" linkLabel="Xem lịch hẹn" onLink={() => navigate("/receptionist/appointments")}>
+                  <MiniPanel title="Chi Tiết Lịch Hẹn" icon="📅" linkLabel="Xem lịch hẹn" onLink={() => navigate("/admin/reports")}>
                     <InfoRow label="Chờ duyệt" value={summary.pendingAppointments ?? 0} valueColor="#f59e0b" />
                     <InfoRow label="Đã xác nhận" value={summary.confirmedAppointments ?? 0} valueColor="#3b82f6" />
                     <InfoRow label="Hoàn thành" value={summary.completedAppointments ?? 0} valueColor="#10b981" />
@@ -736,7 +736,7 @@ export default function AdminDashboard() {
                     <InfoRow label="Payout KTV chờ duyệt" value={summary.pendingPayouts ?? 0} valueColor="#f59e0b" />
                     <InfoRow label="Đã chi trả (Approved)" value={formatMoney(summary.totalPaidOut)} />
                   </MiniPanel>
-                  <MiniPanel title="Hàng Chờ (Waiting List)" icon="⏳" linkLabel="Xem hàng chờ" onLink={() => navigate("/receptionist/waiting-list")}>
+                  <MiniPanel title="Hàng Chờ (Waiting List)" icon="⏳" linkLabel="Xem hàng chờ" onLink={() => navigate("/admin/reports")}>
                     <InfoRow label="Tổng đăng ký" value={summary.totalWaitingCount ?? 0} />
                     <InfoRow label="Đã match / booked" value={summary.matchedWaitingCount ?? 0} valueColor="#10b981" />
                     <InfoRow label="Đã đặt lịch thành công" value={summary.bookedWaitingCount ?? 0} valueColor="#3b82f6" />
@@ -1238,7 +1238,7 @@ export default function AdminDashboard() {
                     <h3>📋 Nhật ký Lịch hẹn mới nhất</h3>
                     <p>8 lịch hẹn gần đây nhất trong hệ thống</p>
                   </div>
-                  <button onClick={() => navigate("/receptionist/appointments")} style={quickLinkStyle}>Xem tất cả →</button>
+                  <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Xem tất cả →</button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
@@ -1616,3 +1616,4 @@ export default function AdminDashboard() {
     </section>
   );
 }
+
