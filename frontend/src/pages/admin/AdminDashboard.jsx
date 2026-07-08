@@ -169,37 +169,27 @@ export default function AdminDashboard() {
   }, [data]);
 
   return (
-    <section className="admin-dashboard admin-page-new">
+    <section className="admin-dashboard admin-page">
       
-      {/* Upper Dashboard Hero */}
-      <header className="dashboard-new-header">
-        <div className="header-meta">
-          <span className="eyebrow-accent">⚡ HỆ THỐNG QUẢN TRỊ SALON CAO CẤP</span>
+      {/* Upper Dashboard Hero with original dark brown background styling */}
+      <div className="admin-dashboard-hero">
+        <div>
+          <div className="admin-eyebrow">⚡ HỆ THỐNG QUẢN TRỊ SALON CAO CẤP</div>
           <h1>Chào mừng trở lại, Admin</h1>
           <p>
             Báo cáo trực quan và số liệu tổng hợp thời gian thực từ cơ sở dữ liệu hệ thống.
           </p>
         </div>
 
-        <div className="header-actions">
-          <button
-            type="button"
-            className="refresh-btn-new"
-            onClick={() => loadDashboard(true)}
-            disabled={refreshing}
-          >
-            {refreshing ? (
-              <>
-                <span className="btn-spinner" /> Đang cập nhật...
-              </>
-            ) : (
-              <>
-                <span>🔄</span> Làm mới dữ liệu
-              </>
-            )}
-          </button>
-        </div>
-      </header>
+        <button
+          type="button"
+          className="admin-refresh-btn"
+          onClick={() => loadDashboard(true)}
+          disabled={refreshing}
+        >
+          {refreshing ? "Đang cập nhật..." : "Làm mới dữ liệu"}
+        </button>
+      </div>
 
       {/* Loading & Error Blocks */}
       {loading && (
@@ -406,6 +396,97 @@ export default function AdminDashboard() {
                     </div>
                   </article>
                 </div>
+
+                {/* Detailed Operation Metrics Deck */}
+                <article className="chart-card full-width-panel" style={{ marginTop: 24 }}>
+                  <div className="chart-header">
+                    <h3>📊 Bảng phân tích vận hành chi tiết</h3>
+                    <p>Toàn bộ trạng thái người dùng, lịch hẹn và các chỉ số giao dịch trong cơ sở dữ liệu</p>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+                    
+                    {/* User accounts block */}
+                    <div style={{ background: "#fdf8fa", border: "1px solid #f6edf0", borderRadius: "20px", padding: "20px" }}>
+                      <h4 style={{ margin: "0 0 14px 0", fontSize: "14px", fontWeight: "800", color: "#8a653a", display: "flex", alignItems: "center", gap: 8 }}>
+                        👤 Tài Khoản Người Dùng
+                      </h4>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#7b6874" }}>Đang hoạt động:</span>
+                          <strong>{summary.activeUsers || 0}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#7b6874" }}>Không hoạt động:</span>
+                          <strong>{summary.inactiveUsers || 0}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#ef4444" }}>Bị khóa (Banned):</span>
+                          <strong style={{ color: "#ef4444" }}>{summary.bannedUsers || 0}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Appointment breakdown block */}
+                    <div style={{ background: "#fdf8fa", border: "1px solid #f6edf0", borderRadius: "20px", padding: "20px" }}>
+                      <h4 style={{ margin: "0 0 14px 0", fontSize: "14px", fontWeight: "800", color: "#8a653a", display: "flex", alignItems: "center", gap: 8 }}>
+                        📅 Chi Tiết Lịch Hẹn
+                      </h4>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#7b6874" }}>Chờ duyệt:</span>
+                          <strong style={{ color: "#f59e0b" }}>{summary.pendingAppointments || 0}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#7b6874" }}>Đã xác nhận:</span>
+                          <strong style={{ color: "#3b82f6" }}>{summary.confirmedAppointments || 0}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#7b6874" }}>Hoàn thành:</span>
+                          <strong style={{ color: "#10b981" }}>{summary.completedAppointments || 0}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#ef4444" }}>Đã hủy:</span>
+                          <strong style={{ color: "#ef4444" }}>{summary.cancelledAppointments || 0}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Financial details block */}
+                    <div style={{ background: "#fdf8fa", border: "1px solid #f6edf0", borderRadius: "20px", padding: "20px" }}>
+                      <h4 style={{ margin: "0 0 14px 0", fontSize: "14px", fontWeight: "800", color: "#8a653a", display: "flex", alignItems: "center", gap: 8 }}>
+                        💳 Chi Tiết Giao Dịch
+                      </h4>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#7b6874" }}>Chờ thanh toán:</span>
+                          <strong style={{ color: "#f59e0b" }}>{summary.pendingPayments || 0}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#ef4444" }}>Thanh toán lỗi:</span>
+                          <strong style={{ color: "#ef4444" }}>{summary.failedPayments || 0}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quality control block */}
+                    <div style={{ background: "#fdf8fa", border: "1px solid #f6edf0", borderRadius: "20px", padding: "20px" }}>
+                      <h4 style={{ margin: "0 0 14px 0", fontSize: "14px", fontWeight: "800", color: "#8a653a", display: "flex", alignItems: "center", gap: 8 }}>
+                        🌟 Đánh Giá & Phản Hồi
+                      </h4>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#7b6874" }}>Review chờ duyệt:</span>
+                          <strong style={{ color: "#f59e0b" }}>{summary.pendingReviews || 0}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span style={{ color: "#7b6874" }}>Feedback chưa đọc:</span>
+                          <strong style={{ color: "#f59e0b" }}>{summary.pendingFeedbacks || 0}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </article>
               </div>
             )}
 
