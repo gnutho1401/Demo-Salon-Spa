@@ -45,7 +45,7 @@ export default function AiStylistAdvisor() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
-  const [activeTab, setActiveTab] = useState("styling"); // "morphology", "styling", "offers"
+  const [activeTab, setActiveTab] = useState("morphology"); // "morphology", "styling", "offers"
   const [history, setHistory] = useState([]);
 
   const fetchHistory = async () => {
@@ -139,7 +139,7 @@ export default function AiStylistAdvisor() {
         image_url: imageUrl.trim()
       });
       setData(res.data.data || res.data || {});
-      setActiveTab("styling"); // default to styling tab upon complete
+      setActiveTab("morphology"); // default to morphology tab upon complete
       fetchHistory(); // refresh history list
     } catch (err) {
       setError(
@@ -818,16 +818,16 @@ export default function AiStylistAdvisor() {
                 {/* Tabs selection */}
                 <div className="tabs-header">
                   <button
-                    className={`tab-trigger ${activeTab === "styling" ? "active" : ""}`}
-                    onClick={() => setActiveTab("styling")}
-                  >
-                    💇 Kiểu tóc & Màu nhuộm
-                  </button>
-                  <button
                     className={`tab-trigger ${activeTab === "morphology" ? "active" : ""}`}
                     onClick={() => setActiveTab("morphology")}
                   >
                     👤 Đặc điểm nhân trắc
+                  </button>
+                  <button
+                    className={`tab-trigger ${activeTab === "styling" ? "active" : ""}`}
+                    onClick={() => setActiveTab("styling")}
+                  >
+                    💇 Kiểu tóc & Màu nhuộm
                   </button>
                   <button
                     className={`tab-trigger ${activeTab === "offers" ? "active" : ""}`}
@@ -837,7 +837,39 @@ export default function AiStylistAdvisor() {
                   </button>
                 </div>
 
-                {/* TAB 1: STYLING RECOMMENDATIONS */}
+                {/* TAB 1: MORPHOLOGY */}
+                {activeTab === "morphology" && (
+                  <div className="glowing-card">
+                    <h2>👤 Phân Tích Hình Thể Học Khuôn Mặt</h2>
+                    <p style={{ color: "#7c6c60", fontSize: "14px", marginTop: -12, marginBottom: 24, lineHeight: 1.5 }}>
+                      Mô hình AI đa phương thức đã phân tích cấu trúc xương, kết cấu tóc và sắc tố dưới da của bạn để kết luận các chỉ số sau:
+                    </p>
+
+                    <div className="badge-showcase">
+                      <div className="morphology-badge">
+                        <span className="label">Hình dáng mặt</span>
+                        <span className="value">{data.analysis?.face_shape}</span>
+                      </div>
+                      <div className="morphology-badge">
+                        <span className="label">Kết cấu tóc</span>
+                        <span className="value">{data.analysis?.hair_type}</span>
+                      </div>
+                      <div className="morphology-badge">
+                        <span className="label">Sắc tố da</span>
+                        <span className="value">{data.analysis?.skin_tone}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 12, background: "#faf8f5", borderRadius: 16, padding: 18, border: "1px solid #ebdcc5" }}>
+                      <span style={{ fontSize: 20 }}>💡</span>
+                      <div style={{ fontSize: "13.5px", color: "#5c4a3c", lineHeight: "1.5" }}>
+                        <strong>Nhận xét từ Cố vấn Thẩm mỹ:</strong> Dáng mặt {data.analysis?.face_shape} là một lợi thế hình thể tuyệt vời. Thiết kế tóc phù hợp sẽ tập trung làm tôn lên các điểm sáng trên gò má và tạo độ thanh thoát tối đa.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 2: STYLING RECOMMENDATIONS */}
                 {activeTab === "styling" && (
                   <div className="glowing-card">
                     <h2>💇 Phác Thảo Thiết Kế Kiểu Tóc & Màu Sắc</h2>
@@ -901,38 +933,6 @@ export default function AiStylistAdvisor() {
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* TAB 2: MORPHOLOGY */}
-                {activeTab === "morphology" && (
-                  <div className="glowing-card">
-                    <h2>👤 Phân Tích Hình Thể Học Khuôn Mặt</h2>
-                    <p style={{ color: "#7c6c60", fontSize: "14px", marginTop: -12, marginBottom: 24, lineHeight: 1.5 }}>
-                      Mô hình AI đa phương thức đã phân tích cấu trúc xương, kết cấu tóc và sắc tố dưới da của bạn để kết luận các chỉ số sau:
-                    </p>
-
-                    <div className="badge-showcase">
-                      <div className="morphology-badge">
-                        <span className="label">Hình dáng mặt</span>
-                        <span className="value">{data.analysis?.face_shape}</span>
-                      </div>
-                      <div className="morphology-badge">
-                        <span className="label">Kết cấu tóc</span>
-                        <span className="value">{data.analysis?.hair_type}</span>
-                      </div>
-                      <div className="morphology-badge">
-                        <span className="label">Sắc tố da</span>
-                        <span className="value">{data.analysis?.skin_tone}</span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 12, background: "#faf8f5", borderRadius: 16, padding: 18, border: "1px solid #ebdcc5" }}>
-                      <span style={{ fontSize: 20 }}>💡</span>
-                      <div style={{ fontSize: "13.5px", color: "#5c4a3c", lineHeight: "1.5" }}>
-                        <strong>Nhận xét từ Cố vấn Thẩm mỹ:</strong> Dáng mặt {data.analysis?.face_shape} là một lợi thế hình thể tuyệt vời. Thiết kế tóc phù hợp sẽ tập trung làm tôn lên các điểm sáng trên gò má và tạo độ thanh thoát tối đa.
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -1051,7 +1051,7 @@ export default function AiStylistAdvisor() {
                       if (item.image_url) {
                         setImageUrl(item.image_url);
                       }
-                      setActiveTab("styling");
+                      setActiveTab("morphology");
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     style={{

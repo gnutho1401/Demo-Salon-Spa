@@ -155,13 +155,12 @@ async function getStylistRecommendations(customerId, imageUrl) {
   let visionResult;
   try {
     visionResult = await analyzeImage(imageUrl);
+    if (visionResult && visionResult.is_face === false) {
+      throw new Error(visionResult.error || 'Không nhận diện được khuôn mặt trong ảnh của bạn. Vui lòng chụp hoặc tải lên ảnh chân dung rõ nét hơn!');
+    }
   } catch (err) {
-    console.warn('[AI Stylist] Face analysis failed, using fallback characteristics:', err.message);
-    visionResult = {
-      face_shape: 'Tròn (Cần tạo kiểu thon gọn hai bên)',
-      hair_type: 'Tóc sợi mỏng, hơi khô',
-      skin_tone: 'Tông da trung bình sáng (Tone ấm)'
-    };
+    console.error('[AI Stylist] Face analysis failed:', err.message);
+    throw new Error(err.message || 'Không thể nhận diện khuôn mặt trong ảnh.');
   }
 
   // 3. Get Salon Context (Services, Stylists)

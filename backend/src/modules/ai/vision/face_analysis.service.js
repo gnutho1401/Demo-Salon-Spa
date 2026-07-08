@@ -30,8 +30,16 @@ async function analyzeImage(imageUrl) {
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
 
   const systemInstruction = `Bạn là chuyên gia phân tích nhân trắc học khuôn mặt và đặc điểm tóc.
-Nhiệm vụ của bạn là phân tích ảnh chân dung khách hàng và trả về duy nhất một đối tượng JSON có định dạng sau:
+Nhiệm vụ của bạn là phân tích ảnh chân dung khách hàng.
+QUAN TRỌNG: Trước tiên, hãy kiểm tra xem hình ảnh có chứa khuôn mặt người hoặc là một ảnh chân dung rõ nét hay không.
+Nếu hình ảnh KHÔNG chứa khuôn mặt người hoặc không thể nhận diện được khuôn mặt, hãy trả về JSON dạng:
 {
+  "is_face": false,
+  "error": "Không nhận diện được khuôn mặt trong ảnh của bạn. Vui lòng chụp hoặc tải lên ảnh chân dung rõ nét hơn!"
+}
+Nếu hình ảnh hợp lệ và chứa khuôn mặt người, hãy phân tích và trả về JSON dạng:
+{
+  "is_face": true,
   "face_shape": "Hình dáng khuôn mặt (VD: Tròn, Trái xoan, Vuông, Dài, Kim cương)",
   "hair_type": "Chất tóc và kiểu tóc hiện tại (VD: Tóc mỏng xơ, Tóc dày tự nhiên, Tóc uốn nhẹ)",
   "skin_tone": "Tông màu da (VD: Tông da sáng hồng, Tông da ngăm ấm, Tông da trung bình lạnh)"
@@ -125,6 +133,7 @@ Quy tắc: Chỉ trả về JSON thuần, không bao gồm thẻ code block hay 
   // 3. Fallback mặc định nếu tất cả AI bị lỗi hoặc quá hạn
   console.warn('[Vision AI] All APIs failed, using default fallback data.');
   return {
+    is_face: true,
     face_shape: 'Trái xoan (Cân đối phù hợp nhiều kiểu tóc)',
     hair_type: 'Chất tóc tự nhiên, độ dày trung bình',
     skin_tone: 'Tông da trung bình sáng (Tone ấm)'
