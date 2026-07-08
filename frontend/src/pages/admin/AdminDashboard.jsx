@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import {
   AreaChart,
@@ -66,16 +67,26 @@ function safeAvatar(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
 }
 
-/* ─────────── Stat Card ─────────── */
-function StatCard({ label, value, note, icon, colorClass }) {
+/* ─────────── Stat Card (clickable) ─────────── */
+function StatCard({ label, value, note, icon, colorClass, onClick }) {
   return (
-    <article className={`admin-stat-card-new ${colorClass || ""}`}>
+    <article
+      className={`admin-stat-card-new ${colorClass || ""}`}
+      onClick={onClick}
+      style={{ cursor: onClick ? "pointer" : "default", position: "relative" }}
+    >
       <div className="card-header-row">
         <span className="card-label">{label}</span>
         <span className="card-icon">{icon}</span>
       </div>
       <h3 className="card-value">{value}</h3>
       {note && <div className="card-note">{note}</div>}
+      {onClick && (
+        <span style={{
+          position: "absolute", bottom: 14, right: 16,
+          fontSize: "11px", fontWeight: "700", color: "#e8396c", opacity: 0.7
+        }}>Xem chi tiết →</span>
+      )}
     </article>
   );
 }
@@ -99,7 +110,7 @@ function InfoRow({ label, value, valueColor }) {
 }
 
 /* ─────────── Mini Panel ─────────── */
-function MiniPanel({ title, icon, children }) {
+function MiniPanel({ title, icon, children, linkLabel, onLink }) {
   return (
     <div
       style={{
@@ -107,6 +118,8 @@ function MiniPanel({ title, icon, children }) {
         border: "1px solid #f6edf0",
         borderRadius: "20px",
         padding: "20px",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <h4
@@ -122,7 +135,29 @@ function MiniPanel({ title, icon, children }) {
       >
         {icon} {title}
       </h4>
-      {children}
+      <div style={{ flex: 1 }}>{children}</div>
+      {linkLabel && onLink && (
+        <button
+          onClick={onLink}
+          style={{
+            marginTop: 12,
+            background: "none",
+            border: "1px solid #f6d0db",
+            borderRadius: "999px",
+            color: "#e8396c",
+            fontSize: "12px",
+            fontWeight: "700",
+            padding: "5px 14px",
+            cursor: "pointer",
+            alignSelf: "flex-start",
+            transition: "background 0.2s",
+          }}
+          onMouseEnter={(e) => e.target.style.background = "#fdf0f4"}
+          onMouseLeave={(e) => e.target.style.background = "none"}
+        >
+          {linkLabel} →
+        </button>
+      )}
     </div>
   );
 }
@@ -136,6 +171,21 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const navigate = useNavigate();
+
+  /* Quick link button style */
+  const quickLinkStyle = {
+    background: "none",
+    border: "1px solid #f6d0db",
+    borderRadius: "999px",
+    color: "#e8396c",
+    fontSize: "12px",
+    fontWeight: "700",
+    padding: "5px 14px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  };
 
   async function loadDashboard(isRefresh = false) {
     try {
@@ -292,6 +342,7 @@ export default function AdminDashboard() {
               note="Từ các giao dịch PAID hôm nay"
               icon="💰"
               colorClass="stat-revenue-today"
+              onClick={() => navigate("/admin/reports")}
             />
             <StatCard
               label="DOANH THU THÁNG NÀY"
@@ -299,6 +350,7 @@ export default function AdminDashboard() {
               note={`Gói liệu trình: ${formatMoney(summary.packageRevenueThisMonth)}`}
               icon="📈"
               colorClass="stat-revenue-month"
+              onClick={() => navigate("/admin/reports")}
             />
             <StatCard
               label="LỊCH HẸN HÔM NAY"
@@ -306,6 +358,7 @@ export default function AdminDashboard() {
               note={`Tổng: ${summary.totalAppointments ?? 0} lịch đặt`}
               icon="📅"
               colorClass="stat-appointments"
+              onClick={() => navigate("/receptionist/appointments")}
             />
             <StatCard
               label="TỔNG KHÁCH HÀNG"
@@ -313,6 +366,7 @@ export default function AdminDashboard() {
               note={`${summary.activeUsers ?? 0} tài khoản đang hoạt động`}
               icon="👥"
               colorClass="stat-customers"
+              onClick={() => navigate("/admin/customers")}
             />
             <StatCard
               label="NHÂN SỰ HỆ THỐNG"
@@ -320,6 +374,7 @@ export default function AdminDashboard() {
               note={`Điểm danh hôm nay: ${data.todayAttendance?.totalCheckedIn ?? 0} người`}
               icon="🧑‍💼"
               colorClass=""
+              onClick={() => navigate("/admin/employees")}
             />
             <StatCard
               label="DỊCH VỤ ĐANG HOẠT ĐỘNG"
@@ -327,6 +382,7 @@ export default function AdminDashboard() {
               note={`${summary.inactiveServices ?? 0} ẩn | ${summary.activePromotions ?? 0} KM đang chạy`}
               icon="✂️"
               colorClass=""
+              onClick={() => navigate("/admin/services")}
             />
             <StatCard
               label="GÓI LIỆU TRÌNH"
@@ -334,6 +390,7 @@ export default function AdminDashboard() {
               note={`${summary.expiredPackages ?? 0} đã hết hạn`}
               icon="📦"
               colorClass=""
+              onClick={() => navigate("/admin/packages")}
             />
             <StatCard
               label="VOUCHER & KHUYẾN MÃI"
@@ -341,6 +398,7 @@ export default function AdminDashboard() {
               note={`${summary.activePromotions ?? 0} chương trình đang chạy`}
               icon="🎟️"
               colorClass=""
+              onClick={() => navigate("/admin/vouchers")}
             />
           </div>
 
@@ -374,6 +432,7 @@ export default function AdminDashboard() {
               </span>
               {summary.pendingAppointments > 0 && (
                 <span
+                  onClick={() => navigate("/receptionist/appointments")}
                   style={{
                     background: "#fef3c7",
                     color: "#92400e",
@@ -381,13 +440,15 @@ export default function AdminDashboard() {
                     borderRadius: "999px",
                     fontSize: "12px",
                     fontWeight: "700",
+                    cursor: "pointer",
                   }}
                 >
-                  {summary.pendingAppointments} lịch hẹn chờ duyệt
+                  {summary.pendingAppointments} lịch hẹn chờ duyệt →
                 </span>
               )}
               {summary.pendingPayments > 0 && (
                 <span
+                  onClick={() => navigate("/receptionist/invoices")}
                   style={{
                     background: "#fef3c7",
                     color: "#92400e",
@@ -395,13 +456,15 @@ export default function AdminDashboard() {
                     borderRadius: "999px",
                     fontSize: "12px",
                     fontWeight: "700",
+                    cursor: "pointer",
                   }}
                 >
-                  {summary.pendingPayments} giao dịch chờ thanh toán
+                  {summary.pendingPayments} giao dịch chờ thanh toán →
                 </span>
               )}
               {summary.pendingReviews > 0 && (
                 <span
+                  onClick={() => navigate("/admin/reviews")}
                   style={{
                     background: "#fef3c7",
                     color: "#92400e",
@@ -409,13 +472,15 @@ export default function AdminDashboard() {
                     borderRadius: "999px",
                     fontSize: "12px",
                     fontWeight: "700",
+                    cursor: "pointer",
                   }}
                 >
-                  {summary.pendingReviews} đánh giá chờ duyệt
+                  {summary.pendingReviews} đánh giá chờ duyệt →
                 </span>
               )}
               {summary.pendingFeedbacks > 0 && (
                 <span
+                  onClick={() => navigate("/admin/feedbacks")}
                   style={{
                     background: "#fef3c7",
                     color: "#92400e",
@@ -423,13 +488,15 @@ export default function AdminDashboard() {
                     borderRadius: "999px",
                     fontSize: "12px",
                     fontWeight: "700",
+                    cursor: "pointer",
                   }}
                 >
-                  {summary.pendingFeedbacks} phản hồi chưa đọc
+                  {summary.pendingFeedbacks} phản hồi chưa đọc →
                 </span>
               )}
               {summary.pendingRefunds > 0 && (
                 <span
+                  onClick={() => navigate("/admin/refunds")}
                   style={{
                     background: "#fee2e2",
                     color: "#991b1b",
@@ -437,13 +504,15 @@ export default function AdminDashboard() {
                     borderRadius: "999px",
                     fontSize: "12px",
                     fontWeight: "700",
+                    cursor: "pointer",
                   }}
                 >
-                  {summary.pendingRefunds} hoàn tiền chờ xử lý
+                  {summary.pendingRefunds} hoàn tiền chờ xử lý →
                 </span>
               )}
               {summary.pendingPayouts > 0 && (
                 <span
+                  onClick={() => navigate("/admin/employees")}
                   style={{
                     background: "#fee2e2",
                     color: "#991b1b",
@@ -451,9 +520,10 @@ export default function AdminDashboard() {
                     borderRadius: "999px",
                     fontSize: "12px",
                     fontWeight: "700",
+                    cursor: "pointer",
                   }}
                 >
-                  {summary.pendingPayouts} yêu cầu payout chờ duyệt
+                  {summary.pendingPayouts} yêu cầu payout chờ duyệt →
                 </span>
               )}
             </div>
@@ -479,11 +549,14 @@ export default function AdminDashboard() {
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               {/* Biểu đồ doanh thu 7 ngày + 2 donut */}
               <div className="overview-tab-layout">
-                <article className="chart-card large-chart">
-                  <div className="chart-header">
+                <article className="chart-card">
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
                     <h3>Doanh thu 7 ngày gần nhất</h3>
                     <p>Tổng thu từ các giao dịch đã thanh toán trong tuần</p>
                   </div>
+                  <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Báo cáo chi tiết →</button>
+                </div>
                   <ResponsiveContainer width="100%" height={270}>
                     <AreaChart
                       data={revenueByDayData}
@@ -545,9 +618,12 @@ export default function AdminDashboard() {
 
                 <div className="donut-charts-row">
                   <article className="chart-card">
-                    <div className="chart-header">
-                      <h3>Trạng thái Lịch hẹn</h3>
-                      <p>Toàn bộ trong hệ thống</p>
+                    <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <h3>Trạng thái Lịch hẹn</h3>
+                        <p>Toàn bộ trong hệ thống</p>
+                      </div>
+                      <button onClick={() => navigate("/receptionist/appointments")} style={quickLinkStyle}>Quản lý →</button>
                     </div>
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
@@ -585,9 +661,12 @@ export default function AdminDashboard() {
                   </article>
 
                   <article className="chart-card">
-                    <div className="chart-header">
-                      <h3>Trạng thái Thanh toán</h3>
-                      <p>Theo bảng Payments trong CSDL</p>
+                    <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <h3>Trạng thái Thanh toán</h3>
+                        <p>Theo bảng Payments trong CSDL</p>
+                      </div>
+                      <button onClick={() => navigate("/receptionist/invoices")} style={quickLinkStyle}>Xem hóa đơn →</button>
                     </div>
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
@@ -628,141 +707,46 @@ export default function AdminDashboard() {
 
               {/* Bảng phân tích vận hành chi tiết */}
               <article className="chart-card">
-                <div className="chart-header">
-                  <h3>📊 Bảng phân tích vận hành chi tiết</h3>
-                  <p>
-                    Toàn bộ trạng thái các phân hệ trong cơ sở dữ liệu hệ
-                    thống
-                  </p>
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3>📊 Bảng phân tích vận hành chi tiết</h3>
+                    <p>Toàn bộ trạng thái các phân hệ trong cơ sở dữ liệu hệ thống</p>
+                  </div>
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-                    gap: 16,
-                  }}
-                >
-                  <MiniPanel title="Tài Khoản Người Dùng" icon="👤">
-                    <InfoRow
-                      label="Đang hoạt động"
-                      value={summary.activeUsers ?? 0}
-                      valueColor="#10b981"
-                    />
-                    <InfoRow
-                      label="Không hoạt động"
-                      value={summary.inactiveUsers ?? 0}
-                    />
-                    <InfoRow
-                      label="Bị khóa (Banned)"
-                      value={summary.bannedUsers ?? 0}
-                      valueColor="#ef4444"
-                    />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 16 }}>
+                  <MiniPanel title="Tài Khoản Người Dùng" icon="👤" linkLabel="Quản lý users" onLink={() => navigate("/admin/users")}>
+                    <InfoRow label="Đang hoạt động" value={summary.activeUsers ?? 0} valueColor="#10b981" />
+                    <InfoRow label="Không hoạt động" value={summary.inactiveUsers ?? 0} />
+                    <InfoRow label="Bị khóa (Banned)" value={summary.bannedUsers ?? 0} valueColor="#ef4444" />
                   </MiniPanel>
-
-                  <MiniPanel title="Chi Tiết Lịch Hẹn" icon="📅">
-                    <InfoRow
-                      label="Chờ duyệt"
-                      value={summary.pendingAppointments ?? 0}
-                      valueColor="#f59e0b"
-                    />
-                    <InfoRow
-                      label="Đã xác nhận"
-                      value={summary.confirmedAppointments ?? 0}
-                      valueColor="#3b82f6"
-                    />
-                    <InfoRow
-                      label="Hoàn thành"
-                      value={summary.completedAppointments ?? 0}
-                      valueColor="#10b981"
-                    />
-                    <InfoRow
-                      label="Đã hủy"
-                      value={summary.cancelledAppointments ?? 0}
-                      valueColor="#ef4444"
-                    />
+                  <MiniPanel title="Chi Tiết Lịch Hẹn" icon="📅" linkLabel="Xem lịch hẹn" onLink={() => navigate("/receptionist/appointments")}>
+                    <InfoRow label="Chờ duyệt" value={summary.pendingAppointments ?? 0} valueColor="#f59e0b" />
+                    <InfoRow label="Đã xác nhận" value={summary.confirmedAppointments ?? 0} valueColor="#3b82f6" />
+                    <InfoRow label="Hoàn thành" value={summary.completedAppointments ?? 0} valueColor="#10b981" />
+                    <InfoRow label="Đã hủy" value={summary.cancelledAppointments ?? 0} valueColor="#ef4444" />
                   </MiniPanel>
-
-                  <MiniPanel title="Gói Liệu Trình" icon="📦">
-                    <InfoRow
-                      label="Đang sử dụng (Active)"
-                      value={summary.activePackages ?? 0}
-                      valueColor="#8b5cf6"
-                    />
-                    <InfoRow
-                      label="Đã hết hạn"
-                      value={summary.expiredPackages ?? 0}
-                    />
-                    <InfoRow
-                      label="Doanh thu gói tháng này"
-                      value={formatMoney(summary.packageRevenueThisMonth)}
-                      valueColor="#10b981"
-                    />
+                  <MiniPanel title="Gói Liệu Trình" icon="📦" linkLabel="Quản lý gói" onLink={() => navigate("/admin/packages")}>
+                    <InfoRow label="Đang sử dụng (Active)" value={summary.activePackages ?? 0} valueColor="#8b5cf6" />
+                    <InfoRow label="Đã hết hạn" value={summary.expiredPackages ?? 0} />
+                    <InfoRow label="Doanh thu gói tháng này" value={formatMoney(summary.packageRevenueThisMonth)} valueColor="#10b981" />
                   </MiniPanel>
-
-                  <MiniPanel title="Hoàn Tiền & Payout" icon="💳">
-                    <InfoRow
-                      label="Hoàn tiền chờ xử lý"
-                      value={summary.pendingRefunds ?? 0}
-                      valueColor="#f59e0b"
-                    />
-                    <InfoRow
-                      label="Hoàn tiền hoàn tất"
-                      value={summary.completedRefunds ?? 0}
-                      valueColor="#10b981"
-                    />
-                    <InfoRow
-                      label="Payout KTV chờ duyệt"
-                      value={summary.pendingPayouts ?? 0}
-                      valueColor="#f59e0b"
-                    />
-                    <InfoRow
-                      label="Đã chi trả (Approved)"
-                      value={formatMoney(summary.totalPaidOut)}
-                    />
+                  <MiniPanel title="Hoàn Tiền & Payout" icon="💳" linkLabel="Xem hoàn tiền" onLink={() => navigate("/admin/refunds")}>
+                    <InfoRow label="Hoàn tiền chờ xử lý" value={summary.pendingRefunds ?? 0} valueColor="#f59e0b" />
+                    <InfoRow label="Hoàn tiền hoàn tất" value={summary.completedRefunds ?? 0} valueColor="#10b981" />
+                    <InfoRow label="Payout KTV chờ duyệt" value={summary.pendingPayouts ?? 0} valueColor="#f59e0b" />
+                    <InfoRow label="Đã chi trả (Approved)" value={formatMoney(summary.totalPaidOut)} />
                   </MiniPanel>
-
-                  <MiniPanel title="Hàng Chờ (Waiting List)" icon="⏳">
-                    <InfoRow
-                      label="Tổng đăng ký"
-                      value={summary.totalWaitingCount ?? 0}
-                    />
-                    <InfoRow
-                      label="Đã match / booked"
-                      value={summary.matchedWaitingCount ?? 0}
-                      valueColor="#10b981"
-                    />
-                    <InfoRow
-                      label="Đã đặt lịch thành công"
-                      value={summary.bookedWaitingCount ?? 0}
-                      valueColor="#3b82f6"
-                    />
-                    <InfoRow
-                      label="Hết hạn / Bỏ qua"
-                      value={summary.expiredWaitingCount ?? 0}
-                      valueColor="#ef4444"
-                    />
+                  <MiniPanel title="Hàng Chờ (Waiting List)" icon="⏳" linkLabel="Xem hàng chờ" onLink={() => navigate("/receptionist/waiting-list")}>
+                    <InfoRow label="Tổng đăng ký" value={summary.totalWaitingCount ?? 0} />
+                    <InfoRow label="Đã match / booked" value={summary.matchedWaitingCount ?? 0} valueColor="#10b981" />
+                    <InfoRow label="Đã đặt lịch thành công" value={summary.bookedWaitingCount ?? 0} valueColor="#3b82f6" />
+                    <InfoRow label="Hết hạn / Bỏ qua" value={summary.expiredWaitingCount ?? 0} valueColor="#ef4444" />
                   </MiniPanel>
-
-                  <MiniPanel title="Điểm Danh Hôm Nay" icon="🧑‍💼">
-                    <InfoRow
-                      label="Đã check-in"
-                      value={data.todayAttendance?.totalCheckedIn ?? 0}
-                    />
-                    <InfoRow
-                      label="Đúng giờ"
-                      value={data.todayAttendance?.present ?? 0}
-                      valueColor="#10b981"
-                    />
-                    <InfoRow
-                      label="Đến muộn"
-                      value={data.todayAttendance?.late ?? 0}
-                      valueColor="#f59e0b"
-                    />
-                    <InfoRow
-                      label="Vắng mặt"
-                      value={data.todayAttendance?.absent ?? 0}
-                      valueColor="#ef4444"
-                    />
+                  <MiniPanel title="Điểm Danh Hôm Nay" icon="🧑‍💼" linkLabel="Xem nhân viên" onLink={() => navigate("/admin/employees")}>
+                    <InfoRow label="Đã check-in" value={data.todayAttendance?.totalCheckedIn ?? 0} />
+                    <InfoRow label="Đúng giờ" value={data.todayAttendance?.present ?? 0} valueColor="#10b981" />
+                    <InfoRow label="Đến muộn" value={data.todayAttendance?.late ?? 0} valueColor="#f59e0b" />
+                    <InfoRow label="Vắng mặt" value={data.todayAttendance?.absent ?? 0} valueColor="#ef4444" />
                   </MiniPanel>
                 </div>
               </article>
@@ -841,11 +825,12 @@ export default function AdminDashboard() {
 
               {/* Biểu đồ cột doanh thu 12 tháng */}
               <article className="chart-card">
-                <div className="chart-header">
-                  <h3>📊 Doanh thu 12 tháng gần nhất</h3>
-                  <p>
-                    Tổng thu từ các giao dịch đã thanh toán theo từng tháng
-                  </p>
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3>📊 Doanh thu 12 tháng gần nhất</h3>
+                    <p>Tổng thu từ các giao dịch đã thanh toán theo từng tháng</p>
+                  </div>
+                  <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Báo cáo →</button>
                 </div>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart
@@ -897,9 +882,12 @@ export default function AdminDashboard() {
 
               {/* Bảng doanh thu gói liệu trình */}
               <article className="chart-card">
-                <div className="chart-header">
-                  <h3>📦 Bảng doanh thu theo Gói Liệu Trình</h3>
-                  <p>Top gói bán chạy nhất theo tổng số lượt mua</p>
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3>📦 Bảng doanh thu theo Gói Liệu Trình</h3>
+                    <p>Top gói bán chạy nhất theo tổng số lượt mua</p>
+                  </div>
+                  <button onClick={() => navigate("/admin/packages")} style={quickLinkStyle}>Quản lý gói →</button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
@@ -1245,9 +1233,12 @@ export default function AdminDashboard() {
 
               {/* Bảng lịch hẹn mới nhất */}
               <article className="chart-card">
-                <div className="chart-header">
-                  <h3>📋 Nhật ký Lịch hẹn mới nhất</h3>
-                  <p>8 lịch hẹn gần đây nhất trong hệ thống</p>
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3>📋 Nhật ký Lịch hẹn mới nhất</h3>
+                    <p>8 lịch hẹn gần đây nhất trong hệ thống</p>
+                  </div>
+                  <button onClick={() => navigate("/receptionist/appointments")} style={quickLinkStyle}>Xem tất cả →</button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
@@ -1450,18 +1441,21 @@ export default function AdminDashboard() {
 
               {/* Bảng hoàn tiền */}
               <article className="chart-card">
-                <div className="chart-header">
-                  <h3>💸 Danh sách Hoàn tiền gần đây</h3>
-                  <p>
-                    Chờ xử lý:{" "}
-                    <strong style={{ color: "#ef4444" }}>
-                      {summary.pendingRefunds ?? 0}
-                    </strong>{" "}
-                    &nbsp;|&nbsp; Đã hoàn:{" "}
-                    <strong style={{ color: "#10b981" }}>
-                      {summary.completedRefunds ?? 0}
-                    </strong>
-                  </p>
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3>💸 Danh sách Hoàn tiền gần đây</h3>
+                    <p>
+                      Chờ xử lý:{" "}
+                      <strong style={{ color: "#ef4444" }}>
+                        {summary.pendingRefunds ?? 0}
+                      </strong>{" "}
+                      &nbsp;|&nbsp; Đã hoàn:{" "}
+                      <strong style={{ color: "#10b981" }}>
+                        {summary.completedRefunds ?? 0}
+                      </strong>
+                    </p>
+                  </div>
+                  <button onClick={() => navigate("/admin/refunds")} style={quickLinkStyle}>Quản lý hoàn tiền →</button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
@@ -1538,18 +1532,21 @@ export default function AdminDashboard() {
 
               {/* Bảng payout kỹ thuật viên */}
               <article className="chart-card">
-                <div className="chart-header">
-                  <h3>🏦 Yêu cầu Chi trả Kỹ thuật viên (Payout)</h3>
-                  <p>
-                    Chờ phê duyệt:{" "}
-                    <strong style={{ color: "#f59e0b" }}>
-                      {summary.pendingPayouts ?? 0}
-                    </strong>{" "}
-                    &nbsp;|&nbsp; Tổng đã chi:{" "}
-                    <strong style={{ color: "#10b981" }}>
-                      {formatMoney(summary.totalPaidOut)}
-                    </strong>
-                  </p>
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3>🏦 Yêu cầu Chi trả Kỹ thuật viên (Payout)</h3>
+                    <p>
+                      Chờ phê duyệt:{" "}
+                      <strong style={{ color: "#f59e0b" }}>
+                        {summary.pendingPayouts ?? 0}
+                      </strong>{" "}
+                      &nbsp;|&nbsp; Tổng đã chi:{" "}
+                      <strong style={{ color: "#10b981" }}>
+                        {formatMoney(summary.totalPaidOut)}
+                      </strong>
+                    </p>
+                  </div>
+                  <button onClick={() => navigate("/admin/employees")} style={quickLinkStyle}>Xem nhân viên →</button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
