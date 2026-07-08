@@ -2,6 +2,7 @@ const { sql, connectDB } = require('../../config/db');
 const { generateContent } = require('../../config/gemini');
 
 async function getCustomerByUserId(pool, userId) {
+  if (!userId) return null;
   const result = await pool.request().input('UserId', sql.Int, userId).query('SELECT CustomerId FROM Customers WHERE UserId = @UserId');
   return result.recordset[0];
 }
@@ -96,38 +97,55 @@ async function buildSalonContext(pool, userId) {
     FROM Branches
   `);
 
+  // 1.8. Lấy danh sách gói combo dịch vụ đang bán
+  const packagesResult = await pool.request().query(`
+    SELECT PackageId, PackageName, Description, OriginalPrice, SalePrice, TotalSessions, ValidityDays
+    FROM Packages
+    WHERE Status = 'ACTIVE'
+    ORDER BY PackageName
+  `);
+
   // 2. Lấy lịch sử appointment của khách (nếu có)
   let customerHistory = [];
-  const customer = await getCustomerByUserId(pool, userId);
-  if (customer) {
-    const historyResult = await pool.request()
-      .input('CustomerId', sql.Int, customer.CustomerId)
-      .query(`
-        SELECT TOP 10
-          s.ServiceName, a.AppointmentDate, a.Status, a.Notes
-        FROM Appointments a
-        LEFT JOIN AppointmentServices ads ON a.AppointmentId = ads.AppointmentId
-        LEFT JOIN Services s ON ads.ServiceId = s.ServiceId
-        WHERE a.CustomerId = @CustomerId
-        ORDER BY a.AppointmentDate DESC
-      `);
-    customerHistory = historyResult.recordset;
+  if (userId) {
+    const customer = await getCustomerByUserId(pool, userId);
+    if (customer) {
+      const historyResult = await pool.request()
+        .input('CustomerId', sql.Int, customer.CustomerId)
+        .query(`
+          SELECT TOP 10
+            s.ServiceName, a.AppointmentDate, a.Status, a.Notes
+          FROM Appointments a
+          LEFT JOIN AppointmentServices ads ON a.AppointmentId = ads.AppointmentId
+          LEFT JOIN Services s ON ads.ServiceId = s.ServiceId
+          WHERE a.CustomerId = @CustomerId
+          ORDER BY a.AppointmentDate DESC
+        `);
+      customerHistory = historyResult.recordset;
+    }
   }
 
-  // 3. Lấy chat history gần nhất để tạo context
-  const chatHistoryResult = await pool.request()
-    .input('UserId', sql.Int, userId)
-    .query(`
-      SELECT TOP 6 Question, Answer
-      FROM AIChatLogs
-      WHERE UserId = @UserId
-      ORDER BY CreatedAt DESC
-    `);
-  const recentChats = chatHistoryResult.recordset.reverse();
+  // 3. Lấy chat history gần nhất để tạo context (nếu có)
+  let recentChats = [];
+  if (userId) {
+    const chatHistoryResult = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .query(`
+        SELECT TOP 6 Question, Answer
+        FROM AIChatLogs
+        WHERE UserId = @UserId
+        ORDER BY CreatedAt DESC
+      `);
+    recentChats = chatHistoryResult.recordset.reverse();
+  }
 
   // Build context string
   const servicesList = servicesResult.recordset.map(s =>
     `- [ID: ${s.ServiceId}] ${s.ServiceName} (${s.CategoryName || 'Chung'}): ${s.Price?.toLocaleString('vi-VN')}đ, ${s.DurationMinutes} phút${s.Description ? ' - ' + s.Description : ''}`
+  ).join('\n');
+
+  const packagesList = packagesResult.recordset.map(p =>
+    `- [Gói Combo ID: ${p.PackageId}] ${p.PackageName}: Giá bán ${p.SalePrice?.toLocaleString('vi-VN')}đ (Giá gốc ${p.OriginalPrice?.toLocaleString('vi-VN')}đ), Gồm ${p.TotalSessions} buổi, HSD ${p.ValidityDays} ngày${p.Description ? ' - ' + p.Description : ''}`
   ).join('\n');
 
   const historyText = customerHistory.length > 0
@@ -163,7 +181,7 @@ async function buildSalonContext(pool, userId) {
     `- Chi nhánh ${b.BranchName}: Địa chỉ: ${b.Address || 'Chưa cập nhật'}, Điện thoại: ${b.Phone || 'Chưa cập nhật'}`
   ).join('\n');
 
-  return { servicesList, techniciansList, branchesList, historyText, chatContext };
+  return { servicesList, techniciansList, branchesList, packagesList, historyText, chatContext };
 }
 
 /**
@@ -178,7 +196,7 @@ async function chat(userId, question) {
 
   try {
     // Lấy context từ database
-    const { servicesList, techniciansList, branchesList, historyText, chatContext } = await buildSalonContext(pool, userId);
+    const { servicesList, techniciansList, branchesList, packagesList, historyText, chatContext } = await buildSalonContext(pool, userId);
     const todayStr = new Date().toISOString().split('T')[0];
 
     // Tạo system prompt
@@ -186,7 +204,7 @@ async function chat(userId, question) {
 (Hôm nay là ngày: ${todayStr})
 
 ## Vai trò:
-- Tư vấn dịch vụ làm đẹp phù hợp cho khách hàng
+- Tư vấn dịch vụ làm đẹp và các gói combo phù hợp cho khách hàng.
 - Trả lời các câu hỏi về giá cả, thời lượng, dịch vụ, ca trực, giờ trống của kỹ thuật viên/stylist, địa chỉ chi nhánh.
 - Hỗ trợ khách hàng xem lịch hẹn, hủy lịch hẹn, xem voucher, xem lịch sử dịch vụ hoặc chọn giờ trống đặt lịch trực tiếp ngay trong khung chat này.
 - Đề xuất combo/gói dịch vụ phù hợp
@@ -194,11 +212,11 @@ async function chat(userId, question) {
 ## Quy tắc:
 1. LUÔN trả lời bằng **tiếng Việt**, thân thiện, chuyên nghiệp
 2. Trả lời ngắn gọn, dễ hiểu (tối đa 3-4 câu cho câu hỏi đơn giản)
-3. Khi gợi ý dịch vụ, LUÔN đề cập giá và thời lượng
+3. Khi gợi ý dịch vụ, LUÔN đề cập giá và thời lượng. Khi gợi ý gói combo, hãy giới thiệu giá bán, số buổi trị liệu và hạn sử dụng.
 4. Nếu khách hỏi ngoài phạm vi salon → nhẹ nhàng chuyển hướng về dịch vụ
 5. Sử dụng emoji phù hợp để tạo cảm giác thân thiện
 6. KHÔNG tự bịa dịch vụ hoặc giá không có trong danh sách
-7. Nếu khách muốn đặt lịch thông thường → hướng dẫn vào trang "Đặt lịch hẹn" trên menu
+7. Nếu khách muốn đặt lịch thông thường → hướng dẫn vào trang "Đặt lịch hẹn" trên menu. Nếu khách muốn mua gói combo dịch vụ, hãy hướng dẫn khách truy cập trang "Gói dịch vụ" trên menu để đăng ký mua.
 8. Khi tư vấn hoặc giới thiệu dịch vụ cụ thể có sẵn trong danh sách dịch vụ, hãy LUÔN chèn thêm một liên kết đặt lịch có định dạng chính xác là: [Đặt lịch: Tên dịch vụ | ID] (ví dụ: nếu dịch vụ có [ID: 3] là "Cắt tóc nam", hãy viết: "[Đặt lịch: Cắt tóc nam | 3]"). KHÔNG tự bịa ID, hãy lấy đúng ID tương ứng của dịch vụ từ danh sách dịch vụ được cung cấp bên dưới.
 9. Khi giới thiệu kỹ thuật viên/stylist cho một dịch vụ cụ thể, bạn có thể tạo một nút đặt lịch kết hợp cả dịch vụ và stylist bằng định dạng chính xác là: [Đặt lịch: Tên dịch vụ | ID | Stylist: Tên stylist | StylistID] (ví dụ: nếu dịch vụ có [ID: 3] và stylist "Nguyễn Văn A" có [Stylist ID: 2], hãy viết: "[Đặt lịch: Cắt tóc nam | 3 | Stylist: Nguyễn Văn A | 2]").
 10. Tích hợp tiện ích tương tác trực tiếp (WIDGET) trong khung chat:
@@ -213,6 +231,9 @@ async function chat(userId, question) {
 
 ## Danh sách dịch vụ hiện có:
 ${servicesList}
+
+## Danh sách các gói Combo dịch vụ hiện có:
+${packagesList}
 
 ## Danh sách kỹ thuật viên/stylist hiện có và lịch trực của họ:
 ${techniciansList}
@@ -247,18 +268,29 @@ ${historyText}
     answer = await getFallbackAnswer(pool, userId, text);
   }
 
-  // Lưu vào database
-  const saved = await pool.request()
-    .input('UserId', sql.Int, userId)
-    .input('Question', sql.NVarChar, text)
-    .input('Answer', sql.NVarChar, answer)
-    .query(`
-      INSERT INTO AIChatLogs (UserId, Question, Answer)
-      OUTPUT INSERTED.*
-      VALUES (@UserId, @Question, @Answer)
-    `);
+  // Lưu vào database nếu người dùng đã đăng nhập (userId có giá trị)
+  if (userId) {
+    const saved = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .input('Question', sql.NVarChar, text)
+      .input('Answer', sql.NVarChar, answer)
+      .query(`
+        INSERT INTO AIChatLogs (UserId, Question, Answer)
+        OUTPUT INSERTED.*
+        VALUES (@UserId, @Question, @Answer)
+      `);
 
-  return saved.recordset[0];
+    return saved.recordset[0];
+  } else {
+    // Trả về đối tượng giả lập cho khách vãng lai
+    return {
+      ChatId: 0,
+      UserId: null,
+      Question: text,
+      Answer: answer,
+      CreatedAt: new Date()
+    };
+  }
 }
 
 /**
@@ -278,16 +310,19 @@ async function getFallbackAnswer(pool, userId, text) {
 
   // 1. Voucher/Khuyến mãi
   if (match(['voucher', 'mã giảm', 'khuyến mãi', 'discount'])) {
+    if (!userId) return '🎁 Vui lòng đăng nhập để xem danh sách voucher ưu đãi của bạn.';
     return '🎁 Dưới đây là danh sách các voucher ưu đãi hiện tại của bạn. Nhấp vào mã để sao chép:\n\n[[WIDGET:MY_VOUCHERS]]';
   }
 
   // 2. Lịch sử dịch vụ
   if (match(['lịch sử', 'dịch vụ đã làm', 'đã sử dụng', 'từng làm'])) {
+    if (!userId) return '📜 Vui lòng đăng nhập để xem lịch sử dịch vụ làm đẹp của bạn.';
     return '📜 Dưới đây là lịch sử các dịch vụ làm đẹp bạn đã thực hiện tại salon của chúng tôi:\n\n[[WIDGET:SERVICE_HISTORY]]';
   }
 
   // 3. Danh sách lịch hẹn / Hủy / Đổi lịch
   if (match(['lịch hẹn', 'đã đặt', 'hủy lịch', 'đổi lịch', 'lịch của tôi'])) {
+    if (!userId) return '📅 Vui lòng đăng nhập để xem hoặc quản lý lịch hẹn sắp tới của bạn.';
     return '📅 Dưới đây là các lịch hẹn sắp tới của bạn. Bạn có thể thay đổi thời gian (đổi lịch trực tiếp) hoặc hủy lịch hẹn ngay tại đây:\n\n[[WIDGET:MY_APPOINTMENTS]]';
   }
 
@@ -986,6 +1021,14 @@ async function addLoyaltyPoints(customerId, points) {
   return { message: `Đã tặng +${points} điểm tích lũy thành công cho khách hàng ${customer.FullName}.` };
 }
 
+async function clearChatHistory(userId) {
+  const pool = await connectDB();
+  await pool.request()
+    .input("UserId", sql.Int, userId)
+    .query("DELETE FROM AIChatLogs WHERE UserId = @UserId");
+  return { success: true, message: "Đã xóa lịch sử trò chuyện thành công" };
+}
+
 module.exports = { 
   getAll, 
   getMine, 
@@ -1000,5 +1043,6 @@ module.exports = {
   sendReminderToCustomer,
   upgradeToVIP,
   giftFreeService,
-  addLoyaltyPoints
+  addLoyaltyPoints,
+  clearChatHistory
 };

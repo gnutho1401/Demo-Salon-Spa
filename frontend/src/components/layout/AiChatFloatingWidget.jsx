@@ -1,16 +1,23 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import CustomerLayout from '../../components/layout/CustomerLayout';
 import { useAuth } from '../../context/AuthContext';
 import axiosClient, { resolveFileUrl } from '../../api/axiosClient';
+
+const DEFAULT_AVATAR = 'https://www.w3schools.com/howto/img_avatar.png';
 
 const QUICK_SUGGESTIONS = [
   'Tôi muốn tư vấn dịch vụ chăm sóc da',
   'Giá dịch vụ nail bao nhiêu?',
   'Hướng dẫn đặt lịch hẹn',
-  'Dịch vụ nào phù hợp lần đầu?',
   'Có combo nào đang giảm giá không?',
 ];
+
+const WELCOME_MESSAGE = {
+  ChatId: 'welcome',
+  Question: null,
+  Answer: '😊 Xin chào! Hiện tại tôi có thể hỗ trợ bạn trực tiếp các việc sau:\n- Tư vấn & đặt lịch dịch vụ (gõ "tôi bị đau lưng", "tôi muốn làm nail")\n- Xem lịch hẹn sắp tới & đổi lịch/hủy lịch (gõ "lịch hẹn của tôi")\n- Xem các voucher ưu đãi (gõ "voucher của tôi")\n- Xem lịch sử làm đẹp (gõ "lịch sử dịch vụ")',
+  CreatedAt: new Date().toISOString()
+};
 
 /** Simple markdown-like formatting */
 function formatAIText(text) {
@@ -126,7 +133,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                     className="book-btn"
                     onClick={() => navigate(`/customer/booking?serviceId=${s.ServiceId}`)}
                   >
-                    Đặt lịch ngay
+                    Đặt lịch
                   </button>
                 </div>
               </div>
@@ -170,7 +177,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
     if (loading) return <div className="ai-chat-widget">⌛ Đang tìm chuyên viên...</div>;
     return (
       <div className="ai-chat-widget">
-        <div className="ai-widget-title">💇 Danh sách chuyên viên/stylist</div>
+        <div className="ai-widget-title">💇 Chuyên viên / stylist</div>
         {stylists.length === 0 ? (
           <div style={{ fontSize: 13, color: '#6b4f5a' }}>Không tìm thấy chuyên viên nào phù hợp.</div>
         ) : (
@@ -187,7 +194,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                   />
                   <div className="ai-widget-stylist-details">
                     <h4>{emp.FullName}</h4>
-                    <span>{emp.Specialization || emp.Position || 'Kỹ thuật viên'}</span>
+                    <span>{emp.Specialization || emp.Position || 'Stylist'}</span>
                     <small>⭐ {Number(emp.AverageRating || 0).toFixed(1)} / 5</small>
                   </div>
                 </div>
@@ -208,7 +215,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
     );
   }
 
-  // Widget 1: MY_APPOINTMENTS
+  // Widget: MY_APPOINTMENTS
   if (type === 'MY_APPOINTMENTS') {
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -368,15 +375,15 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                   {reschedulingAptId !== a.AppointmentId && (
                     <div className="ai-widget-apt-action" style={{ display: 'flex', gap: 6 }}>
                       <button 
-                        style={{ background: '#e3f2fd', color: '#1565c0', border: 'none', padding: '6px 12px', borderRadius: 8, fontWeight: 600, fontSize: 11, cursor: 'pointer' }}
+                        style={{ background: '#e3f2fd', color: '#1565c0', border: 'none', padding: '6px 10px', borderRadius: 8, fontWeight: 600, fontSize: 11, cursor: 'pointer' }}
                         onClick={() => startReschedule(a)}
                       >
-                        Đổi lịch
+                        Đổi
                       </button>
                       <button 
                         disabled={actionLoading === a.AppointmentId}
                         onClick={() => handleCancel(a.AppointmentId)}
-                        style={{ padding: '6px 12px', fontSize: 11, borderRadius: 8, border: 'none', background: '#ffe5ec', color: '#d81b60', fontWeight: 600, cursor: 'pointer' }}
+                        style={{ padding: '6px 10px', fontSize: 11, borderRadius: 8, border: 'none', background: '#ffe5ec', color: '#d81b60', fontWeight: 600, cursor: 'pointer' }}
                       >
                         {actionLoading === a.AppointmentId ? '...' : 'Hủy'}
                       </button>
@@ -397,6 +404,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                         <div className="ai-widget-date-selector">
                           {dateOptions.map(opt => (
                             <button
+                              type="button"
                               key={opt.date}
                               className={`ai-date-chip ${rescheduleSelectedDate === opt.date ? 'active' : ''}`}
                               onClick={() => setRescheduleSelectedDate(opt.date)}
@@ -418,7 +426,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                                   onClick={() => setRescheduleSelectedEmployeeId(String(emp.EmployeeId))}
                                 >
                                   <img 
-                                    src={emp.ImageUrl || '/default-avatar.png'} 
+                                    src={emp.ImageUrl || DEFAULT_AVATAR} 
                                     alt={emp.EmployeeName} 
                                     className="ai-employee-avatar" 
                                   />
@@ -448,6 +456,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                                 const timeStr = String(s.startTime || s).slice(0, 5);
                                 return (
                                   <button 
+                                    type="button"
                                     key={timeStr}
                                     className={`ai-widget-slot-btn ${rescheduleSelectedSlot === timeStr ? 'selected' : ''}`}
                                     onClick={() => setRescheduleSelectedSlot(timeStr)}
@@ -463,6 +472,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                         {/* Confirm / Close */}
                         <div style={{ display: 'flex', gap: 6, marginTop: 12, justifyContent: 'flex-end' }}>
                           <button
+                            type="button"
                             className="ai-widget-btn-secondary"
                             style={{ background: '#eee', color: '#666', border: 'none', padding: '6px 12px', borderRadius: 8, fontWeight: 600, fontSize: 11, cursor: 'pointer' }}
                             onClick={() => {
@@ -474,12 +484,13 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                           </button>
                           {rescheduleSelectedSlot && (
                             <button
+                              type="button"
                               disabled={rescheduleActionLoading}
                               className="ai-widget-btn-primary"
                               style={{ background: '#ff4778', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 8, fontWeight: 600, fontSize: 11, cursor: 'pointer' }}
                               onClick={confirmReschedule}
                             >
-                              {rescheduleActionLoading ? 'Đang cập nhật...' : `Xác nhận đổi sang ${rescheduleSelectedSlot}`}
+                              {rescheduleActionLoading ? '...' : `Xác nhận: ${rescheduleSelectedSlot}`}
                             </button>
                           )}
                         </div>
@@ -495,7 +506,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
     );
   }
 
-  // Widget 2: MY_VOUCHERS
+  // Widget: MY_VOUCHERS
   if (type === 'MY_VOUCHERS') {
     const [vouchers, setVouchers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -546,7 +557,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
     );
   }
 
-  // Widget 3: SLOTS
+  // Widget: SLOTS
   if (type === 'SLOTS') {
     const serviceId = args[0];
     const initialEmployeeId = args[1];
@@ -672,7 +683,6 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
           const res = await axiosClient.get(`/employees/by-service/${serviceId}`);
           const list = res.data?.data || [];
           setEmployees(list);
-          // If no initial employee, or suggested employee not in list, select the first one
           if (!selectedEmployeeId || !list.some(e => String(e.EmployeeId) === String(selectedEmployeeId))) {
             if (list.length > 0) {
               setSelectedEmployeeId(String(list[0].EmployeeId));
@@ -747,6 +757,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
           <div className="ai-widget-success">
             <span>🎉 Đặt lịch hẹn thành công lúc {selectedSlot} ngày {new Date(selectedDate).toLocaleDateString('vi-VN')}!</span>
             <button 
+              type="button"
               className="ai-widget-success-btn" 
               onClick={() => navigate(`/customer/payment/${aptId}?voucherId=${selectedVoucherId || ''}&discount=${calculatedDiscount}`)}
             >
@@ -767,6 +778,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
         <div className="ai-widget-date-selector">
           {dateOptions.map(opt => (
             <button
+              type="button"
               key={opt.date}
               className={`ai-date-chip ${selectedDate === opt.date ? 'active' : ''}`}
               onClick={() => setSelectedDate(opt.date)}
@@ -787,7 +799,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                   className={`ai-employee-card ${String(selectedEmployeeId) === String(emp.EmployeeId) ? 'active' : ''}`}
                   onClick={() => setSelectedEmployeeId(String(emp.EmployeeId))}
                 >
-                  <img src={emp.ImageUrl || '/default-avatar.png'} alt={emp.FullName} className="ai-employee-avatar" />
+                  <img src={emp.ImageUrl || DEFAULT_AVATAR} alt={emp.FullName} className="ai-employee-avatar" />
                   <div className="ai-employee-info">
                     <span className="ai-employee-name">{emp.FullName}</span>
                     <span className="ai-employee-rating">⭐️ {Number(emp.AverageRating || 0).toFixed(1)}</span>
@@ -815,6 +827,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                   const timeStr = String(s.startTime || s).slice(0, 5);
                   return (
                     <button 
+                      type="button"
                       key={timeStr}
                       className={`ai-widget-slot-btn ${selectedSlot === timeStr ? 'selected' : ''}`}
                       onClick={() => setSelectedSlot(timeStr)}
@@ -842,7 +855,6 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                       >
                         <option value="">-- Không áp dụng voucher --</option>
                         {vouchers.map(v => {
-                          const originalPrice = serviceDetail ? Number(serviceDetail.Price || 0) : 0;
                           const discountType = String(v.DiscountType || '').toUpperCase();
                           const valStr = discountType === 'PERCENT' || discountType === 'PERCENTAGE' ? `${v.DiscountValue}%` : `${Number(v.DiscountValue).toLocaleString('vi-VN')}đ`;
                           const desc = `${v.Code} (Giảm ${valStr})`;
@@ -861,6 +873,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                     </div>
                   )}
                   <button 
+                    type="button"
                     disabled={bookingLoading}
                     onClick={handleConfirmBooking}
                   >
@@ -875,7 +888,7 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
     );
   }
 
-  // Widget 4: SERVICE_HISTORY
+  // Widget: SERVICE_HISTORY
   if (type === 'SERVICE_HISTORY') {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -924,13 +937,14 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
   return null;
 }
 
-export default function AiAssistantPage() {
+export default function AiChatFloatingWidget() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
+  const [isOpen, setIsOpen] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
-  const [recommendations, setRecommendations] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
   
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -954,8 +968,8 @@ export default function AiAssistantPage() {
       ? `ai_chat_workspace_sessions_${user.UserId || user.userId}` 
       : `ai_chat_workspace_sessions_guest`;
     
-    let parsedSessions = [];
     const saved = localStorage.getItem(key);
+    let parsedSessions = [];
     if (saved) {
       try {
         parsedSessions = JSON.parse(saved);
@@ -964,18 +978,14 @@ export default function AiAssistantPage() {
       }
     }
 
-    // Pull from DB if logged in
+    // If logged in customer, also pull recent logs from the DB and merge
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        const [recRes, chatRes] = await Promise.all([
-          axiosClient.get('/ai/my/recommendations'),
-          axiosClient.get('/ai/my/chat'),
-        ]);
-        setRecommendations(recRes.data.data || recRes.data || []);
-        
+        const chatRes = await axiosClient.get('/ai/my/chat');
         const dbMessages = chatRes.data?.data || chatRes.data || [];
         if (dbMessages.length > 0) {
+          // Check if there is already a database session in parsed sessions
           const dbSessionIndex = parsedSessions.findIndex(s => s.id === 'session-database');
           const dbSession = {
             id: 'session-database',
@@ -997,22 +1007,25 @@ export default function AiAssistantPage() {
       const defaultSession = {
         id: `session-${Date.now()}`,
         title: 'Cuộc trò chuyện mới',
-        messages: [] // Start empty/fresh
+        messages: [] // start empty/fresh to sync with page
       };
       parsedSessions.push(defaultSession);
     }
 
     setSessions(parsedSessions);
+    // Set active session
     if (!currentSessionId || !parsedSessions.some(s => s.id === currentSessionId)) {
       setCurrentSessionId(parsedSessions[0].id);
     }
   };
 
   useEffect(() => {
-    loadSessions();
-  }, [user]);
+    if (isOpen) {
+      loadSessions();
+    }
+  }, [user, isOpen]);
 
-  // Sync to localStorage and broadcast sync event
+  // Sync sessions array to localStorage and broadcast sync event
   useEffect(() => {
     if (sessions.length > 0) {
       const key = user 
@@ -1045,6 +1058,22 @@ export default function AiAssistantPage() {
     return () => window.removeEventListener('ai-chat-sync', handleSync);
   }, [sessions]);
 
+  // Listen to open-ai-chat global custom event
+  useEffect(() => {
+    const handleOpen = () => {
+      setIsOpen(true);
+    };
+    window.addEventListener('open-ai-chat', handleOpen);
+    return () => window.removeEventListener('open-ai-chat', handleOpen);
+  }, []);
+
+  // Scroll to bottom
+  useEffect(() => {
+    if (isOpen) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isOpen]);
+
   const handleCreateNewSession = () => {
     const activeSession = sessions.find(s => s.id === currentSessionId);
     if (activeSession && activeSession.messages.length === 0) {
@@ -1064,11 +1093,12 @@ export default function AiAssistantPage() {
     };
     setSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
+    setShowHistory(false);
   };
 
   const handleDeleteSession = async (sid, e) => {
     e.stopPropagation();
-
+    
     // Prompts confirmation before deleting any session
     const targetSession = sessions.find(s => s.id === sid);
     const sessionName = targetSession ? targetSession.title : "cuộc trò chuyện này";
@@ -1076,6 +1106,7 @@ export default function AiAssistantPage() {
       return;
     }
 
+    // If it's the database session, also clear it from the backend server
     if (sid === 'session-database') {
       const token = localStorage.getItem('token');
       if (token) {
@@ -1091,6 +1122,7 @@ export default function AiAssistantPage() {
     }
 
     if (sessions.length <= 1) {
+      // Keep at least one blank session
       const resetSession = {
         id: `session-${Date.now()}`,
         title: 'Cuộc trò chuyện mới',
@@ -1108,14 +1140,6 @@ export default function AiAssistantPage() {
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, loading]);
-
   const ask = async (text) => {
     const q = (text || question).trim();
     if (!q) return;
@@ -1123,7 +1147,7 @@ export default function AiAssistantPage() {
 
     const tempMsg = { ChatId: `temp-${Date.now()}`, Question: q, Answer: null, CreatedAt: new Date().toISOString() };
     
-    // Add user question immediately
+    // Add User question immediately
     setSessions(prev => prev.map(s => {
       if (s.id === currentSessionId) {
         return { ...s, messages: [...s.messages, tempMsg] };
@@ -1168,230 +1192,225 @@ export default function AiAssistantPage() {
     ask();
   };
 
-  const handleSuggestion = (text) => {
-    ask(text);
-  };
-
-  const formatTime = (dateStr) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  };
-
   const handleChatClick = (e) => {
     const btn = e.target.closest('.chat-booking-btn');
     if (btn) {
       e.preventDefault();
       const href = btn.getAttribute('href');
       if (href) {
+        setIsOpen(false);
         navigate(href);
       }
     }
   };
 
   return (
-    <CustomerLayout>
-      <div className="ai-chat-page-workspace-container">
-        
-        {/* Sidebar Lịch sử trò chuyện */}
-        <aside className="ai-chat-page-sidebar">
-          <button 
-            type="button" 
-            className="ai-chat-page-new-btn"
-            onClick={handleCreateNewSession}
-          >
-            ➕ Cuộc trò chuyện mới
-          </button>
-          
-          <div className="ai-chat-page-sessions-list">
-            {sessions.map(s => (
-              <div 
-                key={s.id} 
-                className={`ai-chat-page-session-item ${currentSessionId === s.id ? 'active' : ''}`}
-                onClick={() => setCurrentSessionId(s.id)}
-              >
-                <span className="session-title-text" style={{ fontSize: 13, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '75%' }}>
-                  💬 {s.title}
-                </span>
-                <button 
-                  type="button" 
-                  className="delete-session-btn" 
-                  onClick={(e) => handleDeleteSession(s.id, e)}
-                  title="Xóa cuộc hội thoại này"
-                  style={{ border: 'none', background: 'transparent', color: '#ff4778', cursor: 'pointer', fontSize: 12 }}
-                >
-                  🗑️
-                </button>
-              </div>
-            ))}
-          </div>
-        </aside>
+    <div className="ai-chat-floating-container">
+      {/* Floating Button Bubble */}
+      <button 
+        type="button" 
+        className={`ai-chat-bubble-btn ${isOpen ? 'active' : ''}`} 
+        onClick={() => setIsOpen(!isOpen)}
+        title="Trợ lý ảo AI"
+      >
+        {isOpen ? '✕' : '✨'}
+      </button>
 
-        {/* Cửa sổ chat chính bên phải */}
-        <div className="ai-chat-page-main">
+      {/* Collapsible Chat Window Popup */}
+      {isOpen && (
+        <div className="ai-chat-popup-window">
           {/* Header */}
-          <div className="ai-chat-header">
-            <div className="eyebrow">✨ AI Assistant</div>
-            <h2 className="section-title">Trợ lý AI Beauty Salon</h2>
-            <p className="subtitle">Hỏi bất kỳ điều gì về dịch vụ, giá cả, đặt lịch — AI sẽ tư vấn cho bạn!</p>
-          </div>
-
-          <div className="ai-chat-container">
-            {/* Chat Window */}
-            <div className="ai-chat-window">
-              <div className="ai-chat-messages" onClick={handleChatClick}>
-                {messages.length === 0 && !loading && (
-                  <div className="ai-welcome">
-                    <div className="ai-welcome-icon">🤖</div>
-                    <h3>Xin chào! 👋</h3>
-                    <p>Mình là trợ lý AI của Beauty Salon. Hãy gửi câu hỏi đầu tiên để bắt đầu cuộc trò chuyện mới nhé!</p>
-                  </div>
-                )}
-
-                {messages.map((m, idx) => {
-                  const widget = m.Answer ? parseMessageWidget(m.Answer) : null;
-                  let cleanAnswer = m.Answer || '';
-                  if (widget) cleanAnswer = cleanAnswer.replace(widget.rawTag, '').trim();
-
-                  let suggestions = [];
-                  if (cleanAnswer) {
-                    suggestions = parseMessageSuggestions(cleanAnswer);
-                    cleanAnswer = cleanAnswer.replace(/\[\[SUGGESTIONS:[^\]]+\]\]/g, '').trim();
-                  }
-
-                  const isLast = idx === messages.length - 1;
-
-                  return (
-                    <div key={m.ChatId || `${m.Question}-${m.CreatedAt}`}>
-                      {/* User message */}
-                      {m.Question && (
-                        <>
-                          <div className="ai-msg user">
-                            <div className="ai-msg-avatar">👤</div>
-                            <div className="ai-msg-bubble">{m.Question}</div>
-                          </div>
-                          {m.CreatedAt && <div className="ai-msg-time" style={{ textAlign: 'right' }}>{formatTime(m.CreatedAt)}</div>}
-                        </>
-                      )}
-
-                      {/* AI response */}
-                      {cleanAnswer && (
-                        <div className="ai-msg bot">
-                          <div className="ai-msg-avatar">🤖</div>
-                          <div
-                            className="ai-msg-bubble"
-                            dangerouslySetInnerHTML={{ __html: formatAIText(cleanAnswer) }}
-                          />
-                        </div>
-                      )}
-
-                      {/* Widget if exists */}
-                      {widget && (
-                        <AiChatWidget type={widget.type} args={widget.args} />
-                      )}
-
-                      {/* Suggestions chips */}
-                      {isLast && !loading && suggestions.length > 0 && (
-                        <div className="ai-quick-suggestions" style={{ marginLeft: '46px', marginTop: '8px' }}>
-                          {suggestions.map((s) => (
-                            <button
-                              key={s}
-                              type="button"
-                              className="ai-suggestion-chip"
-                              onClick={() => handleSuggestion(s)}
-                            >
-                              💬 {s}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Typing indicator */}
-                {loading && !messages.some(m => m.Answer === null) && (
-                  <div className="ai-typing">
-                    <div className="ai-msg-avatar" style={{
-                      width: 36, height: 36, borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #ff4778, #ff9ab7)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 16, color: 'white', flexShrink: 0,
-                      boxShadow: '0 4px 12px rgba(255,71,120,0.25)'
-                    }}>🤖</div>
-                    <div className="ai-typing-dots">
-                      <span></span><span></span><span></span>
-                    </div>
-                  </div>
-                )}
-
-                {error && <div className="ai-error-toast">{error}</div>}
-
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input area */}
-              <div className="ai-chat-input-area">
-                <form className="ai-chat-form" onSubmit={handleSubmit}>
-                  <input
-                    ref={inputRef}
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="Nhập câu hỏi của bạn..."
-                    disabled={loading}
-                  />
-                  <button
-                    type="submit"
-                    className="ai-chat-send-btn"
-                    disabled={loading || !question.trim()}
-                    title="Gửi"
-                  >
-                    ➤
-                  </button>
-                </form>
-
-                {/* Quick suggestions - only show when no messages */}
-                {messages.length === 0 && (
-                  <div className="ai-quick-suggestions">
-                    {QUICK_SUGGESTIONS.map((s) => (
-                      <button
-                        key={s}
-                        className="ai-suggestion-chip"
-                        onClick={() => handleSuggestion(s)}
-                        disabled={loading}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
+          <div className="ai-chat-popup-header">
+            <div className="ai-chat-popup-header-info">
+              <span className="logo-icon">🌸</span>
+              <div>
+                <h4>BeautyMS AI</h4>
+                <small>{currentSession ? currentSession.title : 'Trợ lý ảo'}</small>
               </div>
             </div>
+            <div className="ai-chat-popup-header-actions" style={{ display: 'flex', gap: 6 }}>
+              <button 
+                type="button" 
+                className="new-chat-btn" 
+                onClick={() => setShowHistory(!showHistory)} 
+                title="Lịch sử trò chuyện"
+                style={{ background: showHistory ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.2)' }}
+              >
+                📂 Lịch sử
+              </button>
+              <button 
+                type="button" 
+                className="new-chat-btn"
+                onClick={handleCreateNewSession}
+                title="Tạo hội thoại mới"
+              >
+                + Chat mới
+              </button>
+            </div>
+          </div>
 
-            {/* Recommendations */}
-            {recommendations.length > 0 && (
-              <div className="ai-recommendations">
-                <h3>💡 Gợi ý dịch vụ cho bạn</h3>
-                <div className="ai-rec-grid">
-                  {recommendations.map((r, i) => (
-                    <div className="ai-rec-card" key={r.RecommendationId || r.ServiceId || i}>
-                      <strong>{r.ServiceName}</strong>
-                      <span>{r.Reason || r.Description}</span>
-                      {r.Price && <span style={{ color: '#ff4778', fontWeight: 700 }}>{Number(r.Price).toLocaleString('vi-VN')}đ • {r.DurationMinutes} phút</span>}
-                      {r.ServiceId && (
-                        <Link className="card-btn primary" to={`/customer/booking?serviceId=${r.ServiceId}`}>
-                          Đặt lịch
-                      </Link>
-                      )}
+          {/* Drawer Lịch Sử Hội Thoại */}
+          {showHistory && (
+            <div className="ai-chat-popup-history-drawer">
+              <div className="ai-chat-popup-history-drawer-header">
+                <h5>Lịch sử trò chuyện</h5>
+                <button type="button" onClick={() => setShowHistory(false)}>✕ Close</button>
+              </div>
+              <div className="ai-chat-popup-history-drawer-body">
+                <button 
+                  type="button" 
+                  className="ai-chat-popup-new-session-btn"
+                  onClick={handleCreateNewSession}
+                >
+                  ➕ Bắt đầu cuộc trò chuyện mới
+                </button>
+                <div className="ai-chat-sessions-list">
+                  {sessions.map(s => (
+                    <div 
+                      key={s.id} 
+                      className={`ai-chat-session-item ${currentSessionId === s.id ? 'active' : ''}`}
+                      onClick={() => {
+                        setCurrentSessionId(s.id);
+                        setShowHistory(false);
+                      }}
+                    >
+                      <span className="session-title-text" style={{ fontSize: 13, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                        💬 {s.title}
+                      </span>
+                      <button 
+                        type="button" 
+                        className="delete-session-btn" 
+                        onClick={(e) => handleDeleteSession(s.id, e)}
+                        title="Xóa hội thoại"
+                        style={{ border: 'none', background: 'transparent', color: '#ff4778', cursor: 'pointer', fontSize: 13 }}
+                      >
+                        🗑️
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
 
-      </div>
-    </CustomerLayout>
+          {/* Messages Body */}
+          <div className="ai-chat-popup-body">
+            <div className="ai-chat-messages-container" onClick={handleChatClick}>
+              {messages.length === 0 && !loading && (
+                <div className="ai-welcome" style={{ padding: '20px 10px', textAlign: 'center' }}>
+                  <div className="ai-welcome-icon" style={{ fontSize: 32 }}>🤖</div>
+                  <h3 style={{ fontSize: 16, margin: '10px 0 5px 0', color: '#ff4778' }}>Xin chào! 👋</h3>
+                  <p style={{ fontSize: 12, color: '#6b4f5a', margin: 0 }}>Mình là trợ lý AI của Beauty Salon. Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện nhé!</p>
+                </div>
+              )}
+              {messages.map((m, idx) => {
+                const widget = m.Answer ? parseMessageWidget(m.Answer) : null;
+                const suggestions = m.Answer ? parseMessageSuggestions(m.Answer) : [];
+                
+                // Clear widgets/suggestions tags from text
+                let cleanAnswer = m.Answer || '';
+                if (widget) cleanAnswer = cleanAnswer.replace(widget.rawTag, '');
+                if (suggestions.length > 0) {
+                  const suggMatch = cleanAnswer.match(/\[\[SUGGESTIONS:([^\]]+)\]\]/);
+                  if (suggMatch) cleanAnswer = cleanAnswer.replace(suggMatch[0], '');
+                }
+
+                return (
+                  <div key={m.ChatId || idx} className="ai-chat-message-group">
+                    {/* User Question */}
+                    {m.Question && (
+                      <div className="ai-chat-msg user">
+                        <div className="ai-chat-msg-text">{m.Question}</div>
+                      </div>
+                    )}
+                    
+                    {/* AI Answer */}
+                    <div className="ai-chat-msg assistant">
+                      <div className="avatar">🤖</div>
+                      <div className="ai-chat-msg-content-wrapper">
+                        <div 
+                          className="ai-chat-msg-text"
+                          dangerouslySetInnerHTML={{ __html: formatAIText(cleanAnswer) }}
+                        />
+                        
+                        {/* Render interactive widgets inline */}
+                        {widget && (
+                          <div className="ai-chat-widget-wrapper">
+                            <AiChatWidget type={widget.type} args={widget.args} />
+                          </div>
+                        )}
+
+                        {/* Render suggestions chips inside popup body */}
+                        {suggestions.length > 0 && (
+                          <div className="ai-chat-suggestions-chips">
+                            {suggestions.map((s, sIdx) => (
+                              <button 
+                                key={sIdx} 
+                                type="button" 
+                                className="suggestion-chip" 
+                                onClick={() => ask(s)}
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Waiting status */}
+              {loading && !messages.some(m => m.Answer === null) && (
+                <div className="ai-chat-msg assistant loading">
+                  <div className="avatar">🤖</div>
+                  <div className="ai-chat-loading-dots">
+                    <span>.</span><span>.</span><span>.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Scroll anchor */}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Form Footer */}
+          <form className="ai-chat-popup-footer" onSubmit={handleSubmit}>
+            {error && <div className="ai-chat-popup-error">{error}</div>}
+            
+            {/* Show quick suggestion help if messages are fresh */}
+            {messages.length <= 1 && (
+              <div className="ai-chat-popup-quick-hints">
+                {QUICK_SUGGESTIONS.map((hint, hIdx) => (
+                  <button 
+                    key={hIdx}
+                    type="button"
+                    onClick={() => ask(hint)}
+                  >
+                    {hint}
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            <div className="ai-chat-popup-input-bar">
+              <input
+                ref={inputRef}
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="Hỏi trợ lý ảo (vd: nặn mụn)..."
+                disabled={loading}
+              />
+              <button type="submit" disabled={loading || !question.trim()}>
+                Gửi
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
   );
 }

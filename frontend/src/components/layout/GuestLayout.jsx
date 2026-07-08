@@ -1,5 +1,6 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import AiChatFloatingWidget from './AiChatFloatingWidget';
 
 export default function GuestLayout({ children }) {
   const navigate = useNavigate();
@@ -40,5 +41,6 @@ export default function GuestLayout({ children }) {
       </nav>
     </header>
     {children}
+    <AiChatFloatingWidget />
   </>;
 }

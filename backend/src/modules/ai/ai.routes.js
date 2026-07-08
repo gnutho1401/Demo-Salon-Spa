@@ -3,10 +3,28 @@ const controller = require("./ai.controller");
 const stylistController = require("./stylist/stylist.controller");
 const authMiddleware = require("../../middlewares/auth.middleware");
 const allowRoles = require("../../middlewares/role.middleware");
+const { verifyToken } = require("../../utils/jwt");
+
+function optionalAuthMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    req.user = null;
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    req.user = verifyToken(token);
+  } catch (err) {
+    req.user = null;
+  }
+  next();
+}
 
 router.get("/my/recommendations", authMiddleware, controller.getMine);
 router.get("/my/chat", authMiddleware, controller.getChatHistory);
-router.post("/chat", authMiddleware, controller.chat);
+router.post("/chat", optionalAuthMiddleware, controller.chat);
+router.delete("/my/chat", authMiddleware, controller.clearMyChatHistory);
 router.post("/stylist/analyze", authMiddleware, stylistController.analyze);
 router.get("/stylist/history", authMiddleware, stylistController.getHistory);
 router.get(
