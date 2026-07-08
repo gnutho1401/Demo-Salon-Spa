@@ -13,6 +13,11 @@ async function getDashboard() {
     latestAppointments,
     recentFeedbacks,
     revenueByDay,
+    revenueByMonth,
+    packagesSummary,
+    pendingRefunds,
+    pendingPayouts,
+    todayAttendance,
   ] = await Promise.all([
     pool.request().query(`
       SELECT
@@ -60,7 +65,18 @@ async function getDashboard() {
         ISNULL((SELECT COUNT(*) FROM WaitingList), 0) AS TotalWaitingCount,
         ISNULL((SELECT COUNT(*) FROM WaitingList WHERE Status IN ('MATCHED', 'BOOKED', 'SKIPPED')), 0) AS MatchedWaitingCount,
         ISNULL((SELECT COUNT(*) FROM WaitingList WHERE Status = 'BOOKED'), 0) AS BookedWaitingCount,
-        ISNULL((SELECT COUNT(*) FROM WaitingList WHERE Status IN ('EXPIRED', 'SKIPPED')), 0) AS ExpiredWaitingCount
+        ISNULL((SELECT COUNT(*) FROM WaitingList WHERE Status IN ('EXPIRED', 'SKIPPED')), 0) AS ExpiredWaitingCount,
+
+        ISNULL((SELECT SUM(pp.Amount) FROM PackagePayments pp WHERE pp.Status = 'PAID' AND MONTH(pp.PaidAt) = MONTH(GETDATE()) AND YEAR(pp.PaidAt) = YEAR(GETDATE())), 0) AS PackageRevenueThisMonth,
+        ISNULL((SELECT COUNT(*) FROM CustomerPackages WHERE Status = 'ACTIVE'), 0) AS ActivePackages,
+        ISNULL((SELECT COUNT(*) FROM CustomerPackages WHERE Status IN ('EXPIRED','CANCELLED')), 0) AS ExpiredPackages,
+        ISNULL((SELECT COUNT(*) FROM Refunds WHERE Status = 'PENDING'), 0) AS PendingRefunds,
+        ISNULL((SELECT COUNT(*) FROM Refunds WHERE Status = 'COMPLETED'), 0) AS CompletedRefunds,
+        ISNULL((SELECT COUNT(*) FROM TechnicianPayoutRequests WHERE Status = 'PENDING'), 0) AS PendingPayouts,
+        ISNULL((SELECT SUM(Amount) FROM TechnicianPayoutRequests WHERE Status = 'APPROVED'), 0) AS TotalPaidOut,
+        ISNULL((SELECT COUNT(*) FROM Branches WHERE Status = 'ACTIVE'), 0) AS TotalBranches,
+        ISNULL((SELECT COUNT(*) FROM Promotions WHERE GETDATE() BETWEEN StartDate AND EndDate), 0) AS ActivePromotions,
+        ISNULL((SELECT COUNT(*) FROM Vouchers), 0) AS TotalVouchers
     `),
 
     pool.request().query(`
@@ -218,6 +234,91 @@ async function getDashboard() {
       GROUP BY d.PayDate
       ORDER BY d.PayDate
     `),
+
+    /* Monthly revenue – last 12 months */
+    pool.request().query(`
+      SELECT
+        FORMAT(m.MonthDate, 'yyyy-MM') AS Month,
+        ISNULL(SUM(p.Amount), 0) AS Revenue
+      FROM (
+        SELECT DATEADD(MONTH, -11, CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE)) AS MonthDate
+        UNION ALL SELECT DATEADD(MONTH, -10, CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -9,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -8,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -7,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -6,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -5,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -4,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -3,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -2,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT DATEADD(MONTH, -1,  CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE))
+        UNION ALL SELECT CAST(DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AS DATE)
+      ) m
+      LEFT JOIN Payments p
+        ON YEAR(p.PaidAt) = YEAR(m.MonthDate)
+        AND MONTH(p.PaidAt) = MONTH(m.MonthDate)
+        AND p.Status = 'PAID'
+      GROUP BY m.MonthDate, FORMAT(m.MonthDate, 'yyyy-MM')
+      ORDER BY m.MonthDate
+    `),
+
+    /* Package sales summary by package */
+    pool.request().query(`
+      SELECT TOP 8
+        pk.PackageId,
+        pk.PackageName,
+        COUNT(cp.CustomerPackageId) AS TotalSold,
+        SUM(ISNULL(cp.PurchasePrice, 0)) AS TotalRevenue,
+        SUM(CASE WHEN cp.Status = 'ACTIVE' THEN 1 ELSE 0 END) AS ActiveCount
+      FROM Packages pk
+      LEFT JOIN CustomerPackages cp ON cp.PackageId = pk.PackageId
+      GROUP BY pk.PackageId, pk.PackageName
+      ORDER BY TotalSold DESC
+    `),
+
+    /* Latest pending refunds */
+    pool.request().query(`
+      SELECT TOP 6
+        r.RefundId,
+        r.RefundAmount,
+        r.Reason,
+        r.Status,
+        r.CreatedAt,
+        cu.FullName AS CustomerName
+      FROM Refunds r
+      LEFT JOIN Payments p ON r.PaymentId = p.PaymentId
+      LEFT JOIN Invoices i ON p.InvoiceId = i.InvoiceId
+      LEFT JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+      LEFT JOIN Customers c ON a.CustomerId = c.CustomerId
+      LEFT JOIN Users cu ON c.UserId = cu.UserId
+      ORDER BY r.CreatedAt DESC, r.RefundId DESC
+    `),
+
+    /* Pending technician payout requests */
+    pool.request().query(`
+      SELECT TOP 6
+        tpr.PayoutRequestId,
+        tpr.Amount,
+        tpr.Status,
+        tpr.RequestedAt,
+        u.FullName AS TechnicianName
+      FROM TechnicianPayoutRequests tpr
+      JOIN Employees e ON tpr.EmployeeId = e.EmployeeId
+      JOIN Users u ON e.UserId = u.UserId
+      WHERE tpr.Status = 'PENDING'
+      ORDER BY tpr.RequestedAt DESC
+    `),
+
+    /* Today's attendance */
+    pool.request().query(`
+      SELECT
+        ISNULL(COUNT(*), 0) AS TotalCheckedIn,
+        ISNULL(SUM(CASE WHEN att.Status = 'PRESENT' THEN 1 ELSE 0 END), 0) AS Present,
+        ISNULL(SUM(CASE WHEN att.Status = 'LATE' THEN 1 ELSE 0 END), 0) AS Late,
+        ISNULL(SUM(CASE WHEN att.Status = 'ABSENT' THEN 1 ELSE 0 END), 0) AS Absent
+      FROM Attendance att
+      WHERE CAST(att.CreatedAt AS DATE) = CAST(GETDATE() AS DATE)
+    `),
   ]);
 
   const s = summary.recordset[0] || {};
@@ -247,6 +348,16 @@ async function getDashboard() {
       matchedWaitingCount: Number(s.MatchedWaitingCount || 0),
       bookedWaitingCount: Number(s.BookedWaitingCount || 0),
       expiredWaitingCount: Number(s.ExpiredWaitingCount || 0),
+      packageRevenueThisMonth: Number(s.PackageRevenueThisMonth || 0),
+      activePackages: Number(s.ActivePackages || 0),
+      expiredPackages: Number(s.ExpiredPackages || 0),
+      pendingRefunds: Number(s.PendingRefunds || 0),
+      completedRefunds: Number(s.CompletedRefunds || 0),
+      pendingPayouts: Number(s.PendingPayouts || 0),
+      totalPaidOut: Number(s.TotalPaidOut || 0),
+      totalBranches: Number(s.TotalBranches || 0),
+      activePromotions: Number(s.ActivePromotions || 0),
+      totalVouchers: Number(s.TotalVouchers || 0),
     },
 
     appointmentStatus: appointmentStatus.recordset.map((row) => ({
@@ -316,6 +427,46 @@ async function getDashboard() {
       date: row.Date,
       revenue: Number(row.Revenue || 0),
     })),
+
+    revenueByMonth: revenueByMonth.recordset.map((row) => ({
+      month: row.Month,
+      revenue: Number(row.Revenue || 0),
+    })),
+
+    packagesSummary: packagesSummary.recordset.map((row) => ({
+      packageId: row.PackageId,
+      packageName: row.PackageName,
+      totalSold: Number(row.TotalSold || 0),
+      totalRevenue: Number(row.TotalRevenue || 0),
+      activeCount: Number(row.ActiveCount || 0),
+    })),
+
+    pendingRefunds: pendingRefunds.recordset.map((row) => ({
+      refundId: row.RefundId,
+      refundAmount: Number(row.RefundAmount || 0),
+      reason: row.Reason,
+      status: row.Status,
+      createdAt: row.CreatedAt,
+      customerName: row.CustomerName,
+    })),
+
+    pendingPayouts: pendingPayouts.recordset.map((row) => ({
+      payoutRequestId: row.PayoutRequestId,
+      amount: Number(row.Amount || 0),
+      status: row.Status,
+      requestedAt: row.RequestedAt,
+      technicianName: row.TechnicianName,
+    })),
+
+    todayAttendance: (() => {
+      const a = todayAttendance.recordset[0] || {};
+      return {
+        totalCheckedIn: Number(a.TotalCheckedIn || 0),
+        present: Number(a.Present || 0),
+        late: Number(a.Late || 0),
+        absent: Number(a.Absent || 0),
+      };
+    })(),
   };
 }
 
