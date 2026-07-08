@@ -267,11 +267,12 @@ async function getDashboard() {
       SELECT TOP 8
         pk.PackageId,
         pk.PackageName,
-        COUNT(cp.CustomerPackageId) AS TotalSold,
-        SUM(ISNULL(cp.PurchasePrice, 0)) AS TotalRevenue,
+        COUNT(DISTINCT cp.CustomerPackageId) AS TotalSold,
+        ISNULL(SUM(CASE WHEN pp.Status = 'PAID' THEN pp.Amount ELSE 0 END), 0) AS TotalRevenue,
         SUM(CASE WHEN cp.Status = 'ACTIVE' THEN 1 ELSE 0 END) AS ActiveCount
       FROM Packages pk
       LEFT JOIN CustomerPackages cp ON cp.PackageId = pk.PackageId
+      LEFT JOIN PackagePayments pp ON pp.CustomerPackageId = cp.CustomerPackageId
       GROUP BY pk.PackageId, pk.PackageName
       ORDER BY TotalSold DESC
     `),
