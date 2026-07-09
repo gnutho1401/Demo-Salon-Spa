@@ -658,6 +658,14 @@ export default function BookingPage() {
 
       if (voucherId) {
         sessionStorage.setItem("bookingVoucherId", String(voucherId));
+        try {
+          await axiosClient.post(`/payments/appointment/${newAppointmentId}/apply-voucher`, {
+            voucherId: voucherId,
+            rewardPoints: 0,
+          });
+        } catch (voucherErr) {
+          console.error("Lỗi tự động áp dụng voucher lên hóa đơn lịch hẹn:", voucherErr);
+        }
       }
 
       if (form.customerPackageId) {
