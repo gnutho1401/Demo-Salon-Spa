@@ -11648,4 +11648,521 @@
   }
 }
 
+/* ==========================================================================
+   PREMIUM LOYALTY MEMBERSHIP DESIGN OVERRIDES
+   ========================================================================== */
+
+/* Shimmer keyframes for card glow & glass shimmer */
+@keyframes cardShimmer {
+  0% { transform: translateX(-150%) skewX(-25deg); }
+  50% { transform: translateX(150%) skewX(-25deg); }
+  100% { transform: translateX(150%) skewX(-25deg); }
+}
+
+@keyframes pulseRankGlow {
+  0% { box-shadow: 0 0 10px rgba(212, 175, 55, 0.1), 0 4px 6px rgba(0,0,0,0.05); }
+  50% { box-shadow: 0 0 25px rgba(212, 175, 55, 0.35), 0 10px 15px rgba(212, 175, 55, 0.15); }
+  100% { box-shadow: 0 0 10px rgba(212, 175, 55, 0.1), 0 4px 6px rgba(0,0,0,0.05); }
+}
+
+@keyframes pulseVIPGlow {
+  0% { box-shadow: 0 0 10px rgba(124, 58, 237, 0.15), 0 4px 6px rgba(0,0,0,0.05); }
+  50% { box-shadow: 0 0 30px rgba(124, 58, 237, 0.45), 0 10px 20px rgba(124, 58, 237, 0.2); }
+  100% { box-shadow: 0 0 10px rgba(124, 58, 237, 0.15), 0 4px 6px rgba(0,0,0,0.05); }
+}
+
+@keyframes floatCard {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(1deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* Premium Digital Membership Card Container */
+.premium-member-card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  height: 230px;
+  border-radius: 24px;
+  padding: 24px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: floatCard 6s ease-in-out infinite;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.premium-member-card * {
+  box-sizing: border-box;
+}
+
+.premium-member-card:hover {
+  transform: translateY(-12px) scale(1.03) rotate(-1deg);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+}
+
+/* Glass shine overlay */
+.premium-member-card .card-glass-shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.25) 45%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.25) 55%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  transform: translateX(-150%) skewX(-25deg);
+  animation: cardShimmer 5s infinite;
+  pointer-events: none;
+}
+
+/* Theme gradients based on membership level */
+.premium-member-card.bronze {
+  background: linear-gradient(135deg, #804a00 0%, #a76b29 50%, #593300 100%);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  border-color: rgba(167, 107, 41, 0.4);
+}
+.premium-member-card.silver {
+  background: linear-gradient(135deg, #708090 0%, #cbd5e1 50%, #475569 100%);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  color: #1e293b;
+  border-color: rgba(203, 213, 225, 0.5);
+}
+.premium-member-card.gold {
+  background: linear-gradient(135deg, #d4af37 0%, #f3e5ab 50%, #aa7c11 100%);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  color: #451a03;
+  border-color: rgba(243, 229, 171, 0.6);
+}
+.premium-member-card.vip {
+  background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #03001e 100%);
+  border-color: rgba(139, 92, 246, 0.5);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+.premium-member-card.normal {
+  background: linear-gradient(135deg, #141716 0%, #2e3532 50%, #0d0f0e 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Card Chip graphic */
+.premium-member-card .card-chip {
+  position: absolute;
+  top: 65px;
+  left: 24px;
+  width: 48px;
+  height: 38px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #e5c060 0%, #b38915 100%);
+  border: 1px solid rgba(0,0,0,0.15);
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.4);
+}
+.premium-member-card.silver .card-chip {
+  background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+}
+
+.premium-member-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 2;
+}
+
+.premium-member-card .card-brand {
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+.premium-member-card .card-vip-badge {
+  font-size: 0.8rem;
+  font-weight: 900;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.premium-member-card .card-body {
+  margin-top: auto;
+  z-index: 2;
+}
+
+.premium-member-card .card-points {
+  margin-left: 64px;
+}
+
+.premium-member-card .card-points span {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: inherit !important;
+}
+
+.premium-member-card .card-points strong {
+  display: block;
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.premium-member-card .card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 20px;
+  z-index: 2;
+}
+
+.premium-member-card .card-holder span,
+.premium-member-card .card-discount span {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+  color: inherit !important;
+}
+
+.premium-member-card .card-holder strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.premium-member-card .card-discount strong {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+/* Premium Dashboard Stats Grid */
+.reward-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.reward-stats-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid rgba(184, 154, 94, 0.15);
+  border-radius: 24px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  box-shadow: 0 10px 30px rgba(27, 61, 47, 0.04);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.reward-stats-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(27, 61, 47, 0.08);
+  border-color: rgba(184, 154, 94, 0.35);
+}
+
+.reward-stats-card .stats-icon-wrapper {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: #f7eedc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.reward-stats-card:hover .stats-icon-wrapper {
+  transform: scale(1.1) rotate(5deg);
+  background: #f1ddb9;
+}
+
+.reward-stats-card .stats-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.reward-stats-card .stats-info span {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.reward-stats-card .stats-info b {
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-top: 4px;
+  line-height: 1.2;
+}
+
+/* Advanced Progress Bar design */
+.premium-progress-container {
+  background: #fff;
+  border: 1px solid rgba(184, 154, 94, 0.15);
+  border-radius: 24px;
+  padding: 26px;
+  box-shadow: 0 10px 30px rgba(27, 61, 47, 0.04);
+  margin-bottom: 8px;
+}
+
+.premium-progress-bar {
+  position: relative;
+  height: 18px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: visible; /* to allow glow and neon bubble */
+  margin: 15px 0 20px;
+}
+
+.premium-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d4af37 0%, #f3e5ab 50%, #aa7c11 100%);
+  position: relative;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+  transition: width 1s ease-out;
+}
+
+.premium-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: cardShimmer 2.5s infinite linear;
+}
+
+/* Levels Grid with premium animations */
+.reward-levels-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.reward-level-card {
+  background: #ffffff;
+  border: 1px solid rgba(184, 154, 94, 0.15);
+  border-radius: 24px;
+  padding: 26px;
+  box-shadow: 0 8px 25px rgba(27, 61, 47, 0.03);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.reward-level-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 15px 35px rgba(27, 61, 47, 0.08);
+}
+
+.reward-level-card.active-tier {
+  background: linear-gradient(135deg, #ffffff 0%, #fffbf2 100%);
+  border: 2px solid #d4af37;
+  animation: pulseRankGlow 3s infinite;
+}
+
+.reward-level-card.active-tier.tier-vip {
+  border-color: #8b5cf6;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
+  animation: pulseVIPGlow 3s infinite;
+}
+
+.reward-level-card .tier-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(135deg, #10b981, #059669);
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);
+}
+
+.reward-level-card h3 {
+  font-size: 1.25rem;
+  font-family: 'Georgia', serif;
+  color: #1e293b;
+  margin: 0 0 6px;
+}
+
+.reward-level-card .tier-points {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.reward-level-card .tier-perk {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #d4af37;
+  margin: 16px 0 8px;
+}
+.reward-level-card.tier-vip .tier-perk {
+  color: #7c3aed;
+}
+
+.reward-level-card .tier-desc {
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 12px;
+  margin-top: auto;
+}
+
+/* History styling */
+.history-section-card {
+  background: #fff;
+  border: 1px solid rgba(184, 154, 94, 0.15);
+  border-radius: 24px;
+  padding: 26px;
+  box-shadow: 0 10px 30px rgba(27, 61, 47, 0.04);
+}
+
+.premium-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.history-item:hover {
+  background: #f1f5f9;
+  transform: translateX(4px);
+  border-color: #cbd5e1;
+}
+
+.history-item-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.history-badge-container {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 1.1rem;
+}
+
+.history-badge-container.earn {
+  background: #ecfdf5;
+  color: #10b981;
+  border: 1px solid #a7f3d0;
+}
+
+.history-badge-container.use {
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+}
+
+.history-item-details p {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.history-item-details small {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.history-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.history-item-points {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.history-item-points.earn {
+  color: #10b981;
+}
+.history-item-points.use {
+  color: #ef4444;
+}
+
+.history-item-amount {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+  .reward-stats,
+  .reward-levels-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .reward-stats,
+  .reward-levels-grid {
+    grid-template-columns: 1fr;
+  }
+  .history-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .history-item-right {
+    align-items: flex-start;
+    margin-left: 60px;
+  }
+}
+
 
