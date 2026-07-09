@@ -20,6 +20,25 @@ async function getAll() {
 async function getMine(userId) {
   const pool = await connectDB();
 
+  // Expire temporary VIP status if it has exceeded its lifetime
+  await pool.request().input("UserId", sql.Int, userId)
+    .query(`
+      UPDATE c
+      SET 
+        c.MembershipLevelId = lv.MembershipLevelId,
+        c.VIPExpiredAt = NULL
+      FROM Customers c
+      OUTER APPLY (
+        SELECT TOP 1 MembershipLevelId
+        FROM MembershipLevels
+        WHERE MinPoints <= ISNULL(c.LoyaltyPoints, 0)
+        ORDER BY MinPoints DESC
+      ) lv
+      WHERE c.UserId = @UserId
+        AND c.VIPExpiredAt IS NOT NULL
+        AND c.VIPExpiredAt < GETUTCDATE()
+    `);
+
   const result = await pool.request().input("UserId", sql.Int, userId).query(`
     SELECT TOP 1
       c.CustomerId,
@@ -29,7 +48,8 @@ async function getMine(userId) {
       COALESCE(ml.LevelName, currentLevel.LevelName, N'Normal') AS LevelName,
       COALESCE(ml.DiscountPercent, currentLevel.DiscountPercent, 0) AS DiscountPercent,
       nextLevel.LevelName AS NextLevelName,
-      nextLevel.MinPoints AS NextLevelMinPoints
+      nextLevel.MinPoints AS NextLevelMinPoints,
+      c.VIPExpiredAt
     FROM Customers c
     JOIN Users u ON c.UserId = u.UserId
     OUTER APPLY (
