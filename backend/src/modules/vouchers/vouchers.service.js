@@ -14,6 +14,9 @@ async function getAllActive() {
     SELECT VoucherId, Code, DiscountType, DiscountValue, MinOrderAmount, MaxDiscountAmount, StartDate, EndDate, Quantity, Status
     FROM Vouchers
     WHERE Status = 'ACTIVE'
+      AND Code NOT LIKE 'CRM%'
+      AND Code NOT LIKE 'FREEGD%'
+      AND Code NOT LIKE 'FREEMS%'
       AND (StartDate IS NULL OR StartDate <= CAST(GETDATE() AS DATE))
       AND (EndDate IS NULL OR EndDate >= CAST(GETDATE() AS DATE))
     ORDER BY VoucherId DESC
@@ -113,6 +116,34 @@ async function saveVoucher(userId, voucherId) {
   if (!valid.recordset[0])
     throw new Error("Voucher không tồn tại hoặc đã hết hạn");
 
+  const voucherRecord = valid.recordset[0];
+  const codeStr = String(voucherRecord.Code || "").toUpperCase();
+  const isCrmVoucher = codeStr.startsWith("CRM");
+  const isFreeGD = codeStr.startsWith("FREEGD");
+  const isFreeMS = codeStr.startsWith("FREEMS");
+
+  if (isCrmVoucher || isFreeGD || isFreeMS) {
+    const custIdStr = String(customer.CustomerId);
+    if (isCrmVoucher) {
+      const matchPattern = `C${custIdStr}R`;
+      if (!codeStr.includes(matchPattern)) {
+        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể lưu");
+      }
+    }
+    if (isFreeGD) {
+      const matchPrefix = `FREEGD${custIdStr}`;
+      if (!codeStr.startsWith(matchPrefix)) {
+        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể lưu");
+      }
+    }
+    if (isFreeMS) {
+      const matchPrefix = `FREEMS${custIdStr}`;
+      if (!codeStr.startsWith(matchPrefix)) {
+        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể lưu");
+      }
+    }
+  }
+
   const existed = await pool
     .request()
     .input("CustomerId", sql.Int, customer.CustomerId)
@@ -193,6 +224,31 @@ async function validateVoucher(userId, data, customerId = null) {
   // Validate free service vouchers limit to specific services
   const codeUpper = String(voucher.Code || "").toUpperCase();
   const isFreeGift = codeUpper.startsWith("FREEGD") || codeUpper.startsWith("FREEMS");
+  const isCrmVoucher = codeUpper.startsWith("CRM");
+  const isFreeGD = codeUpper.startsWith("FREEGD");
+  const isFreeMS = codeUpper.startsWith("FREEMS");
+
+  if (isCrmVoucher || isFreeGD || isFreeMS) {
+    const custIdStr = String(customer.CustomerId);
+    if (isCrmVoucher) {
+      const matchPattern = `C${custIdStr}R`;
+      if (!codeUpper.includes(matchPattern)) {
+        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể sử dụng");
+      }
+    }
+    if (isFreeGD) {
+      const matchPrefix = `FREEGD${custIdStr}`;
+      if (!codeUpper.startsWith(matchPrefix)) {
+        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể sử dụng");
+      }
+    }
+    if (isFreeMS) {
+      const matchPrefix = `FREEMS${custIdStr}`;
+      if (!codeUpper.startsWith(matchPrefix)) {
+        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể sử dụng");
+      }
+    }
+  }
 
   if (isFreeGift) {
     if (!data.serviceId) {
