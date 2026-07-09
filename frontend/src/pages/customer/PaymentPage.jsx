@@ -183,7 +183,7 @@ export default function PaymentPage() {
       0,
   );
 
-  // Khôi phục voucher và điểm thưởng đã lưu trên hóa đơn lịch hẹn
+  // Khôi phục voucher và điểm thưởng đã lưu trên hóa đơn lịch hẹn hoặc truyền từ URL đặt lịch
   useEffect(() => {
     if (!appointment) return;
     
@@ -193,24 +193,42 @@ export default function PaymentPage() {
     setRewardPoints(usedPoints);
     
     // Voucher
-    if (appointment.VoucherId) {
-      setVoucherId(appointment.VoucherId);
-      setVoucherCode(appointment.VoucherCode || "");
+    const savedVoucherId = appointment.VoucherId;
+    const urlVoucherId = searchParams.get("voucherId");
+    const urlDiscount = Number(searchParams.get("discount") || 0);
+    const targetVoucherId = savedVoucherId || urlVoucherId;
+
+    if (targetVoucherId) {
+      setVoucherId(targetVoucherId);
       
-      const totalDiscount = Number(appointment.DiscountAmount || 0);
-      const membershipPercent = Number(membership?.DiscountPercent || 0);
-      const membershipDiscount = Math.min(
-        Math.round((subtotal * membershipPercent) / 100),
-        subtotal
-      );
-      
-      // Pure voucher discount is the remaining discount after points and membership
-      const pureVoucherDiscount = Math.max(totalDiscount - usedPointsDiscount - membershipDiscount, 0);
-      setDiscount(pureVoucherDiscount);
+      if (savedVoucherId) {
+        setVoucherCode(appointment.VoucherCode || "");
+        const totalDiscount = Number(appointment.DiscountAmount || 0);
+        const membershipPercent = Number(membership?.DiscountPercent || 0);
+        const membershipDiscount = Math.min(
+          Math.round((subtotal * membershipPercent) / 100),
+          subtotal
+        );
+        
+        // Pure voucher discount is the remaining discount after points and membership
+        const pureVoucherDiscount = Math.max(totalDiscount - usedPointsDiscount - membershipDiscount, 0);
+        setDiscount(pureVoucherDiscount);
+      } else {
+        setDiscount(urlDiscount);
+        if (myVouchers.length > 0) {
+          const found = myVouchers.find(
+            (v) => String(v.VoucherId || v.voucherId) === String(targetVoucherId)
+          );
+          if (found) {
+            setVoucherCode(found.Code || found.code || "");
+            setSelectedVoucher(found);
+          }
+        }
+      }
       
       if (myVouchers.length > 0) {
         const found = myVouchers.find(
-          (v) => String(v.VoucherId || v.voucherId) === String(appointment.VoucherId)
+          (v) => String(v.VoucherId || v.voucherId) === String(targetVoucherId)
         );
         if (found) setSelectedVoucher(found);
       }
@@ -220,7 +238,7 @@ export default function PaymentPage() {
       setDiscount(0);
       setSelectedVoucher(null);
     }
-  }, [appointment, myVouchers, membership, subtotal]);
+  }, [appointment, myVouchers, membership, subtotal, searchParams]);
 
   const appliedVoucherDiscount = Number(discount || 0);
 
