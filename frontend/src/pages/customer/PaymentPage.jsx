@@ -174,29 +174,6 @@ export default function PaymentPage() {
     return () => clearInterval(timer);
   }, [appointment]);
 
-  // Khôi phục voucher và điểm thưởng đã lưu trên hóa đơn lịch hẹn
-  useEffect(() => {
-    if (!appointment) return;
-    
-    if (appointment.VoucherId) {
-      setVoucherId(appointment.VoucherId);
-      setVoucherCode(appointment.VoucherCode || "");
-      setDiscount(Number(appointment.DiscountAmount || 0));
-      
-      if (myVouchers.length > 0) {
-        const found = myVouchers.find(
-          (v) => String(v.VoucherId || v.voucherId) === String(appointment.VoucherId)
-        );
-        if (found) setSelectedVoucher(found);
-      }
-    }
-    
-    if (appointment.RewardPointsUsed) {
-      setRewardPoints(appointment.RewardPointsUsed);
-    }
-  }, [appointment, myVouchers]);
-
-
   const subtotal = Number(
     appointment?.TotalAmount ??
       appointment?.InvoiceTotalAmount ??
@@ -206,11 +183,46 @@ export default function PaymentPage() {
       0,
   );
 
-  const serverDiscount = Number(
-    appointment?.DiscountAmount ?? appointment?.Discount ?? 0,
-  );
+  // Khôi phục voucher và điểm thưởng đã lưu trên hóa đơn lịch hẹn
+  useEffect(() => {
+    if (!appointment) return;
+    
+    // Reward Points
+    const usedPoints = Number(appointment.RewardPointsUsed || 0);
+    const usedPointsDiscount = Number(appointment.RewardDiscountAmount || 0);
+    setRewardPoints(usedPoints);
+    
+    // Voucher
+    if (appointment.VoucherId) {
+      setVoucherId(appointment.VoucherId);
+      setVoucherCode(appointment.VoucherCode || "");
+      
+      const totalDiscount = Number(appointment.DiscountAmount || 0);
+      const membershipPercent = Number(membership?.DiscountPercent || 0);
+      const membershipDiscount = Math.min(
+        Math.round((subtotal * membershipPercent) / 100),
+        subtotal
+      );
+      
+      // Pure voucher discount is the remaining discount after points and membership
+      const pureVoucherDiscount = Math.max(totalDiscount - usedPointsDiscount - membershipDiscount, 0);
+      setDiscount(pureVoucherDiscount);
+      
+      if (myVouchers.length > 0) {
+        const found = myVouchers.find(
+          (v) => String(v.VoucherId || v.voucherId) === String(appointment.VoucherId)
+        );
+        if (found) setSelectedVoucher(found);
+      }
+    } else {
+      setVoucherId(null);
+      setVoucherCode("");
+      setDiscount(0);
+      setSelectedVoucher(null);
+    }
+  }, [appointment, myVouchers, membership, subtotal]);
 
-  const appliedVoucherDiscount = Number(discount || serverDiscount || 0);
+  const appliedVoucherDiscount = Number(discount || 0);
 
   const calc = useMemo(() => {
     const membershipPercent = Number(membership?.DiscountPercent || 0);

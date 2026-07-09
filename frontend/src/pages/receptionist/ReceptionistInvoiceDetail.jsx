@@ -508,7 +508,10 @@ export default function ReceptionistInvoiceDetail() {
                   <div className="receipt-totals-block">
                     <p><span>Tạm tính:</span> <span>{money(invoice.Total)}</span></p>
                     {invoice.VoucherCode && (
-                      <p><span>Voucher ({invoice.VoucherCode}):</span> <span style={{ color: "#d9534f" }}>- {money(Number(invoice.Discount) - Number(invoice.ManualDiscount))}</span></p>
+                      <p><span>Voucher ({invoice.VoucherCode}):</span> <span style={{ color: "#d9534f" }}>- {money(Number(invoice.Discount) - Number(invoice.ManualDiscount) - Number(invoice.RewardDiscountAmount || 0))}</span></p>
+                    )}
+                    {Number(invoice.RewardPointsUsed || 0) > 0 && (
+                      <p><span>Dùng điểm thưởng ({invoice.RewardPointsUsed} điểm):</span> <span style={{ color: "#d9534f" }}>- {money(invoice.RewardDiscountAmount)}</span></p>
                     )}
                     {Number(invoice.ManualDiscount) > 0 && (
                       <p><span>Giảm thủ công:</span> <span style={{ color: "#d9534f" }}>- {money(invoice.ManualDiscount)}</span></p>

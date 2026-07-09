@@ -932,6 +932,8 @@ async function getById(id, user = null) {
 
         i.InvoiceId,
         i.VoucherId,
+        i.RewardPointsUsed,
+        i.RewardDiscountAmount,
         v.Code AS VoucherCode,
         ISNULL(i.TotalAmount, svcSummary.TotalServiceAmount) AS TotalAmount,
         ISNULL(i.DiscountAmount, 0) AS DiscountAmount,
