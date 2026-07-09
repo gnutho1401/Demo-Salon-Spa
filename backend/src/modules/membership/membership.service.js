@@ -23,7 +23,7 @@ async function getMine(userId) {
   const result = await pool.request().input("UserId", sql.Int, userId).query(`
     SELECT TOP 1
       c.CustomerId,
-      c.FullName,
+      u.FullName AS FullName,
       ISNULL(c.LoyaltyPoints, 0) AS LoyaltyPoints,
       COALESCE(ml.MembershipLevelId, currentLevel.MembershipLevelId) AS MembershipLevelId,
       COALESCE(ml.LevelName, currentLevel.LevelName, N'Normal') AS LevelName,
@@ -31,6 +31,7 @@ async function getMine(userId) {
       nextLevel.LevelName AS NextLevelName,
       nextLevel.MinPoints AS NextLevelMinPoints
     FROM Customers c
+    JOIN Users u ON c.UserId = u.UserId
     OUTER APPLY (
       SELECT TOP 1 *
       FROM MembershipLevels x
