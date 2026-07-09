@@ -1142,21 +1142,23 @@ async function addLoyaltyPoints(customerId, points) {
     .input("Points", sql.Int, points)
     .query("UPDATE Customers SET LoyaltyPoints = LoyaltyPoints + @Points WHERE CustomerId = @CustomerId");
 
-  // Automatically recalculate and update membership rank based on new loyalty points
+  // Automatically recalculate and update membership rank based on new loyalty points (only keep or upgrade, no downgrade)
   await pool.request()
     .input("CustomerId", sql.Int, customerId)
     .query(`
       UPDATE c
       SET MembershipLevelId = lv.MembershipLevelId
       FROM Customers c
+      LEFT JOIN MembershipLevels cur ON c.MembershipLevelId = cur.MembershipLevelId
       OUTER APPLY (
-        SELECT TOP 1 MembershipLevelId
+        SELECT TOP 1 MembershipLevelId, MinPoints
         FROM MembershipLevels
         WHERE MinPoints <= ISNULL(c.LoyaltyPoints, 0)
         ORDER BY MinPoints DESC
       ) lv
       WHERE c.CustomerId = @CustomerId
         AND lv.MembershipLevelId IS NOT NULL
+        AND (cur.MinPoints IS NULL OR lv.MinPoints >= cur.MinPoints)
     `);
 
   const custRes = await pool.request()
