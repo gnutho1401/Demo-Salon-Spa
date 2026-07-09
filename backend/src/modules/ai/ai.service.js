@@ -533,19 +533,28 @@ function ruleBasedChurnPrediction(customerData) {
 
     if (risk_level === 'HIGH_RISK') {
       recommended_action.push("💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.");
-      recommended_action.push("🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo.");
-      recommended_action.push("🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.");
+      
+      let hasBodySpa = false;
+      if (c.favorite_services && c.favorite_services.length > 0) {
+        hasBodySpa = c.favorite_services.some(svc => 
+          svc.includes("Massage") || svc.includes("Spa") || svc.includes("Chăm sóc da") || svc.includes("Thảo dược")
+        );
+      }
+      if (hasBodySpa) {
+        recommended_action.push("🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.");
+      } else {
+        recommended_action.push("🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo.");
+      }
+      recommended_action.push("👑 Đặc cách nâng cấp lên hạng thành viên VIP để giữ chân khách hàng.");
     } else if (risk_level === 'MEDIUM_RISK') {
       recommended_action.push("✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.");
       recommended_action.push("🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.");
-      if (c.favorite_services && c.favorite_services.length > 0) {
-        recommended_action.push(`🔥 Đề xuất combo dịch vụ có giá ưu đãi chứa ${c.favorite_services[0]}.`);
-      }
+      recommended_action.push("🌟 Tặng +200 điểm tích lũy Loyalty để kích thích khách hàng quay lại.");
     } else {
-      recommended_action.push("🌟 Nhân đôi điểm tích lũy thưởng và gửi ưu đãi nhân ngày sinh nhật/dịp lễ.");
-      recommended_action.push("💎 Đề xuất đặc quyền nâng cấp lên gói thẻ thành viên VIP để nhận ưu đãi chiết khấu lâu dài.");
       if (c.favorite_services && c.favorite_services.length > 0) {
-        recommended_action.push(`✨ Giới thiệu liệu trình làm đẹp mới hoặc dịch vụ nâng cấp liên quan đến ${c.favorite_services[0]}.`);
+        recommended_action.push(`✨ Giới thiệu liệu trình làm đẹp mới liên quan đến ${c.favorite_services[0]}.`);
+      } else {
+        recommended_action.push("✨ Giới thiệu dịch vụ mới chăm sóc da mặt chuyên sâu.");
       }
     }
 
@@ -737,16 +746,14 @@ Trả về JSON theo format:
 Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghiệp theo phân nhóm rủi ro:
 1. HIGH_RISK (Rủi ro cao):
    - 💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.
-   - 🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo.
-   - 🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.
+   - 🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo (nếu khách hàng thích làm massage/spa) HOẶC 🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo (nếu khách hàng thích làm tóc/gội đầu hoặc không rõ sở thích). Chỉ chọn duy nhất 1 món quà dịch vụ miễn phí phù hợp nhất cho mỗi khách hàng.
+   - 👑 Đặc cách nâng cấp lên hạng thành viên VIP để giữ chân khách hàng.
 2. MEDIUM_RISK (Rủi ro trung bình):
    - ✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.
    - 🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.
-   - 🔥 Đề xuất combo dịch vụ có giá ưu đãi chứa dịch vụ ưa thích.
+   - 🌟 Tặng +200 điểm tích lũy Loyalty để kích thích khách hàng quay lại.
 3. LOW_RISK (Rủi ro thấp / Ổn định):
-   - 🌟 Nhân đôi điểm tích lũy thưởng và gửi ưu đãi nhân ngày sinh nhật/dịp lễ.
-   - 💎 Đề xuất đặc quyền nâng cấp lên gói thẻ thành viên VIP để nhận ưu đãi chiết khấu lâu dài.
-   - ✨ Giới thiệu liệu trình làm đẹp mới hoặc dịch vụ nâng cấp liên quan đến dịch vụ khách hay dùng.
+   - ✨ Giới thiệu liệu trình làm đẹp mới liên quan đến dịch vụ khách hay dùng (không tặng voucher, không tặng điểm, không nâng VIP).
 
 ## QUY TẮC QUAN TRỌNG
 - Không được trả lời ngoài JSON. Không có thẻ markdown \`\`\`json ngoài kết quả.
