@@ -543,7 +543,7 @@ function ruleBasedChurnPrediction(customerData) {
       if (hasBodySpa) {
         recommended_action.push("🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.");
       } else {
-        recommended_action.push("🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo.");
+        recommended_action.push("🎁 Tặng kèm 01 suất Phục hồi tóc hư tổn miễn phí ở lần hẹn tiếp theo.");
       }
       recommended_action.push("👑 Đặc cách nâng cấp lên hạng thành viên VIP để giữ chân khách hàng.");
     } else if (risk_level === 'MEDIUM_RISK') {
@@ -747,7 +747,7 @@ Trả về JSON theo format:
 Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghiệp theo phân nhóm rủi ro:
 1. HIGH_RISK (Rủi ro cao):
    - 💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.
-   - 🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo (nếu khách hàng thích làm massage/spa) HOẶC 🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo (nếu khách hàng thích làm tóc/gội đầu hoặc không rõ sở thích). Chỉ chọn duy nhất 1 món quà dịch vụ miễn phí phù hợp nhất cho mỗi khách hàng.
+   - 🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo (nếu khách hàng thích làm massage/spa) HOẶC 🎁 Tặng kèm 01 suất Phục hồi tóc hư tổn miễn phí ở lần hẹn tiếp theo (nếu khách hàng thích làm tóc hoặc không rõ sở thích). Chỉ chọn duy nhất 1 món quà dịch vụ miễn phí phù hợp nhất cho mỗi khách hàng.
    - 👑 Đặc cách nâng cấp lên hạng thành viên VIP để giữ chân khách hàng.
 2. MEDIUM_RISK (Rủi ro trung bình):
    - ✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.
@@ -993,7 +993,7 @@ async function upgradeToVIP(customerId) {
   const pool = await connectDB();
   
   const levelRes = await pool.request()
-    .query("SELECT MembershipLevelId, LevelName FROM MembershipLevels WHERE LevelName = 'VIP' OR LevelName = 'Gold' ORDER BY MinPoints DESC");
+    .query("SELECT MembershipLevelId, LevelName FROM MembershipLevels WHERE LevelName = 'Diamond' OR LevelName = 'VIP' OR LevelName = 'Gold' ORDER BY MinPoints DESC");
   let vipLevelId = null;
   if (levelRes.recordset.length > 0) {
     vipLevelId = levelRes.recordset[0].MembershipLevelId;
@@ -1006,10 +1006,12 @@ async function upgradeToVIP(customerId) {
   
   if (!vipLevelId) throw new Error("Không thể tìm thấy cấp độ thành viên VIP/cao cấp để nâng cấp");
 
+  const expiredAt = new Date(Date.now() + 5 * 60 * 1000);
   await pool.request()
     .input("CustomerId", sql.Int, customerId)
     .input("LevelId", sql.Int, vipLevelId)
-    .query("UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = DATEADD(minute, 5, GETDATE()) WHERE CustomerId = @CustomerId");
+    .input("ExpiredAt", sql.DateTime, expiredAt)
+    .query("UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = @ExpiredAt WHERE CustomerId = @CustomerId");
     
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
@@ -1079,8 +1081,8 @@ async function giftFreeService(customerId, serviceName) {
     giftValue = Number(serviceRes.recordset[0].Price);
   }
 
-  const cleanCode = serviceName.includes("Gội đầu") 
-    ? `FREEGD${customerId}${Math.floor(1000 + Math.random() * 9000)}` 
+  const cleanCode = serviceName.includes("Phục hồi") || serviceName.includes("tóc")
+    ? `FREEPH${customerId}${Math.floor(1000 + Math.random() * 9000)}` 
     : `FREEMS${customerId}${Math.floor(1000 + Math.random() * 9000)}`;
 
   const voucherInsert = await pool.request()

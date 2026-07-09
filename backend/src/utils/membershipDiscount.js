@@ -26,7 +26,7 @@ async function getCustomerDiscountPercent(customerId) {
         ) lv
         WHERE c.CustomerId = @CustomerId
           AND c.VIPExpiredAt IS NOT NULL
-          AND c.VIPExpiredAt < GETDATE()
+          AND c.VIPExpiredAt < GETUTCDATE()
       `);
   }
 
