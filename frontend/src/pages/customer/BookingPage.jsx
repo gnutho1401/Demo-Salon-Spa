@@ -555,6 +555,7 @@ export default function BookingPage() {
       const res = await axiosClient.post("/vouchers/validate", {
         code,
         totalAmount: totalPrice,
+        serviceId: selectedService?.ServiceId || selectedService?.serviceId,
       });
 
       const data = res.data.data;
@@ -584,6 +585,7 @@ export default function BookingPage() {
       const res = await axiosClient.post("/vouchers/validate", {
         code: voucher.Code,
         totalAmount: totalPrice,
+        serviceId: selectedService?.ServiceId || selectedService?.serviceId,
       });
 
       const data = res.data.data;

@@ -139,21 +139,46 @@ async function getPayableAppointment(
       throw new Error("Voucher không hợp lệ, đã dùng hoặc không đủ điều kiện");
     }
 
-    if (String(voucher.DiscountType || "").toUpperCase() === "PERCENT") {
-      voucherDiscountAmount =
-        (beforeRewardAmount * toNumber(voucher.DiscountValue)) / 100;
+    const servicesResult = await pool.request()
+      .input("AppointmentId", sql.Int, appointmentId)
+      .query(`
+        SELECT s.ServiceName, ISNULL(aps.Price, s.Price) AS Price
+        FROM AppointmentServices aps
+        LEFT JOIN Services s ON s.ServiceId = aps.ServiceId
+        WHERE aps.AppointmentId = @AppointmentId
+      `);
+    const appServices = servicesResult.recordset;
 
-      if (
-        voucher.MaxDiscountAmount !== null &&
-        voucher.MaxDiscountAmount !== undefined
-      ) {
-        voucherDiscountAmount = Math.min(
-          voucherDiscountAmount,
-          toNumber(voucher.MaxDiscountAmount),
-        );
+    const codeUpper = String(voucher.Code || "").toUpperCase();
+    if (codeUpper.startsWith("FREEGD")) {
+      const goiDauService = appServices.find(s => String(s.ServiceName || "").includes("Gội đầu"));
+      if (!goiDauService) {
+        throw new Error("Voucher này chỉ áp dụng cho dịch vụ Gội đầu thảo dược dưỡng sinh");
       }
+      voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(goiDauService.Price));
+    } else if (codeUpper.startsWith("FREEMS")) {
+      const massageService = appServices.find(s => String(s.ServiceName || "").includes("Massage"));
+      if (!massageService) {
+        throw new Error("Voucher này chỉ áp dụng cho dịch vụ Massage cổ vai gáy");
+      }
+      voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(massageService.Price));
     } else {
-      voucherDiscountAmount = toNumber(voucher.DiscountValue);
+      if (String(voucher.DiscountType || "").toUpperCase() === "PERCENT") {
+        voucherDiscountAmount =
+          (beforeRewardAmount * toNumber(voucher.DiscountValue)) / 100;
+
+        if (
+          voucher.MaxDiscountAmount !== null &&
+          voucher.MaxDiscountAmount !== undefined
+        ) {
+          voucherDiscountAmount = Math.min(
+            voucherDiscountAmount,
+            toNumber(voucher.MaxDiscountAmount),
+          );
+        }
+      } else {
+        voucherDiscountAmount = toNumber(voucher.DiscountValue);
+      }
     }
 
     voucherDiscountAmount = Math.min(

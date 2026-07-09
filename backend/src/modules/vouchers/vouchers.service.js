@@ -190,6 +190,29 @@ async function validateVoucher(userId, data, customerId = null) {
   }
   if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
 
+  // Validate free service vouchers limit to specific services
+  const codeUpper = String(voucher.Code || "").toUpperCase();
+  const isFreeGift = codeUpper.startsWith("FREEGD") || codeUpper.startsWith("FREEMS");
+
+  if (isFreeGift) {
+    if (!data.serviceId) {
+      throw new Error("Vui lòng chọn dịch vụ phù hợp để áp dụng voucher này");
+    }
+    const serviceRes = await pool.request()
+      .input("ServiceId", sql.Int, data.serviceId)
+      .query("SELECT ServiceName FROM Services WHERE ServiceId = @ServiceId");
+    if (serviceRes.recordset.length === 0) {
+      throw new Error("Dịch vụ không tồn tại");
+    }
+    const serviceName = String(serviceRes.recordset[0].ServiceName || "");
+    if (codeUpper.startsWith("FREEGD") && !serviceName.includes("Gội đầu")) {
+      throw new Error("Voucher này chỉ áp dụng cho dịch vụ Gội đầu thảo dược dưỡng sinh");
+    }
+    if (codeUpper.startsWith("FREEMS") && !serviceName.includes("Massage")) {
+      throw new Error("Voucher này chỉ áp dụng cho dịch vụ Massage cổ vai gáy");
+    }
+  }
+
   const useCheck = await pool.request()
     .input("CustomerId", sql.Int, customer.CustomerId)
     .input("VoucherId", sql.Int, voucher.VoucherId)

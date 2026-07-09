@@ -453,6 +453,7 @@ export default function ReceptionistCreateAppointment() {
         code,
         totalAmount: totalPrice,
         customerId: selectedCustomer.CustomerId,
+        serviceId: selectedService?.ServiceId || selectedService?.serviceId,
       });
 
       const data = res.data.data;
@@ -482,6 +483,7 @@ export default function ReceptionistCreateAppointment() {
         code: voucher.Code,
         totalAmount: totalPrice,
         customerId: selectedCustomer.CustomerId,
+        serviceId: selectedService?.ServiceId || selectedService?.serviceId,
       });
 
       const data = res.data.data;
