@@ -9,6 +9,27 @@ async function getCustomerDiscountPercent(customerId) {
 
   const pool = await connectDB();
 
+  // Expire temporary VIP status if it has exceeded its lifetime (skip in unit test mocks)
+  if (process.env.NODE_ENV !== "test") {
+    await pool.request().input("CustomerId", sql.Int, customerId)
+      .query(`
+        UPDATE c
+        SET 
+          c.MembershipLevelId = lv.MembershipLevelId,
+          c.VIPExpiredAt = NULL
+        FROM Customers c
+        OUTER APPLY (
+          SELECT TOP 1 MembershipLevelId
+          FROM MembershipLevels
+          WHERE MinPoints <= ISNULL(c.LoyaltyPoints, 0)
+          ORDER BY MinPoints DESC
+        ) lv
+        WHERE c.CustomerId = @CustomerId
+          AND c.VIPExpiredAt IS NOT NULL
+          AND c.VIPExpiredAt < GETDATE()
+      `);
+  }
+
   const result = await pool.request().input("CustomerId", sql.Int, customerId)
     .query(`
       SELECT COALESCE(ml.DiscountPercent, currentLevel.DiscountPercent, 0) AS DiscountPercent

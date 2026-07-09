@@ -156,8 +156,12 @@ export default function AdminAiCrm() {
     try {
       setActionLoading(true);
       if (isVoucher) {
-        const details = recommendedVoucherDetails;
-        const discountVal = details ? details.discount : 20;
+        let discountVal = 20;
+        if (actionStr.includes("10%")) discountVal = 10;
+        else if (actionStr.includes("15%")) discountVal = 15;
+        else if (actionStr.includes("20%")) discountVal = 20;
+        else if (recommendedVoucherDetails) discountVal = recommendedVoucherDetails.discount;
+
         const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/send-voucher`, {
           discountPercent: discountVal,
         });
@@ -214,8 +218,12 @@ export default function AdminAiCrm() {
       if (isVoucher || isGift || isUpgrade || isPoints || isMessage) {
         try {
           if (isVoucher) {
-            const details = recommendedVoucherDetails;
-            const discountVal = details ? details.discount : 20;
+            let discountVal = 20;
+            if (action.includes("10%")) discountVal = 10;
+            else if (action.includes("15%")) discountVal = 15;
+            else if (action.includes("20%")) discountVal = 20;
+            else if (recommendedVoucherDetails) discountVal = recommendedVoucherDetails.discount;
+
             await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/send-voucher`, {
               discountPercent: discountVal,
             });

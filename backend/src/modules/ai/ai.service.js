@@ -551,6 +551,7 @@ function ruleBasedChurnPrediction(customerData) {
       recommended_action.push("🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.");
       recommended_action.push("🌟 Tặng +200 điểm tích lũy Loyalty để kích thích khách hàng quay lại.");
     } else {
+      recommended_action.push("💝 Gửi tặng Voucher giảm giá 10% áp dụng cho toàn bộ dịch vụ.");
       if (c.favorite_services && c.favorite_services.length > 0) {
         recommended_action.push(`✨ Giới thiệu liệu trình làm đẹp mới liên quan đến ${c.favorite_services[0]}.`);
       } else {
@@ -753,7 +754,8 @@ Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghi
    - 🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.
    - 🌟 Tặng +200 điểm tích lũy Loyalty để kích thích khách hàng quay lại.
 3. LOW_RISK (Rủi ro thấp / Ổn định):
-   - ✨ Giới thiệu liệu trình làm đẹp mới liên quan đến dịch vụ khách hay dùng (không tặng voucher, không tặng điểm, không nâng VIP).
+   - 💝 Gửi tặng Voucher giảm giá 10% áp dụng cho toàn bộ dịch vụ.
+   - ✨ Giới thiệu liệu trình làm đẹp mới liên quan đến dịch vụ khách hay dùng (không tặng điểm, không nâng VIP).
 
 ## QUY TẮC QUAN TRỌNG
 - Không được trả lời ngoài JSON. Không có thẻ markdown \`\`\`json ngoài kết quả.
@@ -1007,15 +1009,15 @@ async function upgradeToVIP(customerId) {
   await pool.request()
     .input("CustomerId", sql.Int, customerId)
     .input("LevelId", sql.Int, vipLevelId)
-    .query("UPDATE Customers SET MembershipLevelId = @LevelId WHERE CustomerId = @CustomerId");
+    .query("UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = DATEADD(minute, 5, GETDATE()) WHERE CustomerId = @CustomerId");
     
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
     .query("SELECT u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
   const customer = custRes.recordset[0];
 
-  const title = "👑 Chúc mừng! Bạn đã được nâng cấp hạng thành viên VIP!";
-  const content = `Beauty Salon trân trọng thông báo quý khách ${customer.FullName} đã được nâng cấp lên hạng thành viên VIP với ưu đãi chiết khấu trọn đời trên mọi dịch vụ.`;
+  const title = "👑 Chúc mừng! Bạn đã được nâng cấp thử nghiệm hạng thành viên VIP!";
+  const content = `Beauty Salon trân trọng thông báo quý khách ${customer.FullName} đã được đặc cách nâng cấp thử nghiệm hạng thành viên VIP (hiệu lực trong 5 phút để trải nghiệm ưu đãi).`;
   
   await pool.request()
     .input("UserId", sql.Int, customer.UserId)
@@ -1029,19 +1031,18 @@ async function upgradeToVIP(customerId) {
     try {
       await sendMail({
         to: customer.Email,
-        subject: "👑 Chúc mừng! Bạn đã được nâng cấp hạng thành viên VIP tại Beauty Salon!",
+        subject: "👑 Chúc mừng! Bạn đã được đặc cách nâng cấp thử nghiệm hạng VIP tại Beauty Salon!",
         html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ebdcc5; padding: 20px; border-radius: 12px;">
-            <h2 style="color: #b45309; text-align: center;">✨ Nâng Cấp Thành Viên VIP ✨</h2>
+            <h2 style="color: #b45309; text-align: center;">✨ Thử Nghiệm Thành Viên VIP ✨</h2>
             <p>Chào <strong>${customer.FullName}</strong>,</p>
             <p>Beauty Salon vô cùng trân trọng sự tin dùng và yêu mến của bạn dành cho các dịch vụ chăm sóc sắc đẹp của chúng tôi trong thời gian qua.</p>
-            <p>Như một lời tri ân đặc biệt nhất, chúng tôi xin trân trọng thông báo tài khoản của bạn đã được đặc cách nâng cấp lên cấp bậc thành viên <strong>VIP</strong>.</p>
+            <p>Để tri ân đặc biệt và giúp bạn trải nghiệm trước quyền lợi, chúng tôi xin trân trọng thông báo tài khoản của bạn đã được đặc cách nâng cấp thử nghiệm lên cấp bậc thành viên <strong>VIP (hiệu lực trong 5 phút)</strong>.</p>
             <div style="background-color: #fdfaf2; border: 1px solid #ebdcc5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #b45309; margin-top: 0;">Đặc Quyền Thành Viên VIP:</h3>
+              <h3 style="color: #b45309; margin-top: 0;">Đặc Quyền VIP Trải Nghiệm (Hiệu lực: 5 phút):</h3>
               <ul style="margin: 0; padding-left: 20px;">
-                <li>Chiết khấu ưu đãi trọn đời trên mọi hóa đơn dịch vụ.</li>
-                <li>Ưu tiên đặt chỗ vào các khung giờ cao điểm.</li>
-                <li>Nhận quà tặng/voucher độc quyền vào ngày sinh nhật và các ngày lễ lớn.</li>
+                <li>Chiết khấu ưu đãi lớn trên mọi hóa đơn dịch vụ đặt lịch trong thời gian hiệu lực.</li>
+                <li>Trải nghiệm đặc quyền VIP trực tiếp trên hệ thống đặt lịch.</li>
               </ul>
             </div>
             <p>Chúng tôi hy vọng sẽ luôn được phục vụ và đồng hành cùng hành trình duy trì vẻ đẹp và sự tự tin của bạn.</p>
