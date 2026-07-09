@@ -532,7 +532,6 @@ function ruleBasedChurnPrediction(customerData) {
     }
 
     if (risk_level === 'HIGH_RISK') {
-      recommended_action.push("📞 Liên hệ trực tiếp qua điện thoại hỏi thăm trải nghiệm và lắng nghe phản hồi.");
       recommended_action.push("💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.");
       recommended_action.push("🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo.");
       recommended_action.push("🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.");
@@ -737,7 +736,6 @@ Trả về JSON theo format:
 ## QUY TẮC ĐỀ XUẤT HÀNH ĐỘNG (RECOMMENDED_ACTION)
 Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghiệp theo phân nhóm rủi ro:
 1. HIGH_RISK (Rủi ro cao):
-   - 📞 Liên hệ trực tiếp qua điện thoại hỏi thăm trải nghiệm và lắng nghe phản hồi.
    - 💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.
    - 🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo.
    - 🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.

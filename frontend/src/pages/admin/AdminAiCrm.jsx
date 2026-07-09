@@ -1066,7 +1066,6 @@ export default function AdminAiCrm() {
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                       {(selectedCust.recommended_action || []).map((action, idx) => {
                         const isVoucher = action.includes("Voucher") || action.includes("voucher");
-                        const isCall = action.includes("điện thoại") || action.includes("Gọi điện") || action.includes("Liên hệ");
                         const isMessage = action.includes("tin nhắn") || action.includes("Zalo/SMS") || action.includes("Gửi tin nhắn");
                         const isGift = action.includes("Tặng kèm") || action.includes("miễn phí") || action.includes("suất");
                         const isUpgrade = action.includes("nâng cấp") || action.includes("VIP");
@@ -1083,17 +1082,6 @@ export default function AdminAiCrm() {
                           btnIcon = "🎁";
                           helperText = "Hệ thống tự động tìm và gửi voucher phù hợp từ danh sách voucher.";
                           handleExecute = () => handleExecuteRecommendedAction(action);
-                        } else if (isCall) {
-                          btnText = "Gọi điện chăm sóc";
-                          btnIcon = "📞";
-                          helperText = `SĐT khách hàng: ${selectedCust.phone || "Chưa cập nhật"}`;
-                          handleExecute = () => {
-                            if (selectedCust.phone) {
-                              window.location.href = `tel:${selectedCust.phone}`;
-                            } else {
-                              showToast("Khách hàng không có số điện thoại", "error");
-                            }
-                          };
                         } else if (isMessage) {
                           btnText = "Gửi lời nhắn mẫu";
                           btnIcon = "✉️";
