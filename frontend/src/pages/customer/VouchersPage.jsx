@@ -44,9 +44,9 @@ export default function VouchersPage() {
       <h3>Voucher đã lưu</h3>
       <div className="voucher-grid">
         {mine.length ? mine.map((v) => {
-          const personalRemaining = 3 - (v.UseCount || 0);
+          const personalRemaining = 1 - (v.UseCount || 0);
           const unpaidUsages = v.Usages ? v.Usages.filter(u => u.PaymentStatus !== 'PAID') : [];
-          const isFullyUsed = v.UsedStatus || v.UseCount >= 3;
+          const isFullyUsed = v.UsedStatus || v.UseCount >= 1;
           
           return (
             <div className={`voucher-card ${isFullyUsed ? 'used' : ''}`} key={v.VoucherId} style={{ display: 'flex', flexDirection: 'column', height: 'auto', gap: 10 }}>
@@ -56,7 +56,7 @@ export default function VouchersPage() {
                 <p>Số lượng tổng còn lại: {v.Quantity}</p>
                 <p>Hạn dùng: {date(v.EndDate)}</p>
                 <p style={{ fontWeight: 'bold', color: isFullyUsed ? '#ef4444' : '#10b981', marginTop: 4 }}>
-                  Số lượt dùng cá nhân còn lại: {isFullyUsed ? 'Hết lượt (3/3)' : `${personalRemaining}/3 lần`}
+                  Số lượt dùng cá nhân còn lại: {isFullyUsed ? 'Hết lượt (1/1)' : `${personalRemaining}/1 lần`}
                 </p>
               </div>
 

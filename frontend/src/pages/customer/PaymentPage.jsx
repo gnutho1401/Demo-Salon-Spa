@@ -661,7 +661,7 @@ export default function PaymentPage() {
                               {money(voucher.QuickDiscountAmount)}
                             </small>
                             <small style={{ display: "block", color: "#64748b", marginTop: 4 }}>
-                              Lượt dùng cá nhân: {voucher.UseCount >= 3 ? "Đã dùng hết (3/3)" : `Còn ${3 - (voucher.UseCount || 0)}/3 lần`} · Còn lại: {voucher.Quantity}
+                              Lượt dùng cá nhân: {voucher.UseCount >= 1 ? "Đã dùng hết (1/1)" : `Còn ${1 - (voucher.UseCount || 0)}/1 lần`} · Còn lại: {voucher.Quantity}
                             </small>
                           </div>
                         </div>
