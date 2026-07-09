@@ -1006,12 +1006,10 @@ async function upgradeToVIP(customerId) {
   
   if (!vipLevelId) throw new Error("Không thể tìm thấy cấp độ thành viên VIP/cao cấp để nâng cấp");
 
-  const expiredAt = new Date(Date.now() + 5 * 60 * 1000);
   await pool.request()
     .input("CustomerId", sql.Int, customerId)
     .input("LevelId", sql.Int, vipLevelId)
-    .input("ExpiredAt", sql.DateTime, expiredAt)
-    .query("UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = @ExpiredAt WHERE CustomerId = @CustomerId");
+    .query("UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = DATEADD(minute, 5, GETUTCDATE()) WHERE CustomerId = @CustomerId");
     
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
