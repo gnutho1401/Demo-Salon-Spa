@@ -1009,7 +1009,7 @@ async function upgradeToVIP(customerId) {
   await pool.request()
     .input("CustomerId", sql.Int, customerId)
     .input("LevelId", sql.Int, vipLevelId)
-    .query("UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = DATEADD(minute, 5, GETUTCDATE()) WHERE CustomerId = @CustomerId");
+    .query("UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = DATEADD(minute, 1, GETUTCDATE()) WHERE CustomerId = @CustomerId");
     
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
@@ -1017,7 +1017,7 @@ async function upgradeToVIP(customerId) {
   const customer = custRes.recordset[0];
 
   const title = "👑 Chúc mừng! Bạn đã được nâng cấp thử nghiệm hạng thành viên VIP!";
-  const content = `Beauty Salon trân trọng thông báo quý khách ${customer.FullName} đã được đặc cách nâng cấp thử nghiệm hạng thành viên VIP (hiệu lực trong 5 phút để trải nghiệm ưu đãi).`;
+  const content = `Beauty Salon trân trọng thông báo quý khách ${customer.FullName} đã được đặc cách nâng cấp thử nghiệm hạng thành viên VIP (hiệu lực trong 1 phút để trải nghiệm ưu đãi).`;
   
   await pool.request()
     .input("UserId", sql.Int, customer.UserId)
@@ -1037,9 +1037,9 @@ async function upgradeToVIP(customerId) {
             <h2 style="color: #b45309; text-align: center;">✨ Thử Nghiệm Thành Viên VIP ✨</h2>
             <p>Chào <strong>${customer.FullName}</strong>,</p>
             <p>Beauty Salon vô cùng trân trọng sự tin dùng và yêu mến của bạn dành cho các dịch vụ chăm sóc sắc đẹp của chúng tôi trong thời gian qua.</p>
-            <p>Để tri ân đặc biệt và giúp bạn trải nghiệm trước quyền lợi, chúng tôi xin trân trọng thông báo tài khoản của bạn đã được đặc cách nâng cấp thử nghiệm lên cấp bậc thành viên <strong>VIP (hiệu lực trong 5 phút)</strong>.</p>
+            <p>Để tri ân đặc biệt và giúp bạn trải nghiệm trước quyền lợi, chúng tôi xin trân trọng thông báo tài khoản của bạn đã được đặc cách nâng cấp thử nghiệm lên cấp bậc thành viên <strong>VIP (hiệu lực trong 1 phút)</strong>.</p>
             <div style="background-color: #fdfaf2; border: 1px solid #ebdcc5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #b45309; margin-top: 0;">Đặc Quyền VIP Trải Nghiệm (Hiệu lực: 5 phút):</h3>
+              <h3 style="color: #b45309; margin-top: 0;">Đặc Quyền VIP Trải Nghiệm (Hiệu lực: 1 phút):</h3>
               <ul style="margin: 0; padding-left: 20px;">
                 <li>Chiết khấu ưu đãi lớn trên mọi hóa đơn dịch vụ đặt lịch trong thời gian hiệu lực.</li>
                 <li>Trải nghiệm đặc quyền VIP trực tiếp trên hệ thống đặt lịch.</li>
