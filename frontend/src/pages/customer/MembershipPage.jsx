@@ -187,10 +187,11 @@ export default function MembershipPage() {
           <div className="reward-levels-grid">
             {levels.map((level) => {
               const isActive = Number(level.MembershipLevelId) === Number(mine?.MembershipLevelId);
-              const isVipTier = String(level.LevelName).toUpperCase() === "VIP";
+              const tierName = String(level.LevelName).toLowerCase();
+              const isTopTier = tierName === "diamond" || tierName === "vip";
               return (
                 <article
-                  className={`reward-level-card ${isActive ? "active-tier" : ""} ${isVipTier ? "tier-vip" : ""}`}
+                  className={`reward-level-card ${isActive ? "active-tier" : ""} ${isTopTier ? "tier-diamond" : ""} tier-${tierName}`}
                   key={level.MembershipLevelId}
                 >
                   {isActive && <span className="tier-badge">Hạng của bạn</span>}
