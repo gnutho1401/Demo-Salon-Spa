@@ -268,6 +268,36 @@ export default function ReceptionistCreateAppointment() {
 
   const totalPrice = form.customerPackageId ? 0 : Number(selectedService?.Price || 0);
 
+  const availableVouchers = useMemo(() => {
+    if (!selectedService) return [];
+    
+    const serviceName = String(selectedService.ServiceName || "").toLowerCase();
+    
+    return myVouchers.filter((voucher) => {
+      const used = Boolean(voucher.UsedStatus || voucher.usedStatus);
+      const useCount = Number(voucher.UseCount || 0);
+      if (used || useCount >= 1) return false;
+
+      const status = String(voucher.Status || voucher.status || "ACTIVE").toUpperCase();
+      if (status !== "ACTIVE") return false;
+
+      if (voucher.EndDate && new Date(voucher.EndDate) < new Date()) return false;
+
+      const minOrder = Number(voucher.MinOrderAmount || voucher.minOrderAmount || 0);
+      if (minOrder > 0 && totalPrice < minOrder) return false;
+
+      const code = String(voucher.Code || "").toUpperCase();
+      if (code.startsWith("FREEGD") && !serviceName.includes("gội đầu")) {
+        return false;
+      }
+      if (code.startsWith("FREEMS") && !serviceName.includes("massage")) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [myVouchers, selectedService, totalPrice]);
+
   const calc = useMemo(() => {
     const membershipPercent = Number(membership?.DiscountPercent || 0);
     const membershipDiscount = Math.round((totalPrice * membershipPercent) / 100);
@@ -1369,13 +1399,13 @@ export default function ReceptionistCreateAppointment() {
                     >
                       {showVoucherList
                         ? "Ẩn voucher của khách"
-                        : `Chọn voucher của khách (${myVouchers.length})`}
+                        : `Chọn voucher của khách (${availableVouchers.length})`}
                     </button>
 
                     {showVoucherList && (
                       <div className="booking-my-voucher-list">
-                        {myVouchers.length > 0 ? (
-                          myVouchers.map((voucher) => (
+                        {availableVouchers.length > 0 ? (
+                          availableVouchers.map((voucher) => (
                             <button
                               type="button"
                               key={voucher.VoucherId}
@@ -1401,7 +1431,7 @@ export default function ReceptionistCreateAppointment() {
                           ))
                         ) : (
                           <p className="booking-empty small">
-                            Khách hàng chưa có voucher khả dụng.
+                            Không có voucher nào phù hợp với dịch vụ hoặc điều kiện hóa đơn của khách.
                           </p>
                         )}
                       </div>

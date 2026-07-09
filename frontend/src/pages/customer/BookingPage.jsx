@@ -296,6 +296,36 @@ export default function BookingPage() {
     ? 0
     : Math.max(totalPrice - voucherDiscount, 0);
 
+  const availableVouchers = useMemo(() => {
+    if (!selectedService) return [];
+    
+    const serviceName = String(selectedService.ServiceName || "").toLowerCase();
+    
+    return myVouchers.filter((voucher) => {
+      const used = Boolean(voucher.UsedStatus || voucher.usedStatus);
+      const useCount = Number(voucher.UseCount || 0);
+      if (used || useCount >= 1) return false;
+
+      const status = String(voucher.Status || voucher.status || "ACTIVE").toUpperCase();
+      if (status !== "ACTIVE") return false;
+
+      if (voucher.EndDate && new Date(voucher.EndDate) < new Date()) return false;
+
+      const minOrder = Number(voucher.MinOrderAmount || voucher.minOrderAmount || 0);
+      if (minOrder > 0 && totalPrice < minOrder) return false;
+
+      const code = String(voucher.Code || "").toUpperCase();
+      if (code.startsWith("FREEGD") && !serviceName.includes("gội đầu")) {
+        return false;
+      }
+      if (code.startsWith("FREEMS") && !serviceName.includes("massage")) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [myVouchers, selectedService, totalPrice]);
+
   function formatMoney(value) {
     return Number(value || 0).toLocaleString("vi-VN") + "đ";
   }
@@ -1372,13 +1402,13 @@ export default function BookingPage() {
                 >
                   {showVoucherList
                     ? "Ẩn voucher của tôi"
-                    : "Chọn voucher của tôi"}
+                    : `Chọn voucher của tôi (${availableVouchers.length})`}
                 </button>
 
                 {showVoucherList && (
                   <div className="booking-my-voucher-list">
-                    {myVouchers.length > 0 ? (
-                      myVouchers.map((voucher) => (
+                    {availableVouchers.length > 0 ? (
+                      availableVouchers.map((voucher) => (
                         <button
                           type="button"
                           key={voucher.VoucherId}
@@ -1401,8 +1431,7 @@ export default function BookingPage() {
                       ))
                     ) : (
                       <p className="booking-empty small">
-                        Bạn chưa có voucher khả dụng. Hãy vào trang Voucher để
-                        lưu mã giảm giá.
+                        Không có voucher nào phù hợp với dịch vụ hoặc điều kiện hóa đơn của bạn.
                       </p>
                     )}
                   </div>

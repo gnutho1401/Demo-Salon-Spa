@@ -43,7 +43,7 @@ function calcVoucherDiscount(voucher, amount) {
   return Math.min(discountAmount, total);
 }
 
-function isVoucherUsable(voucher, amount) {
+function isVoucherUsable(voucher, amount, serviceName = "") {
   const used = Boolean(voucher.UsedStatus || voucher.usedStatus);
   const status = String(
     voucher.Status || voucher.status || "ACTIVE",
@@ -55,9 +55,18 @@ function isVoucherUsable(voucher, amount) {
 
   const useCount = Number(voucher.UseCount || 0);
 
-  if (used || useCount >= 3) return false;
+  if (used || useCount >= 1) return false;
   if (status && status !== "ACTIVE") return false;
   if (minOrder > 0 && Number(amount || 0) < minOrder) return false;
+
+  const code = String(voucher.Code || "").toUpperCase();
+  const sName = String(serviceName || "").toLowerCase();
+  if (code.startsWith("FREEGD") && !sName.includes("gội đầu")) {
+    return false;
+  }
+  if (code.startsWith("FREEMS") && !sName.includes("massage")) {
+    return false;
+  }
 
   return calcVoucherDiscount(voucher, amount) > 0;
 }
@@ -291,6 +300,8 @@ export default function PaymentPage() {
   const voucherBaseAmount = Math.max(subtotal - calc.membershipDiscount, 0);
 
   const availableVouchers = useMemo(() => {
+    const serviceName = appointment?.ServiceName || appointment?.ServiceNames || "";
+    
     return myVouchers
       .map((voucher) => {
         const discountAmount = calcVoucherDiscount(voucher, voucherBaseAmount);
@@ -298,20 +309,17 @@ export default function PaymentPage() {
         return {
           ...voucher,
           QuickDiscountAmount: discountAmount,
-          IsUsableNow: isVoucherUsable(voucher, voucherBaseAmount),
+          IsUsableNow: isVoucherUsable(voucher, voucherBaseAmount, serviceName),
         };
       })
+      .filter((voucher) => voucher.IsUsableNow)
       .sort((a, b) => {
-        if (a.IsUsableNow !== b.IsUsableNow) {
-          return a.IsUsableNow ? -1 : 1;
-        }
-
         return (
           Number(b.QuickDiscountAmount || 0) -
           Number(a.QuickDiscountAmount || 0)
         );
       });
-  }, [myVouchers, voucherBaseAmount]);
+  }, [myVouchers, voucherBaseAmount, appointment]);
 
   async function savePointsToDb(points) {
     try {
