@@ -178,13 +178,7 @@ export default function CustomerProfile() {
 
   const avatarSrc = form.avatarUrl ? resolveFileUrl(form.avatarUrl) : '';
 
-  const getCardLevelClass = (level) => {
-    const lvl = String(level || 'Normal').toLowerCase();
-    if (lvl.includes('silver')) return 'level-silver';
-    if (lvl.includes('gold')) return 'level-gold';
-    if (lvl.includes('diamond') || lvl.includes('platinum')) return 'level-diamond';
-    return 'level-normal';
-  };
+
 
   return (
     <CustomerLayout>
@@ -211,29 +205,39 @@ export default function CustomerProfile() {
           <div className="prof-grid">
             {/* Left Panel: VIP Card, Loyalty points and tab selectors */}
             <div className="prof-left-panel">
-              <div className={`prof-vip-card ${getCardLevelClass(form.membershipLevel)}`}>
-                <div className="prof-vip-header">
-                  <span className="prof-vip-badge">{form.membershipLevel} Pass</span>
-                  <div className="prof-vip-chip"></div>
+              <div className={`premium-member-card ${String(form.membershipLevel || "normal").toLowerCase()}`} style={{ width: '100%', maxWidth: '380px', height: '230px', margin: '0 auto 20px' }}>
+                <div className="card-glass-shine" />
+                <div className="card-chip" />
+                <div className="card-header">
+                  <span className="card-brand">🌟 PREMIUM MEMBER</span>
+                  <span className="card-vip-badge">{form.membershipLevel || "MEMBER"}</span>
                 </div>
 
-                <label className="prof-vip-avatar-container">
-                  <div className="prof-vip-avatar">
-                    {avatarSrc ? (
-                      <img src={avatarSrc} alt="Avatar" />
-                    ) : (
-                      form.fullName ? form.fullName.charAt(0).toUpperCase() : 'K'
-                    )}
-                  </div>
-                  <div className="prof-avatar-overlay">
-                    {uploading ? '⏳' : '📸'}
-                  </div>
-                  <input type="file" accept="image/*" onChange={handleAvatarChange} />
-                </label>
+                <div className="card-body" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '-10px 0' }}>
+                  <label className="prof-vip-avatar-container" style={{ margin: 0, position: 'relative', zIndex: 3 }}>
+                    <div className="prof-vip-avatar">
+                      {avatarSrc ? (
+                        <img src={avatarSrc} alt="Avatar" />
+                      ) : (
+                        form.fullName ? form.fullName.charAt(0).toUpperCase() : 'K'
+                      )}
+                    </div>
+                    <div className="prof-avatar-overlay">
+                      {uploading ? '⏳' : '📸'}
+                    </div>
+                    <input type="file" accept="image/*" onChange={handleAvatarChange} />
+                  </label>
+                </div>
 
-                <div className="prof-vip-footer">
-                  <h3 className="prof-vip-name">{form.fullName || 'Khách hàng'}</h3>
-                  <span className="prof-vip-id">VIP MEMBER</span>
+                <div className="card-footer">
+                  <div className="card-holder">
+                    <span>Chủ thẻ</span>
+                    <strong>{form.fullName || "QUÝ KHÁCH"}</strong>
+                  </div>
+                  <div className="card-discount">
+                    <span>Điểm tích lũy</span>
+                    <strong>{form.loyaltyPoints || 0} PTS</strong>
+                  </div>
                 </div>
               </div>
 
