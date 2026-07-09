@@ -295,8 +295,8 @@ async function validateVoucher(userId, data, customerId = null) {
     `);
 
   const useCount = countRes.recordset[0].UseCount;
-  if (useCount >= 3) {
-    throw new Error("Bạn đã sử dụng voucher này tối đa 3 lần");
+  if (useCount >= 1) {
+    throw new Error("Voucher này chỉ có thể sử dụng tối đa 1 lần");
   }
 
   let discountAmount = 0;

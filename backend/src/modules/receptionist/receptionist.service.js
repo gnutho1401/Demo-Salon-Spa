@@ -2706,7 +2706,7 @@ async function markInvoicePaid(id, method = "CASH", userId = null) {
 
       const useCount = useCountResult.recordset[0]?.UseCount || 0;
 
-      if (useCount >= 3) {
+      if (useCount >= 1) {
         await new sql.Request(tx)
           .input("CustomerId", sql.Int, current.CustomerId)
           .input("VoucherId", sql.Int, current.VoucherId)

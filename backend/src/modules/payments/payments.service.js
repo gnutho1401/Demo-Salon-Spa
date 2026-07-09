@@ -379,8 +379,8 @@ async function markVoucherUsed(transaction, customerId, voucherId) {
   
   const useCount = useCountResult.recordset[0].UseCount;
 
-  // 3. Nếu dùng từ 3 lần trở lên mới chuyển trạng thái UsedStatus = 1 trong CustomerVouchers
-  if (useCount >= 3) {
+  // 3. Nếu dùng từ 1 lần trở lên mới chuyển trạng thái UsedStatus = 1 trong CustomerVouchers
+  if (useCount >= 1) {
     await req.query(`
       UPDATE CustomerVouchers
       SET
@@ -1393,8 +1393,8 @@ async function applyVoucher(userId, appointmentId, body, isStaff = false) {
           AND i.VoucherId = @VoucherId
           AND a.Status NOT IN ('CANCELLED', 'REFUND_PENDING', 'REFUNDED', 'NO_SHOW')
       `);
-    if (countRes.recordset[0].UseCount >= 3) {
-      throw new Error("Bạn đã sử dụng voucher này tối đa 3 lần");
+    if (countRes.recordset[0].UseCount >= 1) {
+      throw new Error("Voucher này chỉ có thể sử dụng tối đa 1 lần");
     }
   }
 
