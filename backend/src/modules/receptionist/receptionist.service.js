@@ -2,7 +2,7 @@ const { sql, connectDB } = require("../../config/db");
 const { getServiceById } = require("../appointments/appointments.service");
 const appointmentStateService = require("../appointments/appointment-state.service");
 const eventBusService = require("../event-bus/eventBus.service");
-const { addLoyaltyPoints, updateCustomerMembershipLevel } = require("../../utils/membershipDiscount");
+const { addLoyaltyPoints, updateCustomerMembershipLevel, useLoyaltyPoints } = require("../../utils/membershipDiscount");
 
 function normalizeDateOnly(value) {
   if (!value) return null;
@@ -2528,6 +2528,8 @@ async function getInvoiceById(id) {
       i.InvoiceId,
       i.AppointmentId,
       i.VoucherId,
+      i.RewardPointsUsed,
+      i.RewardDiscountAmount,
       v.Code AS VoucherCode,
       COALESCE(i.TotalAmount, 0) AS Total,
       COALESCE(i.DiscountAmount, 0) AS Discount,
@@ -2664,6 +2666,17 @@ async function markInvoicePaid(id, method = "CASH", userId = null) {
         SET Status = 'PAID'
         WHERE InvoiceId = @InvoiceId
       `);
+
+    if (Number(current.RewardPointsUsed || 0) > 0 && paymentId) {
+      await useLoyaltyPoints(
+        tx,
+        current.CustomerId,
+        paymentId,
+        current.AppointmentId,
+        Number(current.RewardPointsUsed),
+        Number(current.RewardDiscountAmount)
+      );
+    }
 
     const paidAmount = current.FinalAmount || current.Total || 0;
     if (paidAmount > 0 && current.CustomerId && paymentId) {
