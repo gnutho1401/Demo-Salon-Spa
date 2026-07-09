@@ -14,6 +14,7 @@ export default function AdminAiCrm() {
   const [activeSegment, setActiveSegment] = useState("ALL");
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const [executedActions, setExecutedActions] = useState({});
 
   useEffect(() => {
     fetchCrmData();
@@ -150,28 +151,17 @@ export default function AdminAiCrm() {
     const isGift = actionStr.includes("Gội đầu") || actionStr.includes("Massage") || actionStr.includes("Tặng kèm") || actionStr.includes("suất");
     const isUpgrade = actionStr.includes("nâng cấp") || actionStr.includes("VIP");
     const isPoints = actionStr.includes("điểm tích lũy") || actionStr.includes("điểm thưởng") || actionStr.includes("Nhân đôi");
+    const isMessage = actionStr.includes("tin nhắn") || actionStr.includes("Zalo/SMS") || actionStr.includes("Gửi tin nhắn");
 
     try {
       setActionLoading(true);
       if (isVoucher) {
         const details = recommendedVoucherDetails;
-        if (!details) {
-          showToast("Không xác định được ưu đãi voucher cần tặng từ khuyến nghị.", "error");
-          return;
-        }
-        const matchingVoucher = vouchers.find(
-          (v) =>
-            v.DiscountType === "PERCENTAGE" &&
-            Number(v.DiscountValue) === details.discount
-        );
-        if (!matchingVoucher) {
-          showToast(`Không tìm thấy Voucher giảm giá ${details.discount}% hoạt động trong hệ thống. Vui lòng tạo voucher này trước.`, "error");
-          return;
-        }
+        const discountVal = details ? details.discount : 20;
         const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/send-voucher`, {
-          voucherId: matchingVoucher.VoucherId,
+          discountPercent: discountVal,
         });
-        showToast(res.data?.message || `Đã tặng thành công Voucher ${matchingVoucher.Code}!`, "success");
+        showToast(res.data?.message || `Đã tặng thành công Voucher giảm giá ${discountVal}% mới!`, "success");
       } else if (isUpgrade) {
         const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/upgrade-vip`);
         showToast(res.data?.message || "Đã đặc cách nâng cấp VIP thành công!", "success");
@@ -186,13 +176,82 @@ export default function AdminAiCrm() {
           points: 200
         });
         showToast(res.data?.message || "Đã cộng +200 điểm thưởng tích lũy thành công!", "success");
+      } else if (isMessage) {
+        const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/send-reminder`, {
+          message: customMessage,
+        });
+        showToast(res.data?.message || "Đã gửi nhắc nhở chăm sóc thành công!", "success");
       } else {
         showToast("Hành động này không yêu cầu kích hoạt phần mềm.", "info");
       }
+
+      setExecutedActions(prev => ({
+        ...prev,
+        [`${selectedCust.customer_id}-${actionStr}`]: true
+      }));
     } catch (err) {
       showToast(err.response?.data?.message || "Không thể thực hiện hành động này", "error");
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function handleExecuteAllActions() {
+    if (!selectedCust) return;
+    const actions = selectedCust.recommended_action || [];
+    setActionLoading(true);
+    let successCount = 0;
+    
+    for (const action of actions) {
+      if (executedActions[`${selectedCust.customer_id}-${action}`]) continue;
+
+      const isVoucher = action.includes("Voucher") || action.includes("voucher");
+      const isGift = action.includes("Gội đầu") || action.includes("Massage") || action.includes("Tặng kèm") || action.includes("suất");
+      const isUpgrade = action.includes("nâng cấp") || action.includes("VIP");
+      const isPoints = action.includes("điểm tích lũy") || action.includes("điểm thưởng") || action.includes("Nhân đôi");
+      const isMessage = action.includes("tin nhắn") || action.includes("Zalo/SMS") || action.includes("Gửi tin nhắn");
+
+      if (isVoucher || isGift || isUpgrade || isPoints || isMessage) {
+        try {
+          if (isVoucher) {
+            const details = recommendedVoucherDetails;
+            const discountVal = details ? details.discount : 20;
+            await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/send-voucher`, {
+              discountPercent: discountVal,
+            });
+          } else if (isUpgrade) {
+            await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/upgrade-vip`);
+          } else if (isGift) {
+            const giftName = action.includes("Gội đầu") ? "Gội đầu thảo dược dưỡng sinh" : "Massage cổ vai gáy miễn phí";
+            await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/gift-free-service`, {
+              serviceName: giftName
+            });
+          } else if (isPoints) {
+            await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/add-points`, {
+              points: 200
+            });
+          } else if (isMessage) {
+            await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/send-reminder`, {
+              message: customMessage,
+            });
+          }
+          
+          setExecutedActions(prev => ({
+            ...prev,
+            [`${selectedCust.customer_id}-${action}`]: true
+          }));
+          successCount++;
+        } catch (err) {
+          console.error(`Lỗi thực hiện hành động "${action}":`, err.message);
+        }
+      }
+    }
+    
+    setActionLoading(false);
+    if (successCount > 0) {
+      showToast(`Đã thực hiện thành công ${successCount} hành động chăm sóc!`, "success");
+    } else {
+      showToast("Không có hành động mới nào cần thực hiện.", "info");
     }
   }
 
@@ -602,6 +661,13 @@ export default function AdminAiCrm() {
                           ))}
                         </div>
 
+                        {(cust.phone || cust.email) && (
+                          <div style={{ fontSize: "0.75rem", color: "#6b7280", display: "flex", flexDirection: "column", gap: "2px", margin: "6px 0 0 0" }}>
+                            {cust.phone && <span>📞 {cust.phone}</span>}
+                            {cust.email && <span style={{ wordBreak: "break-all" }}>✉️ {cust.email}</span>}
+                          </div>
+                        )}
+
                         <div
                           style={{
                             display: "flex",
@@ -692,8 +758,9 @@ export default function AdminAiCrm() {
                         {selectedCust.name}
                       </h2>
                       <p style={{ margin: 0, color: "#666", fontSize: "0.85rem" }}>
-                        ID khách hàng: #{selectedCust.customer_id}{" "}
+                        ID khách hàng: #{selectedCust.customer_id}
                         {selectedCust.phone ? ` • SĐT: ${selectedCust.phone}` : ""}
+                        {selectedCust.email ? ` • Email: ${selectedCust.email}` : ""}
                       </p>
                     </div>
 
@@ -968,9 +1035,32 @@ export default function AdminAiCrm() {
                       gap: "20px",
                     }}
                   >
-                    <h4 style={{ fontSize: "1rem", color: "#1b3d2f", margin: "0", fontWeight: "700" }}>
-                      ⚡ Thực hiện Hành động Giữ chân ngay lập tức
-                    </h4>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <h4 style={{ fontSize: "1rem", color: "#1b3d2f", margin: "0", fontWeight: "700" }}>
+                        ⚡ Thực hiện Hành động Giữ chân ngay lập tức
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={handleExecuteAllActions}
+                        disabled={actionLoading}
+                        style={{
+                          backgroundColor: "#b45309",
+                          color: "#fff",
+                          border: "none",
+                          padding: "8px 14px",
+                          borderRadius: "8px",
+                          fontWeight: "bold",
+                          fontSize: "0.78rem",
+                          cursor: actionLoading ? "not-allowed" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          boxShadow: "0 2px 5px rgba(180,83,9,0.2)",
+                        }}
+                      >
+                        🚀 Thực hiện tất cả
+                      </button>
+                    </div>
 
                     {/* Dynamic Action Buttons from Recommendations */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -1005,16 +1095,10 @@ export default function AdminAiCrm() {
                             }
                           };
                         } else if (isMessage) {
-                          btnText = "Xem tin nhắn mẫu";
+                          btnText = "Gửi lời nhắn mẫu";
                           btnIcon = "✉️";
-                          helperText = "Cuộn xuống khung soạn thảo tin nhắn Zalo/SMS mẫu phía dưới.";
-                          handleExecute = () => {
-                            const el = document.getElementById("retention-textarea");
-                            if (el) {
-                              el.scrollIntoView({ behavior: "smooth" });
-                              el.focus();
-                            }
-                          };
+                          helperText = "Gửi ngay lời nhắc và hỏi thăm theo mẫu soạn sẵn qua Email/Thông báo.";
+                          handleExecute = () => handleExecuteRecommendedAction(action);
                         } else if (isGift) {
                           const giftName = action.includes("Gội đầu") ? "Gội đầu thảo dược dưỡng sinh" : "Massage cổ vai gáy miễn phí";
                           btnText = `Tặng suất ${giftName}`;
@@ -1038,6 +1122,9 @@ export default function AdminAiCrm() {
                           helperText = "Đọc kỹ khuyến nghị để thực hiện hỗ trợ khách.";
                         }
 
+                        const isExecuted = executedActions[`${selectedCust.customer_id}-${action}`];
+                        const isDisabled = actionLoading || isExecuted;
+
                         return (
                           <div
                             key={idx}
@@ -1050,6 +1137,7 @@ export default function AdminAiCrm() {
                               borderRadius: "12px",
                               border: "1px solid #ebdcc5",
                               gap: "16px",
+                              opacity: isExecuted ? 0.75 : 1,
                             }}
                           >
                             <div style={{ flex: 1 }}>
@@ -1064,17 +1152,16 @@ export default function AdminAiCrm() {
                               <button
                                 type="button"
                                 onClick={handleExecute}
-                                disabled={actionLoading}
+                                disabled={isDisabled}
                                 style={{
-                                  backgroundColor: "#1b3d2f",
-                                  color: "#fff",
+                                  backgroundColor: isExecuted ? "#cbd5e1" : "#1b3d2f",
+                                  color: isExecuted ? "#64748b" : "#fff",
                                   border: "none",
                                   padding: "8px 16px",
                                   borderRadius: "8px",
                                   fontWeight: "bold",
                                   fontSize: "0.8rem",
-                                  cursor: actionLoading ? "not-allowed" : "pointer",
-                                  opacity: actionLoading ? 0.6 : 1,
+                                  cursor: isDisabled ? "not-allowed" : "pointer",
                                   whiteSpace: "nowrap",
                                   display: "flex",
                                   alignItems: "center",
@@ -1082,8 +1169,8 @@ export default function AdminAiCrm() {
                                   transition: "all 0.2s",
                                 }}
                               >
-                                <span>{btnIcon}</span>
-                                <span>{btnText}</span>
+                                <span>{isExecuted ? "✓" : btnIcon}</span>
+                                <span>{isExecuted ? "Đã thực hiện" : btnText}</span>
                               </button>
                             )}
                           </div>
@@ -1091,12 +1178,32 @@ export default function AdminAiCrm() {
                       })}
                     </div>
 
-                    {/* Manual Override Section */}
-                    <div style={{ borderTop: "1px dashed #ebdcc5", marginTop: "10px", paddingTop: "15px" }}>
-                      <h5 style={{ margin: "0 0 12px 0", color: "#8a653a", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                        🛠️ Công cụ gửi thủ công / Dự phòng
-                      </h5>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    {/* Collapsible Manual Override Section */}
+                    <details
+                      style={{
+                        borderTop: "1.5px solid #ebdcc5",
+                        marginTop: "10px",
+                        paddingTop: "15px",
+                      }}
+                    >
+                      <summary
+                        style={{
+                          fontSize: "0.88rem",
+                          fontWeight: "bold",
+                          color: "#6b5444",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          listStyle: "none",
+                          userSelect: "none",
+                        }}
+                      >
+                        <span>🛠️ Công cụ gửi thủ công / Dự phòng</span>
+                        <span style={{ fontSize: "0.75rem", color: "#b45309" }}>Xem chi tiết ▼</span>
+                      </summary>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "15px" }}>
                         {/* Send Custom Voucher manually */}
                         <div
                           style={{
@@ -1214,7 +1321,7 @@ export default function AdminAiCrm() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </details>
                   </div>
                 </div>
               ) : (

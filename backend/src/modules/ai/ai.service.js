@@ -1,5 +1,6 @@
 const { sql, connectDB } = require('../../config/db');
 const { generateContent } = require('../../config/gemini');
+const { sendMail } = require('../../utils/sendMail');
 
 async function getCustomerByUserId(pool, userId) {
   if (!userId) return null;
@@ -533,7 +534,8 @@ function ruleBasedChurnPrediction(customerData) {
     if (risk_level === 'HIGH_RISK') {
       recommended_action.push("📞 Liên hệ trực tiếp qua điện thoại hỏi thăm trải nghiệm và lắng nghe phản hồi.");
       recommended_action.push("💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.");
-      recommended_action.push("🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh hoặc Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.");
+      recommended_action.push("🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo.");
+      recommended_action.push("🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.");
     } else if (risk_level === 'MEDIUM_RISK') {
       recommended_action.push("✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.");
       recommended_action.push("🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.");
@@ -573,7 +575,7 @@ async function predictCustomersChurn(executorUserId) {
   
   // 1. Get all customers
   const customersResult = await pool.request().query(`
-    SELECT c.CustomerId, u.FullName, u.Phone, c.CreatedAt
+    SELECT c.CustomerId, u.FullName, u.Phone, u.Email, c.CreatedAt
     FROM Customers c
     JOIN Users u ON c.UserId = u.UserId
   `);
@@ -681,6 +683,7 @@ async function predictCustomersChurn(executorUserId) {
       customer_id: cust.CustomerId.toString(),
       name: cust.FullName,
       phone: cust.Phone || null,
+      email: cust.Email || null,
       total_visits,
       last_visit_date,
       avg_days_between_visits,
@@ -736,7 +739,8 @@ Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghi
 1. HIGH_RISK (Rủi ro cao):
    - 📞 Liên hệ trực tiếp qua điện thoại hỏi thăm trải nghiệm và lắng nghe phản hồi.
    - 💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.
-   - 🎁 Tặng kèm 01 suất Gội đầu thảo duyệt dưỡng sinh hoặc Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.
+   - 🎁 Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh miễn phí ở lần hẹn tiếp theo.
+   - 🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.
 2. MEDIUM_RISK (Rủi ro trung bình):
    - ✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.
    - 🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.
@@ -821,6 +825,8 @@ Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghi
     return {
       ...c,
       segments,
+      phone: orig ? orig.phone : null,
+      email: orig ? orig.email : null,
       total_visits: orig ? orig.total_visits : 0,
       total_spent: orig ? orig.total_spent : 0,
       last_visit_date: orig ? orig.last_visit_date : null,
@@ -835,36 +841,47 @@ Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghi
   return resultPayload;
 }
 
-async function sendVoucherToCustomer(customerId, voucherId) {
+async function sendVoucherToCustomer(customerId, voucherId, discountPercent) {
   const pool = await connectDB();
   
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT c.CustomerId, u.FullName, u.UserId FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query("SELECT c.CustomerId, u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
   const customer = custRes.recordset[0];
   if (!customer) throw new Error("Khách hàng không tồn tại");
 
-  const vouchRes = await pool.request()
-    .input("VoucherId", sql.Int, voucherId)
-    .query("SELECT VoucherId, Code, DiscountValue, DiscountType FROM Vouchers WHERE VoucherId = @VoucherId AND Status = 'ACTIVE'");
-  const voucher = vouchRes.recordset[0];
-  if (!voucher) throw new Error("Voucher không tồn tại hoặc đã hết hạn/bị vô hiệu hóa");
+  let voucherCode = "";
+  let discountType = "PERCENT";
+  let discountVal = 20;
+  let finalVoucherId = voucherId;
 
-  const existRes = await pool.request()
-    .input("CustomerId", sql.Int, customerId)
-    .input("VoucherId", sql.Int, voucherId)
-    .query("SELECT UsedStatus FROM CustomerVouchers WHERE CustomerId = @CustomerId AND VoucherId = @VoucherId");
-  
-  if (existRes.recordset.length > 0) {
-    const usage = existRes.recordset[0];
-    if (usage.UsedStatus === 0) {
-      throw new Error(`Khách hàng ${customer.FullName} đã sở hữu Voucher này và chưa sử dụng.`);
-    }
+  if (discountPercent) {
+    discountVal = Number(discountPercent);
+    voucherCode = `CRM${discountVal}${customerId}${Math.floor(1000 + Math.random() * 9000)}`;
+    
+    const voucherInsert = await pool.request()
+      .input("Code", sql.NVarChar, voucherCode)
+      .input("DiscountValue", sql.Decimal(18, 2), discountVal)
+      .query(`
+        INSERT INTO Vouchers (Code, DiscountType, DiscountValue, MinOrderAmount, StartDate, EndDate, Quantity, Status)
+        OUTPUT INSERTED.VoucherId
+        VALUES (@Code, 'PERCENT', @DiscountValue, 0, CAST(GETDATE() AS DATE), CAST(DATEADD(month, 3, GETDATE()) AS DATE), 1, 'ACTIVE')
+      `);
+    finalVoucherId = voucherInsert.recordset[0].VoucherId;
+  } else {
+    const vouchRes = await pool.request()
+      .input("VoucherId", sql.Int, voucherId)
+      .query("SELECT VoucherId, Code, DiscountValue, DiscountType FROM Vouchers WHERE VoucherId = @VoucherId AND Status = 'ACTIVE'");
+    const voucher = vouchRes.recordset[0];
+    if (!voucher) throw new Error("Voucher không tồn tại hoặc đã hết hạn/bị vô hiệu hóa");
+    voucherCode = voucher.Code;
+    discountType = voucher.DiscountType;
+    discountVal = Number(voucher.DiscountValue);
   }
 
   await pool.request()
     .input("CustomerId", sql.Int, customerId)
-    .input("VoucherId", sql.Int, voucherId)
+    .input("VoucherId", sql.Int, finalVoucherId)
     .query(`
       MERGE INTO CustomerVouchers AS target
       USING (SELECT @CustomerId AS CustomerId, @VoucherId AS VoucherId) AS source
@@ -876,7 +893,7 @@ async function sendVoucherToCustomer(customerId, voucherId) {
     `);
 
   const title = "🎁 Bạn nhận được quà tặng Voucher từ Salon!";
-  const content = `Beauty Salon thân tặng quý khách voucher ưu đãi: ${voucher.Code} (Giảm ${voucher.DiscountType === 'PERCENTAGE' ? `${Number(voucher.DiscountValue)}%` : `${Number(voucher.DiscountValue).toLocaleString('vi-VN')}đ`}). Trân trọng kính mời quý khách đặt lịch hẹn trải nghiệm dịch vụ.`;
+  const content = `Beauty Salon thân tặng quý khách voucher ưu đãi: ${voucherCode} (Giảm ${discountType === 'PERCENT' ? `${discountVal}%` : `${discountVal.toLocaleString('vi-VN')}đ`}). Trân trọng kính mời quý khách đặt lịch hẹn trải nghiệm dịch vụ.`;
   
   await pool.request()
     .input("UserId", sql.Int, customer.UserId)
@@ -885,7 +902,39 @@ async function sendVoucherToCustomer(customerId, voucherId) {
     .input("Type", sql.NVarChar, "PROMOTION")
     .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
 
-  return { message: `Đã gửi tặng Voucher ${voucher.Code} thành công cho khách hàng ${customer.FullName}.` };
+  // Send email if email exists
+  if (customer.Email) {
+    try {
+      await sendMail({
+        to: customer.Email,
+        subject: `🎁 Quà tặng Voucher giảm giá ${discountType === 'PERCENT' ? `${discountVal}%` : `${discountVal.toLocaleString('vi-VN')}đ`} từ Beauty Salon!`,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ebdcc5; padding: 20px; border-radius: 12px;">
+            <h2 style="color: #1b3d2f; text-align: center;">Món Quà Tri Ân Đặc Biệt</h2>
+            <p>Chào <strong>${customer.FullName}</strong>,</p>
+            <p>Đã lâu rồi Beauty Salon chưa có cơ hội được đồng hành và chăm sóc sắc đẹp cho bạn. Chúng tôi rất nhớ bạn và mong muốn được mang đến những trải nghiệm tuyệt vời nhất ở lần hẹn tiếp theo.</p>
+            <p>Chúng tôi xin gửi tặng riêng bạn một mã Voucher ưu đãi đặc biệt:</p>
+            <div style="background-color: #fcf8f2; border: 1px dashed #b45309; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
+              <span style="font-size: 1.2rem; color: #8c2d19; font-weight: bold; letter-spacing: 1px;">Mã Voucher: ${voucherCode}</span>
+              <br/>
+              <span style="font-size: 0.9rem; color: #6b7280;">Ưu đãi giảm giá <strong>${discountType === 'PERCENT' ? `${discountVal}%` : `${discountVal.toLocaleString('vi-VN')}đ`}</strong> cho toàn bộ dịch vụ</span>
+            </div>
+            <p><strong>Hạn sử dụng:</strong> 3 tháng kể từ ngày nhận được email này.</p>
+            <p>Bạn có thể áp dụng mã này khi đặt lịch trực tiếp trên website của chúng tôi hoặc xuất trình cho lễ tân khi thanh toán tại quầy.</p>
+            <p style="text-align: center; margin-top: 30px;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Đặt lịch hẹn ngay</a>
+            </p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
+            <p style="font-size: 0.8rem; color: #999; text-align: center;">Mọi thắc mắc xin vui lòng liên hệ hotline của salon. Trân trọng cảm ơn!</p>
+          </div>
+        `
+      });
+    } catch (mailErr) {
+      console.error("[Mail Error] Gửi mail voucher thất bại:", mailErr.message);
+    }
+  }
+
+  return { message: `Đã gửi tặng Voucher ${voucherCode} thành công cho khách hàng ${customer.FullName}.` };
 }
 
 async function sendReminderToCustomer(customerId, message) {
@@ -893,7 +942,7 @@ async function sendReminderToCustomer(customerId, message) {
 
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT c.CustomerId, u.FullName, u.UserId FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query("SELECT c.CustomerId, u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
   const customer = custRes.recordset[0];
   if (!customer) throw new Error("Khách hàng không tồn tại");
 
@@ -903,6 +952,32 @@ async function sendReminderToCustomer(customerId, message) {
     .input("Content", sql.NVarChar, message)
     .input("Type", sql.NVarChar, "PROMOTION")
     .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+
+  // Send email if email exists
+  if (customer.Email) {
+    try {
+      await sendMail({
+        to: customer.Email,
+        subject: "💌 Lời nhắn từ Beauty Salon",
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ebdcc5; padding: 20px; border-radius: 12px;">
+            <h2 style="color: #1b3d2f; text-align: center;">Lời Nhắn Gửi Yêu Thương</h2>
+            <p>Chào <strong>${customer.FullName}</strong>,</p>
+            <div style="background-color: #faf8f5; border-left: 4px solid #1b3d2f; padding: 15px; font-style: italic; margin: 20px 0; white-space: pre-line;">
+              ${message}
+            </div>
+            <p style="text-align: center; margin-top: 30px;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Ghé thăm Beauty Salon</a>
+            </p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
+            <p style="font-size: 0.8rem; color: #999; text-align: center;">Mọi thắc mắc xin vui lòng liên hệ hotline của salon. Trân trọng cảm ơn!</p>
+          </div>
+        `
+      });
+    } catch (mailErr) {
+      console.error("[Mail Error] Gửi mail nhắc nhở thất bại:", mailErr.message);
+    }
+  }
 
   return { message: `Đã gửi nhắc nhở chăm sóc thành công tới khách hàng ${customer.FullName}.` };
 }
@@ -931,7 +1006,7 @@ async function upgradeToVIP(customerId) {
     
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT u.FullName, u.UserId FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query("SELECT u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
   const customer = custRes.recordset[0];
 
   const title = "👑 Chúc mừng! Bạn đã được nâng cấp hạng thành viên VIP!";
@@ -944,6 +1019,40 @@ async function upgradeToVIP(customerId) {
     .input("Type", sql.NVarChar, "SYSTEM")
     .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
 
+  // Send email if email exists
+  if (customer.Email) {
+    try {
+      await sendMail({
+        to: customer.Email,
+        subject: "👑 Chúc mừng! Bạn đã được nâng cấp hạng thành viên VIP tại Beauty Salon!",
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ebdcc5; padding: 20px; border-radius: 12px;">
+            <h2 style="color: #b45309; text-align: center;">✨ Nâng Cấp Thành Viên VIP ✨</h2>
+            <p>Chào <strong>${customer.FullName}</strong>,</p>
+            <p>Beauty Salon vô cùng trân trọng sự tin dùng và yêu mến của bạn dành cho các dịch vụ chăm sóc sắc đẹp của chúng tôi trong thời gian qua.</p>
+            <p>Như một lời tri ân đặc biệt nhất, chúng tôi xin trân trọng thông báo tài khoản của bạn đã được đặc cách nâng cấp lên cấp bậc thành viên <strong>VIP</strong>.</p>
+            <div style="background-color: #fdfaf2; border: 1px solid #ebdcc5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #b45309; margin-top: 0;">Đặc Quyền Thành Viên VIP:</h3>
+              <ul style="margin: 0; padding-left: 20px;">
+                <li>Chiết khấu ưu đãi trọn đời trên mọi hóa đơn dịch vụ.</li>
+                <li>Ưu tiên đặt chỗ vào các khung giờ cao điểm.</li>
+                <li>Nhận quà tặng/voucher độc quyền vào ngày sinh nhật và các ngày lễ lớn.</li>
+              </ul>
+            </div>
+            <p>Chúng tôi hy vọng sẽ luôn được phục vụ và đồng hành cùng hành trình duy trì vẻ đẹp và sự tự tin của bạn.</p>
+            <p style="text-align: center; margin-top: 30px;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Truy cập tài khoản VIP</a>
+            </p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
+            <p style="font-size: 0.8rem; color: #999; text-align: center;">Trân trọng cảm ơn quý khách!</p>
+          </div>
+        `
+      });
+    } catch (mailErr) {
+      console.error("[Mail Error] Gửi mail nâng cấp VIP thất bại:", mailErr.message);
+    }
+  }
+
   return { message: `Đã nâng cấp khách hàng ${customer.FullName} lên VIP và gửi thông báo thành công!` };
 }
 
@@ -951,7 +1060,7 @@ async function giftFreeService(customerId, serviceName) {
   const pool = await connectDB();
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT u.FullName, u.UserId FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query("SELECT u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
   const customer = custRes.recordset[0];
   if (!customer) throw new Error("Khách hàng không tồn tại");
 
@@ -993,6 +1102,38 @@ async function giftFreeService(customerId, serviceName) {
     .input("Type", sql.NVarChar, "PROMOTION")
     .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
 
+  // Send email if email exists
+  if (customer.Email) {
+    try {
+      await sendMail({
+        to: customer.Email,
+        subject: `💆 Quà tặng dịch vụ miễn phí: ${serviceName} từ Beauty Salon!`,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ebdcc5; padding: 20px; border-radius: 12px;">
+            <h2 style="color: #1b3d2f; text-align: center;">Quà Tặng Đặc Biệt Dành Cho Bạn</h2>
+            <p>Chào <strong>${customer.FullName}</strong>,</p>
+            <p>Để tri ân sự đồng hành của bạn và mong muốn mang đến những phút giây thư giãn tuyệt vời, Beauty Salon xin gửi tặng riêng bạn một suất <strong>${serviceName}</strong> hoàn toàn miễn phí.</p>
+            <p>Mã Voucher quà tặng đã được nạp trực tiếp vào tài khoản của bạn:</p>
+            <div style="background-color: #fcf8f2; border: 1px dashed #b45309; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
+              <span style="font-size: 1.2rem; color: #8c2d19; font-weight: bold; letter-spacing: 1px;">Mã Quà Tặng: ${cleanCode}</span>
+              <br/>
+              <span style="font-size: 0.9rem; color: #6b7280;">Trị giá <strong>${giftValue.toLocaleString('vi-VN')}đ</strong> (Miễn phí 100% dịch vụ ${serviceName})</span>
+            </div>
+            <p><strong>Hạn sử dụng:</strong> 3 tháng kể từ ngày nhận được email này.</p>
+            <p>Bạn có thể áp dụng mã này khi đặt lịch trực tiếp trên website của chúng tôi hoặc xuất trình cho lễ tân khi thanh toán tại quầy.</p>
+            <p style="text-align: center; margin-top: 30px;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Đặt lịch hẹn ngay</a>
+            </p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
+            <p style="font-size: 0.8rem; color: #999; text-align: center;">Mọi thắc mắc xin vui lòng liên hệ hotline của salon. Trân trọng cảm ơn!</p>
+          </div>
+        `
+      });
+    } catch (mailErr) {
+      console.error("[Mail Error] Gửi mail quà tặng dịch vụ thất bại:", mailErr.message);
+    }
+  }
+
   return { message: `Đã tặng quà miễn phí (${serviceName}) thành công cho ${customer.FullName}. Mã voucher: ${cleanCode}` };
 }
 
@@ -1005,7 +1146,7 @@ async function addLoyaltyPoints(customerId, points) {
 
   const custRes = await pool.request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT u.FullName, u.UserId, c.LoyaltyPoints FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query("SELECT u.FullName, u.UserId, u.Email, c.LoyaltyPoints FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
   const customer = custRes.recordset[0];
 
   const title = `🌟 Điểm thưởng tích lũy tăng thêm: +${points} điểm!`;
@@ -1017,6 +1158,33 @@ async function addLoyaltyPoints(customerId, points) {
     .input("Content", sql.NVarChar, content)
     .input("Type", sql.NVarChar, "SYSTEM")
     .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+
+  // Send email if email exists
+  if (customer.Email) {
+    try {
+      await sendMail({
+        to: customer.Email,
+        subject: `🌟 Bạn nhận được điểm thưởng Loyalty từ Beauty Salon!`,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ebdcc5; padding: 20px; border-radius: 12px;">
+            <h2 style="color: #1b3d2f; text-align: center;">Tích Điểm Loyalty Points</h2>
+            <p>Chào <strong>${customer.FullName}</strong>,</p>
+            <p>Bạn vừa nhận được thêm điểm thưởng từ hệ thống chăm sóc khách hàng tự động của chúng tôi:</p>
+            <div style="background-color: #f0f7f4; border: 1px solid #d1e7dd; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
+              <span style="font-size: 1.2rem; color: #157347; font-weight: bold;">+${points} Điểm Thưởng</span>
+              <br/>
+              <span style="font-size: 0.9rem; color: #6b7280;">Tổng số điểm tích lũy hiện tại: <strong>${customer.LoyaltyPoints}</strong> điểm</span>
+            </div>
+            <p>Điểm Loyalty có thể dùng để thăng hạng thành viên hoặc quy đổi ra các voucher ưu đãi hấp dẫn ở lần hẹn tiếp theo.</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
+            <p style="font-size: 0.8rem; color: #999; text-align: center;">Trân trọng cảm ơn quý khách!</p>
+          </div>
+        `
+      });
+    } catch (mailErr) {
+      console.error("[Mail Error] Gửi mail tích điểm thất bại:", mailErr.message);
+    }
+  }
 
   return { message: `Đã tặng +${points} điểm tích lũy thành công cho khách hàng ${customer.FullName}.` };
 }

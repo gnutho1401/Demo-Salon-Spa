@@ -14,9 +14,13 @@ async function predictChurn(req, res) { try { return success(res, await service.
 async function sendVoucherToCustomer(req, res) {
   try {
     const customerId = Number(req.params.id);
-    const { voucherId } = req.body;
-    if (!voucherId) throw new Error("Vui lòng chọn Voucher");
-    const data = await service.sendVoucherToCustomer(customerId, Number(voucherId));
+    const { voucherId, discountPercent } = req.body;
+    if (!voucherId && !discountPercent) throw new Error("Vui lòng chọn Voucher hoặc tỷ lệ giảm giá");
+    const data = await service.sendVoucherToCustomer(
+      customerId,
+      voucherId ? Number(voucherId) : null,
+      discountPercent ? Number(discountPercent) : null
+    );
     return success(res, data, "Gửi tặng Voucher thành công!");
   } catch (err) {
     return error(res, err.message, 400);
