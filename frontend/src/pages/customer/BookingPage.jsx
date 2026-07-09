@@ -315,10 +315,10 @@ export default function BookingPage() {
       if (minOrder > 0 && totalPrice < minOrder) return false;
 
       const code = String(voucher.Code || "").toUpperCase();
-      if (code.startsWith("FREEGD") && !serviceName.includes("gội đầu")) {
+      if (code.startsWith("FREEPH") && serviceName !== "phục hồi tóc hư tổn") {
         return false;
       }
-      if (code.startsWith("FREEMS") && !serviceName.includes("massage")) {
+      if (code.startsWith("FREEMS") && serviceName !== "massage cổ vai gáy") {
         return false;
       }
 

@@ -150,14 +150,14 @@ async function getPayableAppointment(
     const appServices = servicesResult.recordset;
 
     const codeUpper = String(voucher.Code || "").toUpperCase();
-    if (codeUpper.startsWith("FREEGD")) {
-      const goiDauService = appServices.find(s => String(s.ServiceName || "").includes("Gội đầu"));
-      if (!goiDauService) {
-        throw new Error("Voucher này chỉ áp dụng cho dịch vụ Gội đầu thảo dược dưỡng sinh");
+    if (codeUpper.startsWith("FREEPH")) {
+      const phucHoiService = appServices.find(s => String(s.ServiceName || "") === "Phục hồi tóc hư tổn");
+      if (!phucHoiService) {
+        throw new Error("Voucher này chỉ áp dụng cho dịch vụ Phục hồi tóc hư tổn");
       }
-      voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(goiDauService.Price));
+      voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(phucHoiService.Price));
     } else if (codeUpper.startsWith("FREEMS")) {
-      const massageService = appServices.find(s => String(s.ServiceName || "").includes("Massage"));
+      const massageService = appServices.find(s => String(s.ServiceName || "") === "Massage cổ vai gáy");
       if (!massageService) {
         throw new Error("Voucher này chỉ áp dụng cho dịch vụ Massage cổ vai gáy");
       }

@@ -15,7 +15,7 @@ async function getAllActive() {
     FROM Vouchers
     WHERE Status = 'ACTIVE'
       AND Code NOT LIKE 'CRM%'
-      AND Code NOT LIKE 'FREEGD%'
+      AND Code NOT LIKE 'FREEPH%'
       AND Code NOT LIKE 'FREEMS%'
       AND (StartDate IS NULL OR StartDate <= CAST(GETDATE() AS DATE))
       AND (EndDate IS NULL OR EndDate >= CAST(GETDATE() AS DATE))
@@ -119,10 +119,10 @@ async function saveVoucher(userId, voucherId) {
   const voucherRecord = valid.recordset[0];
   const codeStr = String(voucherRecord.Code || "").toUpperCase();
   const isCrmVoucher = codeStr.startsWith("CRM");
-  const isFreeGD = codeStr.startsWith("FREEGD");
+  const isFreePH = codeStr.startsWith("FREEPH");
   const isFreeMS = codeStr.startsWith("FREEMS");
 
-  if (isCrmVoucher || isFreeGD || isFreeMS) {
+  if (isCrmVoucher || isFreePH || isFreeMS) {
     const custIdStr = String(customer.CustomerId);
     if (isCrmVoucher) {
       const matchPattern = `C${custIdStr}R`;
@@ -130,8 +130,8 @@ async function saveVoucher(userId, voucherId) {
         throw new Error("Voucher này dành riêng cho khách hàng khác và không thể lưu");
       }
     }
-    if (isFreeGD) {
-      const matchPrefix = `FREEGD${custIdStr}`;
+    if (isFreePH) {
+      const matchPrefix = `FREEPH${custIdStr}`;
       if (!codeStr.startsWith(matchPrefix)) {
         throw new Error("Voucher này dành riêng cho khách hàng khác và không thể lưu");
       }
@@ -223,12 +223,12 @@ async function validateVoucher(userId, data, customerId = null) {
 
   // Validate free service vouchers limit to specific services
   const codeUpper = String(voucher.Code || "").toUpperCase();
-  const isFreeGift = codeUpper.startsWith("FREEGD") || codeUpper.startsWith("FREEMS");
+  const isFreeGift = codeUpper.startsWith("FREEPH") || codeUpper.startsWith("FREEMS");
   const isCrmVoucher = codeUpper.startsWith("CRM");
-  const isFreeGD = codeUpper.startsWith("FREEGD");
+  const isFreePH = codeUpper.startsWith("FREEPH");
   const isFreeMS = codeUpper.startsWith("FREEMS");
 
-  if (isCrmVoucher || isFreeGD || isFreeMS) {
+  if (isCrmVoucher || isFreePH || isFreeMS) {
     const custIdStr = String(customer.CustomerId);
     if (isCrmVoucher) {
       const matchPattern = `C${custIdStr}R`;
@@ -236,8 +236,8 @@ async function validateVoucher(userId, data, customerId = null) {
         throw new Error("Voucher này dành riêng cho khách hàng khác và không thể sử dụng");
       }
     }
-    if (isFreeGD) {
-      const matchPrefix = `FREEGD${custIdStr}`;
+    if (isFreePH) {
+      const matchPrefix = `FREEPH${custIdStr}`;
       if (!codeUpper.startsWith(matchPrefix)) {
         throw new Error("Voucher này dành riêng cho khách hàng khác và không thể sử dụng");
       }
@@ -261,10 +261,10 @@ async function validateVoucher(userId, data, customerId = null) {
       throw new Error("Dịch vụ không tồn tại");
     }
     const serviceName = String(serviceRes.recordset[0].ServiceName || "");
-    if (codeUpper.startsWith("FREEGD") && !serviceName.includes("Gội đầu")) {
-      throw new Error("Voucher này chỉ áp dụng cho dịch vụ Gội đầu thảo dược dưỡng sinh");
+    if (codeUpper.startsWith("FREEPH") && serviceName !== "Phục hồi tóc hư tổn") {
+      throw new Error("Voucher này chỉ áp dụng cho dịch vụ Phục hồi tóc hư tổn");
     }
-    if (codeUpper.startsWith("FREEMS") && !serviceName.includes("Massage")) {
+    if (codeUpper.startsWith("FREEMS") && serviceName !== "Massage cổ vai gáy") {
       throw new Error("Voucher này chỉ áp dụng cho dịch vụ Massage cổ vai gáy");
     }
   }

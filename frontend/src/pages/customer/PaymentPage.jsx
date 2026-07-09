@@ -61,10 +61,10 @@ function isVoucherUsable(voucher, amount, serviceName = "") {
 
   const code = String(voucher.Code || "").toUpperCase();
   const sName = String(serviceName || "").toLowerCase();
-  if (code.startsWith("FREEGD") && !sName.includes("gội đầu")) {
+  if (code.startsWith("FREEPH") && sName !== "phục hồi tóc hư tổn") {
     return false;
   }
-  if (code.startsWith("FREEMS") && !sName.includes("massage")) {
+  if (code.startsWith("FREEMS") && sName !== "massage cổ vai gáy") {
     return false;
   }
 
