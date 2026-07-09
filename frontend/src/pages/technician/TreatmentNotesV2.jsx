@@ -383,7 +383,12 @@ export default function TreatmentNotesV2() {
   const [completedAppts,      setCompletedAppts]      = useState([]);
   const [loadingAppts,        setLoadingAppts]        = useState(false);
 
-  const toast$ = useCallback((msg, type = "success") => setToast({ msg, type }), []);
+  const toast$ = useCallback((msg, type = "success") => {
+    setToast({ msg, type });
+    if (type === "error") {
+      window.alert("⚠️ CẢNH BÁO LỖI:\n\n" + msg);
+    }
+  }, []);
   const isAdmin = ["ADMIN", "MANAGER"].includes(userRole.toUpperCase());
   const isFinalized = selectedNote?.status === "finalized";
   const def = useMemo(() => getDefaults(selectedNote?.ServiceName), [selectedNote]);

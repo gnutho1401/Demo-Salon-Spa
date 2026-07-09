@@ -53,7 +53,13 @@ export default function BookingPage() {
   const [employeeLoading, setEmployeeLoading] = useState(false);
 
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [error, _setError] = useState("");
+  const setError = (msg) => {
+    _setError(msg);
+    if (msg) {
+      window.alert("⚠️ CẢNH BÁO LỖI:\n\n" + msg);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {

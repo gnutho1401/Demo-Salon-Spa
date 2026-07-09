@@ -90,7 +90,13 @@ export default function PaymentPage() {
   const [rewardPoints, setRewardPoints] = useState(0);
 
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [error, _setError] = useState("");
+  const setError = (msg) => {
+    _setError(msg);
+    if (msg) {
+      window.alert("⚠️ CẢNH BÁO LỖI:\n\n" + msg);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [paying, setPaying] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(null);
