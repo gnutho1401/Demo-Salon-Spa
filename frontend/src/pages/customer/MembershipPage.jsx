@@ -84,7 +84,7 @@ export default function MembershipPage() {
         <section className="reward-hero" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 30 }}>
           <div style={{ flex: 1, minWidth: '300px' }}>
             <span style={{ color: '#b45309', fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: 1.5 }}>LOYALTY REWARDS</span>
-            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2.5rem', color: '#111827', margin: '10px 0' }}>Hạng Thành Viên & Điểm Tích Lũy</h1>
+            <h1 style={{ fontFamily: 'var(--font-heading), Georgia, serif', fontSize: '2.5rem', color: '#111827', margin: '10px 0' }}>Hạng Thành Viên & Điểm Tích Lũy</h1>
             <p style={{ color: '#4b5563', lineHeight: 1.6, fontSize: '1rem', margin: '0 0 20px 0' }}>
               Trải nghiệm dịch vụ chăm sóc sắc đẹp cao cấp và nhận các chương trình ưu đãi đặc quyền tương ứng với phân hạng của bạn.
             </p>
@@ -161,7 +161,7 @@ export default function MembershipPage() {
         </section>
 
         <section className="premium-progress-container">
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', color: '#1e293b', margin: '0 0 8px' }}>Tiến độ nâng hạng tiếp theo</h2>
+          <h2 style={{ fontFamily: 'var(--font-heading), Georgia, serif', fontSize: '1.5rem', color: '#1e293b', margin: '0 0 8px' }}>Tiến độ nâng hạng tiếp theo</h2>
 
           {loading ? (
             <p style={{ color: '#64748b' }}>Đang tải dữ liệu tiến trình...</p>
@@ -183,7 +183,7 @@ export default function MembershipPage() {
         </section>
 
         <section>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', color: '#1e293b', marginBottom: 16 }}>Đặc quyền các phân hạng</h2>
+          <h2 style={{ fontFamily: 'var(--font-heading), Georgia, serif', fontSize: '1.5rem', color: '#1e293b', marginBottom: 16 }}>Đặc quyền các phân hạng</h2>
           <div className="reward-levels-grid">
             {levels.map((level) => {
               const isActive = Number(level.MembershipLevelId) === Number(mine?.MembershipLevelId);
@@ -205,7 +205,7 @@ export default function MembershipPage() {
         </section>
 
         <section className="history-section-card">
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '1.5rem', color: '#1e293b', marginBottom: 18 }}>Lịch sử điểm thưởng</h2>
+          <h2 style={{ fontFamily: 'var(--font-heading), Georgia, serif', fontSize: '1.5rem', color: '#1e293b', marginBottom: 18 }}>Lịch sử điểm thưởng</h2>
 
           {loading ? (
             <div className="reward-empty">Đang tải lịch sử điểm...</div>

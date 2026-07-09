@@ -12015,7 +12015,7 @@
 
 .reward-level-card h3 {
   font-size: 1.25rem;
-  font-family: 'Georgia', serif;
+  font-family: var(--font-heading), Georgia, serif;
   color: #1e293b;
   margin: 0 0 6px;
 }
