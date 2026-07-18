@@ -57,7 +57,7 @@ async function processRefund(refundId, adminId, manual = false) {
       .input("RefundId", sql.Int, refundId)
       .query(`
         SELECT r.RefundId, r.PaymentId, r.Status, r.RefundAmount, r.BankCode, r.AccountNumber, r.AccountName, 
-               p.InvoiceId, p.PaymentMethod, i.AppointmentId, a.AppointmentDate
+               p.InvoiceId, p.PaymentMethod, i.AppointmentId, a.AppointmentDate, a.StartTime, a.EndTime, a.EmployeeId, a.BranchId
         FROM Refunds r
         JOIN Payments p ON r.PaymentId = p.PaymentId
         JOIN Invoices i ON p.InvoiceId = i.InvoiceId
@@ -150,7 +150,12 @@ async function processRefund(refundId, adminId, manual = false) {
         const dateStr = refund.AppointmentDate instanceof Date
           ? refund.AppointmentDate.toISOString().slice(0, 10)
           : String(refund.AppointmentDate).slice(0, 10);
-        runAutoMatch(dateStr).catch(err => console.error("Auto match failed after admin refund complete:", err.message));
+        runAutoMatch(dateStr, {
+          startTime: refund.StartTime,
+          endTime: refund.EndTime,
+          employeeId: refund.EmployeeId,
+          branchId: refund.BranchId
+        }).catch(err => console.error("Auto match failed after admin refund complete:", err.message));
       } catch (err) {
         console.error("Auto match trigger failed after admin refund complete:", err.message);
       }

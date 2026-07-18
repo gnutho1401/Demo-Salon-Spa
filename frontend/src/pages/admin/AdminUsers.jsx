@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const emptyForm = {
   FullName: "",

@@ -29,20 +29,29 @@ export default function ResetPassword() {
     }
   };
 
-  return <div className="auth-page">
-    <form className="auth-card" onSubmit={submit}>
-      <div className="eyebrow">New password</div>
-      <h2>Đặt lại mật khẩu</h2>
-      {message && <p className={isError ? 'auth-error' : 'auth-success'}>{message}</p>}
+  return (
+    <div className="auth-page">
+      {/* Background dynamic animated mesh orbs */}
+      <div className="auth-bg-decor">
+        <div className="auth-orb auth-orb-1"></div>
+        <div className="auth-orb auth-orb-2"></div>
+        <div className="auth-orb auth-orb-3"></div>
+      </div>
 
-      <label>Mật khẩu mới</label>
-      <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nhập mật khẩu mới" />
+      <form className="auth-card" onSubmit={submit}>
+        <div className="eyebrow">New password</div>
+        <h2>Đặt lại mật khẩu</h2>
+        {message && <p className={isError ? 'auth-error' : 'auth-success'}>{message}</p>}
 
-      <label>Nhập lại mật khẩu mới</label>
-      <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Nhập lại mật khẩu mới" />
+        <label>Mật khẩu mới</label>
+        <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nhập mật khẩu mới" />
 
-      <button className="btn" style={{width:'100%',marginTop:10}}>Đặt lại mật khẩu</button>
-      <p className="muted"><Link className="see-all" to="/login">Quay lại đăng nhập</Link></p>
-    </form>
-  </div>;
+        <label>Nhập lại mật khẩu mới</label>
+        <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Nhập lại mật khẩu mới" />
+
+        <button className="btn" style={{width:'100%',marginTop:10}}>Đặt lại mật khẩu</button>
+        <p className="muted"><Link className="see-all" to="/login">Quay lại đăng nhập</Link></p>
+      </form>
+    </div>
+  );
 }

@@ -426,9 +426,10 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                                   onClick={() => setRescheduleSelectedEmployeeId(String(emp.EmployeeId))}
                                 >
                                   <img 
-                                    src={emp.ImageUrl || DEFAULT_AVATAR} 
+                                    src={resolveFileUrl(emp.ImageUrl || emp.AvatarUrl || emp.Avatar) || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'} 
                                     alt={emp.EmployeeName} 
                                     className="ai-employee-avatar" 
+                                    onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'; }}
                                   />
                                   <div className="ai-employee-info">
                                     <span className="ai-employee-name">{emp.EmployeeName}</span>
@@ -799,7 +800,12 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                   className={`ai-employee-card ${String(selectedEmployeeId) === String(emp.EmployeeId) ? 'active' : ''}`}
                   onClick={() => setSelectedEmployeeId(String(emp.EmployeeId))}
                 >
-                  <img src={emp.ImageUrl || DEFAULT_AVATAR} alt={emp.FullName} className="ai-employee-avatar" />
+                  <img 
+                    src={resolveFileUrl(emp.ImageUrl || emp.AvatarUrl || emp.Avatar) || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'} 
+                    alt={emp.FullName} 
+                    className="ai-employee-avatar" 
+                    onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'; }}
+                  />
                   <div className="ai-employee-info">
                     <span className="ai-employee-name">{emp.FullName}</span>
                     <span className="ai-employee-rating">⭐️ {Number(emp.AverageRating || 0).toFixed(1)}</span>
@@ -1221,14 +1227,36 @@ export default function AiChatFloatingWidget() {
         <div className="ai-chat-popup-window">
           {/* Header */}
           <div className="ai-chat-popup-header">
-            <div className="ai-chat-popup-header-info">
+            <div 
+              className="ai-chat-popup-header-info"
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/customer/ai');
+              }}
+              style={{ cursor: 'pointer' }}
+              title="Nhấn để mở trang AI tư vấn đầy đủ"
+            >
               <span className="logo-icon">🌸</span>
               <div>
-                <h4>BeautyMS AI</h4>
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  BeautyMS AI <span style={{ fontSize: '11px', opacity: 0.8 }}>↗️</span>
+                </h4>
                 <small>{currentSession ? currentSession.title : 'Trợ lý ảo'}</small>
               </div>
             </div>
-            <div className="ai-chat-popup-header-actions" style={{ display: 'flex', gap: 6 }}>
+            <div className="ai-chat-popup-header-actions" style={{ display: 'flex', gap: 4 }}>
+              <button 
+                type="button" 
+                className="new-chat-btn"
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate('/customer/ai');
+                }}
+                title="Mở rộng sang trang AI tư vấn đầy đủ"
+                style={{ background: 'rgba(255, 255, 255, 0.25)' }}
+              >
+                ✨ Trang AI
+              </button>
               <button 
                 type="button" 
                 className="new-chat-btn" 
@@ -1244,7 +1272,7 @@ export default function AiChatFloatingWidget() {
                 onClick={handleCreateNewSession}
                 title="Tạo hội thoại mới"
               >
-                + Chat mới
+                + Mới
               </button>
             </div>
           </div>

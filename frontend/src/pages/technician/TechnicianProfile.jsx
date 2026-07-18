@@ -4,7 +4,7 @@ import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import TechnicianLayout from "../../layouts/TechnicianLayout";
 import "../../styles/pages/technician.css";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function getAvatarUrl(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;

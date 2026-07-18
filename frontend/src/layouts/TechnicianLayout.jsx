@@ -4,7 +4,7 @@ import axiosClient, { resolveFileUrl } from "../api/axiosClient";
 import { useAuth } from "../context/AuthContext";
 import "../styles/pages/technician.css";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const menuGroups = [
   {
@@ -17,7 +17,6 @@ const menuGroups = [
     title: "LỊCH LÀM VIỆC",
     items: [
       { to: "/technician/schedule", icon: "📅", label: "Lịch làm việc" },
-      { to: "/technician/attendance", icon: "⏰", label: "Ca làm & Đăng ký" },
       { to: "/technician/appointments", icon: "🧾", label: "Lịch hẹn của tôi" },
     ]
   },

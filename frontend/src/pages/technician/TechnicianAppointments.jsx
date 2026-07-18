@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import TechnicianLayout from "../../layouts/TechnicianLayout";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function avatar(url) {
   if (!url) return DEFAULT_AVATAR;
@@ -164,7 +164,7 @@ export default function TechnicianAppointments() {
   const completeAppointment = async (id) => {
     try {
       await axiosClient.patch(`/technician/appointments/${id}/complete`);
-      await refreshPage();
+      navigate(`/technician/treatment-notes?appointmentId=${id}`);
     } catch (err) {
       alert(err.response?.data?.message || "Không thể hoàn thành lịch hẹn");
     }

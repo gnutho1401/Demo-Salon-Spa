@@ -1,5 +1,6 @@
 const { sql, connectDB } = require("../../config/db");
 const crypto = require("crypto");
+const { getPayOS } = require("../../config/payos.config");
 
 function formatVnpDate(date = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -146,7 +147,17 @@ async function getAll(filters = {}) {
     ORDER BY ${orderBy}
   `);
 
-  return result.recordset;
+  return result.recordset.map(pkg => {
+    const original = Number(pkg.OriginalPrice || 0);
+    const sale = Number(pkg.SalePrice || 0);
+    const discountPercent = original > 0 ? Math.round(((original - sale) / original) * 100) : 0;
+    return {
+      ...pkg,
+      Price: original,
+      FinalPrice: sale,
+      DiscountPercent: discountPercent
+    };
+  });
 }
 
 async function getCategories() {
@@ -218,6 +229,12 @@ async function getById(id) {
   item.Services = services.recordset;
   item.ServiceNames = services.recordset.map((x) => x.ServiceName).join(", ");
 
+  const original = Number(item.OriginalPrice || 0);
+  const sale = Number(item.SalePrice || 0);
+  item.Price = original;
+  item.FinalPrice = sale;
+  item.DiscountPercent = original > 0 ? Math.round(((original - sale) / original) * 100) : 0;
+
   return item;
 }
 
@@ -235,6 +252,18 @@ async function getMine(userId, customerId = null) {
   const result = await pool
     .request()
     .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      WITH LatestPayments AS (
+        SELECT 
+          PackagePaymentId,
+          CustomerPackageId,
+          Amount,
+          PaymentMethod,
+          Status AS PaymentStatus,
+          TransactionCode,
+          PaidAt,
+          ROW_NUMBER() OVER (PARTITION BY CustomerPackageId ORDER BY PackagePaymentId DESC) as rn
+        FROM PackagePayments
+      )
       SELECT
         cp.CustomerPackageId,
         cp.CustomerId,
@@ -258,7 +287,7 @@ async function getMine(userId, customerId = null) {
         pp.PackagePaymentId,
         pp.Amount,
         pp.PaymentMethod,
-        pp.Status AS PaymentStatus,
+        pp.PaymentStatus,
         pp.TransactionCode,
         pp.PaidAt,
 
@@ -268,8 +297,8 @@ async function getMine(userId, customerId = null) {
         ON cp.PackageId = p.PackageId
       LEFT JOIN PackageCategories pc
         ON p.PackageCategoryId = pc.PackageCategoryId
-      LEFT JOIN PackagePayments pp
-        ON cp.CustomerPackageId = pp.CustomerPackageId
+      LEFT JOIN LatestPayments pp
+        ON cp.CustomerPackageId = pp.CustomerPackageId AND pp.rn = 1
       LEFT JOIN PackageServices ps
         ON p.PackageId = ps.PackageId
       LEFT JOIN Services s
@@ -302,7 +331,7 @@ async function getMine(userId, customerId = null) {
         pp.PackagePaymentId,
         pp.Amount,
         pp.PaymentMethod,
-        pp.Status,
+        pp.PaymentStatus,
         pp.TransactionCode,
         pp.PaidAt
       ORDER BY cp.CustomerPackageId DESC
@@ -503,6 +532,22 @@ async function checkExistingPackage(pool, customerId, packageId) {
   }
 }
 
+async function checkPendingPackage(pool, customerId, packageId) {
+  const existingPkg = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("PackageId", sql.Int, packageId)
+    .query(`
+      SELECT TOP 1 CustomerPackageId
+      FROM CustomerPackages
+      WHERE CustomerId = @CustomerId 
+        AND PackageId = @PackageId 
+        AND Status = 'PENDING_PAYMENT'
+    `);
+  if (existingPkg.recordset.length > 0) {
+    throw new Error("Bạn đã đăng ký combo này và đang chờ thanh toán. Vui lòng thanh toán gói hiện tại hoặc hủy giao dịch cũ trong mục 'Liệu trình của tôi'.");
+  }
+}
+
 async function buyPackage(userId, packageId, payload = {}) {
   const pool = await connectDB();
 
@@ -513,11 +558,10 @@ async function buyPackage(userId, packageId, payload = {}) {
   if (!pkg)
     throw new Error("Combo / liệu trình không tồn tại hoặc đã ngừng bán");
 
-  // Cho phép mua một combo nhiều lần, không chặn khi đang sở hữu gói hoạt động/tạm khóa nữa
-  // await checkExistingPackage(pool, customer.CustomerId, packageId);
+  await checkPendingPackage(pool, customer.CustomerId, packageId);
 
   const transaction = new sql.Transaction(pool);
-
+  
   try {
     await transaction.begin();
 
@@ -564,8 +608,7 @@ async function createVnpayPackageUrl(
   if (!pkg)
     throw new Error("Combo / liệu trình không tồn tại hoặc đã ngừng bán");
 
-  // Cho phép mua một combo nhiều lần qua VNPAY, không chặn khi đang sở hữu gói hoạt động/tạm khóa nữa
-  // await checkExistingPackage(pool, customer.CustomerId, packageId);
+  await checkPendingPackage(pool, customer.CustomerId, packageId);
 
   const prices = calcDiscount(pkg.OriginalPrice, pkg.SalePrice);
   const txnRef = `PKG${packageId}_${Date.now()}`;
@@ -709,6 +752,96 @@ async function createVnpayRepayUrl(
     paymentUrl: `${vnpUrl}?${buildQuery(sorted)}`,
     amount: prices.finalPrice,
     transactionCode: txnRef,
+  };
+}
+
+async function createPayosRepayUrl(userId, customerPackageId) {
+  const pool = await connectDB();
+
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
+
+  // Get customer package details and check ownership
+  const pkgResult = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, customerPackageId)
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT cp.*, p.PackageName, p.OriginalPrice, p.SalePrice
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE cp.CustomerPackageId = @CustomerPackageId AND cp.CustomerId = @CustomerId
+    `);
+
+  const cp = pkgResult.recordset[0];
+  if (!cp) {
+    throw new Error("Không tìm thấy liệu trình này hoặc bạn không có quyền sở hữu");
+  }
+
+  if (cp.Status !== "PENDING_PAYMENT") {
+    throw new Error("Liệu trình này không ở trạng thái chờ thanh toán");
+  }
+
+  const prices = calcDiscount(cp.OriginalPrice, cp.SalePrice);
+  const orderCode = Number(`${customerPackageId}${Date.now() % 1000000}`);
+
+  // Create a new PENDING PackagePayments record
+  await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, customerPackageId)
+    .input("Amount", sql.Decimal(18, 2), prices.finalPrice)
+    .input("PaymentMethod", sql.NVarChar, "PAYOS")
+    .input("Status", sql.NVarChar, "PENDING")
+    .input("TransactionCode", sql.NVarChar, String(orderCode)).query(`
+      INSERT INTO PackagePayments
+      (
+        CustomerPackageId,
+        Amount,
+        PaymentMethod,
+        Status,
+        TransactionCode,
+        PaidAt
+      )
+      VALUES
+      (
+        @CustomerPackageId,
+        @Amount,
+        @PaymentMethod,
+        @Status,
+        @TransactionCode,
+        NULL
+      )
+    `);
+
+  const payos = getPayOS();
+
+  const returnUrl =
+    process.env.PAYOS_PACKAGE_RETURN_URL ||
+    `${process.env.BACKEND_URL || "http://localhost:5000"}/api/packages/payos-return`;
+
+  const cancelUrl =
+    `${process.env.FRONTEND_URL || "http://localhost:5173"}/customer/packages?cancel=1`;
+
+  const paymentData = {
+    orderCode: orderCode,
+    amount: Math.round(Number(prices.finalPrice || 0)),
+    description: `Tra combo #${customerPackageId}`.slice(0, 25),
+    returnUrl: returnUrl,
+    cancelUrl: cancelUrl,
+    items: [
+      {
+        name: cp.PackageName.slice(0, 50),
+        quantity: 1,
+        price: Math.round(Number(prices.finalPrice || 0)),
+      },
+    ],
+  };
+
+  const paymentLink = await payos.paymentRequests.create(paymentData);
+
+  return {
+    paymentUrl: paymentLink.checkoutUrl,
+    amount: prices.finalPrice,
+    transactionCode: String(orderCode),
   };
 }
 
@@ -1550,8 +1683,8 @@ async function approveRequest(staffUserId, requestType, requestId, action) {
 async function getPackageReport(filters = {}) {
   const pool = await connectDB();
 
-  const startDate = filters.startDate || null;
-  const endDate = filters.endDate || null;
+  const startDate = filters.startDate && filters.startDate !== "" ? filters.startDate : null;
+  const endDate = filters.endDate && filters.endDate !== "" ? filters.endDate : null;
 
   const result = await pool
     .request()
@@ -1566,7 +1699,7 @@ async function getPackageReport(filters = {}) {
         SUM(CASE WHEN cp.Status = 'EXPIRED' THEN 1 ELSE 0 END) AS ExpiredPackages,
         SUM(CASE WHEN cp.Status = 'CANCELLED' THEN 1 ELSE 0 END) AS CancelledPackages,
         SUM(CASE WHEN cp.EndDate >= CAST(GETDATE() AS DATE) 
-                  AND cp.EndDate <= CAST(GETDATE() AS DATE) + 7
+                  AND cp.EndDate <= DATEADD(day, 7, CAST(GETDATE() AS DATE))
                   AND cp.Status = 'ACTIVE' THEN 1 ELSE 0 END) AS ExpiringSoonPackages,
         ISNULL(SUM(pp.Amount), 0) AS TotalRevenue,
         CASE WHEN COUNT(*) > 0
@@ -1579,8 +1712,8 @@ async function getPackageReport(filters = {}) {
         END AS UsageRate
       FROM CustomerPackages cp
       LEFT JOIN PackagePayments pp ON cp.CustomerPackageId = pp.CustomerPackageId AND pp.Status = 'PAID'
-      WHERE (CAST(@StartDate AS DATE) IS NULL OR cp.CreatedAt >= @StartDate)
-        AND (CAST(@EndDate AS DATE) IS NULL OR cp.CreatedAt <= CAST(@EndDate AS DATE) + 1)
+      WHERE (@StartDate IS NULL OR cp.CreatedAt >= @StartDate)
+        AND (@EndDate IS NULL OR cp.CreatedAt < DATEADD(day, 1, @EndDate))
     `);
 
   // Top packages by revenue
@@ -1598,8 +1731,8 @@ async function getPackageReport(filters = {}) {
       FROM Packages p
       LEFT JOIN CustomerPackages cp ON p.PackageId = cp.PackageId
       LEFT JOIN PackagePayments pp ON cp.CustomerPackageId = pp.CustomerPackageId AND pp.Status = 'PAID'
-      WHERE (CAST(@StartDate AS DATE) IS NULL OR cp.CreatedAt >= @StartDate)
-        AND (CAST(@EndDate AS DATE) IS NULL OR cp.CreatedAt <= CAST(@EndDate AS DATE) + 1)
+      WHERE (@StartDate IS NULL OR cp.CreatedAt >= @StartDate)
+        AND (@EndDate IS NULL OR cp.CreatedAt < DATEADD(day, 1, @EndDate))
       GROUP BY p.PackageId, p.PackageName
       ORDER BY Revenue DESC
     `);
@@ -1625,6 +1758,213 @@ async function getPackageReport(filters = {}) {
   };
 }
 
+async function createPayosPackageUrl(userId, packageId, payload = {}) {
+  const pool = await connectDB();
+
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
+
+  const pkg = await getActivePackage(pool, packageId);
+  if (!pkg)
+    throw new Error("Combo / liệu trình không tồn tại hoặc đã ngừng bán");
+
+  await checkPendingPackage(pool, customer.CustomerId, packageId);
+
+  const prices = calcDiscount(pkg.OriginalPrice, pkg.SalePrice);
+
+  // orderCode must be a unique positive integer
+  const orderCode = Number(`${packageId}${Date.now() % 1000000}`);
+
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+
+    await createCustomerPackageTransaction(
+      transaction,
+      customer.CustomerId,
+      pkg,
+      "PAYOS",
+      "PENDING",
+      String(orderCode),
+    );
+
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
+
+  const payos = getPayOS();
+
+  const returnUrl =
+    process.env.PAYOS_PACKAGE_RETURN_URL ||
+    `${process.env.BACKEND_URL || "http://localhost:5000"}/api/packages/payos-return`;
+
+  const cancelUrl =
+    `${process.env.FRONTEND_URL || "http://localhost:5173"}/packages/${packageId}?cancel=1`;
+
+  const paymentData = {
+    orderCode: orderCode,
+    amount: Math.round(Number(prices.finalPrice || 0)),
+    description: `Mua combo #${packageId}`.slice(0, 25),
+    returnUrl: returnUrl,
+    cancelUrl: cancelUrl,
+    items: [
+      {
+        name: pkg.PackageName.slice(0, 50),
+        quantity: 1,
+        price: Math.round(Number(prices.finalPrice || 0)),
+      },
+    ],
+  };
+
+  const paymentLink = await payos.paymentRequests.create(paymentData);
+
+  return {
+    paymentUrl: paymentLink.checkoutUrl,
+    amount: prices.finalPrice,
+    transactionCode: String(orderCode),
+  };
+}
+
+async function handlePayosReturn(query = {}) {
+  const orderCode = query.orderCode || query.code;
+  const status = query.status; // PAID, CANCELLED
+  const cancel = query.cancel === "true" || status === "CANCELLED";
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+  if (!orderCode) {
+    return `${frontendUrl}/customer/packages?error=missing_order_code`;
+  }
+
+  const pool = await connectDB();
+
+  // Search package payment by orderCode
+  const found = await pool
+    .request()
+    .input("TransactionCode", sql.NVarChar, String(orderCode)).query(`
+      SELECT TOP 1
+        pp.PackagePaymentId,
+        pp.Amount,
+        pp.Status,
+        cp.CustomerPackageId,
+        cp.CustomerId,
+        cp.PackageId,
+        p.ValidityDays,
+        p.TotalSessions
+      FROM PackagePayments pp
+      JOIN CustomerPackages cp
+        ON pp.CustomerPackageId = cp.CustomerPackageId
+      JOIN Packages p
+        ON cp.PackageId = p.PackageId
+      WHERE pp.TransactionCode = @TransactionCode
+        AND pp.PaymentMethod = 'PAYOS'
+    `);
+
+  const payment = found.recordset[0];
+
+  if (!payment) {
+    return `${frontendUrl}/customer/packages?error=payment_not_found`;
+  }
+
+  const failUrl = `${frontendUrl}/customer/packages?error=payos_failed`;
+
+  if (cancel) {
+    await pool
+      .request()
+      .input("PackagePaymentId", sql.Int, payment.PackagePaymentId).query(`
+        UPDATE PackagePayments
+        SET Status = 'FAILED'
+        WHERE PackagePaymentId = @PackagePaymentId
+          AND Status = 'PENDING';
+
+        UPDATE CustomerPackages
+        SET Status = 'CANCELLED'
+        WHERE CustomerPackageId = (
+          SELECT CustomerPackageId
+          FROM PackagePayments
+          WHERE PackagePaymentId = @PackagePaymentId
+        )
+        AND Status = 'PENDING_PAYMENT';
+      `);
+
+    return failUrl;
+  }
+
+  // Verify actual status from PayOS
+  try {
+    const payos = getPayOS();
+    const info = await payos.paymentRequests.get(String(orderCode));
+
+    if (info && info.status === "PAID") {
+      if (String(payment.Status).toUpperCase() !== "PAID") {
+        const transaction = new sql.Transaction(pool);
+
+        try {
+          await transaction.begin();
+
+          await new sql.Request(transaction)
+            .input("PackagePaymentId", sql.Int, payment.PackagePaymentId)
+            .input("VnpTransactionNo", sql.NVarChar, String(info.id || info.paymentLinkId || "")).query(`
+              UPDATE PackagePayments
+              SET
+                Status = 'PAID',
+                PaidAt = GETDATE(),
+                VnpTransactionNo = @VnpTransactionNo
+              WHERE PackagePaymentId = @PackagePaymentId
+            `);
+
+          await new sql.Request(transaction)
+            .input("CustomerPackageId", sql.Int, payment.CustomerPackageId)
+            .input("ValidityDays", sql.Int, payment.ValidityDays || 30)
+            .input(
+              "TotalSessions",
+              sql.Int,
+              Math.max(Number(payment.TotalSessions || 1), 1),
+            ).query(`
+              UPDATE CustomerPackages
+              SET
+                Status = 'ACTIVE',
+                StartDate = CAST(GETDATE() AS DATE),
+                EndDate = CAST(GETDATE() AS DATE) + CAST(@ValidityDays AS INT),
+                TotalSessions = @TotalSessions,
+                RemainingSessions = @TotalSessions,
+                UpdatedAt = GETDATE()
+              WHERE CustomerPackageId = @CustomerPackageId
+            `);
+
+          await new sql.Request(transaction)
+            .input("CustomerId", sql.Int, payment.CustomerId)
+            .input(
+              "Points",
+              sql.Int,
+              Math.floor(Number(payment.Amount || 0) / 10000),
+            ).query(`
+              UPDATE Customers
+              SET LoyaltyPoints = LoyaltyPoints + @Points
+              WHERE CustomerId = @CustomerId
+            `);
+
+          await transaction.commit();
+        } catch (err) {
+          try {
+            await transaction.rollback();
+          } catch (_) {}
+          throw err;
+        }
+      }
+      return `${frontendUrl}/customer/packages?paid=1`;
+    }
+  } catch (err) {
+    console.error("PayOS package verify error:", err.message);
+  }
+
+  return failUrl;
+}
+
 module.exports = {
   getAll,
   getCategories,
@@ -1635,6 +1975,9 @@ module.exports = {
   createVnpayPackageUrl,
   createVnpayRepayUrl,
   handleVnpayReturn,
+  createPayosPackageUrl,
+  createPayosRepayUrl,
+  handlePayosReturn,
   create,
   update,
   remove,

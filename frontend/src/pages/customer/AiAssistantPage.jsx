@@ -418,9 +418,10 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                                   onClick={() => setRescheduleSelectedEmployeeId(String(emp.EmployeeId))}
                                 >
                                   <img 
-                                    src={emp.ImageUrl || '/default-avatar.png'} 
+                                    src={resolveFileUrl(emp.ImageUrl || emp.AvatarUrl || emp.Avatar) || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'} 
                                     alt={emp.EmployeeName} 
                                     className="ai-employee-avatar" 
+                                    onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'; }}
                                   />
                                   <div className="ai-employee-info">
                                     <span className="ai-employee-name">{emp.EmployeeName}</span>
@@ -787,7 +788,12 @@ function AiChatWidget({ type: initialType, args: initialArgs }) {
                   className={`ai-employee-card ${String(selectedEmployeeId) === String(emp.EmployeeId) ? 'active' : ''}`}
                   onClick={() => setSelectedEmployeeId(String(emp.EmployeeId))}
                 >
-                  <img src={emp.ImageUrl || '/default-avatar.png'} alt={emp.FullName} className="ai-employee-avatar" />
+                  <img 
+                    src={resolveFileUrl(emp.ImageUrl || emp.AvatarUrl || emp.Avatar) || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'} 
+                    alt={emp.FullName} 
+                    className="ai-employee-avatar" 
+                    onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'; }}
+                  />
                   <div className="ai-employee-info">
                     <span className="ai-employee-name">{emp.FullName}</span>
                     <span className="ai-employee-rating">⭐️ {Number(emp.AverageRating || 0).toFixed(1)}</span>

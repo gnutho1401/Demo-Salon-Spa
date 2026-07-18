@@ -141,6 +141,32 @@ export default function ReceptionistDashboard() {
     }
   }
 
+  async function handleCompleteService(appointment) {
+    if (actionLoading) return;
+    try {
+      setActionLoading(true);
+      await axiosClient.put(`/receptionist/appointments/${appointment.AppointmentId}/complete`);
+      const isPaid = appointment.PaymentStatus === "PAID" || appointment.CustomerPackageId;
+      if (isPaid) {
+        showToast("Hoàn thành dịch vụ & Checkout thành công!", "success");
+      } else {
+        showToast("Đã hoàn thành dịch vụ! Đang chuyển đến trang thanh toán...", "success");
+        setTimeout(() => {
+          if (appointment.InvoiceId) {
+            navigate(`/receptionist/invoices/${appointment.InvoiceId}`);
+          } else {
+            navigate(`/receptionist/invoices`);
+          }
+        }, 1000);
+      }
+      await loadDashboardData();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Thao tác thất bại", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   // Computed Values
   const allAppointments = stats?.todayAppointments || [];
 
@@ -233,8 +259,8 @@ export default function ReceptionistDashboard() {
   // Live KTV dispatch calculations
   const liveTechnicians = useMemo(() => {
     return technicians.map(tech => {
-      const busyApp = allAppointments.find(a => 
-        a.TechnicianId === tech.TechnicianId && 
+      const busyApp = allAppointments.find(a =>
+        a.TechnicianId === tech.TechnicianId &&
         String(a.Status).toUpperCase() === "IN_PROGRESS"
       );
 
@@ -265,6 +291,8 @@ export default function ReceptionistDashboard() {
   const totalInvoices = invoiceCount || 1;
   const paidPercent = percent(paidInvoiceCount, totalInvoices);
   const unpaidPercent = percent(unpaidInvoiceCount, totalInvoices);
+  const circumference = 2 * Math.PI * 38;
+  const paidDash = (paidPercent / 100) * circumference;
 
   return (
     <ReceptionistLayout>
@@ -481,13 +509,160 @@ export default function ReceptionistDashboard() {
 
           .hq-panel-title h3 {
             margin: 0;
-            font-family: Georgia, serif !important;
+            font-family: 'Plus Jakarta Sans', sans-serif !important;
             font-size: 1.08rem;
             color: #1b3d2f;
             display: flex;
             align-items: center;
             gap: 8px;
             font-weight: 800;
+          }
+
+          /* Popular Services List & Progress Styling */
+          .hq-progress-bar-container {
+            margin-bottom: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
+          .hq-progress-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+          .hq-rank-badge {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: #fff;
+            flex-shrink: 0;
+          }
+          .hq-rank-1 { background: #1b3d2f; }
+          .hq-rank-2 { background: #b45309; }
+          .hq-rank-3 { background: #c5ac6b; color: #1b3d2f; }
+          .hq-rank-other { background: #8c7e74; }
+
+          .hq-progress-labels {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex: 1;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #242019;
+            min-width: 0;
+          }
+          .hq-service-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding-right: 8px;
+          }
+          .hq-service-count {
+            font-weight: 700;
+            color: #1b3d2f;
+            flex-shrink: 0;
+          }
+          .hq-progress-track {
+            height: 6px;
+            background: #ebdcc533;
+            border-radius: 99px;
+            width: 100%;
+            overflow: hidden;
+          }
+          .hq-progress-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+          }
+
+          /* Highlight Customer Card */
+          .hq-vip-card {
+            display: flex;
+            gap: 12px;
+            background: linear-gradient(135deg, #fffdfa 0%, #fcf8f0 100%);
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid #ebdcc5;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(27, 61, 47, 0.03);
+            transition: all 0.25s ease;
+          }
+          .hq-vip-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(27, 61, 47, 0.06);
+            border-color: #d4a94f;
+          }
+          .hq-vip-avatar-wrapper {
+            position: relative;
+            flex-shrink: 0;
+          }
+          .hq-vip-badge {
+            position: absolute;
+            bottom: -3px;
+            right: -3px;
+            background: linear-gradient(135deg, #ebdcc5, #d4a94f);
+            color: #1b3d2f;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            border: 1.5px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
+          .hq-vip-info {
+            flex: 1;
+            min-width: 0;
+          }
+          .hq-vip-name {
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: #1b3d2f;
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .hq-vip-meta {
+            margin: 2px 0 0;
+            font-size: 0.72rem;
+            color: #665c54;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+          }
+          .hq-vip-spent {
+            font-weight: 700;
+            color: #b45309;
+            background: #fff8f1;
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid #ffedd5;
+          }
+          .hq-vip-btn {
+            font-size: 0.72rem;
+            padding: 6px 12px;
+            background: #1b3d2f;
+            color: #fff;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            border: 1px solid #1b3d2f;
+          }
+          .hq-vip-btn:hover {
+            background: #ebdcc5;
+            color: #1b3d2f;
+            border-color: #ebdcc5;
           }
 
           /* Hourly timeline grid slots */
@@ -963,7 +1138,7 @@ export default function ReceptionistDashboard() {
         <header className="hq-nav-bar">
           <div className="hq-greeter">
             <h1>Quầy Vận Hành Trung Tâm 🍃</h1>
-            <p>Bảng điều khiển Lễ tân và Điều phối KTV trực ca • {todayText}</p>
+            <p>Bảng điều khiển Lễ tân và Quản lý Salon • {todayText}</p>
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
@@ -1037,10 +1212,10 @@ export default function ReceptionistDashboard() {
 
             {/* Main Interactive Grid Workspace */}
             <section className="hq-workspace">
-              
+
               {/* Column 1: Timeline, Queue, and Search filters */}
               <div>
-                
+
                 {/* Appointment timeline and operations board */}
                 <div className="hq-panel-card">
                   <div className="hq-panel-title">
@@ -1206,21 +1381,23 @@ export default function ReceptionistDashboard() {
                               {a.Status === "IN_PROGRESS" && (
                                 <button
                                   type="button"
-                                  onClick={() => executeAppointmentAction(a.AppointmentId, "complete", "Hoàn thành dịch vụ")}
+                                  onClick={() => handleCompleteService(a)}
                                   className="hq-action-btn primary"
                                   disabled={actionLoading}
                                 >
-                                  🏁 Hoàn thành
+                                  {a.PaymentStatus === "PAID" || a.CustomerPackageId
+                                    ? "🏁 Hoàn thành & Checkout"
+                                    : "🏁 Hoàn thành & Thanh toán"}
                                 </button>
                               )}
 
-                              {(a.Status === "COMPLETED" || a.Status === "PENDING_PAYMENT") && (
+                              {(a.Status === "COMPLETED" || a.Status === "PENDING_PAYMENT") && a.PaymentStatus !== "PAID" && (
                                 <Link
-                                  to={`/receptionist/invoices`}
+                                  to={a.InvoiceId ? `/receptionist/invoices/${a.InvoiceId}` : `/receptionist/invoices`}
                                   className="hq-action-btn primary"
                                   style={{ textDecoration: "none" }}
                                 >
-                                  💳 Checkout tính tiền
+                                  💳 Thanh toán tính tiền
                                 </Link>
                               )}
                             </div>
@@ -1234,8 +1411,7 @@ export default function ReceptionistDashboard() {
                 {/* Queue list component */}
                 <div className="hq-panel-card">
                   <div className="hq-panel-title">
-                    <h3>⏳ Smart Hàng Chờ Lễ Tân & Check-in Quầy ({checkInQueue.length} khách)</h3>
-                    <Link to="/receptionist/waiting-list" style={{ fontSize: "0.78rem", color: "#1b3d2f", fontWeight: "bold", textDecoration: "none" }}>Xem hàng chờ →</Link>
+                    <h3>⏳ Danh sách chờ Check-in tại quầy ({checkInQueue.length} khách)</h3>
                   </div>
 
                   <div className="hq-scroll-container" style={{ maxHeight: "240px" }}>
@@ -1274,7 +1450,7 @@ export default function ReceptionistDashboard() {
 
               {/* Column 2: Live Beds layout, Live KTV availability, Finance report, Quick tools */}
               <div>
-                
+
                 {/* Section 1: Room & Bed Availability Map */}
                 <div className="hq-panel-card">
                   <div className="hq-panel-title">
@@ -1316,7 +1492,7 @@ export default function ReceptionistDashboard() {
                             <div className="ktv-card-text">
                               <h4>{tech.FullName}</h4>
                               <p>{tech.Specialization || "Spa KTV"}</p>
-                              
+
                               <div className="ktv-indicator">
                                 <span className="ktv-dot" style={{ backgroundColor: tech.status === "BUSY" ? "#dc3545" : "#28a745" }} />
                                 <span style={{ color: tech.status === "BUSY" ? "#dc3545" : "#28a745" }}>
@@ -1393,7 +1569,7 @@ export default function ReceptionistDashboard() {
                     <svg viewBox="0 0 300 60" width="100%" height="45">
                       <line x1="0" y1="50" x2="300" y2="50" stroke="#ebdcc5" strokeWidth="0.5" />
                       <line x1="0" y1="25" x2="300" y2="25" stroke="#ebdcc5" strokeWidth="0.5" strokeDasharray="3 3" />
-                      
+
                       <path
                         d={`M 10 ${50 - ((hourBookingCounts["08"] || 0) * 12)} 
                             L 40 ${50 - ((hourBookingCounts["09"] || 0) * 12)} 
@@ -1409,7 +1585,7 @@ export default function ReceptionistDashboard() {
                         stroke="#1b3d2f"
                         strokeWidth="2"
                       />
-                      
+
                       <circle cx="10" cy={50 - ((hourBookingCounts["08"] || 0) * 12)} r="2.5" fill="#ef4f83" />
                       <circle cx="40" cy={50 - ((hourBookingCounts["09"] || 0) * 12)} r="2.5" fill="#ef4f83" />
                       <circle cx="70" cy={50 - ((hourBookingCounts["10"] || 0) * 12)} r="2.5" fill="#ef4f83" />
@@ -1459,29 +1635,39 @@ export default function ReceptionistDashboard() {
                   </div>
 
                   {/* Popular Services progress bars */}
-                  <h4 style={{ fontSize: "0.74rem", color: "#8c7e74", margin: "0 0 8px 0", textTransform: "uppercase" }}>🔥 Top dịch vụ đặt nhiều hôm nay</h4>
-                  <div style={{ background: "#faf8f5", padding: "12px 14px", borderRadius: "12px", border: "1px solid #f1ebd9", marginBottom: "16px" }}>
+                  <h4 style={{ fontSize: "0.74rem", color: "#8c7e74", margin: "0 0 10px 0", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.3px" }}>🔥 Top dịch vụ đặt nhiều hôm nay</h4>
+                  <div style={{ background: "#faf8f5", padding: "14px", borderRadius: "16px", border: "1px solid #f1ebd9", marginBottom: "20px" }}>
                     {popularServices.length === 0 ? (
                       <p style={{ fontSize: "0.74rem", color: "#888", textAlign: "center", margin: 0 }}>Chưa có thống kê dịch vụ hôm nay.</p>
                     ) : (
                       popularServices.map((s, idx) => {
                         const maxVal = Math.max(...popularServices.map((x) => Number(x.BookingCount || 0)), 1);
                         const percentFill = Math.round((Number(s.BookingCount || 0) / maxVal) * 100);
+                        const rankClass = idx === 0 ? "hq-rank-1" : idx === 1 ? "hq-rank-2" : idx === 2 ? "hq-rank-3" : "hq-rank-other";
 
                         return (
                           <div className="hq-progress-bar-container" key={s.ServiceId}>
-                            <div className="hq-progress-labels">
-                              <span>{s.ServiceName}</span>
-                              <span style={{ color: "#1b3d2f" }}>{s.BookingCount} ca</span>
+                            <div className="hq-progress-row">
+                              <div className={`hq-rank-badge ${rankClass}`}>{idx + 1}</div>
+                              <div className="hq-progress-labels">
+                                <span className="hq-service-name">{s.ServiceName}</span>
+                                <span className="hq-service-count">{s.BookingCount} ca</span>
+                              </div>
                             </div>
-                            <div className="hq-progress-track">
-                              <div
-                                className="hq-progress-fill"
-                                style={{
-                                  width: `${percentFill}%`,
-                                  backgroundColor: idx === 0 ? "#1b3d2f" : idx === 1 ? "#ebdcc5" : "#b45309",
-                                }}
-                              />
+                            <div style={{ paddingLeft: "30px" }}>
+                              <div className="hq-progress-track">
+                                <div
+                                  className="hq-progress-fill"
+                                  style={{
+                                    width: `${percentFill}%`,
+                                    background: idx === 0 
+                                      ? "linear-gradient(90deg, #1b3d2f 0%, #34614d 100%)" 
+                                      : idx === 1 
+                                      ? "linear-gradient(90deg, #b45309 0%, #f59e0b 100%)" 
+                                      : "linear-gradient(90deg, #ebdcc5 0%, #d4a94f 100%)",
+                                  }}
+                                />
+                              </div>
                             </div>
                           </div>
                         );
@@ -1492,16 +1678,21 @@ export default function ReceptionistDashboard() {
                   {/* VIP Profile summary info */}
                   {highlightedCustomer && (
                     <>
-                      <h4 style={{ fontSize: "0.74rem", color: "#8c7e74", margin: "14px 0 8px 0", textTransform: "uppercase" }}>⭐ Khách hàng nổi bật trong ca</h4>
-                      <div style={{ display: "flex", gap: "10px", background: "#faf8f5", padding: "10px 12px", borderRadius: "12px", border: "1.5px solid #ebdcc5", alignItems: "center" }}>
-                        <Avatar src={highlightedCustomer.AvatarUrl} name={highlightedCustomer.FullName} size="38px" />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <strong style={{ fontSize: "0.82rem", color: "#1b3d2f" }}>{highlightedCustomer.FullName}</strong>
-                          <p style={{ margin: "2px 0 0", fontSize: "0.7rem", color: "#666" }}>
-                            SĐT: {highlightedCustomer.Phone || "Chưa gán"} • Chi tiêu: <strong style={{ color: "#b45309" }}>{money(highlightedCustomer.TotalSpent)}</strong>
-                          </p>
+                      <h4 style={{ fontSize: "0.74rem", color: "#8c7e74", margin: "14px 0 10px 0", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.3px" }}>⭐ Khách hàng nổi bật trong ca</h4>
+                      <div className="hq-vip-card">
+                        <div className="hq-vip-avatar-wrapper">
+                          <Avatar src={highlightedCustomer.AvatarUrl} name={highlightedCustomer.FullName} size="42px" />
+                          <div className="hq-vip-badge">👑</div>
                         </div>
-                        <Link to="/receptionist/customers" className="hq-action-btn" style={{ fontSize: "0.68rem", padding: "4px 8px", textDecoration: "none" }}>Hồ sơ</Link>
+                        <div className="hq-vip-info">
+                          <span className="hq-vip-name">{highlightedCustomer.FullName}</span>
+                          <div className="hq-vip-meta">
+                            <span>SĐT: {highlightedCustomer.Phone || "Chưa gán"}</span>
+                            <span>•</span>
+                            <span>Chi tiêu: <strong className="hq-vip-spent">{money(highlightedCustomer.TotalSpent)}</strong></span>
+                          </div>
+                        </div>
+                        <Link to="/receptionist/customers" className="hq-vip-btn">Hồ sơ</Link>
                       </div>
                     </>
                   )}

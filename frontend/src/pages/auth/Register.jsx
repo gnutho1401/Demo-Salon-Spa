@@ -46,31 +46,56 @@ export default function Register() {
     }
   };
 
-  return <div className="auth-page">
-    <form className="auth-card" onSubmit={submit}>
-      <div className="eyebrow">Create account</div>
-      <h2>Đăng ký</h2>
-      {message && <p className={isError ? 'auth-error' : 'auth-success'}>{message}</p>}
+  return (
+    <div className="auth-page">
+      {/* Background dynamic animated mesh orbs */}
+      <div className="auth-bg-decor">
+        <div className="auth-orb auth-orb-1"></div>
+        <div className="auth-orb auth-orb-2"></div>
+        <div className="auth-orb auth-orb-3"></div>
+      </div>
 
-      <input name="fullName" placeholder="Họ tên" value={form.fullName} onChange={handleChange} />
-      <input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
-      <input name="phone" placeholder="Số điện thoại" value={form.phone} onChange={handleChange} />
-      <input name="password" placeholder="Mật khẩu" type="password" value={form.password} onChange={handleChange} />
+      <form className="auth-card" onSubmit={submit}>
+        <div className="eyebrow">Create account</div>
+        <h2>Đăng ký</h2>
+        {message && <p className={isError ? 'auth-error' : 'auth-success'}>{message}</p>}
 
-      <select name="gender" value={form.gender} onChange={handleChange}>
-        <option value="">Chọn giới tính</option>
-        <option value="Male">Nam</option>
-        <option value="Female">Nữ</option>
-        <option value="Other">Khác</option>
-      </select>
+        <label>Họ tên</label>
+        <input name="fullName" placeholder="Nhập họ tên của bạn" value={form.fullName} onChange={handleChange} />
+        
+        <label>Email</label>
+        <input name="email" placeholder="Nhập địa chỉ email" value={form.email} onChange={handleChange} />
+        
+        <label>Số điện thoại</label>
+        <input name="phone" placeholder="Nhập số điện thoại" value={form.phone} onChange={handleChange} />
+        
+        <label>Mật khẩu</label>
+        <input name="password" placeholder="Tạo mật khẩu" type="password" value={form.password} onChange={handleChange} />
 
-      <input name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleChange} />
-      <input name="address" placeholder="Địa chỉ" value={form.address} onChange={handleChange} />
+        <div className="auth-row">
+          <div className="auth-col">
+            <label>Giới tính</label>
+            <select name="gender" value={form.gender} onChange={handleChange}>
+              <option value="">Chọn giới tính</option>
+              <option value="Male">Nam</option>
+              <option value="Female">Nữ</option>
+              <option value="Other">Khác</option>
+            </select>
+          </div>
+          <div className="auth-col">
+            <label>Ngày sinh</label>
+            <input name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleChange} />
+          </div>
+        </div>
 
-      <button className="btn" style={{width:'100%',marginTop:10}} disabled={loading}>
-        {loading ? 'Đang đăng ký...' : 'Đăng ký'}
-      </button>
-      <p className="muted">Đã có tài khoản? <Link className="see-all" to="/login">Đăng nhập</Link></p>
-    </form>
-  </div>;
+        <label>Địa chỉ</label>
+        <input name="address" placeholder="Nhập địa chỉ" value={form.address} onChange={handleChange} />
+
+        <button className="btn" style={{width:'100%', marginTop:10}} disabled={loading}>
+          {loading ? 'Đang đăng ký...' : 'Đăng ký'}
+        </button>
+        <p className="muted">Đã có tài khoản? <Link className="see-all" to="/login">Đăng nhập</Link></p>
+      </form>
+    </div>
+  );
 }

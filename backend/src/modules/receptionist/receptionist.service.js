@@ -1,5 +1,5 @@
 const { sql, connectDB } = require("../../config/db");
-const { getServiceById } = require("../appointments/appointments.service");
+const { getServiceById, deductComboSession } = require("../appointments/appointments.service");
 const appointmentStateService = require("../appointments/appointment-state.service");
 const eventBusService = require("../event-bus/eventBus.service");
 const { addLoyaltyPoints, updateCustomerMembershipLevel, useLoyaltyPoints } = require("../../utils/membershipDiscount");
@@ -380,6 +380,8 @@ async function getAppointments(filters = {}) {
   const pool = await connectDB();
 
   const date = normalizeDateOnly(filters.date || filters.appointmentDate);
+  const fromDate = normalizeDateOnly(filters.fromDate);
+  const toDate = normalizeDateOnly(filters.toDate);
   const status = normalizeText(filters.status).toUpperCase();
   const customerKeyword = normalizeText(filters.customer || filters.keyword);
   const technicianId = filters.technicianId
@@ -387,15 +389,19 @@ async function getAppointments(filters = {}) {
     : null;
   const serviceId = filters.serviceId ? Number(filters.serviceId) : null;
   const paymentStatus = normalizeText(filters.paymentStatus).toUpperCase();
+  const branchId = filters.branchId ? Number(filters.branchId) : null;
 
   const result = await pool
     .request()
     .input("DateFilter", sql.Date, date)
+    .input("FromDate", sql.Date, fromDate)
+    .input("ToDate", sql.Date, toDate)
     .input("StatusFilter", sql.NVarChar, status || null)
     .input("CustomerKeyword", sql.NVarChar, customerKeyword || null)
     .input("TechnicianId", sql.Int, technicianId)
     .input("ServiceId", sql.Int, serviceId)
-    .input("PaymentStatus", sql.NVarChar, paymentStatus || null).query(`
+    .input("PaymentStatus", sql.NVarChar, paymentStatus || null)
+    .input("BranchId", sql.Int, branchId).query(`
       SELECT
         a.AppointmentId,
         a.CustomerId,
@@ -413,20 +419,23 @@ async function getAppointments(filters = {}) {
         CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
         a.Status,
         COALESCE(p.Status, 'UNPAID') AS PaymentStatus,
+        i.InvoiceId,
         COALESCE(i.FinalAmount, COALESCE(i.TotalAmount, 0)) AS FinalAmount,
         a.CreatedAt,
         a.CustomerPackageId,
-        pkg.PackageName AS CustomerPackageName
+        pkg.PackageName AS CustomerPackageName,
+        COALESCE(a.BranchId, e.BranchId) AS BranchId,
+        b.BranchName
       FROM Appointments a
       JOIN Customers c ON a.CustomerId = c.CustomerId
       JOIN Users cu ON c.UserId = cu.UserId
       JOIN Employees e ON a.EmployeeId = e.EmployeeId
       JOIN Users eu ON e.UserId = eu.UserId
+      LEFT JOIN Branches b ON COALESCE(a.BranchId, e.BranchId) = b.BranchId
       LEFT JOIN CustomerPackages cp ON a.CustomerPackageId = cp.CustomerPackageId
       LEFT JOIN Packages pkg ON cp.PackageId = pkg.PackageId
 
       OUTER APPLY (
-
         SELECT TOP 1
           aps.ServiceId,
           ss.ServiceName
@@ -434,12 +443,11 @@ async function getAppointments(filters = {}) {
         JOIN Services ss ON aps.ServiceId = ss.ServiceId
         WHERE aps.AppointmentId = a.AppointmentId
         ORDER BY aps.AppointmentServiceId ASC
-) s
+      ) s
 
       LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
 
       OUTER APPLY (
-
         SELECT TOP 1
           p2.Status
         FROM Payments p2
@@ -454,10 +462,13 @@ async function getAppointments(filters = {}) {
             ELSE 6
           END,
           p2.PaymentId DESC
-) p
+      ) p
 
       WHERE
         (@DateFilter IS NULL OR a.AppointmentDate = @DateFilter)
+        AND (@FromDate IS NULL OR a.AppointmentDate >= @FromDate)
+        AND (@ToDate IS NULL OR a.AppointmentDate <= @ToDate)
+        AND (@BranchId IS NULL OR COALESCE(a.BranchId, e.BranchId) = @BranchId)
         AND (@StatusFilter IS NULL OR UPPER(a.Status) = @StatusFilter)
         AND (@TechnicianId IS NULL OR a.EmployeeId = @TechnicianId)
         AND (@ServiceId IS NULL OR s.ServiceId = @ServiceId)
@@ -637,6 +648,14 @@ async function confirmAppointment(id, userId = null) {
     userId,
     "Receptionist confirmed appointment",
   );
+
+  // Tự động finalize hồ sơ điều trị gốc liên kết với lịch tái khám này
+  try {
+    const treatmentNotesV2Service = require("../treatment-notes-v2/treatment-notes-v2.service");
+    await treatmentNotesV2Service.finalizeByFollowUpAppointment(Number(id));
+  } catch (finalizeErr) {
+    console.warn("[receptionist confirm] Auto-finalize treatment note failed:", finalizeErr.message);
+  }
 
   await createReceptionistNotification(
     pool,
@@ -945,6 +964,9 @@ async function completeAppointment(id, userId = null) {
       userId
     });
 
+    // Always finalize checkout and send email upon completion of service
+    await finalizeCheckout(pool, id, userId);
+
     return await getAppointmentById(id);
   } catch (err) {
     try {
@@ -1139,7 +1161,12 @@ async function cancelAppointment(id, data = {}, userId = null) {
 
     try {
       const { runAutoMatch } = require("../waiting-list/waiting-list.service");
-      runAutoMatch(current.AppointmentDate).catch(err => console.error("Auto match failed:", err.message));
+      runAutoMatch(current.AppointmentDate, {
+        startTime: current.StartTime,
+        endTime: current.EndTime,
+        employeeId: current.EmployeeId,
+        branchId: current.BranchId
+      }).catch(err => console.error("Auto match failed:", err.message));
     } catch (err) {
       console.error("Auto match trigger failed:", err.message);
     }
@@ -1163,21 +1190,38 @@ async function noShowAppointment(id, userId = null) {
     throw new Error("Không thể đánh dấu No Show");
   }
 
-  await pool.request().input("AppointmentId", sql.Int, id).query(`
-      UPDATE Appointments
-      SET Status = 'NO_SHOW',
-          UpdatedAt = CURRENT_TIMESTAMP
-      WHERE AppointmentId = @AppointmentId
-    `);
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
 
-  await addStatusHistory(
-    pool,
-    id,
-    current.Status,
-    "NO_SHOW",
-    userId,
-    "Receptionist marked customer as no-show",
-  );
+    await new sql.Request(transaction).input("AppointmentId", sql.Int, id).query(`
+        UPDATE Appointments
+        SET Status = 'NO_SHOW',
+            UpdatedAt = CURRENT_TIMESTAMP
+        WHERE AppointmentId = @AppointmentId
+      `);
+
+    await addStatusHistory(
+      transaction,
+      id,
+      current.Status,
+      "NO_SHOW",
+      userId,
+      "Receptionist marked customer as no-show",
+    );
+
+    // Tự động trừ buổi combo nếu có liên kết CustomerPackageId
+    if (current.CustomerPackageId) {
+      await deductComboSession(transaction, id);
+    }
+
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
 
   return await getAppointmentById(id);
 }
@@ -1864,6 +1908,18 @@ async function getAvailableSlots({
                 AND @EndTime > CONVERT(VARCHAR(8), a.StartTime, 108)
               )
           )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM WaitingList w
+            WHERE w.MatchedEmployeeId = e.EmployeeId
+              AND w.MatchedDate = @AppointmentDate
+              AND w.Status = 'MATCHED'
+              AND w.HoldExpiresAt > GETUTCDATE()
+              AND (
+                @StartTime < CONVERT(VARCHAR(8), w.MatchedEndTime, 108)
+                AND @EndTime > CONVERT(VARCHAR(8), w.MatchedStartTime, 108)
+              )
+          )
       `);
 
     const count = Number(available.recordset[0]?.AvailableTechnicianCount || 0);
@@ -1883,6 +1939,11 @@ async function rescheduleAppointment(id, data = {}, userId = null) {
   const pool = await connectDB();
   const current = await getAppointmentById(id);
   if (!current) throw new Error("Không tìm thấy lịch hẹn");
+
+  const apptStatus = String(current.Status || "").toUpperCase();
+  if (["CHECKED_IN", "IN_PROGRESS", "COMPLETED", "CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(apptStatus) || current.CheckedInAt) {
+    throw new Error("Khách hàng đã check-in hoặc ca hẹn đang thực hiện, không thể đổi ca trực / đổi giờ");
+  }
 
   const appointmentDate = normalizeDateOnly(data.appointmentDate);
   const startTime = String(data.startTime || "").slice(0, 5);
@@ -1926,46 +1987,59 @@ async function rescheduleAppointment(id, data = {}, userId = null) {
   if (busy.recordset.length) {
     throw new Error("Kỹ thuật viên đã có lịch trong khung giờ này");
   }
-  await pool
-    .request()
-    .input("AppointmentId", sql.Int, id)
-    .input("AppointmentDate", sql.Date, appointmentDate)
-    .input("StartTime", sql.VarChar, `${startTime}:00`)
-    .input("EndTime", sql.VarChar, endTime)
-    .input("EmployeeId", sql.Int, technicianId).query(`
-      UPDATE Appointments
-      SET AppointmentDate = @AppointmentDate,
-          StartTime = @StartTime,
-          EndTime = @EndTime,
-          EmployeeId = @EmployeeId,
-          UpdatedAt = CURRENT_TIMESTAMP
-      WHERE AppointmentId = @AppointmentId
+
+  // 1. Check if there's already a pending request awaiting confirmation
+  const existing = await pool.request()
+    .input("AppointmentId", sql.Int, Number(id))
+    .query(`
+      SELECT RequestId, Status FROM AppointmentRescheduleRequests
+      WHERE AppointmentId = @AppointmentId AND Status IN ('PENDING', 'AWAITING_CUSTOMER')
     `);
-
-  await addStatusHistory(
-    pool,
-    id,
-    current.Status,
-    current.Status,
-    userId,
-    "Receptionist rescheduled appointment",
-  );
-
-  await createReceptionistNotification(
-    pool,
-    "Appointment đổi lịch",
-    `Lịch hẹn #${id} đã được đổi lịch.`,
-    "APPOINTMENT_RESCHEDULED",
-  );
-
-  try {
-    const { runAutoMatch } = require("../waiting-list/waiting-list.service");
-    runAutoMatch(current.AppointmentDate).catch(err => console.error("Auto match failed:", err.message));
-  } catch (err) {
-    console.error("Auto match trigger failed:", err.message);
+  if (existing.recordset.length > 0) {
+    throw new Error("Lịch hẹn này đang có yêu cầu đổi lịch chờ khách hàng xác nhận.");
   }
 
-  return await getAppointmentById(id);
+  // 2. Insert into AppointmentRescheduleRequests with Status = 'AWAITING_CUSTOMER'
+  await pool.request()
+    .input("AppointmentId", sql.Int, Number(id))
+    .input("RequesterId", sql.Int, userId || null)
+    .input("RequestedDate", sql.Date, appointmentDate)
+    .input("RequestedStartTime", sql.VarChar(8), `${startTime}:00`)
+    .input("RequestedEndTime", sql.VarChar(8), endTime)
+    .input("Reason", sql.NVarChar, data.reason || "Lễ tân đổi ca trực / đổi giờ hẹn")
+    .query(`
+      INSERT INTO AppointmentRescheduleRequests 
+      (AppointmentId, RequesterId, RequestedDate, RequestedStartTime, RequestedEndTime, Reason, Status, CreatedAt, UpdatedAt)
+      VALUES 
+      (@AppointmentId, @RequesterId, @RequestedDate, @RequestedStartTime, @RequestedEndTime, @Reason, 'AWAITING_CUSTOMER', GETDATE(), GETDATE())
+    `);
+
+  // 3. Notify Customer
+  try {
+    const custUserRes = await pool.request()
+      .input("CustomerId", sql.Int, current.CustomerId)
+      .query("SELECT UserId FROM Customers WHERE CustomerId = @CustomerId");
+    const custUserId = custUserRes.recordset[0]?.UserId;
+
+    if (custUserId) {
+      const dateTextStr = new Date(appointmentDate).toLocaleDateString("vi-VN");
+      const timeRangeStr = `${startTime} - ${endTime.slice(0, 5)}`;
+      const notificationsService = require("../notifications/notifications.service");
+      await notificationsService.create({
+        userId: custUserId,
+        title: "📅 Lễ tân đề xuất đổi ca trực / giờ hẹn của bạn",
+        content: `Lễ tân đề xuất đổi lịch hẹn #${id} sang ngày ${dateTextStr} lúc ${timeRangeStr}. Vui lòng vào Chi tiết lịch hẹn để xác nhận hoặc từ chối.`,
+        type: "RESCHEDULE_AWAITING_CUSTOMER"
+      });
+    }
+  } catch (errNotif) {
+    console.error("Gửi thông báo đổi lịch cho khách thất bại:", errNotif.message);
+  }
+
+  return {
+    message: "Đã tạo đề xuất đổi lịch thành công! Đã gửi yêu cầu đổi ca trực / đổi giờ tới khách hàng để xác nhận.",
+    awaitingCustomer: true
+  };
 }
 
 async function createAppointment(data, userId = null) {
@@ -2276,7 +2350,7 @@ async function createAppointment(data, userId = null) {
       WHERE MatchedEmployeeId = @TechnicianId
         AND MatchedDate = @AppointmentDate
         AND Status = 'MATCHED'
-        AND HoldExpiresAt > GETUTCDATE()
+        AND HoldExpiresAt > GETDATE()
         AND CustomerId <> @CustomerId
         AND (
           @StartTime < CONVERT(VARCHAR(8), MatchedEndTime, 108)
@@ -2753,6 +2827,12 @@ async function markInvoicePaid(id, method = "CASH", userId = null) {
     );
 
     await tx.commit();
+
+    const appt = await getAppointmentById(current.AppointmentId);
+    if (appt && appt.Status === 'COMPLETED') {
+      await finalizeCheckout(pool, current.AppointmentId, userId);
+    }
+
     return await getInvoiceById(id);
   } catch (err) {
     try {
@@ -2768,13 +2848,12 @@ async function requestRefund(id, data = {}, userId = null) {
 
   if (!current) throw new Error("Không tìm thấy hóa đơn");
 
-  const reason = normalizeText(data.reason);
-  const refundAmount = Number(
-    data.refundAmount || current.FinalAmount || current.Total || 0,
-  );
+  if (String(current.AppointmentStatus || "").toUpperCase() === "COMPLETED") {
+    throw new Error("Không thể hoàn trả lịch hẹn đã hoàn thành");
+  }
 
+  const reason = normalizeText(data.reason);
   if (!reason) throw new Error("Vui lòng nhập lý do hoàn tiền");
-  if (refundAmount <= 0) throw new Error("Số tiền hoàn phải lớn hơn 0");
 
   if (
     !current.PaymentInfo ||
@@ -2785,6 +2864,14 @@ async function requestRefund(id, data = {}, userId = null) {
 
   const paymentMethod = String(current.PaymentInfo.PaymentMethod || "").toUpperCase();
   const isPackage = paymentMethod === "PACKAGE";
+
+  const refundAmount = isPackage ? 0 : Number(
+    data.refundAmount || current.FinalAmount || current.Total || 0,
+  );
+
+  if (!isPackage && refundAmount <= 0) {
+    throw new Error("Số tiền hoàn phải lớn hơn 0");
+  }
 
   if (!isPackage) {
     const bankCode = data.bankCode || data.BankCode;
@@ -2963,7 +3050,12 @@ async function requestRefund(id, data = {}, userId = null) {
         const dateStr = current.AppointmentDate instanceof Date
           ? current.AppointmentDate.toISOString().slice(0, 10)
           : String(current.AppointmentDate).slice(0, 10);
-        runAutoMatch(dateStr).catch(err => console.error("Auto match failed after receptionist refund request:", err.message));
+        runAutoMatch(dateStr, {
+          startTime: current.StartTime,
+          endTime: current.EndTime,
+          employeeId: current.EmployeeId,
+          branchId: current.BranchId
+        }).catch(err => console.error("Auto match failed after receptionist refund request:", err.message));
       } catch (err) {
         console.error("Auto match trigger failed after receptionist refund request:", err.message);
       }
@@ -3044,6 +3136,7 @@ async function getWaitingAvailableSlots(id, query = {}) {
         employeeId: tech.EmployeeId,
         serviceId: waiting.ServiceId,
         appointmentDate,
+        excludeWaitingId: waitingId,
       });
 
       for (const slot of techSlots) {
@@ -3447,7 +3540,12 @@ async function updateWaitingList(id, data = {}) {
       : String(currentItem.MatchedDate).slice(0, 10);
     try {
       const { runAutoMatch } = require("../waiting-list/waiting-list.service");
-      runAutoMatch(dateStr).catch(err => console.error("Auto match failed after receptionist update status:", err.message));
+      runAutoMatch(dateStr, {
+        startTime: currentItem.MatchedStartTime,
+        endTime: currentItem.MatchedEndTime,
+        employeeId: currentItem.MatchedEmployeeId,
+        branchId: currentItem.PreferredBranchId
+      }).catch(err => console.error("Auto match failed after receptionist update status:", err.message));
     } catch (e) {
       console.error("Failed to require waiting-list.service or run auto match:", e.message);
     }
@@ -3460,6 +3558,16 @@ async function updateWaitingList(id, data = {}) {
 }
 
 async function deleteWaitingList(id, cancelReason = null) {
+  const pool = await connectDB();
+  const existed = await pool.request()
+    .input("WaitingId", sql.Int, Number(id))
+    .query(`SELECT Status FROM WaitingList WHERE WaitingId = @WaitingId`);
+  const currentItem = existed.recordset[0];
+  if (!currentItem) throw new Error("Không tìm thấy yêu cầu hàng chờ");
+  if (!["WAITING", "NOTIFIED"].includes(currentItem.Status)) {
+    throw new Error("Chỉ có thể hủy yêu cầu đang chờ hoặc đã thông báo.");
+  }
+
   return updateWaitingList(id, {
     status: "CANCELLED",
     cancelReason: cancelReason || "Receptionist hủy yêu cầu hàng chờ",
@@ -3910,11 +4018,20 @@ async function getReceptionistProfile(userId) {
         ws.ShiftDate,
         CONVERT(VARCHAR(5), ws.StartTime, 108) AS StartTime,
         CONVERT(VARCHAR(5), ws.EndTime, 108) AS EndTime,
-        sr.Status
-      FROM ShiftRegistrations sr
-      JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
-      WHERE sr.TechnicianId = @EmployeeId
-        AND sr.Status = 'APPROVED'
+        COALESCE(sr.Status, 'APPROVED') AS Status
+      FROM WorkShifts ws
+      LEFT JOIN ShiftRegistrations sr ON ws.ShiftId = sr.ShiftId AND sr.TechnicianId = @EmployeeId
+      WHERE (
+        (sr.TechnicianId = @EmployeeId AND sr.Status = 'APPROVED')
+        OR (ws.ShiftName <> N'Cả Ngày' AND EXISTS (
+          SELECT 1 FROM Appointments app
+          WHERE app.EmployeeId = @EmployeeId
+            AND app.AppointmentDate = ws.ShiftDate
+            AND app.Status NOT IN ('CANCELLED', 'NO_SHOW')
+            AND CONVERT(VARCHAR(5), app.StartTime, 108) >= CONVERT(VARCHAR(5), ws.StartTime, 108)
+            AND CONVERT(VARCHAR(5), app.StartTime, 108) < CONVERT(VARCHAR(5), ws.EndTime, 108)
+        ))
+      )
       ORDER BY ws.ShiftDate ASC, ws.StartTime ASC
     `);
 
@@ -4047,9 +4164,6 @@ async function checkoutAppointment(id, userId = null) {
     if (!note) {
       throw new Error(`Dịch vụ ${s.ServiceId} chưa được kỹ thuật viên điền hồ sơ trị liệu`);
     }
-    if (note.status !== "finalized") {
-      throw new Error(`Hồ sơ trị liệu cho dịch vụ ${s.ServiceId} mới ở dạng nháp (draft), chưa được kỹ thuật viên khóa/finalized`);
-    }
   }
 
   // 2. Kiểm tra hóa đơn đã thanh toán chưa
@@ -4168,6 +4282,29 @@ async function checkoutAppointment(id, userId = null) {
       }
     }
 
+    // 6. Tự động gửi thông báo Hóa đơn dịch vụ tới tài khoản khách hàng trên ứng dụng
+    if (current.CustomerId) {
+      try {
+        const { create: createNotification } = require("../notifications/notifications.service");
+        const custUserRes = await pool.request()
+          .input("CustomerId", sql.Int, current.CustomerId)
+          .query(`SELECT UserId FROM Customers WHERE CustomerId = @CustomerId`);
+        const custUserId = custUserRes.recordset[0]?.UserId;
+
+        if (custUserId) {
+          await createNotification({
+            userId: custUserId,
+            title: `🧾 Hóa đơn thanh toán dịch vụ #${current.InvoiceId || id}`,
+            content: `Dịch vụ làm đẹp cho lịch hẹn #${id} đã hoàn tất check-out. Tổng tiền thanh toán: ${Number(current.FinalAmount || 0).toLocaleString('vi-VN')}đ. Hóa đơn chi tiết đã được gửi tới email ${current.CustomerEmail || ''}. Cảm ơn quý khách!`,
+            type: "INVOICE"
+          });
+          console.log(`[Checkout] In-app invoice notification created for UserId ${custUserId}`);
+        }
+      } catch (notifErr) {
+        console.error(`[Checkout] Failed to create in-app invoice notification:`, notifErr.message);
+      }
+    }
+
     // Publish event
     eventBusService.publish("APPOINTMENT_CHECKED_OUT", {
       appointmentId: Number(id),
@@ -4181,6 +4318,99 @@ async function checkoutAppointment(id, userId = null) {
     } catch (_) {}
     throw err;
   }
+}
+
+async function finalizeCheckout(pool, id, userId = null) {
+  const current = await getAppointmentById(id);
+  if (!current) return;
+  if (current.CheckedOutAt) return; // Already checked out, skip sending email again
+
+  await pool.request()
+    .input("AppointmentId", sql.Int, id)
+    .query(`
+      UPDATE Appointments
+      SET CheckedOutAt = COALESCE(CheckedOutAt, CURRENT_TIMESTAMP),
+          CompletedAt = COALESCE(CompletedAt, CURRENT_TIMESTAMP),
+          Status = 'COMPLETED',
+          UpdatedAt = CURRENT_TIMESTAMP
+      WHERE AppointmentId = @AppointmentId
+    `);
+
+  const servicesResult = await pool.request()
+    .input("AppointmentId", sql.Int, id)
+    .query(`SELECT ServiceId, Price FROM AppointmentServices WHERE AppointmentId = @AppointmentId`);
+  const apptServices = servicesResult.recordset || [];
+
+  if (current.CustomerEmail) {
+    try {
+      const { sendMail } = require("../../utils/sendMail");
+      
+      let servicesListHtml = "";
+      if (apptServices.length > 0) {
+        servicesListHtml = apptServices.map(s => `<li>Dịch vụ giá: ${Number(s.Price).toLocaleString('vi-VN')}đ</li>`).join("");
+      }
+
+      const emailHtml = `
+        <div style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333;">
+          <h2 style="color: #d91f68; border-bottom: 2px solid #fce7f3; padding-bottom: 8px;">Cảm ơn quý khách đã đồng hành cùng BeautyMS!</h2>
+          <p>Chào <strong>${current.CustomerName}</strong>,</p>
+          <p>Chúng tôi xin gửi lời cảm ơn chân thành nhất vì quý khách đã tin tưởng và sử dụng dịch vụ tại salon của chúng tôi vào ngày <strong>${new Date(current.AppointmentDate).toLocaleDateString('vi-VN')}</strong>.</p>
+          
+          <div style="background: #fafafa; border: 1px solid #eaeaea; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #555;">Tóm tắt dịch vụ đã thực hiện:</h3>
+            <ul>
+              ${servicesListHtml || '<li>Dịch vụ chăm sóc sắc đẹp</li>'}
+            </ul>
+            <p style="margin-bottom: 0;">Tổng số tiền thanh toán: <strong>${Number(current.FinalAmount).toLocaleString('vi-VN')}đ</strong></p>
+          </div>
+          
+          <p>Mọi góp ý hoặc phản hồi của quý khách về dịch vụ và tay nghề Kỹ thuật viên <strong>${current.TechnicianName || 'Chuyên viên'}</strong> sẽ giúp chúng tôi hoàn thiện chất lượng phục vụ ngày một tốt hơn.</p>
+          <p>Quý khách có thể đánh giá dịch vụ trực tuyến tại đây: 
+            <a href="http://localhost:3000/customer/reviews" style="display: inline-block; background: #d91f68; color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; margin-top: 5px;">Viết Đánh Giá Ngay</a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
+          <p style="font-size: 12px; color: #999;">Đây là email tự động gửi từ hệ thống chăm sóc khách hàng của BeautyMS. Vui lòng không trả lời trực tiếp email này.</p>
+        </div>
+      `;
+
+      await sendMail({
+        to: current.CustomerEmail,
+        subject: "[BeautyMS] Cảm ơn quý khách đã sử dụng dịch vụ",
+        html: emailHtml
+      });
+      console.log(`[Checkout] Thank-you email sent successfully to ${current.CustomerEmail}`);
+    } catch (mailErr) {
+      console.error(`[Checkout] Failed to send check-out email to ${current.CustomerEmail}:`, mailErr.message);
+    }
+  }
+
+  if (current.CustomerId) {
+    try {
+      const { create: createNotification } = require("../notifications/notifications.service");
+      const custUserRes = await pool.request()
+        .input("CustomerId", sql.Int, current.CustomerId)
+        .query(`SELECT UserId FROM Customers WHERE CustomerId = @CustomerId`);
+      const custUserId = custUserRes.recordset[0]?.UserId;
+
+      if (custUserId) {
+        await createNotification({
+          userId: custUserId,
+          title: `🧾 Hóa đơn thanh toán dịch vụ #${current.InvoiceId || id}`,
+          content: `Dịch vụ làm đẹp cho lịch hẹn #${id} đã hoàn tất check-out. Tổng tiền thanh toán: ${Number(current.FinalAmount || 0).toLocaleString('vi-VN')}đ. Hóa đơn chi tiết đã được gửi tới email ${current.CustomerEmail || ''}. Cảm ơn quý khách!`,
+          type: "INVOICE"
+        });
+        console.log(`[Checkout] In-app invoice notification created for UserId ${custUserId}`);
+      }
+    } catch (notifErr) {
+      console.error(`[Checkout] Failed to create in-app invoice notification:`, notifErr.message);
+    }
+  }
+
+  eventBusService.publish("APPOINTMENT_CHECKED_OUT", {
+    appointmentId: Number(id),
+    userId
+  });
 }
 
 function parseTimeToMinutes(timeStr) {
@@ -4203,12 +4433,21 @@ async function getTechnicianWorkload(employeeId, date) {
     .input("EmployeeId", sql.Int, Number(employeeId))
     .input("Date", sql.Date, date)
     .query(`
-      SELECT sr.RegistrationId 
-      FROM ShiftRegistrations sr
-      JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
-      WHERE sr.TechnicianId = @EmployeeId 
-        AND ws.ShiftDate = @Date 
-        AND sr.Status = 'APPROVED'
+      SELECT ws.ShiftId 
+      FROM WorkShifts ws
+      LEFT JOIN ShiftRegistrations sr ON ws.ShiftId = sr.ShiftId AND sr.TechnicianId = @EmployeeId
+      WHERE ws.ShiftDate = @Date
+        AND (
+          (sr.TechnicianId = @EmployeeId AND sr.Status = 'APPROVED')
+          OR (ws.ShiftName <> N'Cả Ngày' AND EXISTS (
+            SELECT 1 FROM Appointments a
+            WHERE a.EmployeeId = @EmployeeId
+              AND a.AppointmentDate = ws.ShiftDate
+              AND a.Status NOT IN ('CANCELLED', 'NO_SHOW')
+              AND CONVERT(VARCHAR(5), a.StartTime, 108) >= CONVERT(VARCHAR(5), ws.StartTime, 108)
+              AND CONVERT(VARCHAR(5), a.StartTime, 108) < CONVERT(VARCHAR(5), ws.EndTime, 108)
+          ))
+        )
     `);
   
   const isDayOff = leaveResult.recordset.length === 0;
@@ -4883,19 +5122,23 @@ async function updateInvoiceDetails(invoiceId, { serviceIds, voucherCode, manual
       // Calculate discount for current voucher on potentially updated TotalAmount
       const vResult = await new sql.Request(tx)
         .input("VoucherId", sql.Int, voucherIdToSave)
-        .query("SELECT DiscountType, DiscountValue, MinOrderAmount, MaxDiscountAmount FROM Vouchers WHERE VoucherId = @VoucherId");
+        .query("SELECT Code, DiscountType, DiscountValue, MinOrderAmount, MaxDiscountAmount FROM Vouchers WHERE VoucherId = @VoucherId");
       const voucher = vResult.recordset[0];
       if (voucher) {
-        const minOrder = Number(voucher.MinOrderAmount || 0);
+        const codeUpper = String(voucher.Code || "").toUpperCase();
+        const isFree = codeUpper.startsWith("FREE");
+        
+        const minOrder = Number(voucher.MinOrderAmount || 0) / 10;
         if (totalAmount >= minOrder) {
           if (String(voucher.DiscountType).toUpperCase() === "PERCENT") {
             voucherDiscount = (totalAmount * Number(voucher.DiscountValue || 0)) / 100;
-            const maxDiscount = Number(voucher.MaxDiscountAmount || 0);
+            const maxDiscount = Number(voucher.MaxDiscountAmount || 0) / 10;
             if (maxDiscount > 0) {
               voucherDiscount = Math.min(voucherDiscount, maxDiscount);
             }
           } else {
-            voucherDiscount = Number(voucher.DiscountValue || 0);
+            const discountVal = Number(voucher.DiscountValue || 0);
+            voucherDiscount = isFree ? discountVal : discountVal / 10;
           }
           voucherDiscount = Math.min(voucherDiscount, totalAmount);
         } else {
@@ -5211,7 +5454,7 @@ async function ensureShiftForAppointment(technicianId, appointmentDate, startTim
       .input("ShiftName", sql.NVarChar, "Cả ngày")
       .input("ShiftDate", sql.Date, dateStr)
       .input("StartTime", sql.VarChar, "08:00:00")
-      .input("EndTime", sql.VarChar, "22:00:00")
+      .input("EndTime", sql.VarChar, "20:00:00")
       .query(`
         INSERT INTO WorkShifts (ShiftName, ShiftDate, StartTime, EndTime, MaxTechnicians, Status)
         OUTPUT INSERTED.ShiftId

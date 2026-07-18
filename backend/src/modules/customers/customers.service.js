@@ -857,7 +857,8 @@ async function getMyServiceHistory(userId) {
 
         aps.AppointmentServiceId,
         aps.ServiceId,
-        aps.Price,
+        aps.Price AS Price,
+        s.Price AS ServicePrice,
 
         s.ServiceName,
         s.Description AS ServiceDescription,
@@ -999,14 +1000,34 @@ async function getMyServiceHistory(userId) {
   const categoryMap = new Map();
   const monthMap = new Map();
 
-  let totalSpent = 0;
+  const appointmentSpentRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query(`
+      SELECT SUM(i.FinalAmount) AS AppointmentSpent
+      FROM Invoices i
+      JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+      WHERE a.CustomerId = @CustomerId AND i.Status = 'PAID'
+    `);
+
+  const packageSpentRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query(`
+      SELECT SUM(pp.Amount) AS PackageSpent
+      FROM PackagePayments pp
+      JOIN CustomerPackages cp ON pp.CustomerPackageId = cp.CustomerPackageId
+      WHERE cp.CustomerId = @CustomerId AND pp.Status = 'PAID'
+    `);
+
+  const appSum = appointmentSpentRes.recordset[0]?.AppointmentSpent || 0;
+  const pkgSum = packageSpentRes.recordset[0]?.PackageSpent || 0;
+  const totalSpent = appSum + pkgSum;
+
   let reviewedCount = 0;
   let totalRating = 0;
   let totalDuration = 0;
 
   for (const item of items) {
     const amount = Number(item.Price || 0);
-    totalSpent += amount;
     totalDuration += Number(item.DurationMinutes || 0);
 
     if (item.ReviewId) {
@@ -1321,7 +1342,30 @@ async function remove(id) {
   return { id };
 }
 
+async function getPublicReviews() {
+  const pool = await connectDB();
+  const result = await pool.request().query(`
+    SELECT TOP 10
+      r.ReviewId,
+      r.Rating,
+      r.Comment,
+      r.CreatedAt,
+      COALESCE(cu.FullName, N'Khách hàng ẩn danh') AS CustomerName,
+      COALESCE(s.ServiceName, N'Dịch vụ tổng hợp') AS ServiceName
+    FROM Reviews r
+    LEFT JOIN Customers c ON r.CustomerId = c.CustomerId
+    LEFT JOIN Users cu ON c.UserId = cu.UserId
+    LEFT JOIN Services s ON r.ServiceId = s.ServiceId
+    WHERE r.Rating = 5 
+      AND r.Comment IS NOT NULL 
+      AND LEN(LTRIM(RTRIM(r.Comment))) > 0
+    ORDER BY r.CreatedAt DESC
+  `);
+  return result.recordset;
+}
+
 module.exports = {
+  getPublicReviews,
   getAll,
   getById,
   getMyProfile,

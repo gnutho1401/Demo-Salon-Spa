@@ -114,7 +114,7 @@ async function getPayableAppointment(
       .request()
       .input("VoucherId", sql.Int, voucherId)
       .input("CustomerId", sql.Int, item.CustomerId)
-      .input("TotalAmount", sql.Decimal(18, 2), beforeRewardAmount).query(`
+      .query(`
         SELECT TOP 1
           v.VoucherId,
           v.Code,
@@ -128,15 +128,35 @@ async function getPayableAppointment(
           AND cv.CustomerId = @CustomerId
           AND v.Status = 'ACTIVE'
           AND cv.UsedStatus = 0
-          AND ISNULL(v.MinOrderAmount, 0) <= @TotalAmount
           AND (v.StartDate IS NULL OR v.StartDate <= CAST(GETDATE() AS DATE))
           AND (v.EndDate IS NULL OR v.EndDate >= CAST(GETDATE() AS DATE))
       `);
 
-    const voucher = voucherResult.recordset[0];
+    let voucher = voucherResult.recordset[0];
 
     if (!voucher) {
       throw new Error("Voucher không hợp lệ, đã dùng hoặc không đủ điều kiện");
+    }
+
+    // Scale down voucher amounts by 10 to match website service prices
+    const codeUpper = String(voucher.Code || "").toUpperCase();
+    const isFree = codeUpper.startsWith("FREE");
+    
+    const minOrder = Number(voucher.MinOrderAmount || 0) / 10;
+    const maxDiscount = voucher.MaxDiscountAmount ? Number(voucher.MaxDiscountAmount) / 10 : null;
+    
+    let discountValue = Number(voucher.DiscountValue || 0);
+    if (!isFree && String(voucher.DiscountType).toUpperCase() === "AMOUNT") {
+      discountValue = discountValue / 10;
+    }
+
+    voucher.MinOrderAmount = minOrder;
+    voucher.MaxDiscountAmount = maxDiscount;
+    voucher.DiscountValue = discountValue;
+
+    // Check minimum order limit in JS
+    if (minOrder > 0 && beforeRewardAmount < minOrder) {
+      throw new Error(`Đơn hàng tối thiểu ${minOrder.toLocaleString('vi-VN')}đ để sử dụng voucher này`);
     }
 
     const servicesResult = await pool.request()
@@ -149,7 +169,6 @@ async function getPayableAppointment(
       `);
     const appServices = servicesResult.recordset;
 
-    const codeUpper = String(voucher.Code || "").toUpperCase();
     if (codeUpper.startsWith("FREEPH")) {
       const phucHoiService = appServices.find(s => String(s.ServiceName || "") === "Phục hồi tóc hư tổn");
       if (!phucHoiService) {
@@ -162,6 +181,12 @@ async function getPayableAppointment(
         throw new Error("Voucher này chỉ áp dụng cho dịch vụ Massage cổ vai gáy");
       }
       voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(massageService.Price));
+    } else if (codeUpper.startsWith("FREEGD")) {
+      const goiDauService = appServices.find(s => String(s.ServiceName || "").includes("Gội đầu"));
+      if (!goiDauService) {
+        throw new Error("Voucher này chỉ áp dụng cho dịch vụ Gội đầu");
+      }
+      voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(goiDauService.Price));
     } else {
       if (String(voucher.DiscountType || "").toUpperCase() === "PERCENT") {
         voucherDiscountAmount =
@@ -392,21 +417,41 @@ async function markVoucherUsed(transaction, customerId, voucherId) {
   }
 }
 
-async function markAppointmentPaid(transaction, appointmentId) {
-  await new sql.Request(transaction).input(
-    "AppointmentId",
-    sql.Int,
-    appointmentId,
-  ).query(`
-      UPDATE Appointments
-      SET
-        Status = CASE
-          WHEN Status IN ('PENDING_PAYMENT', 'PENDING', 'PAID') THEN 'CONFIRMED'
-          ELSE Status
-        END,
-        UpdatedAt = GETDATE()
-      WHERE AppointmentId = @AppointmentId
-    `);
+async function markAppointmentPaid(transaction, appointmentId, reason = "Thanh toán thành công") {
+  const appRes = await new sql.Request(transaction)
+    .input("AppointmentId", sql.Int, appointmentId)
+    .query("SELECT Status FROM Appointments WHERE AppointmentId = @AppointmentId");
+  const appointment = appRes.recordset[0];
+  if (!appointment) return;
+
+  const oldStatus = appointment.Status;
+  if (["PENDING_PAYMENT", "PENDING", "PAID"].includes(oldStatus)) {
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, appointmentId)
+      .query(`
+        UPDATE Appointments
+        SET Status = 'CONFIRMED', UpdatedAt = GETDATE()
+        WHERE AppointmentId = @AppointmentId
+      `);
+
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, appointmentId)
+      .input("OldStatus", sql.NVarChar, oldStatus)
+      .input("NewStatus", sql.NVarChar, "CONFIRMED")
+      .input("Reason", sql.NVarChar, reason)
+      .query(`
+        INSERT INTO AppointmentStatusHistory (AppointmentId, OldStatus, NewStatus, Reason, ChangedAt)
+        VALUES (@AppointmentId, @OldStatus, @NewStatus, @Reason, GETDATE())
+      `);
+
+    // Tự động finalize hồ sơ điều trị gốc liên kết với lịch tái khám này
+    try {
+      const treatmentNotesV2Service = require("../treatment-notes-v2/treatment-notes-v2.service");
+      await treatmentNotesV2Service.finalizeByFollowUpAppointment(Number(appointmentId));
+    } catch (finalizeErr) {
+      console.warn("[markAppointmentPaid] Auto-finalize treatment note failed:", finalizeErr.message);
+    }
+  }
 }
 
 async function markInvoicePaid(transaction, invoiceId) {
@@ -527,7 +572,7 @@ async function payAppointment(userId, appointmentId, payload = {}) {
     }
 
     await markInvoicePaid(transaction, invoiceId);
-    await markAppointmentPaid(transaction, appointmentId);
+    await markAppointmentPaid(transaction, appointmentId, 'Invoice marked paid by receptionist');
 
     const earnedPoints = await addLoyaltyPoints(
       transaction,
@@ -756,7 +801,7 @@ async function processVnpayCallback(query = {}) {
         `);
 
       await markInvoicePaid(transaction, payment.InvoiceId);
-      await markAppointmentPaid(transaction, payment.AppointmentId);
+      await markAppointmentPaid(transaction, payment.AppointmentId, 'Payment completed via VNPay');
 
       if (payment.VoucherId) {
         await markVoucherUsed(
@@ -987,11 +1032,139 @@ async function processPayosWebhook(webhookBody) {
         ORDER BY p.PaymentId DESC
       `);
 
-    const payment = paymentResult.recordset[0];
+    let payment = paymentResult.recordset[0];
+    let isPackagePayment = false;
+    let pkgPayment = null;
 
     if (!payment) {
+      // Check if it is a Package Payment
+      const pkgPaymentResult = await new sql.Request(transaction)
+        .input("TransactionCode", sql.NVarChar, orderCode)
+        .query(`
+          SELECT TOP 1
+            pp.PackagePaymentId,
+            pp.Amount,
+            pp.Status,
+            cp.CustomerPackageId,
+            cp.CustomerId,
+            cp.PackageId,
+            p.ValidityDays,
+            p.TotalSessions
+          FROM PackagePayments pp
+          INNER JOIN CustomerPackages cp ON pp.CustomerPackageId = cp.CustomerPackageId
+          INNER JOIN Packages p ON cp.PackageId = p.PackageId
+          WHERE pp.TransactionCode = @TransactionCode
+            AND pp.PaymentMethod = 'PAYOS'
+          ORDER BY pp.PackagePaymentId DESC
+        `);
+
+      pkgPayment = pkgPaymentResult.recordset[0];
+      if (pkgPayment) {
+        isPackagePayment = true;
+      }
+    }
+
+    if (!payment && !isPackagePayment) {
       await transaction.commit();
       return { success: false, message: "Không tìm thấy giao dịch PayOS" };
+    }
+
+    if (isPackagePayment) {
+      if (pkgPayment.Status === "PAID") {
+        await transaction.commit();
+        return {
+          success: true,
+          message: "Giao dịch gói đã được xử lý trước đó",
+          CustomerPackageId: pkgPayment.CustomerPackageId,
+        };
+      }
+
+      if (code === "00") {
+        // Update PackagePayments to PAID
+        await new sql.Request(transaction)
+          .input("PackagePaymentId", sql.Int, pkgPayment.PackagePaymentId)
+          .input(
+            "VnpTransactionNo",
+            sql.NVarChar,
+            String(webhookData.paymentLinkId || webhookData.reference || ""),
+          )
+          .query(`
+            UPDATE PackagePayments
+            SET
+              Status = 'PAID',
+              PaidAt = GETDATE(),
+              VnpTransactionNo = @VnpTransactionNo
+            WHERE PackagePaymentId = @PackagePaymentId
+          `);
+
+        // Update CustomerPackages to ACTIVE
+        await new sql.Request(transaction)
+          .input("CustomerPackageId", sql.Int, pkgPayment.CustomerPackageId)
+          .input("ValidityDays", sql.Int, pkgPayment.ValidityDays || 30)
+          .input(
+            "TotalSessions",
+            sql.Int,
+            Math.max(Number(pkgPayment.TotalSessions || 1), 1),
+          )
+          .query(`
+            UPDATE CustomerPackages
+            SET
+              Status = 'ACTIVE',
+              StartDate = CAST(GETDATE() AS DATE),
+              EndDate = CAST(GETDATE() AS DATE) + CAST(@ValidityDays AS INT),
+              TotalSessions = @TotalSessions,
+              RemainingSessions = @TotalSessions,
+              UpdatedAt = GETDATE()
+            WHERE CustomerPackageId = @CustomerPackageId
+          `);
+
+        // Add Loyalty Points to customer
+        await new sql.Request(transaction)
+          .input("CustomerId", sql.Int, pkgPayment.CustomerId)
+          .input(
+            "Points",
+            sql.Int,
+            Math.floor(Number(pkgPayment.Amount || 0) / 10000),
+          )
+          .query(`
+            UPDATE Customers
+            SET LoyaltyPoints = LoyaltyPoints + @Points
+            WHERE CustomerId = @CustomerId
+          `);
+
+        await transaction.commit();
+        return {
+          success: true,
+          message: "Thanh toán gói PayOS thành công",
+          CustomerPackageId: pkgPayment.CustomerPackageId,
+        };
+      } else {
+        // Payment failed
+        await new sql.Request(transaction)
+          .input("PackagePaymentId", sql.Int, pkgPayment.PackagePaymentId)
+          .query(`
+            UPDATE PackagePayments
+            SET Status = 'FAILED'
+            WHERE PackagePaymentId = @PackagePaymentId
+              AND Status = 'PENDING';
+
+            UPDATE CustomerPackages
+            SET Status = 'CANCELLED'
+            WHERE CustomerPackageId = (
+              SELECT CustomerPackageId
+              FROM PackagePayments
+              WHERE PackagePaymentId = @PackagePaymentId
+            )
+            AND Status = 'PENDING_PAYMENT';
+          `);
+
+        await transaction.commit();
+        return {
+          success: false,
+          message: "Thanh toán gói PayOS thất bại",
+          CustomerPackageId: pkgPayment.CustomerPackageId,
+        };
+      }
     }
 
     if (payment.Status === "PAID") {
@@ -1022,7 +1195,7 @@ async function processPayosWebhook(webhookBody) {
         `);
 
       await markInvoicePaid(transaction, payment.InvoiceId);
-      await markAppointmentPaid(transaction, payment.AppointmentId);
+      await markAppointmentPaid(transaction, payment.AppointmentId, 'Payment completed via PayOS');
 
       if (payment.VoucherId) {
         await markVoucherUsed(
@@ -1175,7 +1348,7 @@ async function handlePayosReturn(query = {}) {
           `);
 
         await markInvoicePaid(transaction, payment.InvoiceId);
-        await markAppointmentPaid(transaction, payment.AppointmentId);
+        await markAppointmentPaid(transaction, payment.AppointmentId, 'Payment completed via PayOS');
         await transaction.commit();
 
         return {
@@ -1432,6 +1605,68 @@ async function applyVoucher(userId, appointmentId, body, isStaff = false) {
   return calculation;
 }
 
+async function checkAndUpdatePayosStatusByAppointment(appointmentId) {
+  try {
+    const pool = await connectDB();
+    const paymentResult = await pool.request()
+      .input("AppointmentId", sql.Int, appointmentId)
+      .query(`
+        SELECT TOP 1 p.PaymentId, p.TransactionCode, p.Status, p.InvoiceId, i.CustomerId
+        FROM Payments p
+        INNER JOIN Invoices i ON i.InvoiceId = p.InvoiceId
+        WHERE i.AppointmentId = @AppointmentId
+          AND p.PaymentMethod = 'PAYOS'
+          AND p.Status = 'PENDING'
+        ORDER BY p.PaymentId DESC
+      `);
+    const payment = paymentResult.recordset[0];
+    if (!payment || !payment.TransactionCode) return;
+
+    const payos = getPayOS();
+    const info = await payos.paymentRequests.get(String(payment.TransactionCode));
+    if (info && info.status === "PAID") {
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+      try {
+        await new sql.Request(transaction)
+          .input("PaymentId", sql.Int, payment.PaymentId)
+          .input("VnpTransactionNo", sql.NVarChar, String(info.id || info.paymentLinkId || ""))
+          .query(`
+            UPDATE Payments
+            SET Status = 'PAID', VnpTransactionNo = @VnpTransactionNo, VnpResponseCode = '00', PaidAt = GETDATE()
+            WHERE PaymentId = @PaymentId
+          `);
+        await markInvoicePaid(transaction, payment.InvoiceId);
+        await markAppointmentPaid(transaction, appointmentId, 'Payment completed via PayOS');
+        
+        // Load details to award points & mark voucher used
+        const invRes = await new sql.Request(transaction)
+          .input("InvoiceId", sql.Int, payment.InvoiceId)
+          .query("SELECT VoucherId, RewardPointsUsed, RewardDiscountAmount, Amount FROM Invoices WHERE InvoiceId = @InvoiceId");
+        const inv = invRes.recordset[0];
+        if (inv) {
+          if (inv.VoucherId) {
+            await markVoucherUsed(transaction, payment.CustomerId, inv.VoucherId);
+          }
+          if (Number(inv.RewardPointsUsed || 0) > 0) {
+            await useLoyaltyPoints(transaction, payment.CustomerId, payment.PaymentId, appointmentId, inv.RewardPointsUsed, inv.RewardDiscountAmount);
+          }
+          await addLoyaltyPoints(transaction, payment.CustomerId, payment.PaymentId, appointmentId, inv.Amount);
+          await updateCustomerMembershipLevel(transaction, payment.CustomerId);
+        }
+        
+        await transaction.commit();
+        console.log(`[Auto-Sync] Synchronized pending payment for appointment ${appointmentId} to PAID.`);
+      } catch (err) {
+        await transaction.rollback();
+        console.error("[Auto-Sync] Sync transaction failed:", err.message);
+      }
+    }
+  } catch (err) {
+    console.error("[Auto-Sync] Sync check failed:", err.message);
+  }
+}
+
 module.exports = {
   getMyPayments,
   getPayableAppointment,
@@ -1446,4 +1681,5 @@ module.exports = {
   cancelPayosPayment,
   refundPayosPayment,
   applyVoucher,
+  checkAndUpdatePayosStatusByAppointment,
 };

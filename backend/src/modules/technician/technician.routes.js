@@ -219,12 +219,31 @@ router.patch(
   allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
   controller.startAppointment,
 );
+router.put(
+  "/appointments/:id/start",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.startAppointment,
+);
 
 router.patch(
   "/appointments/:id/complete",
   authMiddleware,
   allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
   controller.completeAppointment,
+);
+router.put(
+  "/appointments/:id/complete",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.completeAppointment,
+);
+
+router.patch(
+  "/appointments/:id/duration",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.updateAppointmentDuration,
 );
 
 router.get(

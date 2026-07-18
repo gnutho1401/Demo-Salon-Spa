@@ -29,6 +29,7 @@ import MembershipPage from "../pages/customer/MembershipPage";
 import NotificationsPage from "../pages/customer/NotificationsPage";
 import AiAssistantPage from "../pages/customer/AiAssistantPage";
 import AiStylistAdvisor from "../pages/customer/AiStylistAdvisor";
+import SkinAnalyzerPage from "../pages/customer/SkinAnalyzerPage";
 import FeedbackPage from "../pages/customer/FeedbackPage";
 import VouchersPage from "../pages/customer/VouchersPage";
 import WaitingListPage from "../pages/customer/WaitingListPage";
@@ -351,6 +352,14 @@ export default function AppRoutes() {
         element={
           <CustomerProtectedPage>
             <AiStylistAdvisor />
+          </CustomerProtectedPage>
+        }
+      />
+      <Route
+        path="/customer/skin-analyzer"
+        element={
+          <CustomerProtectedPage>
+            <SkinAnalyzerPage />
           </CustomerProtectedPage>
         }
       />

@@ -3,7 +3,7 @@ import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
 import { useAuth } from "../../context/AuthContext";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function avatar(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;

@@ -22,6 +22,22 @@ router.get(
   controller.getAnalytics
 );
 
+// 2.5. AI Smart Note Autocomplete
+router.post(
+  "/ai-generate",
+  authMiddleware,
+  allowRoles("Admin", "Manager", "Technician"),
+  controller.generateAINote
+);
+
+// 2.6. AI Customer Advisor Insights
+router.get(
+  "/customers/:id/ai-insights",
+  authMiddleware,
+  allowRoles("Admin", "Manager", "Technician", "Receptionist"),
+  controller.getCustomerAIInsights
+);
+
 // 3. Get customer treatment history (accessible to KTV, Receptionist, Managers, Admins)
 router.get(
   "/customers/:id",

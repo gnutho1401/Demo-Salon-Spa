@@ -23,7 +23,7 @@ const TIME_SLOT = {
   ANY: "Linh hoạt cả ngày",
   MORNING: "Buổi sáng 08:00 - 12:00",
   AFTERNOON: "Buổi chiều 13:00 - 17:00",
-  EVENING: "Buổi tối 18:00 - 21:00",
+  EVENING: "Buổi tối 18:00 - 20:00",
   CUSTOM: "Tự chọn khoảng giờ",
 };
 
@@ -302,9 +302,10 @@ export default function WaitingListPage() {
           setFullyBookedEmployeeIds(bookedIds);
           
           setForm((prev) => {
-            if (prev.preferredEmployeeId && !bookedIds.includes(String(prev.preferredEmployeeId))) {
-              return { ...prev, preferredEmployeeId: "" };
-            }
+            // Keep the preferred employee fixed even if they are not fully booked
+            // if (prev.preferredEmployeeId && !bookedIds.includes(String(prev.preferredEmployeeId))) {
+            //   return { ...prev, preferredEmployeeId: "" };
+            // }
             return prev;
           });
         }
@@ -774,16 +775,6 @@ export default function WaitingListPage() {
 
                 <label>
                   Kỹ thuật viên mong muốn
-                  {form.preferredDate && filteredEmployees.length === 0 && !loadingAvailability && (
-                    <span style={{ color: "#ef4f83", fontSize: "12px", marginLeft: "10px", fontWeight: "normal" }}>
-                      (Tất cả KTV còn slot trống, hãy đặt lịch bình thường)
-                    </span>
-                  )}
-                  {form.preferredDate && filteredEmployees.length > 0 && (
-                    <span style={{ color: "#aaa", fontSize: "12px", marginLeft: "10px", fontWeight: "normal" }}>
-                      (Chỉ hiển thị KTV đã hết lịch)
-                    </span>
-                  )}
                   <select
                     value={form.preferredEmployeeId}
                     onChange={(e) => {
@@ -795,10 +786,10 @@ export default function WaitingListPage() {
                         preferredBranchId: empObj ? String(empObj.BranchId) : form.preferredBranchId
                       });
                     }}
-                    disabled={!form.serviceId || form.acceptOtherTechnician || loadingAvailability}
+                    disabled={true}
                   >
                     <option value="">Không yêu cầu</option>
-                    {filteredEmployees.map((e) => (
+                    {employees.map((e) => (
                       <option key={e.EmployeeId} value={e.EmployeeId}>
                         {e.FullName} - {e.Specialization || "Kỹ thuật viên"}
                       </option>
@@ -817,6 +808,7 @@ export default function WaitingListPage() {
                     onChange={(e) =>
                       setForm({ ...form, preferredDate: e.target.value })
                     }
+                    disabled={true}
                   />
                 </label>
 
@@ -832,13 +824,9 @@ export default function WaitingListPage() {
                         preferredTimeTo: "",
                       })
                     }
-                    disabled={form.acceptOtherTimeSlots}
+                    disabled={true}
                   >
                     <option value="ANY">Linh hoạt cả ngày</option>
-                    <option value="MORNING">Buổi sáng 08:00 - 12:00</option>
-                    <option value="AFTERNOON">Buổi chiều 13:00 - 17:00</option>
-                    <option value="EVENING">Buổi tối 18:00 - 21:00</option>
-                    <option value="CUSTOM">Tự chọn khoảng giờ</option>
                   </select>
                 </label>
               </div>
@@ -869,43 +857,7 @@ export default function WaitingListPage() {
                 </div>
               )}
 
-              <div className="booking-waitlist-checkboxes">
-                <label className="premium-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={form.acceptOtherTechnician}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setForm((prev) => ({
-                        ...prev,
-                        acceptOtherTechnician: checked,
-                        preferredEmployeeId: checked ? "" : prev.preferredEmployeeId,
-                      }));
-                    }}
-                  />
-                  <span className="checkbox-custom"></span>
-                  Chấp nhận kỹ thuật viên khác (Không yêu cầu)
-                </label>
 
-                <label className="premium-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={form.acceptOtherTimeSlots}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setForm((prev) => ({
-                        ...prev,
-                        acceptOtherTimeSlots: checked,
-                        flexibleTimeSlot: checked ? "ANY" : prev.flexibleTimeSlot,
-                        preferredTimeFrom: "",
-                        preferredTimeTo: "",
-                      }));
-                    }}
-                  />
-                  <span className="checkbox-custom"></span>
-                  Chấp nhận khung giờ khác trong ngày (Linh hoạt cả ngày)
-                </label>
-              </div>
             </div>
 
             <div className="wlx-actions">
@@ -1107,6 +1059,23 @@ export default function WaitingListPage() {
                     </div>
 
                     <div className="wlx-info-grid">
+                      {item.Status === "BOOKED" && item.ConvertedAppointmentId && (
+                        <div style={{ gridColumn: "span 2", background: "rgba(219, 39, 119, 0.1)", padding: "8px 12px", borderRadius: "8px", border: "1px dashed #db2777", marginBottom: "8px" }}>
+                          <span style={{ color: "#db2777", fontWeight: "bold" }}>Lịch hẹn liên kết</span>
+                          <b>
+                            <a
+                              href={`/customer/appointments/${item.ConvertedAppointmentId}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                navigate(`/customer/appointments/${item.ConvertedAppointmentId}`);
+                              }}
+                              style={{ color: "#db2777", textDecoration: "underline", fontWeight: "bold" }}
+                            >
+                              Xem lịch hẹn AP{String(item.ConvertedAppointmentId).padStart(5, "0")} 📅
+                            </a>
+                          </b>
+                        </div>
+                      )}
                       <div>
                         <span>Vị trí hàng chờ</span>
                         <b>#{item.WaitingPosition || 1}</b>
@@ -1224,11 +1193,7 @@ export default function WaitingListPage() {
                         </button>
                       )}
 
-                      {canEdit && (
-                        <button type="button" onClick={() => editItem(item)}>
-                          ✏️ Sửa
-                        </button>
-                      )}
+
 
                       {canCancel && (
                         <button

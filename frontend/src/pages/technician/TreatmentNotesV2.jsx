@@ -183,16 +183,15 @@ function getProductsByCategory(categoryName = "", serviceName = "") {
    ───────────────────────────────────────── */
 function getDefaults(name = "") {
   const n = name.toLowerCase();
+
+  // 1. Nail Services
   if (n.includes("nail") || n.includes("móng") || n.includes("gel") || n.includes("sơn") || n.includes("vẽ") || !name) {
     return {
       steps: [
-        "Vệ sinh & khử khuẩn móng",
-        "Dũa form móng oval",
-        "Dũa bề mặt & làm sạch",
-        "Sơn base coat",
-        "Vẽ nail art họa tiết pastel",
-        "Sơn top coat bóng",
-        "Dưỡng dầu & massage tay",
+        "Ngâm tay/chân vệ sinh móng - Làm sạch móng và ngâm nước ấm muối khoáng giúp làm mềm da quanh móng.",
+        "Cắt da & Tạo phom - Nhặt sạch tế bào da thừa quanh móng và dũa tạo dáng móng vuông hoặc tròn theo ý muốn.",
+        "Sơn liên kết & Sơn màu gel - Sơn lớp base bảo vệ móng, sơn 2 lớp màu gel cao cấp chuẩn màu và sấy máy UV khô nhanh.",
+        "Sơn phủ bóng & Thoa dưỡng - Sơn lớp phủ bóng bảo vệ màu lâu trôi và massage nhẹ nhàng vùng quanh móng bằng dầu dưỡng."
       ],
       products: [
         { name: "Son gel OPI - Bubble Bath", desc: "Màu hồng pastel" },
@@ -202,7 +201,7 @@ function getDefaults(name = "") {
       ],
       beforeCond: "Khô, dễ gãy",
       afterResult: "Đẹp, bóng khỏe",
-      observations: "Móng khách hơi khô, da quanh móng hơi khô. Bà tư vấn dưỡng ẩm và tránh tiếp xúc hóa chất. Khách thích màu hồng nhẹ nhàng.",
+      observations: "Móng khách hơi khô, da quanh móng hơi khô. Đã tư vấn dưỡng ẩm và tránh tiếp xúc hóa chất. Khách thích màu hồng nhẹ nhàng.",
       recs: ["Dưỡng ẩm da tay và móng 2-3 lần/ngày", "Tránh ngâm tay trong nước quá nóng hoặc hóa chất", "Nên quay lại sau 3 - 4 tuần để làm mới", "Sử dụng dầu dưỡng móng trước khi đi ngủ"],
       specs: [
         { label: "Tình trạng móng", field: "beforeCond", value: "Khô, dễ gãy" },
@@ -216,15 +215,22 @@ function getDefaults(name = "") {
       afterLabel: "Kết quả sau khi làm",
     };
   }
+
+  // 2. Massage / Body Services
   if (n.includes("massage") || n.includes("body") || n.includes("thư giãn") || n.includes("đá nóng")) {
     return {
-      steps: ["Làm ấm cơ thể bằng tinh dầu", "Day ấn huyệt giảm xơ cứng", "Chườm đá nóng vùng lưng vai", "Xoa bóp thải độc và thư giãn sâu"],
+      steps: [
+        "Khởi động & Giãn cơ - Xoa bóp nhẹ nhàng vùng lưng và vai với tinh dầu thảo dược giúp giãn cơ, tăng tuần hoàn.",
+        "Trị liệu chuyên sâu - Tác động lực vừa phải lên các nhóm cơ căng cứng, miết dọc sống lưng để giải phóng các điểm chèn ép.",
+        "Ấn huyệt giải độc - Bấm các huyệt vị quan trọng trên cơ thể để kích thích đào thải độc tố và xua tan căng thẳng mệt mỏi.",
+        "Thư giãn & Làm sạch - Đắp khăn nóng thảo dược giúp lưu thông khí huyết và lau sạch tinh dầu thừa nhẹ nhàng."
+      ],
       products: [
         { name: "Tinh dầu Lavender", desc: "Thảo mộc" },
         { name: "Đá bazan trị liệu", desc: "Nóng 55°C" },
       ],
       beforeCond: "Đau mỏi vai gáy",
-      afterResult: "Giảm cơ thắt, nhẹ nhõm",
+      afterResult: "Giảm co thắt cơ, nhẹ nhõm",
       observations: "Vùng cơ thang bả vai trái bị co cứng nhiều do ngồi lâu. Đã thực hiện giải cơ sâu 20 phút.",
       recs: ["Uống 500ml nước ấm sau massage", "Tập giãn cơ vai nhẹ mỗi 2 tiếng", "Hẹn lịch sau 1 tuần phục hồi"],
       specs: [
@@ -238,8 +244,73 @@ function getDefaults(name = "") {
       afterLabel: "Kết quả sau massage",
     };
   }
+
+  // 3. Skin / Facial / Skin-care Services
+  if (n.includes("da") || n.includes("skin") || n.includes("detox") || n.includes("mặt") || n.includes("facial")) {
+    return {
+      steps: [
+        "Rửa mặt sạch sâu - Dùng sữa rửa mặt dịu nhẹ loại bỏ lớp trang điểm, kem chống nắng và bụi bẩn tích tụ.",
+        "Tẩy tế bào chết & Xông hơi - Lấy đi lớp sừng già cỗi trên bề mặt da kết hợp xông hơi nóng giúp giãn nở lỗ chân lông.",
+        "Hút mụn & Oxy tươi - Hút sạch bã nhờn, mụn cám vùng chữ T và phun oxy tinh khiết cung cấp dưỡng chất sâu cho da.",
+        "Điện di tinh chất & Đắp mặt nạ - Điện di tinh chất (Vitamin C/Collagen) giúp thẩm thấu và đắp mặt nạ phục hồi dịu da."
+      ],
+      products: [
+        { name: "Sữa rửa mặt Cetaphil", desc: "Dịu nhẹ cho mọi loại da" },
+        { name: "Tinh chất Collagen tươi", desc: "Dưỡng ẩm, tái tạo da" },
+        { name: "Mặt nạ đất sét trà xanh", desc: "Làm dịu da và se khít lỗ chân lông" }
+      ],
+      beforeCond: "Da sạm, nhiều sợi bã nhờn",
+      afterResult: "Sáng mịn, sạch sâu thông thoáng",
+      observations: "Da khách hàng thuộc nhóm da hỗn hợp thiên dầu, vùng chữ T nhiều bã nhờn. Đã điện di tinh chất làm sáng da.",
+      recs: ["Thoa kem chống nắng mỗi ngày", "Cấp ẩm đầy đủ bằng toner/serum dịu nhẹ", "Nên làm dịch vụ chăm sóc da định kỳ mỗi 2 tuần"],
+      specs: [
+        { label: "Tình trạng da", field: "beforeCond", value: "Da hỗn hợp, xỉn màu" },
+        { label: "Kỹ thuật thực hiện", value: "Điện di tinh chất" },
+        { label: "Thời gian thực hiện", field: "duration", value: "1 giờ" },
+        { label: "Chi phí dịch vụ", field: "price", value: "400,000đ" }
+      ],
+      beforeLabel: "Tình trạng da trước khi chăm sóc",
+      afterLabel: "Kết quả sau khi chăm sóc"
+    };
+  }
+
+  // 4. Hair / Washing / Coloring Services
+  if (n.includes("tóc") || n.includes("hair") || n.includes("nhuộm") || n.includes("gội")) {
+    return {
+      steps: [
+        "Tư vấn & Kiểm tra da đầu - Chuyên gia kiểm tra tình trạng tóc, da đầu và tư vấn kiểu dáng, màu sắc hoặc liệu trình phục hồi phù hợp.",
+        "Gội xả sinh học thư giãn - Gội đầu thảo dược nhẹ nhàng giúp làm sạch bụi bẩn, bã nhờn và massage da đầu lưu thông khí huyết.",
+        "Kỹ thuật chuyên sâu - Tiến hành cắt, uốn, duỗi, nhuộm hoặc hấp phục hồi keratin cao cấp bằng máy móc chuyên nghiệp.",
+        "Dưỡng tóc & Tạo nếp - Thoa serum dưỡng bóng tóc chống tia UV và sấy tạo kiểu bồng bềnh tự nhiên."
+      ],
+      products: [
+        { name: "Dầu gội sinh học organic L'Oreal", desc: "Phục hồi tóc hư tổn" },
+        { name: "Tinh dầu bưởi kích thích mọc tóc", desc: "Chiết xuất tự nhiên" },
+        { name: "Serum dưỡng Keratin phục hồi", desc: "Bảo vệ tóc trước nhiệt độ sấy" }
+      ],
+      beforeCond: "Tóc xơ rối, hư tổn nhẹ",
+      afterResult: "Bóng mượt, phom tóc bồng bềnh",
+      observations: "Tóc khách có dấu hiệu xơ ở phần ngọn do nhiệt. Đã bù đắp dưỡng chất Keratin sâu tại bước phục hồi.",
+      recs: ["Hạn chế sấy tóc ở nhiệt độ quá cao tại nhà", "Sử dụng dầu xả/dầu hấp phục hồi tóc 2-3 lần/tuần", "Dùng tinh dầu dưỡng bảo vệ ngọn tóc trước ánh nắng"],
+      specs: [
+        { label: "Tình trạng tóc", field: "beforeCond", value: "Tóc xơ rối, hư tổn nhẹ" },
+        { label: "Kỹ thuật", value: "Gội dưỡng sinh & Phục hồi Keratin" },
+        { label: "Thời gian thực hiện", field: "duration", value: "1 giờ 15 phút" },
+        { label: "Chi phí dịch vụ", field: "price", value: "300,000đ" }
+      ],
+      beforeLabel: "Tình trạng tóc trước dịch vụ",
+      afterLabel: "Kết quả sau dịch vụ"
+    };
+  }
+
+  // 5. Default Fallback
   return {
-    steps: ["Vệ sinh chuẩn bị dụng cụ", "Thực hiện các bước quy trình kỹ thuật chuẩn", "Lau sạch và dưỡng ẩm hoàn tất"],
+    steps: [
+      "Tư vấn & Chuẩn bị - Kiểm tra nhu cầu của khách hàng, chuẩn bị dụng cụ và vệ sinh sạch sẽ vùng điều trị.",
+      "Chuẩn bị bề mặt - Làm sạch da/tóc hoặc ngâm mềm vùng điều trị để chuẩn bị tiếp nhận liệu trình chính.",
+      "Kỹ thuật chuyên môn - Chuyên viên giàu kinh nghiệm thực hiện các thao tác kỹ thuật bài bản, tối ưu hiệu quả điều trị.",
+      "Bảo vệ & Hướng dẫn - Thoa dưỡng chất bảo vệ và hướng dẫn quy trình tự chăm sóc tại nhà để duy trì kết quả."
+    ],
     products: [{ name: "Sản phẩm chuyên dụng Luna Salon", desc: "" }],
     beforeCond: "Bình thường",
     afterResult: "Hoàn thiện đẹp",
@@ -278,6 +349,7 @@ export default function TreatmentNotesV2() {
   const navigate = useNavigate();
   const appointmentId = sp.get("appointmentId");
   const customerIdParam = sp.get("customerId");
+  const serviceIdParam = sp.get("serviceId");
 
   /* ── data ── */
   const [customer,     setCustomer]     = useState(null);
@@ -328,6 +400,13 @@ export default function TreatmentNotesV2() {
   const [editProducts, setEditProducts] = useState([]);
   const [beforeImgs,   setBeforeImgs]   = useState([]);
   const [afterImgs,    setAfterImgs]    = useState([]);
+  const [detailedImgs, setDetailedImgs] = useState([]);
+  /* ── AI fields ── */
+  const [aiInsights, setAiInsights] = useState(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [rawAINoteInput, setRawAINoteInput] = useState("");
+  const [generatingNote, setGeneratingNote] = useState(false);
+  const [showAIInsights, setShowAIInsights] = useState(false);
   const [newStep,      setNewStep]      = useState("");
   const [showProductPicker, setShowProductPicker] = useState(false);
 
@@ -393,6 +472,148 @@ export default function TreatmentNotesV2() {
   const isFinalized = selectedNote?.status === "finalized";
   const def = useMemo(() => getDefaults(selectedNote?.ServiceName), [selectedNote]);
 
+  /* ── AI Assistants ── */
+  const toggleAIInsights = async () => {
+    if (showAIInsights) {
+      setShowAIInsights(false);
+      return;
+    }
+    
+    setShowAIInsights(true);
+    if (aiInsights || !customer?.CustomerId) return;
+    
+    try {
+      setLoadingInsights(true);
+      const res = await axiosClient.get(`/v2/treatment-notes/customers/${customer.CustomerId}/ai-insights`);
+      setAiInsights(res.data?.data);
+    } catch (err) {
+      toast$(err.response?.data?.message || err.message || "Không thể tải phân tích AI.", "error");
+      setShowAIInsights(false);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
+  const handleGenerateAINote = async () => {
+    if (!rawAINoteInput.trim()) return;
+    try {
+      setGeneratingNote(true);
+      const res = await axiosClient.post("/v2/treatment-notes/ai-generate", {
+        rawText: rawAINoteInput,
+        serviceName: selectedNote?.ServiceName,
+        categoryName: selectedNote?.CategoryName
+      });
+      const aiData = res.data?.data;
+      if (aiData) {
+        if (aiData.before_condition) setEditBefore(aiData.before_condition);
+        if (aiData.after_result) setEditAfter(aiData.after_result);
+        if (aiData.technician_notes) setEditObserv(aiData.technician_notes);
+        if (aiData.recommendations) setEditRecs(aiData.recommendations);
+        if (aiData.procedure_steps) setEditSteps(aiData.procedure_steps);
+        if (aiData.products_used) {
+          setEditProducts(aiData.products_used.map(p => typeof p === "string" ? { name: p.split(" - ")[0] || p, desc: p.split(" - ")[1] || "" } : p));
+        }
+        
+        // Suggest follow up timing if applicable
+        if (aiData.suggested_follow_up_days) {
+          const d = new Date();
+          d.setDate(d.getDate() + Number(aiData.suggested_follow_up_days));
+          const dateStr = d.toISOString().split("T")[0];
+          
+          let matchedServiceId = "";
+          const cleanSvcName = (selectedNote?.ServiceName || "").toLowerCase();
+          const foundSvc = services.find(s => cleanSvcName.includes(s.ServiceName.toLowerCase()) || s.ServiceName.toLowerCase().includes(cleanSvcName));
+          if (foundSvc) {
+            matchedServiceId = String(foundSvc.ServiceId);
+          }
+          
+          toast$(`🪄 AI khuyên tái khám sau ${aiData.suggested_follow_up_days} ngày (${d.toLocaleDateString("vi-VN")}): ${aiData.suggested_follow_up_reason || "Tái khám theo dõi phác đồ"}`, "info");
+        }
+        
+        toast$("Đã điền tự động ghi chú chuyên nghiệp bằng AI!");
+      }
+    } catch (err) {
+      toast$(err.response?.data?.message || err.message || "Không thể sinh ghi chú bằng AI.", "error");
+    } finally {
+      setGeneratingNote(false);
+    }
+  };
+
+  const applyAIBooking = () => {
+    if (!aiInsights?.suggestedFollowUp) return;
+    const { serviceId, serviceName, daysFromNow, notes } = aiInsights.suggestedFollowUp;
+    
+    const today = new Date();
+    today.setDate(today.getDate() + Number(daysFromNow));
+    const dateStr = today.toISOString().split("T")[0];
+    
+    setBookDate(dateStr);
+    
+    let matchingSvcId = String(serviceId);
+    const foundSvc = services.find(s => String(s.ServiceId) === String(serviceId) || s.ServiceName.toLowerCase() === serviceName.toLowerCase());
+    if (foundSvc) {
+      matchingSvcId = String(foundSvc.ServiceId);
+      setBookSvcName(foundSvc.ServiceName);
+      setBookSvcImage(foundSvc.ImageUrl);
+    } else {
+      const firstSvc = services[0];
+      if (firstSvc) {
+        matchingSvcId = String(firstSvc.ServiceId);
+        setBookSvcName(firstSvc.ServiceName);
+        setBookSvcImage(firstSvc.ImageUrl);
+      }
+    }
+    setBookSvc(matchingSvcId);
+    
+    const defaultKtvId = selectedNote?.technician_id || (employees[0]?.EmployeeId);
+    setBookKtv(String(defaultKtvId));
+    const ktvObj = employees.find(e => String(e.EmployeeId) === String(defaultKtvId));
+    setBookKtvName(ktvObj?.FullName || "");
+    setBookKtvAvatar(ktvObj?.AvatarUrl || "");
+    
+    setBookNote(notes || `Tái khám ${serviceName}`);
+    setBookStatus("CONFIRMED");
+    setBookDateLocked(false);
+    setShowBook(true);
+    
+    toast$("Đã áp dụng thông tin tái khám của AI vào lịch hẹn!");
+  };
+
+  const getFutureDate = (days) => {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(days));
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  };
+
+  const parseBold = (str) => {
+    if (!str) return "";
+    const parts = str.split(/\*\*([\s\S]+?)\*\*/g);
+    return parts.map((part, i) => i % 2 === 1 ? <strong key={i} className="tn-ai-strong">{part}</strong> : part);
+  };
+
+  const renderAiMarkdown = (text) => {
+    if (!text) return null;
+    const lines = text.split("\n");
+    return lines.map((line, idx) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("###")) {
+        const headingText = trimmed.replace("###", "").trim();
+        let colorClass = "tn-ai-h3";
+        if (headingText.includes("CẢNH BÁO")) colorClass = "tn-ai-h3--warning";
+        else if (headingText.includes("TIẾN TRÌNH")) colorClass = "tn-ai-h3--progress";
+        else if (headingText.includes("UP-SELL")) colorClass = "tn-ai-h3--upsell";
+        
+        return <h4 key={idx} className={`tn-ai-heading ${colorClass}`}>{headingText}</h4>;
+      }
+      if (trimmed.startsWith("-") || trimmed.startsWith("*")) {
+        const bulletText = trimmed.substring(1).trim();
+        return <li key={idx} className="tn-ai-li">{parseBold(bulletText)}</li>;
+      }
+      if (trimmed === "") return <div key={idx} style={{ height: "8px" }} />;
+      return <p key={idx} className="tn-ai-p">{parseBold(trimmed)}</p>;
+    });
+  };
+
   /* ── load user role ── */
   useEffect(() => {
     axiosClient.get("/auth/me").then(r => setUserRole(r.data?.data?.RoleName || "Technician")).catch(() => {});
@@ -410,7 +631,7 @@ export default function TreatmentNotesV2() {
         // 1. If we have activeApptId, load note or auto-create one from appointment details
         if (activeApptId) {
           try {
-            const r = await axiosClient.get(`/v2/treatment-notes/appointments/${activeApptId}`);
+            const r = await axiosClient.get(`/v2/treatment-notes/appointments/${activeApptId}${serviceIdParam ? `?serviceId=${serviceIdParam}` : ""}`);
             activeNote = r.data?.data;
             if (activeNote) {
               customerId = activeNote.customer_id;
@@ -423,7 +644,7 @@ export default function TreatmentNotesV2() {
               const data = apptR.data?.data || {};
               const fullAppt = data.appointment || {};
               const servicesList = data.services || [];
-              const serviceId = servicesList[0]?.ServiceId || 1;
+              const serviceId = serviceIdParam ? Number(serviceIdParam) : (servicesList[0]?.ServiceId || 1);
               const technicianId = fullAppt.TechnicianId || 1;
               customerId = fullAppt.CustomerId;
 
@@ -503,7 +724,7 @@ export default function TreatmentNotesV2() {
         // Load active note
         if (activeApptId && !activeNote) {
           try {
-            const r = await axiosClient.get(`/v2/treatment-notes/appointments/${activeApptId}`);
+            const r = await axiosClient.get(`/v2/treatment-notes/appointments/${activeApptId}${serviceIdParam ? `?serviceId=${serviceIdParam}` : ""}`);
             activeNote = r.data?.data;
           } catch {}
         }
@@ -525,7 +746,7 @@ export default function TreatmentNotesV2() {
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointmentId, customerIdParam]);
+  }, [appointmentId, customerIdParam, serviceIdParam]);
 
   useEffect(() => {
     if (selectedNote?.customer_id) {
@@ -637,9 +858,16 @@ export default function TreatmentNotesV2() {
       : []);
     setBeforeImgs(n.before_images?.length ? n.before_images : []);
     setAfterImgs(n.after_images?.length ? n.after_images : []);
+    setDetailedImgs(n.detailed_images?.length ? n.detailed_images : []);
   };
 
-  const selectNote = (n) => { setSelectedNote(n); initFields(n); setIsEditing(false); };
+  const selectNote = (n) => { 
+    setSelectedNote(n); 
+    initFields(n); 
+    setIsEditing(false); 
+    setAiInsights(null);
+    setShowAIInsights(false);
+  };
 
   /* ── filters ── */
   const ktvList = useMemo(() => [...new Set(timeline.map(n => n.TechnicianName).filter(Boolean))], [timeline]);
@@ -681,6 +909,7 @@ export default function TreatmentNotesV2() {
     products_used: editProducts.map(p => `${p.name}${p.desc ? ` - ${p.desc}` : ""}`),
     before_images: beforeImgs,
     after_images: afterImgs,
+    detailed_images: detailedImgs,
   });
 
   const reloadTimeline = async () => {
@@ -692,6 +921,11 @@ export default function TreatmentNotesV2() {
 
   const handleSave = async () => {
     if (!selectedNote) return;
+    const apptStatus = String(selectedNote?.AppointmentStatus || "").toUpperCase();
+    if (selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(apptStatus)) {
+      toast$("Chỉ được thực hiện/lưu phác đồ khi dịch vụ ở trạng thái Đang thực hiện hoặc Hoàn thành.", "error");
+      return;
+    }
     try {
       setSaving(true);
       await axiosClient.patch(`/v2/treatment-notes/${selectedNote.id}`, buildPayload());
@@ -705,7 +939,13 @@ export default function TreatmentNotesV2() {
   };
 
   const handleFinalize = async () => {
-    if (!selectedNote || !window.confirm("Sau khi KHÓA hồ sơ sẽ không thể chỉnh sửa. Tiếp tục?")) return;
+    if (!selectedNote) return;
+    const apptStatus = String(selectedNote?.AppointmentStatus || "").toUpperCase();
+    if (selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(apptStatus)) {
+      toast$("Chỉ được khóa phác đồ khi dịch vụ ở trạng thái Đang thực hiện hoặc Hoàn thành.", "error");
+      return;
+    }
+    if (!window.confirm("Sau khi KHÓA hồ sơ sẽ không thể chỉnh sửa. Tiếp tục?")) return;
     try {
       setSaving(true);
       await axiosClient.patch(`/v2/treatment-notes/${selectedNote.id}`, buildPayload());
@@ -719,13 +959,31 @@ export default function TreatmentNotesV2() {
     finally { setSaving(false); }
   };
 
+  const handleCustomerDeclines = async () => {
+    if (!selectedNote) return;
+    if (!window.confirm("Xác nhận khách hàng không có nhu cầu đặt lịch tái khám và muốn khóa hồ sơ điều trị này?")) return;
+    try {
+      setSaving(true);
+      await axiosClient.post(`/v2/treatment-notes/${selectedNote.id}/finalize`);
+      toast$("Đã xác nhận: Khách hàng không muốn đặt lịch tái khám. Hồ sơ điều trị đã được khóa.");
+      setIsEditing(false);
+      const d = await reloadTimeline();
+      const u = d.find(n => n.id === selectedNote.id);
+      if (u) { setSelectedNote(u); initFields(u); }
+    } catch (e) {
+      toast$(e.response?.data?.message || "Không thể khóa hồ sơ.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openEditFollowUpModal = () => {
     if (!followUpApptDetail) return;
     const apptDateStr = followUpApptDetail.AppointmentDate
       ? followUpApptDetail.AppointmentDate.split("T")[0]
       : "";
     setBookDate(apptDateStr);
-    setBookTime(followUpApptDetail.StartTime ? followUpApptDetail.StartTime.substring(0, 5) : "10:00");
+    setBookTime(formatTime(followUpApptDetail.StartTime) || "10:00");
     const svcId = followUpApptDetail.ServiceId || (followUpApptDetail.ServiceIds ? followUpApptDetail.ServiceIds.split(",")[0] : "");
     setBookSvc(String(svcId || ""));
     const svcObj = services.find(s => String(s.ServiceId) === String(svcId));
@@ -789,15 +1047,16 @@ export default function TreatmentNotesV2() {
         isWalkIn: false,
         customerPackageId: pkgId,
         parentAppointmentId: selectedNote?.appointment_id || null,
-        status: bookStatus,
-        treatmentNoteId: (bookStatus === "PENDING" && selectedNote?.id) ? selectedNote.id : undefined,
+        status: pkgId ? bookStatus : "PENDING_PAYMENT",
+        treatmentNoteId: ((bookStatus === "PENDING" || !pkgId) && selectedNote?.id) ? selectedNote.id : undefined,
       });
 
       const dataAppt = res.data?.data;
       const finalApptId = dataAppt?.appointmentId || dataAppt?.AppointmentId;
+      const actualStatus = dataAppt?.status || dataAppt?.Status || (pkgId ? bookStatus : "PENDING_PAYMENT");
 
       let updatedTimeline = null;
-      if (bookStatus === "CONFIRMED") {
+      if (actualStatus === "CONFIRMED") {
         if (selectedNote && selectedNote.status !== "finalized") {
           try {
             await axiosClient.patch(`/v2/treatment-notes/${selectedNote.id}`, {
@@ -822,7 +1081,7 @@ export default function TreatmentNotesV2() {
           }
         }
       } else {
-        // Ghi chú dạng PENDING
+        // Ghi chú dạng PENDING hoặc PENDING_PAYMENT
         if (selectedNote && finalApptId) {
           try {
             await axiosClient.patch(`/v2/treatment-notes/${selectedNote.id}`, {
@@ -913,7 +1172,7 @@ export default function TreatmentNotesV2() {
         noteId = createRes.data?.data?.noteId;
       } catch (err) {
         // Already exists – fetch from appointment
-        const findRes = await axiosClient.get(`/v2/treatment-notes/appointments/${appt.AppointmentId}`);
+        const findRes = await axiosClient.get(`/v2/treatment-notes/appointments/${appt.AppointmentId}?serviceId=${appt.ServiceId}`);
         note = findRes.data?.data;
       }
 
@@ -924,7 +1183,7 @@ export default function TreatmentNotesV2() {
           note = fullRes.data?.data;
         } catch {
           // Fallback to appointment-based lookup
-          const fallbackRes = await axiosClient.get(`/v2/treatment-notes/appointments/${appt.AppointmentId}`);
+          const fallbackRes = await axiosClient.get(`/v2/treatment-notes/appointments/${appt.AppointmentId}?serviceId=${appt.ServiceId}`);
           note = fallbackRes.data?.data;
         }
       }
@@ -1039,14 +1298,7 @@ export default function TreatmentNotesV2() {
     return null;
   }, [afterImgs]);
 
-  const detailThumbs = useMemo(() => {
-    // Chỉ lấy ảnh thật đã upload (before + after), không dùng nh ảnh placeholder
-    const allImgs = [
-      ...(beforeImgs || []).map(src => ({ src: resolveFileUrl(src), label: "TRƯỚC" })),
-      ...(afterImgs  || []).map(src => ({ src: resolveFileUrl(src), label: "SAU"   })),
-    ];
-    return allImgs;
-  }, [beforeImgs, afterImgs]);
+
 
   const getTimelineThumb = (item) => {
     if (item.ImageUrl) return resolveFileUrl(item.ImageUrl);
@@ -1385,9 +1637,78 @@ export default function TreatmentNotesV2() {
               <button className="tn-pcard-foot-btn" onClick={() => navigate(`/technician/customers?customerId=${customer?.CustomerId}`)} type="button">
                 Xem lịch sử chi tiết <span style={{ marginLeft: "4px", fontSize: "0.95rem" }}>›</span>
               </button>
+              {/* <button 
+                className="tn-pcard-foot-btn tn-pcard-foot-btn--ai" 
+                onClick={toggleAIInsights}
+                style={{
+                  background: "linear-gradient(135deg, #7c3aed, #2563eb)",
+                  color: "#fff",
+                  border: "none",
+                  marginLeft: "10px"
+                }}
+                type="button"
+              >
+                🪄 Trợ lý AI Advisor {loadingInsights ? "..." : "›"}
+              </button> */}
             </div>
           </section>
         )}
+
+        {/* {showAIInsights && (
+          <div className="tn-ai-insights-panel tn-card" style={{ marginBottom: "16px", border: "1.5px solid #d8b4fe", background: "#faf5ff" }}>
+            <div className="tn-ai-insights-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #ebd5ff", paddingBottom: "10px", marginBottom: "15px" }}>
+              <div className="tn-ai-insights-title" style={{ fontSize: "1rem", fontWeight: "700", color: "#6b21a8", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>🧠 Trợ Lý AI Advisor VIP</span>
+                <span className="tn-ai-sparkle">✨</span>
+              </div>
+              <button 
+                type="button"
+                className="tn-ai-close-btn" 
+                onClick={() => setShowAIInsights(false)}
+                style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: "1.1rem" }}
+              >
+                ✕
+              </button>
+            </div>
+            {loadingInsights ? (
+              <div className="tn-ai-loading" style={{ textAlign: "center", padding: "30px 10px" }}>
+                <span className="tn-spinner tn-spinner--ai"></span>
+                <p style={{ marginTop: "12px", fontSize: "0.85rem", color: "#7c3aed", fontWeight: "600" }}>AI đang phân tích hồ sơ và lịch sử làm đẹp của khách hàng...</p>
+              </div>
+            ) : aiInsights ? (
+              <div className="tn-ai-insights-body">
+                <div className="tn-ai-markdown" style={{ fontSize: "0.85rem", color: "var(--text-charcoal)", lineHeight: "1.6" }}>
+                  {renderAiMarkdown(aiInsights.reportMarkdown)}
+                </div>
+                
+                {aiInsights.suggestedFollowUp && (
+                  <div className="tn-ai-followup-proposal" style={{ marginTop: "20px", padding: "15px", border: "1.5px dashed #c084fc", borderRadius: "10px", background: "#fdf4ff" }}>
+                    <h4 style={{ margin: "0 0 10px 0", color: "#581c87", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.88rem", fontWeight: "700" }}>
+                      📅 Đề xuất hẹn tái khám tự động từ AI:
+                    </h4>
+                    <div className="tn-ai-proposal-details" style={{ fontSize: "0.82rem", color: "#6b21a8", display: "flex", flexDirection: "column", gap: "5px", marginBottom: "12px" }}>
+                      <div>📍 <strong>Dịch vụ đề xuất:</strong> {aiInsights.suggestedFollowUp.serviceName}</div>
+                      <div>⏰ <strong>Thời gian:</strong> Tái khám sau {aiInsights.suggestedFollowUp.daysFromNow} ngày (Khoảng ngày {getFutureDate(aiInsights.suggestedFollowUp.daysFromNow)})</div>
+                      <div>📝 <strong>Ghi chú lý do:</strong> {aiInsights.suggestedFollowUp.notes}</div>
+                    </div>
+                    <button
+                      className="tn-btn tn-btn--success tn-btn--ai-book"
+                      onClick={applyAIBooking}
+                      style={{ background: "linear-gradient(135deg, #a855f7, #7c3aed)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "6px", fontSize: "0.8rem", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" }}
+                      type="button"
+                    >
+                      📅 Áp dụng & Lên lịch hẹn này ngay
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "20px", color: "#9ca3af", fontSize: "0.82rem" }}>
+                Không thể tải phân tích AI hoặc không có đủ dữ liệu.
+              </div>
+            )}
+          </div>
+        )} */}
 
         {/* ── BODY: 2 PANELS ── */}
         <div className="tn-body">
@@ -1635,7 +1956,23 @@ export default function TreatmentNotesV2() {
                     </div>
                     <div className="tn-detail__head-actions">
                       {!isFinalized && !isEditing && (
-                        <button className="tn-btn tn-btn--outline" onClick={() => setIsEditing(true)} type="button">✏ Chỉnh sửa</button>
+                        <button 
+                          className="tn-btn tn-btn--outline" 
+                          onClick={() => {
+                            const apptStatus = String(selectedNote?.AppointmentStatus || "").toUpperCase();
+                            if (selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(apptStatus)) {
+                              toast$("Chỉ được thực hiện/chỉnh sửa phác đồ khi dịch vụ ở trạng thái Đang thực hiện hoặc Hoàn thành.", "error");
+                              return;
+                            }
+                            setIsEditing(true);
+                          }} 
+                          type="button"
+                          disabled={selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(String(selectedNote.AppointmentStatus).toUpperCase())}
+                          style={selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(String(selectedNote.AppointmentStatus).toUpperCase()) ? { opacity: 0.5, cursor: "not-allowed" } : {}}
+                          title={selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(String(selectedNote.AppointmentStatus).toUpperCase()) ? "Dịch vụ phải ở trạng thái Đang thực hiện hoặc Hoàn thành mới được chỉnh sửa" : ""}
+                        >
+                          ✏ Chỉnh sửa
+                        </button>
                       )}
                       <button className="tn-btn tn-btn--outline" onClick={() => window.print()} type="button">📥 In / PDF</button>
                       <button className="tn-btn tn-btn--outline" onClick={handleShare} type="button">🔗 Chia sẻ</button>
@@ -1663,6 +2000,54 @@ export default function TreatmentNotesV2() {
                     </div>
                   </div>
 
+                  {/* {isEditing && (
+                    <div className="tn-ai-assist-box" style={{ marginBottom: "20px", border: "1.5px solid #a855f7", borderRadius: "10px", background: "#fdf4ff", padding: "15px" }}>
+                      <div className="tn-ai-assist-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                        <span style={{ fontSize: "0.9rem", fontWeight: "700", color: "#7e22ce" }}>🪄 AI Trợ lý Soạn thảo Siêu tốc</span>
+                        <span style={{ background: "#f3e8ff", color: "#7e22ce", fontSize: "0.68rem", padding: "2px 6px", borderRadius: "4px", fontWeight: "800" }}>VIP</span>
+                      </div>
+                      <div className="tn-ai-assist-body" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <textarea
+                          className="tn-textarea tn-ai-input"
+                          rows={2}
+                          placeholder="Gõ từ khóa thô (Ví dụ: móng khô giòn dễ gãy, sơn gel hồng opi Bubble Bath, dặn bôi dầu dưỡng 2 lần/ngày)..."
+                          value={rawAINoteInput}
+                          onChange={(e) => setRawAINoteInput(e.target.value)}
+                          style={{ border: "1px solid #d8b4fe", borderRadius: "6px", fontSize: "0.82rem", padding: "8px", width: "100%", boxSizing: "border-box" }}
+                        />
+                        <button
+                          type="button"
+                          className="tn-btn tn-ai-gen-btn"
+                          disabled={generatingNote || !rawAINoteInput.trim()}
+                          onClick={handleGenerateAINote}
+                          style={{
+                            background: "linear-gradient(135deg, #a855f7, #7c3aed)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "6px",
+                            padding: "8px 16px",
+                            fontSize: "0.8rem",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "8px",
+                            alignSelf: "flex-end"
+                          }}
+                        >
+                          {generatingNote ? (
+                            <>
+                              <span className="tn-spinner tn-spinner--ai-btn" style={{ width: "12px", height: "12px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "tn-spin 0.8s linear infinite" }}></span> Đang tối ưu...
+                            </>
+                          ) : (
+                            "🪄 Tối ưu bằng AI"
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )} */}
+
                   <div className="tn-ba">
                     <div className="tn-ba__col">
                       <p className="tn-ba__label">Tình trạng trước dịch vụ</p>
@@ -1683,13 +2068,8 @@ export default function TreatmentNotesV2() {
                               onChange={e => {
                                 const f = e.target.files[0];
                                 if (!f) return;
-                                const currentCount = (beforeImgs?.length || 0) + (afterImgs?.length || 0);
-                                if ((beforeImgs?.length || 0) === 0 && currentCount >= 6) {
-                                  toast$("Tổng số hình ảnh chi tiết (trước và sau) không được vượt quá 6 hình ảnh!", "error");
-                                  return;
-                                }
                                 const r = new FileReader();
-                                r.onloadend = () => setBeforeImgs(prev => prev.length ? [r.result, ...prev.slice(1)] : [r.result]);
+                                r.onloadend = () => setBeforeImgs([r.result]);
                                 r.readAsDataURL(f);
                               }} />
                           </div>
@@ -1718,13 +2098,8 @@ export default function TreatmentNotesV2() {
                               onChange={e => {
                                 const f = e.target.files[0];
                                 if (!f) return;
-                                const currentCount = (beforeImgs?.length || 0) + (afterImgs?.length || 0);
-                                if ((afterImgs?.length || 0) === 0 && currentCount >= 6) {
-                                  toast$("Tổng số hình ảnh chi tiết (trước và sau) không được vượt quá 6 hình ảnh!", "error");
-                                  return;
-                                }
                                 const r = new FileReader();
-                                r.onloadend = () => setAfterImgs(prev => prev.length ? [r.result, ...prev.slice(1)] : [r.result]);
+                                r.onloadend = () => setAfterImgs([r.result]);
                                 r.readAsDataURL(f);
                               }} />
                           </div>
@@ -2047,36 +2422,17 @@ export default function TreatmentNotesV2() {
                       {isEditing && (
                         <div style={{ display: "flex", gap: 6 }}>
                           <label style={{ cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" }}>
-                            + Ảnh trước
+                            + Tải ảnh
                             <input type="file" accept="image/*" multiple style={{ display: "none" }}
                               onChange={e => {
                                 const files = Array.from(e.target.files || []);
-                                const currentCount = (beforeImgs?.length || 0) + (afterImgs?.length || 0);
-                                if (currentCount + files.length > 6) {
+                                if (detailedImgs.length + files.length > 6) {
                                   toast$("Tổng số hình ảnh chi tiết không được vượt quá 6 hình ảnh!", "error");
                                   return;
                                 }
                                 files.forEach(f => {
                                   const r = new FileReader();
-                                  r.onloadend = () => setBeforeImgs(prev => [...prev, r.result]);
-                                  r.readAsDataURL(f);
-                                });
-                                e.target.value = "";
-                              }} />
-                          </label>
-                          <label style={{ cursor: "pointer", fontSize: "0.78rem", fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>
-                            + Ảnh sau
-                            <input type="file" accept="image/*" multiple style={{ display: "none" }}
-                              onChange={e => {
-                                const files = Array.from(e.target.files || []);
-                                const currentCount = (beforeImgs?.length || 0) + (afterImgs?.length || 0);
-                                if (currentCount + files.length > 6) {
-                                  toast$("Tổng số hình ảnh chi tiết không được vượt quá 6 hình ảnh!", "error");
-                                  return;
-                                }
-                                files.forEach(f => {
-                                  const r = new FileReader();
-                                  r.onloadend = () => setAfterImgs(prev => [...prev, r.result]);
+                                  r.onloadend = () => setDetailedImgs(prev => [...prev, r.result]);
                                   r.readAsDataURL(f);
                                 });
                                 e.target.value = "";
@@ -2085,26 +2441,13 @@ export default function TreatmentNotesV2() {
                         </div>
                       )}
                     </div>
-                    {detailThumbs.length > 0 ? (
+                    {detailedImgs.length > 0 ? (
                       <div className="tn-gallery" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 8 }}>
-                        {/* Before images */}
-                        {(beforeImgs || []).map((src, i) => (
-                          <div key={`b-${i}`} className="tn-gallery__thumb" style={{ position: "relative" }}>
-                            <img src={resolveFileUrl(src)} alt={`trước-${i+1}`} onClick={() => setImgFull(resolveFileUrl(src))} style={{ width: "100%", height: "90px", objectFit: "cover", borderRadius: 6, cursor: "zoom-in" }} />
-                            <span style={{ position: "absolute", top: 4, left: 4, background: "#3b82f6", color: "#fff", fontSize: "0.62rem", fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>TRƯỚC</span>
+                        {(detailedImgs || []).map((src, i) => (
+                          <div key={`d-${i}`} className="tn-gallery__thumb" style={{ position: "relative" }}>
+                            <img src={resolveFileUrl(src)} alt={`chi-tiet-${i+1}`} onClick={() => setImgFull(resolveFileUrl(src))} style={{ width: "100%", height: "90px", objectFit: "cover", borderRadius: 6, cursor: "zoom-in" }} />
                             {isEditing && (
-                              <button type="button" onClick={() => setBeforeImgs(prev => prev.filter((_, j) => j !== i))}
-                                style={{ position: "absolute", top: 3, right: 3, background: "rgba(239,68,68,0.85)", color: "#fff", border: "none", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 10, lineHeight: 1 }}>✕</button>
-                            )}
-                          </div>
-                        ))}
-                        {/* After images */}
-                        {(afterImgs || []).map((src, i) => (
-                          <div key={`a-${i}`} className="tn-gallery__thumb" style={{ position: "relative" }}>
-                            <img src={resolveFileUrl(src)} alt={`sau-${i+1}`} onClick={() => setImgFull(resolveFileUrl(src))} style={{ width: "100%", height: "90px", objectFit: "cover", borderRadius: 6, cursor: "zoom-in" }} />
-                            <span style={{ position: "absolute", top: 4, left: 4, background: "#10b981", color: "#fff", fontSize: "0.62rem", fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>SAU</span>
-                            {isEditing && (
-                              <button type="button" onClick={() => setAfterImgs(prev => prev.filter((_, j) => j !== i))}
+                              <button type="button" onClick={() => setDetailedImgs(prev => prev.filter((_, j) => j !== i))}
                                 style={{ position: "absolute", top: 3, right: 3, background: "rgba(239,68,68,0.85)", color: "#fff", border: "none", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 10, lineHeight: 1 }}>✕</button>
                             )}
                           </div>
@@ -2114,7 +2457,7 @@ export default function TreatmentNotesV2() {
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 120, gap: 8, color: "var(--text-muted-gray)" }}>
                         <span style={{ fontSize: "2.2rem" }}>🖼️</span>
                         <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>
-                          {isEditing ? "Dùng nút ‘+ Ảnh trước’ / ‘+ Ảnh sau’ để tải lên" : "Chưa có hình ảnh chi tiết."}
+                          {isEditing ? "Dùng nút ‘+ Tải ảnh’ để tải lên" : "Chưa có hình ảnh chi tiết."}
                         </span>
                       </div>
                     )}
@@ -2135,7 +2478,7 @@ export default function TreatmentNotesV2() {
                           </div>
                           <div className="tn-followup__info">
                             <strong>{followUpApptDetail.ServiceName || selectedNote.ServiceName}</strong>
-                            <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>⏰ {followUpApptDetail.StartTime ? followUpApptDetail.StartTime.substring(0, 5) : "10:00"} (CN {followUpApptDetail.BranchId || 1})</p>
+                            <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>⏰ {formatTime(followUpApptDetail.StartTime) || "10:00"} (CN {followUpApptDetail.BranchId || 1})</p>
                             <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>👤 KTV: {followUpApptDetail.EmployeeName || selectedNote.TechnicianName}</p>
                             <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>🏷️ Trạng thái: <strong style={{ color: followUpApptDetail.Status === "CONFIRMED" ? "#16a34a" : "#d97706" }}>{followUpApptDetail.Status === "CONFIRMED" ? "Đã xác nhận" : "Chờ xác nhận"}</strong></p>
                           </div>
@@ -2230,6 +2573,9 @@ export default function TreatmentNotesV2() {
                               setBookNote("");
                               setShowBook(true);
                             }} type="button">🔁 Chọn ngày khác
+                            </button>
+                            <button className="tn-btn tn-btn--sm" style={{ justifyContent: "center", width: "100%", backgroundColor: "#fff5f5", color: "#c53030", border: "1px solid #feb2b2", fontWeight: "700" }} onClick={handleCustomerDeclines} type="button">
+                              🚫 Khách hàng không muốn
                             </button>
                           </>
                         ) : (

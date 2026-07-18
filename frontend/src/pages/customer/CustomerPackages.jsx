@@ -232,6 +232,24 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
     }
   };
 
+  const handleRepayPayos = async (customerPackageId) => {
+    setActionLoading(true);
+    try {
+      setMessage("");
+      const res = await axiosClient.post(`/packages/my/${customerPackageId}/repay-payos`);
+      const data = res.data.data || res.data;
+      if (data && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        throw new Error("Không nhận được URL thanh toán");
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Lỗi tạo link thanh toán PayOS");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading && !detail) {
     return (
       <div className="pkg-detail-panel">
@@ -526,14 +544,24 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
               </span>
             </div>
             {d.Status === "PENDING_PAYMENT" && !!d.IsOwner && (
-              <button
-                className="btn primary"
-                style={{ width: "100%", marginTop: "16px", justifyContent: "center" }}
-                onClick={() => handleRepay(d.CustomerPackageId)}
-                disabled={actionLoading}
-              >
-                💳 {actionLoading ? "Đang xử lý..." : "Thanh toán ngay qua VNPay"}
-              </button>
+              <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                <button
+                  className="btn primary"
+                  style={{ flex: 1, justifyContent: "center" }}
+                  onClick={() => handleRepay(d.CustomerPackageId)}
+                  disabled={actionLoading}
+                >
+                  💳 VNPay
+                </button>
+                <button
+                  className="btn primary"
+                  style={{ flex: 1, justifyContent: "center", background: "#ef4f83", borderColor: "#ef4f83" }}
+                  onClick={() => handleRepayPayos(d.CustomerPackageId)}
+                  disabled={actionLoading}
+                >
+                  📲 PayOS
+                </button>
+              </div>
             )}
           </div>
 
@@ -564,7 +592,7 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
                     <div key={m.PackageMemberId} className="pkg-member-card-premium">
                       <img
                         className="pkg-member-avatar"
-                        src={resolveFileUrl(m.AvatarUrl) || "/images/default-avatar.png"}
+                        src={resolveFileUrl(m.AvatarUrl) || "/images/avatars/default-avatar.png"}
                         alt={m.FullName}
                       />
                       <div className="pkg-member-info">
@@ -667,7 +695,7 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
                     onMouseLeave={(e) => e.currentTarget.style.background = "#fff"}
                   >
                     <img
-                      src={resolveFileUrl(m.AvatarUrl) || "/images/default-avatar.png"}
+                      src={resolveFileUrl(m.AvatarUrl) || "/images/avatars/default-avatar.png"}
                       alt={m.FullName}
                       style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }}
                     />
@@ -705,7 +733,7 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <img
-                  src={resolveFileUrl(selectedMember.AvatarUrl) || "/images/default-avatar.png"}
+                  src={resolveFileUrl(selectedMember.AvatarUrl) || "/images/avatars/default-avatar.png"}
                   alt={selectedMember.FullName}
                   style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }}
                 />
@@ -820,6 +848,17 @@ export default function CustomerPackages() {
     }
   };
 
+  const buyPayos = async (id) => {
+    try {
+      setMessage("");
+      const res = await axiosClient.post(`/packages/${id}/payos`);
+      const data = res.data.data || res.data;
+      window.location.href = data.paymentUrl;
+    } catch (err) {
+      alert(err.response?.data?.message || "Không tạo được thanh toán PayOS");
+    }
+  };
+
   return (
     <CustomerLayout>
       <section className="customer-combo-page">
@@ -888,46 +927,53 @@ export default function CustomerPackages() {
                     className="my-combo-card"
                     key={p.CustomerPackageId}
                     onClick={() => setSelectedPkg(p)}
-                    style={{ cursor: "pointer" }}
                   >
-                    <img
-                      src={resolveFileUrl(p.ImageUrl) || "/vite.svg"}
-                      alt={p.PackageName}
-                    />
-                    <div>
-                      <div className="combo-category">
-                        {p.CategoryName}
+                    <div className="my-combo-card-img-wrap">
+                      <img
+                        src={resolveFileUrl(p.ImageUrl) || "/images/services/default-service.png"}
+                        alt={p.PackageName}
+                      />
+                      {p.CategoryName && (
+                        <span className="my-combo-card-badge">{p.CategoryName}</span>
+                      )}
+                    </div>
+
+                    <div className="my-combo-card-body">
+                      <div>
                         {!p.IsOwner && (
-                          <span style={{ marginLeft: 8, background: "#dbeafe", color: "#1e40af", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
-                            Được chia sẻ
-                          </span>
+                          <div style={{ marginBottom: 4 }}>
+                            <span style={{ background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                              👥 Được chia sẻ
+                            </span>
+                          </div>
                         )}
+                        <h3 className="my-combo-card-title">{p.PackageName}</h3>
+                        <p className="my-combo-card-desc">{p.ServiceNames || "Dịch vụ chăm sóc spa chuyên sâu"}</p>
                       </div>
-                      <h3>{p.PackageName}</h3>
-                      <p className="muted">{p.ServiceNames}</p>
-                      <div className="combo-progress">
-                        <span style={{ width: `${percent}%` }} />
-                      </div>
-                      <div className="combo-meta">
-                        <span>
-                          {used}/{total} buổi đã dùng
-                        </span>
-                        <span>
-                          {remaining !== null && remaining >= 0
-                            ? `Còn ${remaining} ngày`
-                            : remaining !== null
-                              ? "Đã hết hạn"
-                              : "Chưa kích hoạt"}
-                        </span>
-                      </div>
-                      <div
-                        className="combo-meta"
-                        style={{ justifyContent: "space-between" }}
-                      >
-                        <StatusBadge status={p.Status} />
-                        <span className="muted" style={{ fontSize: 12 }}>
-                          Nhấn để xem chi tiết →
-                        </span>
+
+                      <div>
+                        <div className="my-combo-card-progress-wrap">
+                          <div className="combo-progress">
+                            <span style={{ width: `${percent}%` }} />
+                          </div>
+                          <div className="my-combo-card-stats">
+                            <span><b>{used}/{total}</b> buổi đã dùng</span>
+                            <span className="my-combo-card-days">
+                              {remaining !== null && remaining >= 0
+                                ? `Còn ${remaining} ngày`
+                                : remaining !== null
+                                  ? "Đã hết hạn"
+                                  : "Chưa kích hoạt"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="my-combo-card-footer">
+                          <StatusBadge status={p.Status} />
+                          <span className="my-combo-card-cta">
+                            Nhấn xem chi tiết <span className="arrow">→</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </article>
@@ -1006,18 +1052,27 @@ export default function CustomerPackages() {
                         <del>{money(p.Price)}</del>
                       )}
                     </div>
-                    <div className="combo-actions">
+                    <div className="combo-actions" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
                       <button
                         className="card-btn"
+                        style={{ margin: 0, padding: "8px 4px", fontSize: "11px" }}
                         onClick={() => navigate(`/packages/${p.PackageId}`)}
                       >
                         Chi tiết
                       </button>
                       <button
                         className="card-btn primary"
+                        style={{ margin: 0, padding: "8px 4px", fontSize: "11px" }}
                         onClick={() => buyVnpay(p.PackageId)}
                       >
-                        Thanh toán VNPay
+                        VNPay
+                      </button>
+                      <button
+                        className="card-btn primary"
+                        style={{ margin: 0, padding: "8px 4px", fontSize: "11px", background: "#ef4f83", borderColor: "#ef4f83" }}
+                        onClick={() => buyPayos(p.PackageId)}
+                      >
+                        PayOS
                       </button>
                     </div>
                   </div>

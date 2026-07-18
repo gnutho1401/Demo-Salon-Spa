@@ -4,7 +4,7 @@ import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
 import "../../styles/pages/receptionist.css";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function avatarUrl(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
@@ -25,7 +25,7 @@ const TIME_SLOT_MAP = {
   ANY: "Linh hoạt cả ngày",
   MORNING: "Sáng (08:00 - 12:00)",
   AFTERNOON: "Chiều (13:00 - 17:00)",
-  EVENING: "Tối (18:00 - 21:00)",
+  EVENING: "Tối (18:00 - 20:00)",
   CUSTOM: "Tự chọn khoảng giờ",
 };
 
@@ -564,7 +564,7 @@ export default function ReceptionistWaitingList() {
                 <option value="ANY">Linh hoạt cả ngày</option>
                 <option value="MORNING">Buổi sáng 08:00 - 12:00</option>
                 <option value="AFTERNOON">Buổi chiều 13:00 - 17:00</option>
-                <option value="EVENING">Buổi tối 18:00 - 21:00</option>
+                <option value="EVENING">Buổi tối 18:00 - 20:00</option>
                 <option value="CUSTOM">Tự chọn khoảng giờ</option>
               </select>
             </label>
@@ -1029,7 +1029,7 @@ export default function ReceptionistWaitingList() {
                             </button>
                           )}
 
-                          {["WAITING", "NOTIFIED", "MATCHED", "SKIPPED", "EXPIRED"].includes(item.Status) && (
+                          {["WAITING", "NOTIFIED"].includes(item.Status) && (
                             <button
                               type="button"
                               className="wl-mini-btn danger"

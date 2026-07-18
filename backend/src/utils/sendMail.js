@@ -26,14 +26,23 @@ async function sendMail({ to, subject, html }) {
     return { skipped: true };
   }
 
-  await transporter.sendMail({
-    from: `Beauty Salon <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html,
-  });
-
-  return { skipped: false };
+  try {
+    await transporter.sendMail({
+      from: `Beauty Salon <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    return { skipped: false };
+  } catch (err) {
+    console.error('Lỗi khi gửi email qua SMTP:', err.message);
+    console.log('Chuyển hướng in nội dung email ra console:', {
+      to,
+      subject,
+      html,
+    });
+    return { skipped: true, error: err.message };
+  }
 }
 
 async function sendVerifyEmail(to, code) {
