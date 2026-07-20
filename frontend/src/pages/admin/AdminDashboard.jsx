@@ -125,7 +125,15 @@ function ActionChip({ children, onClick, urgent = false }) {
 }
 
 /* ─────────── Mini Panel ─────────── */
-function MiniPanel({ title, icon, children, linkLabel, onLink }) {
+function MiniPanel({
+  title,
+  icon,
+  children,
+  linkLabel,
+  onLink,
+  secondaryLinkLabel,
+  onSecondaryLink,
+}) {
   return (
     <div
       style={{
@@ -151,28 +159,45 @@ function MiniPanel({ title, icon, children, linkLabel, onLink }) {
         {icon} {title}
       </h4>
       <div style={{ flex: 1 }}>{children}</div>
-      {linkLabel && onLink && (
-        <button
-          onClick={onLink}
-          style={{
-            marginTop: 12,
-            background: "none",
-            border: "1px solid #f6d0db",
-            borderRadius: "999px",
-            color: "#e8396c",
-            fontSize: "12px",
-            fontWeight: "700",
-            padding: "5px 14px",
-            cursor: "pointer",
-            alignSelf: "flex-start",
-            transition: "background 0.2s",
-          }}
-          onMouseEnter={(e) => e.target.style.background = "#fdf0f4"}
-          onMouseLeave={(e) => e.target.style.background = "none"}
-        >
-          {linkLabel} →
-        </button>
-      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+        {linkLabel && onLink && (
+          <button
+            onClick={onLink}
+            style={{
+              background: "none",
+              border: "1px solid #f6d0db",
+              borderRadius: "999px",
+              color: "#e8396c",
+              fontSize: "12px",
+              fontWeight: "700",
+              padding: "5px 14px",
+              cursor: "pointer",
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "#fdf0f4"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+          >
+            {linkLabel} →
+          </button>
+        )}
+        {secondaryLinkLabel && onSecondaryLink && (
+          <button
+            onClick={onSecondaryLink}
+            style={{
+              background: "none",
+              border: "1px solid #ead8bd",
+              borderRadius: "999px",
+              color: "#8a653a",
+              fontSize: "12px",
+              fontWeight: "700",
+              padding: "5px 14px",
+              cursor: "pointer",
+            }}
+          >
+            {secondaryLinkLabel} →
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -649,7 +674,14 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 16 }}>
-                  <MiniPanel title="Tài Khoản Người Dùng" icon="👤" linkLabel="Quản lý users" onLink={() => navigate("/admin/users")}>
+                  <MiniPanel
+                    title="Nhân sự & khách hàng"
+                    icon="👥"
+                    linkLabel="Quản lý nhân viên"
+                    onLink={() => navigate("/admin/employees")}
+                    secondaryLinkLabel="Quản lý khách hàng"
+                    onSecondaryLink={() => navigate("/admin/customers")}
+                  >
                     <InfoRow label="Đang hoạt động" value={summary.activeUsers ?? 0} valueColor="#10b981" />
                     <InfoRow label="Không hoạt động" value={summary.inactiveUsers ?? 0} />
                     <InfoRow label="Bị khóa (Banned)" value={summary.bannedUsers ?? 0} valueColor="#ef4444" />

@@ -5,16 +5,12 @@ import AppRoutes from "./routes/AppRoutes";
 import "./styles/main.css";
 
 export default function App() {
-  const googleClientId =
-    import.meta.env.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID";
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || "not-configured";
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
-      {" "}
       <BrowserRouter>
-        {" "}
         <AuthProvider>
-          {" "}
           <AppRoutes />
         </AuthProvider>
       </BrowserRouter>

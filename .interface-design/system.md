@@ -57,6 +57,9 @@ Quy tắc:
 - Sidebar desktop bám theo viewport và có vùng cuộn riêng.
 - Dưới breakpoint `992px`, sidebar chuyển thành mobile drawer.
 - Sau khi chuyển route trên mobile, drawer phải tự đóng.
+- Không dùng module “Tài khoản” độc lập trong Admin. Tài khoản nội bộ (`ADMIN`, `MANAGER`, `RECEPTIONIST`, `TECHNICIAN`) được quản lý tại **Nhân viên**; tài khoản `CUSTOMER` được quản lý tại **Khách hàng**.
+- Mỗi tài khoản nội bộ phải có đúng một hồ sơ `Employees`; mỗi tài khoản Customer phải có đúng một hồ sơ `Customers`. Form của hai module chịu trách nhiệm cả thông tin đăng nhập, trạng thái và hồ sơ nghiệp vụ.
+- Route cũ `/admin/users` chỉ dùng để chuyển hướng tương thích về `/admin/employees`; không hiển thị lại mục menu hoặc màn hình quản trị tài khoản chung.
 
 ## 4. Mobile drawer
 
@@ -151,3 +154,20 @@ rg -n "window\.(confirm|alert)|\bconfirm\(" frontend/src/pages/admin frontend/sr
 - Style Admin dùng chung: `frontend/src/styles/pages/admin.css`.
 
 Tại thời điểm cập nhật tài liệu, mã Admin không còn native `window.confirm` hoặc `alert`. Lỗi thao tác thông thường phải hiển thị bằng trạng thái nội tuyến; hành động có hậu quả phải đi qua `AdminConfirmDialog`.
+
+## 11. Ảnh dịch vụ và hồ sơ nhân sự
+
+Ảnh là dữ liệu nhận diện nghiệp vụ và phải dùng chung giữa mọi vai trò; không tạo bản sao khác nhau cho Admin, Lễ tân, Kỹ thuật viên và Khách hàng.
+
+- Nguồn chuẩn duy nhất là URL tương đối `/images/...`, được backend phục vụ từ `backend/public/images`. Frontend không giữ một kho ảnh tĩnh riêng.
+- `ServiceCategories.ImageUrl`, `Services.ImageUrl`, `Packages.ImageUrl` và `Promotions.ImageUrl` phải trỏ đến file tồn tại trước khi phát hành dữ liệu.
+- Ảnh danh mục, dịch vụ và khuyến mãi dùng bố cục ngang, vùng chủ thể an toàn khi cắt ở tỷ lệ `3:2` hoặc `16:9`, hiển thị bằng `object-fit: cover`.
+- Ảnh dịch vụ phải hấp dẫn nhưng mô tả đúng nhóm nghiệp vụ; không dùng chữ nhúng trong ảnh, logo giả, watermark hoặc bao bì có thương hiệu.
+- Ảnh hồ sơ nhân viên dùng tỷ lệ vuông, chân dung người trưởng thành, diện mạo trẻ và chuyên nghiệp, ánh sáng tự nhiên, nền Salon tông linen–walnut–brass và đủ khoảng trống cho avatar tròn.
+- Không dùng selfie, ảnh có watermark, đồng phục giống học sinh, bộ lọc làm đẹp quá mức hoặc ảnh người nổi tiếng.
+- Với tài khoản đã liên kết nhân viên, `Users.AvatarUrl` và `Employees.ImageUrl` phải giống nhau. Khi đổi ảnh phải cập nhật hai trường trong cùng một giao dịch.
+- Ảnh dự phòng theo loại dữ liệu: dịch vụ dùng `/images/services/default-service.png`; khuyến mãi dùng `/images/promotions/promo-1.png`; tài khoản dùng avatar mặc định theo vai trò.
+- Mỗi thẻ ảnh phải có `alt` mô tả tên đối tượng. Ảnh thuần trang trí dùng `alt=""`.
+- Khi ảnh lỗi tải, thay bằng ảnh dự phòng cùng loại và dừng sau một lần để tránh vòng lặp `onError`.
+
+Migration chuẩn để đồng bộ URL ảnh: `database/migrations/sync_image_assets.sql`.

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
-const DEFAULT_IMAGE = "/images/promotion-default.jpg";
+const DEFAULT_IMAGE = "/images/promotions/promo-1.png";
 
 const emptyForm = {
   title: "",
@@ -1363,7 +1363,7 @@ export default function AdminPromotions() {
                   onChange={(e) =>
                     setForm({ ...form, imageUrl: e.target.value })
                   }
-                  placeholder="/images/promotion-default.jpg"
+                  placeholder="/images/promotions/promo-1.png"
                 />
               </label>
 

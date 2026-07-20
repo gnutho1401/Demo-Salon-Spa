@@ -4,6 +4,17 @@ import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
+const ROLE_LABELS = {
+  ADMIN: "Quản trị viên",
+  MANAGER: "Quản lý",
+  RECEPTIONIST: "Lễ tân",
+  TECHNICIAN: "Kỹ thuật viên",
+};
+
+function roleLabel(roleName) {
+  return ROLE_LABELS[roleName] || roleName || "Chưa xác định";
+}
+
 const emptyForm = {
   fullName: "",
   email: "",
@@ -207,6 +218,9 @@ export default function AdminEmployees() {
     if (!editingId && !form.password.trim()) {
       return setError("Vui lòng nhập mật khẩu khi tạo nhân viên");
     }
+    if (form.password.trim() && form.password.trim().length < 6) {
+      return setError("Mật khẩu phải có ít nhất 6 ký tự");
+    }
 
     const payload = {
       fullName: form.fullName.trim(),
@@ -227,7 +241,7 @@ export default function AdminEmployees() {
       imageUrl: form.imageUrl.trim() || form.avatarUrl.trim() || null,
     };
 
-    if (!editingId) payload.password = form.password;
+    if (form.password.trim()) payload.password = form.password.trim();
 
     try {
       setSaving(true);
@@ -591,13 +605,15 @@ export default function AdminEmployees() {
           margin-bottom: 16px;
           font-size: 13px;
         }
-        .info-item {
+        .admin-employee-info .info-item {
+          display: block;
+          min-width: 0;
           background: #f8fafc;
           padding: 10px;
           border-radius: 8px;
           border: 1px solid #f1f5f9;
         }
-        .info-item span {
+        .admin-employee-info .info-item span {
           display: block;
           font-size: 10px;
           color: #94a3b8;
@@ -605,9 +621,13 @@ export default function AdminEmployees() {
           text-transform: uppercase;
           margin-bottom: 2px;
         }
-        .info-item strong {
+        .admin-employee-info .info-item strong {
+          display: block;
+          min-width: 0;
           color: #334155;
           font-size: 12.5px;
+          line-height: 1.35;
+          overflow-wrap: anywhere;
         }
         
         .card-btn-action {
@@ -843,9 +863,9 @@ export default function AdminEmployees() {
           <div className="admin-eyebrow" style={{ textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, fontSize: "11px", color: "#d6b57e" }}>
             Hệ thống quản trị
           </div>
-          <h1>Quản lý nhân sự</h1>
+          <h1>Quản lý nhân viên</h1>
           <p>
-            Quản lý tài khoản nhân viên, vị trí, mức lương, chi nhánh và dịch vụ phụ trách của kỹ thuật viên Spa.
+            Quản lý đầy đủ tài khoản Admin, Quản lý, Lễ tân và Kỹ thuật viên cùng hồ sơ công việc tương ứng.
           </p>
         </div>
 
@@ -920,7 +940,7 @@ export default function AdminEmployees() {
           <option value="">Tất cả vai trò</option>
           {roles.map((r) => (
             <option key={r.RoleId} value={r.RoleId}>
-              {r.RoleName}
+              {roleLabel(r.RoleName)}
             </option>
           ))}
         </select>
@@ -988,7 +1008,7 @@ export default function AdminEmployees() {
                 <div className="admin-employee-info">
                   <div className="info-item">
                     <span>Vai trò</span>
-                    <strong>{item.RoleName}</strong>
+                    <strong>{roleLabel(item.RoleName)}</strong>
                   </div>
                   <div className="info-item">
                     <span>Chi nhánh</span>
@@ -1114,7 +1134,7 @@ export default function AdminEmployees() {
               {activeDetailTab === "general" ? (
                 <div className="detail-grid">
                   <p><strong>Số điện thoại:</strong> {selected.Phone || "Chưa có"}</p>
-                  <p><strong>Vai trò:</strong> {selected.RoleName}</p>
+                  <p><strong>Vai trò:</strong> {roleLabel(selected.RoleName)}</p>
                   <p><strong>Chi nhánh làm việc:</strong> {selected.BranchName || "Chưa gán"}</p>
                   <p><strong>Địa chỉ chi nhánh:</strong> {selected.BranchAddress || "Chưa có"}</p>
                   <p><strong>Vị trí:</strong> {selected.Position || "Chưa có"}</p>
@@ -1205,7 +1225,7 @@ export default function AdminEmployees() {
                     <option value="">Chọn vai trò</option>
                     {roles.map((r) => (
                       <option key={r.RoleId} value={r.RoleId}>
-                        {r.RoleName}
+                        {roleLabel(r.RoleName)}
                       </option>
                     ))}
                   </select>
@@ -1325,18 +1345,19 @@ export default function AdminEmployees() {
                   />
                 </label>
 
-                {!editingId && (
-                  <label className="form-label">
-                    Mật khẩu khởi tạo tài khoản *
-                    <input
-                      className="form-input"
-                      type="password"
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      required
-                    />
-                  </label>
-                )}
+                <label className="form-label">
+                  {editingId
+                    ? "Mật khẩu mới (để trống nếu giữ nguyên)"
+                    : "Mật khẩu khởi tạo tài khoản *"}
+                  <input
+                    className="form-input"
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    minLength={6}
+                    required={!editingId}
+                  />
+                </label>
 
                 <label className="form-label form-wide">
                   Tóm tắt tiểu sử bản thân
@@ -1450,7 +1471,7 @@ export default function AdminEmployees() {
           confirmAction ? (
             <>
               <strong>{confirmAction.item.FullName}</strong>
-              <span> · {confirmAction.item.Position || confirmAction.item.RoleName || "Nhân viên"} · Trạng thái mới: {confirmAction.nextStatus}</span>
+              <span> · {confirmAction.item.Position || roleLabel(confirmAction.item.RoleName) || "Nhân viên"} · Trạng thái mới: {confirmAction.nextStatus}</span>
             </>
           ) : null
         }

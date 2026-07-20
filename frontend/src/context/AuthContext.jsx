@@ -3,13 +3,30 @@ import axiosClient from '../api/axiosClient';
 
 const AuthContext = createContext(null);
 
+function readStoredUser() {
+  const savedUser = localStorage.getItem('user');
+  if (!savedUser || savedUser === 'undefined' || savedUser === 'null') {
+    return null;
+  }
+
+  try {
+    const parsedUser = JSON.parse(savedUser);
+    return parsedUser && typeof parsedUser === 'object' ? parsedUser : null;
+  } catch (_) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [user, setUser] = useState(readStoredUser);
 
   const login = (data) => {
+    if (!data?.token || !data?.user || typeof data.user !== 'object') {
+      throw new Error('Phản hồi đăng nhập không hợp lệ');
+    }
+
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);

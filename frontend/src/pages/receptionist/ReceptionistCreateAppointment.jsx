@@ -735,7 +735,7 @@ export default function ReceptionistCreateAppointment() {
                             onClick={() => chooseService(item.ServiceId)}
                           >
                             <img
-                              src={resolveFileUrl(item.ImageUrl) || "/images/default-service.jpg"}
+                              src={resolveFileUrl(item.ImageUrl) || "/images/services/default-service.png"}
                               alt={item.ServiceName}
                             />
                             <div className="booking-service-body">
@@ -947,7 +947,7 @@ export default function ReceptionistCreateAppointment() {
                       <img
                         src={
                           resolveFileUrl(selectedService.ImageUrl) ||
-                          "/images/default-service.jpg"
+                          "/images/services/default-service.png"
                         }
                         alt={selectedService.ServiceName}
                       />

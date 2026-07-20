@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route } from "react-router-dom";
 import TechniciansPage from "../pages/guest/TechniciansPage";
 import GuestLayout from "../components/layout/GuestLayout";
 import Home from "../pages/guest/Home";
@@ -45,7 +45,6 @@ import AdminServices from "../pages/admin/AdminServices";
 import AdminPromotions from "../pages/admin/AdminPromotions";
 import AdminVouchers from "../pages/admin/AdminVouchers";
 import AdminMemberships from "../pages/admin/AdminMemberships";
-import AdminUsers from "../pages/admin/AdminUsers";
 import AdminServiceCategories from "../pages/admin/AdminServiceCategories";
 import AdminReviews from "../pages/admin/AdminReviews";
 import AdminFeedbacks from "../pages/admin/AdminFeedbacks";
@@ -714,13 +713,7 @@ export default function AppRoutes() {
       />
       <Route
         path="/admin/users"
-        element={
-          <AdminProtectedPage>
-            <AdminLayout>
-              <AdminUsers />
-            </AdminLayout>
-          </AdminProtectedPage>
-        }
+        element={<Navigate to="/admin/employees" replace />}
       />
       <Route
         path="/admin/packages"

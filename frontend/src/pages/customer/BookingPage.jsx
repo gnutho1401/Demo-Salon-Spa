@@ -959,7 +959,7 @@ export default function BookingPage() {
                             <img
                               src={
                                 resolveFileUrl(item.ImageUrl) ||
-                                "/images/default-service.jpg"
+                                "/images/services/default-service.png"
                               }
                               alt={item.ServiceName}
                             />
@@ -1064,7 +1064,7 @@ export default function BookingPage() {
                               <img
                                 src={
                                   resolveFileUrl(item.ImageUrl) ||
-                                  "/images/default-service.jpg"
+                                  "/images/services/default-service.png"
                                 }
                                 alt={item.ServiceName}
                               />
@@ -1357,7 +1357,7 @@ export default function BookingPage() {
                   <img
                     src={
                       resolveFileUrl(selectedService.ImageUrl) ||
-                      "/images/default-service.jpg"
+                      "/images/services/default-service.png"
                     }
                     alt={selectedService.ServiceName}
                   />

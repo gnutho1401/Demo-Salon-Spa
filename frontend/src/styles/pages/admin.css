@@ -1303,7 +1303,9 @@ body:has(
   gap: 10px;
 }
 
-.admin-employee-info div {
+.admin-employee-info .info-item {
+  display: block;
+  min-width: 0;
   padding: 12px;
   border-radius: 16px;
   background: #fff6e9;
@@ -1318,8 +1320,12 @@ body:has(
 }
 
 .admin-employee-info strong {
+  display: block;
+  min-width: 0;
   color: #2f1f14;
   font-size: 0.9rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .admin-card-actions {

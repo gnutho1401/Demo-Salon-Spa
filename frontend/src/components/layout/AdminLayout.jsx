@@ -31,10 +31,7 @@ const navGroups = [
   },
   {
     label: "Nhân sự & quyền truy cập",
-    items: [
-      { to: "/admin/employees", label: "Nhân viên", icon: "employees" },
-      { to: "/admin/users", label: "Tài khoản", icon: "users" },
-    ],
+    items: [{ to: "/admin/employees", label: "Nhân viên", icon: "employees" }],
   },
   {
     label: "Tài chính & kiểm soát",
@@ -62,7 +59,6 @@ const iconPaths = {
   feedback: "M4 4h16v12H8l-4 4V4Zm4 5h8m-8 3h5",
   spark: "m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Zm6 11 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z",
   employees: "M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7-4h6m-3-3v6M2 21v-3a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v3",
-  users: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9v-2a7 7 0 0 1 14 0v2",
   refund: "M4 10a8 8 0 1 1 2 7m-2 0v-5h5m3-5v10m-3-3 3 3 3-3",
   report: "M5 3h10l4 4v14H5V3Zm10 0v5h4M9 13h6m-6 4h6",
   chart: "M4 20V10m6 10V4m6 16v-7m4 7H2",

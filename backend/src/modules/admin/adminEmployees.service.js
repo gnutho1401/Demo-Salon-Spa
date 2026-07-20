@@ -321,10 +321,15 @@ async function update(id, data) {
       ? toInt(data.yearsOfExperience, 0)
       : current.YearsOfExperience;
   const bio = data.bio !== undefined ? nullable(data.bio) : current.Bio;
+  const newPassword =
+    data.password !== undefined ? text(data.password) : "";
 
   if (!fullName) throw new Error("Họ tên không được để trống");
   if (!email) throw new Error("Email không được để trống");
   if (!roleId) throw new Error("Vui lòng chọn vai trò");
+  if (newPassword && newPassword.length < 6) {
+    throw new Error("Mật khẩu phải có ít nhất 6 ký tự");
+  }
 
   const pool = await connectDB();
 
@@ -339,6 +344,9 @@ async function update(id, data) {
 
   if (existed.recordset[0]) throw new Error("Email đã tồn tại");
 
+  const passwordHash = newPassword
+    ? await bcrypt.hash(newPassword, 10)
+    : null;
   const transaction = new sql.Transaction(pool);
 
   try {
@@ -351,6 +359,7 @@ async function update(id, data) {
       .input("Phone", sql.NVarChar, phone)
       .input("RoleId", sql.Int, roleId)
       .input("AvatarUrl", sql.NVarChar, avatarUrl)
+      .input("PasswordHash", sql.NVarChar, passwordHash)
       .input("Status", sql.NVarChar, userStatus).query(`
         UPDATE Users
         SET FullName = @FullName,
@@ -358,6 +367,7 @@ async function update(id, data) {
             Phone = @Phone,
             RoleId = @RoleId,
             AvatarUrl = @AvatarUrl,
+            PasswordHash = COALESCE(@PasswordHash, PasswordHash),
             Status = @Status,
             UpdatedAt = GETDATE()
         WHERE UserId = @UserId
