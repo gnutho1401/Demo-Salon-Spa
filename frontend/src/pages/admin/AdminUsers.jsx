@@ -1186,7 +1186,7 @@ export default function AdminUsers() {
       {/* DETAIL MODAL (React Portal) */}
       {selected && createPortal(
         <div className="admin-modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="admin-modal-wrapper" style={{ maxWidth: 750 }} onClick={(e) => e.stopPropagation()}>
+          <div className="admin-modal-wrapper admin-user-detail-modal" style={{ maxWidth: 750 }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-profile-header">
               {renderAvatar(selected, 64)}
               <div>

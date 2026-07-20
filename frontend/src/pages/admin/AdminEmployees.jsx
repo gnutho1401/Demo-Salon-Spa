@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
@@ -53,6 +54,8 @@ export default function AdminEmployees() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   // Tabs inside detail modal
   const [activeDetailTab, setActiveDetailTab] = useState("general");
@@ -258,12 +261,7 @@ export default function AdminEmployees() {
     }
   }
 
-  async function changeStatus(item, nextStatus) {
-    const ok = window.confirm(
-      `Bạn muốn đổi trạng thái của nhân viên ${item.FullName} thành ${nextStatus}?`,
-    );
-    if (!ok) return;
-
+  async function applyStatusChange(item, nextStatus) {
     try {
       setError("");
       await axiosClient.patch(`/admin/employees/${item.EmployeeId}/status`, {
@@ -280,6 +278,21 @@ export default function AdminEmployees() {
     }
   }
 
+  function changeStatus(item, nextStatus) {
+    setConfirmAction({ type: "status", item, nextStatus });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      await applyStatusChange(confirmAction.item, confirmAction.nextStatus);
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
   // Open Service Assignment Modal
   const openServiceAssign = async (employee) => {
     setAssigningEmployee(employee);
@@ -291,7 +304,11 @@ export default function AdminEmployees() {
       setSelectedServices(servicesData.filter(s => s.Assigned === 1).map(s => s.ServiceId));
     } catch (err) {
       console.error("Error loading employee services", err);
-      alert("Không tải được danh sách dịch vụ của nhân viên");
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Không tải được danh sách dịch vụ của nhân viên",
+      );
     } finally {
       setLoadingServices(false);
     }
@@ -318,7 +335,11 @@ export default function AdminEmployees() {
       scrollToItem(empId, "employee");
     } catch (err) {
       console.error("Error saving services", err);
-      alert("Lưu phân bổ dịch vụ thất bại");
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Lưu phân bổ dịch vụ thất bại",
+      );
     } finally {
       setSavingServices(false);
     }
@@ -1416,6 +1437,29 @@ export default function AdminEmployees() {
           </div>
         </div>
       ) : null}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title="Cập nhật trạng thái nhân viên?"
+        description={
+          confirmAction?.nextStatus === "ACTIVE"
+            ? "Nhân viên sẽ được phép hoạt động trở lại theo quyền và phân công hiện có."
+            : "Nhân viên có thể mất quyền truy cập hoặc không còn được phân công vào hoạt động vận hành."
+        }
+        details={
+          confirmAction ? (
+            <>
+              <strong>{confirmAction.item.FullName}</strong>
+              <span> · {confirmAction.item.Position || confirmAction.item.RoleName || "Nhân viên"} · Trạng thái mới: {confirmAction.nextStatus}</span>
+            </>
+          ) : null
+        }
+        confirmLabel={confirmAction?.nextStatus === "ACTIVE" ? "Kích hoạt nhân viên" : "Cập nhật trạng thái"}
+        tone={confirmAction?.nextStatus === "ACTIVE" ? "warning" : "danger"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }

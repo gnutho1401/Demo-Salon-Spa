@@ -3,7 +3,7 @@ const { success, error } = require("../../utils/response");
 
 // Helper to determine if the user has Admin/Manager level access
 function checkAdminAccess(req) {
-  const role = String(req.user?.RoleName || "").toUpperCase();
+  const role = String(req.user?.role || "").toUpperCase();
   return role === "ADMIN" || role === "MANAGER";
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 const DEFAULT_SERVICE = "/images/services/skincare.png";
@@ -133,6 +134,8 @@ export default function AdminReviews() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
 
   const gridRef = useRef(null);
@@ -281,10 +284,7 @@ export default function AdminReviews() {
     setSuccessMsg("");
   }
 
-  async function changeStatus(item, nextStatus) {
-    const ok = window.confirm(`Bạn có chắc muốn chuyển review #${item.ReviewId} sang trạng thái ${nextStatus}?`);
-    if (!ok) return;
-
+  async function applyStatusChange(item, nextStatus) {
     try {
       setError("");
       setSuccessMsg("");
@@ -347,10 +347,7 @@ export default function AdminReviews() {
     }
   }
 
-  async function removeResponse(item) {
-    if (!window.confirm(`Bạn muốn xóa phản hồi admin của đánh giá #${item.ReviewId}?`))
-      return;
-
+  async function applyRemoveResponse(item) {
     try {
       setError("");
       setSuccessMsg("");
@@ -366,6 +363,29 @@ export default function AdminReviews() {
       setError(
         err?.response?.data?.message || err?.message || "Xóa phản hồi thất bại",
       );
+    }
+  }
+
+  function changeStatus(item, nextStatus) {
+    setConfirmAction({ type: "status", item, nextStatus });
+  }
+
+  function removeResponse(item) {
+    setConfirmAction({ type: "remove-response", item });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmAction.type === "remove-response") {
+        await applyRemoveResponse(confirmAction.item);
+      } else {
+        await applyStatusChange(confirmAction.item, confirmAction.nextStatus);
+      }
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -1353,6 +1373,30 @@ export default function AdminReviews() {
           </div>
         </div>
       )}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.type === "remove-response" ? "Xóa phản hồi của Admin?" : "Cập nhật trạng thái đánh giá?"}
+        description={
+          confirmAction?.type === "remove-response"
+            ? "Nội dung phản hồi hiện tại của Admin sẽ bị xóa khỏi đánh giá này."
+            : "Trạng thái mới quyết định đánh giá có được hiển thị và sử dụng trong báo cáo hay không."
+        }
+        details={
+          confirmAction ? (
+            <>
+              <strong>Đánh giá #{confirmAction.item.ReviewId}</strong>
+              <span> · {confirmAction.item.CustomerName || "Khách hàng"} · {Number(confirmAction.item.Rating || 0)}/5 sao</span>
+              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+            </>
+          ) : null
+        }
+        confirmLabel={confirmAction?.type === "remove-response" ? "Xóa phản hồi" : "Cập nhật trạng thái"}
+        tone={confirmAction?.type === "remove-response" || confirmAction?.nextStatus === "REJECTED" ? "danger" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
 
       {/* LIGHTBOX MODAL */}
       {lightboxPhoto && (

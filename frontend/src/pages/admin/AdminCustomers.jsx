@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
@@ -141,6 +142,8 @@ export default function AdminCustomers() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [selected, setSelected] = useState(null); // Detailed customer object
   const [activeTab, setActiveTab] = useState("profile"); // Tab: profile, appointments, packages, history
@@ -485,13 +488,12 @@ export default function AdminCustomers() {
   };
 
   // Change Status
-  const handleChangeStatus = async (customerRow) => {
+  const handleChangeStatus = (customerRow) => {
     const nextStatus = customerRow.Status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-    const ok = window.confirm(
-      `Bạn muốn đổi trạng thái tài khoản ${customerRow.Email} thành ${nextStatus}?`,
-    );
-    if (!ok) return;
+    setConfirmAction({ type: "status", item: customerRow, nextStatus });
+  };
 
+  const applyStatusChange = async (customerRow, nextStatus) => {
     try {
       setError("");
       await axiosClient.patch(`/admin/customers/${customerRow.UserId}/status`, {
@@ -513,6 +515,17 @@ export default function AdminCustomers() {
           err?.message ||
           "Không thay đổi được trạng thái tài khoản",
       );
+    }
+  };
+
+  const handleConfirmedAction = async () => {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      await applyStatusChange(confirmAction.item, confirmAction.nextStatus);
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   };
 
@@ -2106,12 +2119,8 @@ export default function AdminCustomers() {
                             </a>
                           )}
                           <a
-                            href="/admin/promotions"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setShowChurnModal(false);
-                              alert(`Chuyển đến màn hình Voucher để thiết lập quà tặng giữ chân cho ${selectedChurnCust.name}`);
-                            }}
+                            href="/admin/vouchers"
+                            onClick={() => setShowChurnModal(false)}
                             className="card-btn"
                             style={{ textDecoration: "none", flex: 1, textAlign: "center" }}
                           >
@@ -2139,6 +2148,29 @@ export default function AdminCustomers() {
           </div>
         </div>
       )}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title="Cập nhật trạng thái khách hàng?"
+        description={
+          confirmAction?.nextStatus === "INACTIVE"
+            ? "Khách hàng sẽ không thể tiếp tục sử dụng tài khoản cho đến khi được kích hoạt lại."
+            : "Tài khoản sẽ được kích hoạt lại và khách hàng có thể tiếp tục sử dụng hệ thống."
+        }
+        details={
+          confirmAction ? (
+            <>
+              <strong>{confirmAction.item.FullName}</strong>
+              <span> · {confirmAction.item.Email} · Trạng thái mới: {confirmAction.nextStatus}</span>
+            </>
+          ) : null
+        }
+        confirmLabel={confirmAction?.nextStatus === "INACTIVE" ? "Ngừng hoạt động" : "Kích hoạt lại"}
+        tone={confirmAction?.nextStatus === "INACTIVE" ? "danger" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }

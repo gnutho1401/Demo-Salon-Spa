@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const emptyForm = {
   Code: "",
@@ -55,6 +56,8 @@ export default function AdminVouchers() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const gridRef = useRef(null);
   const shouldScrollRef = useRef(false);
@@ -295,12 +298,7 @@ export default function AdminVouchers() {
     }
   }
 
-  async function changeStatus(item, nextStatus) {
-    const ok = window.confirm(
-      `Bạn muốn đổi trạng thái voucher "${item.Code}" thành ${nextStatus}?`,
-    );
-    if (!ok) return;
-
+  async function applyStatusChange(item, nextStatus) {
     try {
       setError("");
       await axiosClient.patch(`/admin/vouchers/${item.VoucherId}/status`, {
@@ -317,10 +315,7 @@ export default function AdminVouchers() {
     }
   }
 
-  async function remove(item) {
-    const ok = window.confirm(`Bạn chắc chắn muốn xóa voucher "${item.Code}"?`);
-    if (!ok) return;
-
+  async function applyRemove(item) {
     try {
       setError("");
       await axiosClient.delete(`/admin/vouchers/${item.VoucherId}`);
@@ -330,6 +325,29 @@ export default function AdminVouchers() {
       setError(
         err?.response?.data?.message || err?.message || "Xóa voucher thất bại",
       );
+    }
+  }
+
+  function changeStatus(item, nextStatus) {
+    setConfirmAction({ type: "status", item, nextStatus });
+  }
+
+  function remove(item) {
+    setConfirmAction({ type: "delete", item });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmAction.type === "delete") {
+        await applyRemove(confirmAction.item);
+      } else {
+        await applyStatusChange(confirmAction.item, confirmAction.nextStatus);
+      }
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -1823,6 +1841,30 @@ export default function AdminVouchers() {
           </form>
         </div>
       ) : null}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.type === "delete" ? "Xóa voucher?" : "Cập nhật trạng thái voucher?"}
+        description={
+          confirmAction?.type === "delete"
+            ? "Voucher sẽ bị xóa khỏi hệ thống và không thể tiếp tục được khách hàng sử dụng."
+            : "Trạng thái mới sẽ ảnh hưởng ngay đến khả năng áp dụng mã ưu đãi khi thanh toán."
+        }
+        details={
+          confirmAction ? (
+            <>
+              <strong>{confirmAction.item.Code}</strong>
+              <span> · Giá trị {discountText(confirmAction.item)}</span>
+              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+            </>
+          ) : null
+        }
+        confirmLabel={confirmAction?.type === "delete" ? "Xóa voucher" : "Cập nhật trạng thái"}
+        tone={confirmAction?.type === "delete" ? "danger" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }

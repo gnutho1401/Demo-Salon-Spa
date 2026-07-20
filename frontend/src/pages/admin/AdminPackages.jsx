@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_IMAGE = "/images/packages/acne-package.png";
 
@@ -53,6 +54,8 @@ export default function AdminPackages() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const gridRef = useRef(null);
   const shouldScrollRef = useRef(false);
@@ -353,14 +356,7 @@ export default function AdminPackages() {
     }
   }
 
-  async function changeStatus(item, nextStatus) {
-    if (
-      !window.confirm(
-        `Đổi trạng thái "${item.PackageName}" thành ${nextStatus}?`,
-      )
-    )
-      return;
-
+  async function applyStatusChange(item, nextStatus) {
     try {
       setError("");
       await axiosClient.patch(`/admin/packages/${item.PackageId}/status`, {
@@ -377,12 +373,7 @@ export default function AdminPackages() {
     }
   }
 
-  async function remove(item) {
-    if (
-      !window.confirm(`Bạn chắc chắn muốn xóa package "${item.PackageName}"?`)
-    )
-      return;
-
+  async function applyRemove(item) {
     try {
       setError("");
       await axiosClient.delete(`/admin/packages/${item.PackageId}`);
@@ -392,6 +383,29 @@ export default function AdminPackages() {
       setError(
         err?.response?.data?.message || err?.message || "Xóa package thất bại",
       );
+    }
+  }
+
+  function changeStatus(item, nextStatus) {
+    setConfirmAction({ type: "status", item, nextStatus });
+  }
+
+  function remove(item) {
+    setConfirmAction({ type: "delete", item });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmAction.type === "delete") {
+        await applyRemove(confirmAction.item);
+      } else {
+        await applyStatusChange(confirmAction.item, confirmAction.nextStatus);
+      }
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -1934,6 +1948,29 @@ export default function AdminPackages() {
           </form>
         </div>
       ) : null}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.type === "delete" ? "Xóa gói dịch vụ?" : "Cập nhật trạng thái gói?"}
+        description={
+          confirmAction?.type === "delete"
+            ? "Gói có thể đang được khách hàng sử dụng hoặc tham chiếu trong lịch sử giao dịch. Chỉ xóa khi chắc chắn không còn phụ thuộc."
+            : "Trạng thái mới sẽ ảnh hưởng ngay đến khả năng khách hàng nhìn thấy và mua gói dịch vụ."
+        }
+        details={
+          confirmAction ? (
+            <>
+              <strong>{confirmAction.item.PackageName}</strong>
+              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+            </>
+          ) : null
+        }
+        confirmLabel={confirmAction?.type === "delete" ? "Xóa gói dịch vụ" : "Cập nhật trạng thái"}
+        tone={confirmAction?.type === "delete" ? "danger" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }

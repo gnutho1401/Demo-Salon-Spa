@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_IMAGE = "/images/promotion-default.jpg";
 
@@ -54,6 +55,8 @@ export default function AdminPromotions() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [detailServices, setDetailServices] = useState([]);
   const [loadingDetailSvc, setLoadingDetailSvc] = useState(false);
@@ -326,12 +329,7 @@ export default function AdminPromotions() {
     }
   }
 
-  async function changeStatus(item, nextStatus) {
-    const ok = window.confirm(
-      `Bạn muốn đổi trạng thái "${item.Title}" thành ${nextStatus}?`,
-    );
-    if (!ok) return;
-
+  async function applyStatusChange(item, nextStatus) {
     try {
       setError("");
       await axiosClient.patch(`/admin/promotions/${item.PromotionId}/status`, {
@@ -348,12 +346,7 @@ export default function AdminPromotions() {
     }
   }
 
-  async function remove(item) {
-    const ok = window.confirm(
-      `Bạn chắc chắn muốn xóa khuyến mãi "${item.Title}"?`,
-    );
-    if (!ok) return;
-
+  async function applyRemove(item) {
     try {
       setError("");
       await axiosClient.delete(`/admin/promotions/${item.PromotionId}`);
@@ -365,6 +358,29 @@ export default function AdminPromotions() {
           err?.message ||
           "Xóa khuyến mãi thất bại",
       );
+    }
+  }
+
+  function changeStatus(item, nextStatus) {
+    setConfirmAction({ type: "status", item, nextStatus });
+  }
+
+  function remove(item) {
+    setConfirmAction({ type: "delete", item });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmAction.type === "delete") {
+        await applyRemove(confirmAction.item);
+      } else {
+        await applyStatusChange(confirmAction.item, confirmAction.nextStatus);
+      }
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -1421,6 +1437,29 @@ export default function AdminPromotions() {
           </form>
         </div>
       ) : null}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.type === "delete" ? "Xóa khuyến mãi?" : "Cập nhật trạng thái khuyến mãi?"}
+        description={
+          confirmAction?.type === "delete"
+            ? "Khuyến mãi sẽ bị xóa khỏi hệ thống và không thể khôi phục từ giao diện Admin."
+            : "Khả năng áp dụng ưu đãi cho các dịch vụ liên quan sẽ thay đổi ngay sau khi cập nhật."
+        }
+        details={
+          confirmAction ? (
+            <>
+              <strong>{confirmAction.item.Title}</strong>
+              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+            </>
+          ) : null
+        }
+        confirmLabel={confirmAction?.type === "delete" ? "Xóa khuyến mãi" : "Cập nhật trạng thái"}
+        tone={confirmAction?.type === "delete" ? "danger" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }

@@ -4,6 +4,7 @@ import axiosClient from "../../api/axiosClient";
 export default function AdminReports() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState("");
   const [categories, setCategories] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [memberships, setMemberships] = useState([]);
@@ -82,9 +83,11 @@ export default function AdminReports() {
   // CSV Export function
   const exportToCSV = () => {
     if (!data || !data.customerAppointments || data.customerAppointments.length === 0) {
-      alert("Không có dữ liệu để xuất file!");
+      setNotice("Không có dữ liệu lịch hẹn phù hợp để xuất file.");
       return;
     }
+
+    setNotice("");
 
     const headers = [
       "Mã Lịch Hẹn",
@@ -126,6 +129,7 @@ export default function AdminReports() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Pagination for Appointments list (Client-side)
@@ -529,6 +533,12 @@ export default function AdminReports() {
           Xuất File CSV
         </button>
       </div>
+
+      {notice ? (
+        <div className="admin-error-card" role="alert" style={{ marginBottom: 20 }}>
+          {notice}
+        </div>
+      ) : null}
 
       {/* Filters Section */}
       <div className="filter-card">

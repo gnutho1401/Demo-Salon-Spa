@@ -69,8 +69,10 @@ function safeAvatar(url) {
 
 /* ─────────── Stat Card (clickable) ─────────── */
 function StatCard({ label, value, note, icon, colorClass, onClick }) {
+  const CardElement = onClick ? "button" : "article";
   return (
-    <article
+    <CardElement
+      type={onClick ? "button" : undefined}
       className={`admin-stat-card-new ${colorClass || ""}`}
       onClick={onClick}
       style={{ cursor: onClick ? "pointer" : "default", position: "relative" }}
@@ -87,7 +89,7 @@ function StatCard({ label, value, note, icon, colorClass, onClick }) {
           fontSize: "11px", fontWeight: "700", color: "#e8396c", opacity: 0.7
         }}>Xem chi tiết →</span>
       )}
-    </article>
+    </CardElement>
   );
 }
 
@@ -106,6 +108,19 @@ function InfoRow({ label, value, valueColor }) {
       <span style={{ color: "#7b6874" }}>{label}</span>
       <strong style={{ color: valueColor || "#2d2430" }}>{value}</strong>
     </div>
+  );
+}
+
+function ActionChip({ children, onClick, urgent = false }) {
+  return (
+    <button
+      className={`dashboard-action-chip${urgent ? " is-urgent" : ""}`}
+      type="button"
+      onClick={onClick}
+    >
+      {children}
+      <span aria-hidden="true">→</span>
+    </button>
   );
 }
 
@@ -332,10 +347,7 @@ export default function AdminDashboard() {
       {!loading && data && (
         <>
           {/* ── 8 Thẻ thống kê chính ── */}
-          <div
-            className="dashboard-stats-grid"
-            style={{ gridTemplateColumns: "repeat(4, 1fr)" }}
-          >
+          <div className="dashboard-stats-grid">
             <StatCard
               label="DOANH THU HÔM NAY"
               value={formatMoney(summary.revenueToday)}
@@ -409,124 +421,47 @@ export default function AdminDashboard() {
             summary.pendingFeedbacks > 0 ||
             summary.pendingRefunds > 0 ||
             summary.pendingPayouts > 0) && (
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 10,
-                background: "linear-gradient(135deg, #fffbeb, #fff7f0)",
-                border: "1px solid #fde68a",
-                borderRadius: "20px",
-                padding: "14px 20px",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontWeight: "800",
-                  color: "#92400e",
-                  fontSize: "13px",
-                }}
-              >
-                ⚠️ CẦN XỬ LÝ:
-              </span>
-              {summary.pendingAppointments > 0 && (
-                <span
-                  onClick={() => navigate("/admin/reports")}
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingAppointments} lịch hẹn chờ duyệt →
-                </span>
-              )}
-              {summary.pendingPayments > 0 && (
-                <span
-                  onClick={() => navigate("/admin/reports")}
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingPayments} giao dịch chờ thanh toán →
-                </span>
-              )}
-              {summary.pendingReviews > 0 && (
-                <span
-                  onClick={() => navigate("/admin/reviews")}
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingReviews} đánh giá chờ duyệt →
-                </span>
-              )}
-              {summary.pendingFeedbacks > 0 && (
-                <span
-                  onClick={() => navigate("/admin/feedbacks")}
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingFeedbacks} phản hồi chưa đọc →
-                </span>
-              )}
-              {summary.pendingRefunds > 0 && (
-                <span
-                  onClick={() => navigate("/admin/refunds")}
-                  style={{
-                    background: "#fee2e2",
-                    color: "#991b1b",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingRefunds} hoàn tiền chờ xử lý →
-                </span>
-              )}
-              {summary.pendingPayouts > 0 && (
-                <span
-                  onClick={() => navigate("/admin/employees")}
-                  style={{
-                    background: "#fee2e2",
-                    color: "#991b1b",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingPayouts} yêu cầu payout chờ duyệt →
-                </span>
-              )}
-            </div>
+            <section className="dashboard-action-rail" aria-labelledby="operations-pulse-title">
+              <div className="dashboard-action-heading">
+                <span className="dashboard-action-symbol" aria-hidden="true">!</span>
+                <div>
+                  <p>Nhịp vận hành</p>
+                  <h2 id="operations-pulse-title">Việc cần xử lý</h2>
+                </div>
+              </div>
+              <div className="dashboard-action-list">
+                {summary.pendingAppointments > 0 && (
+                  <ActionChip onClick={() => navigate("/admin/reports")}>
+                    {summary.pendingAppointments} lịch hẹn chờ duyệt
+                  </ActionChip>
+                )}
+                {summary.pendingPayments > 0 && (
+                  <ActionChip onClick={() => navigate("/admin/reports")}>
+                    {summary.pendingPayments} giao dịch chờ thanh toán
+                  </ActionChip>
+                )}
+                {summary.pendingReviews > 0 && (
+                  <ActionChip onClick={() => navigate("/admin/reviews")}>
+                    {summary.pendingReviews} đánh giá chờ duyệt
+                  </ActionChip>
+                )}
+                {summary.pendingFeedbacks > 0 && (
+                  <ActionChip onClick={() => navigate("/admin/feedbacks")}>
+                    {summary.pendingFeedbacks} phản hồi chưa đọc
+                  </ActionChip>
+                )}
+                {summary.pendingRefunds > 0 && (
+                  <ActionChip urgent onClick={() => navigate("/admin/refunds")}>
+                    {summary.pendingRefunds} hoàn tiền chờ xử lý
+                  </ActionChip>
+                )}
+                {summary.pendingPayouts > 0 && (
+                  <ActionChip urgent onClick={() => navigate("/admin/employees")}>
+                    {summary.pendingPayouts} payout chờ duyệt
+                  </ActionChip>
+                )}
+              </div>
+            </section>
           )}
 
           {/* ── Tab điều hướng ── */}
@@ -1167,13 +1102,7 @@ export default function AdminDashboard() {
           {activeTab === "appointments" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               {/* KPI cards */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 16,
-                }}
-              >
+              <div className="dashboard-appointment-kpis">
                 {[
                   {
                     label: "Hôm nay",

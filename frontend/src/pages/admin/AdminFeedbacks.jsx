@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
@@ -119,6 +120,8 @@ export default function AdminFeedbacks() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const gridRef = useRef(null);
   const shouldScrollRef = useRef(false);
@@ -261,10 +264,7 @@ export default function AdminFeedbacks() {
     setSuccessMsg("");
   }
 
-  async function changeStatus(item, nextStatus) {
-    const ok = window.confirm(`Bạn có chắc muốn chuyển feedback #${item.FeedbackId} sang trạng thái ${nextStatus}?`);
-    if (!ok) return;
-
+  async function applyStatusChange(item, nextStatus) {
     try {
       setError("");
       setSuccessMsg("");
@@ -320,10 +320,7 @@ export default function AdminFeedbacks() {
     }
   }
 
-  async function removeResponse(item) {
-    if (!window.confirm(`Bạn muốn xóa phản hồi admin của feedback #${item.FeedbackId}?`))
-      return;
-
+  async function applyRemoveResponse(item) {
     try {
       setError("");
       setSuccessMsg("");
@@ -339,6 +336,29 @@ export default function AdminFeedbacks() {
       setError(
         err?.response?.data?.message || err?.message || "Xóa phản hồi thất bại",
       );
+    }
+  }
+
+  function changeStatus(item, nextStatus) {
+    setConfirmAction({ type: "status", item, nextStatus });
+  }
+
+  function removeResponse(item) {
+    setConfirmAction({ type: "remove-response", item });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmAction.type === "remove-response") {
+        await applyRemoveResponse(confirmAction.item);
+      } else {
+        await applyStatusChange(confirmAction.item, confirmAction.nextStatus);
+      }
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -1301,6 +1321,30 @@ export default function AdminFeedbacks() {
           </div>
         </div>
       )}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.type === "remove-response" ? "Xóa phản hồi của Admin?" : "Cập nhật trạng thái feedback?"}
+        description={
+          confirmAction?.type === "remove-response"
+            ? "Nội dung phản hồi hiện tại của Admin sẽ bị xóa khỏi feedback này."
+            : "Trạng thái mới sẽ được dùng để theo dõi tiến độ xử lý ý kiến của khách hàng."
+        }
+        details={
+          confirmAction ? (
+            <>
+              <strong>Feedback #{confirmAction.item.FeedbackId}</strong>
+              <span> · {confirmAction.item.CustomerName || "Khách hàng"}</span>
+              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+            </>
+          ) : null
+        }
+        confirmLabel={confirmAction?.type === "remove-response" ? "Xóa phản hồi" : "Cập nhật trạng thái"}
+        tone={confirmAction?.type === "remove-response" || confirmAction?.nextStatus === "REJECTED" ? "danger" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }

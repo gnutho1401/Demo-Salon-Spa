@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import axiosClient from "../../api/axiosClient";
-import AdminLayout from "../../components/layout/AdminLayout";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("vi-VN", {
@@ -65,7 +64,7 @@ export default function PackageReportPage() {
   const monthlyTrend = data?.monthlyTrend || [];
 
   return (
-    <section className="admin-page">
+    <section className="admin-page admin-package-report-page">
       <div className="admin-dashboard-hero" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, gap: 16, flexWrap: "wrap" }}>
         <div>
           <div className="admin-eyebrow">Enterprise Packages</div>
@@ -77,7 +76,7 @@ export default function PackageReportPage() {
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center", background: "#fff", padding: 12, borderRadius: 14, border: "1px solid #f4e7dd" }}>
+        <div className="package-report-filters" style={{ display: "flex", gap: 8, alignItems: "center", background: "#fff", padding: 12, borderRadius: 14, border: "1px solid #f4e7dd" }}>
           <div>
             <label style={{ fontSize: 11, color: "#7c6f68", display: "block", marginBottom: 2 }}>Từ ngày</label>
             <input
@@ -137,7 +136,7 @@ export default function PackageReportPage() {
             <StatCard icon="⏰" label="Sắp hết hạn" value={summary.ExpiringSoonPackages || 0} note="Gói ACTIVE sẽ hết hạn trong 7 ngày tới" />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: 20, marginBottom: 24 }}>
+          <div className="package-report-panels" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: 20, marginBottom: 24 }}>
             {/* Completion Rates */}
             <div className="card" style={{ background: "#fff", borderRadius: 14, border: "1px solid #f4e7dd", padding: 20 }}>
               <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#3d2e26", marginBottom: 16 }}>Tiến độ & Tần suất sử dụng</h3>

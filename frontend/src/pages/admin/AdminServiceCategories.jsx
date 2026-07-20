@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_IMAGE = "/images/services/skincare.png";
 
@@ -34,6 +35,8 @@ export default function AdminServiceCategories() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const gridRef = useRef(null);
   const shouldScrollRef = useRef(false);
@@ -247,14 +250,7 @@ export default function AdminServiceCategories() {
     }
   }
 
-  async function remove(item) {
-    if (
-      !window.confirm(
-        `Bạn chắc chắn muốn xóa danh mục "${item.CategoryName}"?\nHành động này không thể hoàn tác nếu danh mục trống.`,
-      )
-    )
-      return;
-
+  async function applyRemove(item) {
     try {
       setError("");
       await axiosClient.delete(`/admin/service-categories/${item.CategoryId}`);
@@ -264,6 +260,21 @@ export default function AdminServiceCategories() {
       setError(
         err?.response?.data?.message || err?.message || "Xóa danh mục thất bại",
       );
+    }
+  }
+
+  function remove(item) {
+    setConfirmAction({ type: "delete", item });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      await applyRemove(confirmAction.item);
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -1027,6 +1038,18 @@ export default function AdminServiceCategories() {
           </div>
         </div>
       ) : null}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title="Xóa danh mục dịch vụ?"
+        description="Chỉ có thể xóa danh mục trống. Nếu danh mục đang chứa dịch vụ, hệ thống sẽ từ chối để bảo vệ dữ liệu liên quan."
+        details={confirmAction ? <strong>{confirmAction.item.CategoryName}</strong> : null}
+        confirmLabel="Xóa danh mục"
+        tone="danger"
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }
