@@ -906,66 +906,43 @@ async function completeAppointment(userId, appointmentId) {
 
       if (usageCheck.recordset.length === 0) {
         const packageCheck = await new sql.Request(transaction)
-          .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
-          .input("ServiceId", sql.Int, current.ServiceId).query(`
-            SELECT
-              cp.CustomerPackageId,
-              cp.RemainingSessions,
-              cp.UsedSessions,
-              cp.Status,
-              cp.EndDate,
-              ISNULL(ps.SessionCount, 1) AS MaxSessions,
-              (
-                SELECT ISNULL(SUM(SessionsUsed), 0)
-                FROM CustomerPackageUsages
-                WHERE CustomerPackageId = @CustomerPackageId
-                  AND ServiceId = @ServiceId
-                  AND Status <> 'CANCELLED'
-              ) AS UsedCount
-            FROM CustomerPackages cp
-            JOIN PackageServices ps
-              ON cp.PackageId = ps.PackageId
-            WHERE cp.CustomerPackageId = @CustomerPackageId
-              AND ps.ServiceId = @ServiceId
+          .input("CustomerPackageId", sql.Int, current.CustomerPackageId).query(`
+            SELECT CustomerPackageId, RemainingSessions, UsedSessions, Status
+            FROM CustomerPackages
+            WHERE CustomerPackageId = @CustomerPackageId
           `);
 
         const cp = packageCheck.recordset[0];
-        if (!cp) throw new Error("Combo không chứa dịch vụ của lịch hẹn này");
-        if (String(cp.Status).toUpperCase() !== "ACTIVE") {
-          throw new Error("Combo không còn ở trạng thái ACTIVE");
-        }
-        if (new Date(cp.EndDate) < new Date(new Date().toDateString())) {
-          throw new Error("Combo đã hết hạn, không thể trừ buổi");
-        }
-        if (Number(cp.RemainingSessions || 0) < 1) {
-          throw new Error("Combo không còn đủ số buổi để hoàn thành lịch này");
-        }
-        if (cp.UsedCount >= cp.MaxSessions) {
-          throw new Error(`Dịch vụ này đã dùng hết số buổi quy định trong combo (Tối đa ${cp.MaxSessions} buổi)`);
-        }
+        if (cp) {
+          const mainSvcRes = await new sql.Request(transaction)
+            .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
+              SELECT TOP 1 ServiceId FROM AppointmentServices WHERE AppointmentId = @AppointmentId
+            `);
+          const mainServiceId = mainSvcRes.recordset[0]?.ServiceId || null;
 
-        await new sql.Request(transaction)
-          .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
-          .input("AppointmentId", sql.Int, Number(appointmentId))
-          .input("ServiceId", sql.Int, current.ServiceId).query(`
-            INSERT INTO CustomerPackageUsages
-              (CustomerPackageId, AppointmentId, ServiceId, SessionsUsed, Status, UsedAt, UsedBy)
-            SELECT @CustomerPackageId, @AppointmentId, @ServiceId, 1, 'USED', GETDATE(), c.UserId
-            FROM Appointments a
-            JOIN Customers c ON a.CustomerId = c.CustomerId
-            WHERE a.AppointmentId = @AppointmentId;
+          await new sql.Request(transaction)
+            .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
+            .input("AppointmentId", sql.Int, Number(appointmentId))
+            .input("ServiceId", sql.Int, mainServiceId).query(`
+              INSERT INTO CustomerPackageUsages
+                (CustomerPackageId, AppointmentId, ServiceId, SessionsUsed, Status, UsedAt, UsedBy)
+              SELECT @CustomerPackageId, @AppointmentId, @ServiceId, 1, 'USED', GETDATE(), c.UserId
+              FROM Appointments a
+              JOIN Customers c ON a.CustomerId = c.CustomerId
+              WHERE a.AppointmentId = @AppointmentId;
+            `);
 
-            UPDATE CustomerPackages
-            SET
-              RemainingSessions = CASE WHEN RemainingSessions > 0 THEN RemainingSessions - 1 ELSE 0 END,
-              UsedSessions = UsedSessions + 1,
-              Status = CASE
-                WHEN RemainingSessions - 1 <= 0 THEN 'USED_UP'
-                ELSE 'ACTIVE'
-              END,
-              UpdatedAt = GETDATE()
-            WHERE CustomerPackageId = @CustomerPackageId;
-          `);
+          await new sql.Request(transaction)
+            .input("CustomerPackageId", sql.Int, current.CustomerPackageId).query(`
+              UPDATE CustomerPackages
+              SET
+                RemainingSessions = CASE WHEN RemainingSessions > 0 THEN RemainingSessions - 1 ELSE 0 END,
+                UsedSessions = ISNULL(UsedSessions, 0) + 1,
+                Status = CASE WHEN (ISNULL(RemainingSessions, 1) - 1) <= 0 THEN 'COMPLETED' ELSE Status END,
+                UpdatedAt = GETDATE()
+              WHERE CustomerPackageId = @CustomerPackageId;
+            `);
+        }
       }
     }
 
