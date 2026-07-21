@@ -86,6 +86,29 @@ async function vnpayReturn(req, res) {
     );
   }
 }
+async function createPayosPackage(req, res) {
+  try {
+    return success(
+      res,
+      await service.createPayosPackageUrl(
+        req.user.userId,
+        req.params.id,
+        req.body,
+      ),
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+async function payosReturn(req, res) {
+  try {
+    return res.redirect(await service.handlePayosReturn(req.query));
+  } catch (err) {
+    return res.redirect(
+      `${process.env.FRONTEND_URL || "http://localhost:5173"}/customer/packages?error=${encodeURIComponent(err.message)}`,
+    );
+  }
+}
 async function create(req, res) {
   try {
     return success(res, await service.create(req.body), "Created", 201);
@@ -306,6 +329,41 @@ async function findMember(req, res) {
   }
 }
 
+async function repayCustomerPackage(req, res) {
+  try {
+    const ipAddr =
+      req.headers["x-forwarded-for"] ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      req.connection.socket.remoteAddress;
+
+    return success(
+      res,
+      await service.createVnpayRepayUrl(
+        req.user.userId,
+        req.params.customerPackageId,
+        ipAddr,
+      ),
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function repayPayosCustomerPackage(req, res) {
+  try {
+    return success(
+      res,
+      await service.createPayosRepayUrl(
+        req.user.userId,
+        req.params.customerPackageId,
+      ),
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
   getAll,
   getCategories,
@@ -315,6 +373,8 @@ module.exports = {
   buyPackage,
   createVnpayPackage,
   vnpayReturn,
+  createPayosPackage,
+  payosReturn,
   create,
   update,
   remove,
@@ -331,4 +391,5 @@ module.exports = {
   getPackageReport,
   findMember,
   repayCustomerPackage,
+  repayPayosCustomerPackage,
 };

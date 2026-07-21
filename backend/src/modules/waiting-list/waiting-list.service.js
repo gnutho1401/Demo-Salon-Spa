@@ -46,18 +46,27 @@ function toInt(value) {
 }
 
 function normalizeDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
   const raw = text(value);
   if (!raw) return null;
+  const datePart = raw.includes("T") ? raw.split("T")[0] : raw;
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
     throw new Error("Ngày mong muốn không hợp lệ.");
   }
 
-  return raw;
+  return datePart;
 }
 
 function normalizeTime(value) {
-  const raw = text(value);
+  if (!value) return null;
+  const formatted = formatTimeOnly(value);
+  if (!formatted) return null;
+
+  const raw = text(formatted);
   if (!raw) return null;
 
   if (!/^\d{2}:\d{2}(:\d{2})?$/.test(raw)) {
@@ -97,7 +106,7 @@ function validateTimeRange(from, to) {
 }
 
 function estimateResponse(priorityLevel, position, preferredDate) {
-  if (!preferredDate) return "Trong ngày hẹn (trước 21:00)";
+  if (!preferredDate) return "Trong ngày hẹn (trước 20:00)";
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const dateStrNormalized = preferredDate instanceof Date
@@ -105,7 +114,7 @@ function estimateResponse(priorityLevel, position, preferredDate) {
     : String(preferredDate).slice(0, 10);
 
   if (dateStrNormalized === todayStr) {
-    return "Trong ngày hôm nay (trước 21:00)";
+    return "Trong ngày hôm nay (trước 20:00)";
   }
 
   // Format to DD/MM/YYYY
@@ -114,7 +123,7 @@ function estimateResponse(priorityLevel, position, preferredDate) {
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
   const year = dateObj.getFullYear();
 
-  return `Trong ngày ${day}/${month}/${year} (trước 21:00)`;
+  return `Trong ngày ${day}/${month}/${year} (trước 20:00)`;
 }
 
 async function getCustomer(pool, userId) {
@@ -231,7 +240,7 @@ async function getOptions() {
       { value: "ANY", label: "Linh hoạt cả ngày" },
       { value: "MORNING", label: "Buổi sáng 08:00 - 12:00" },
       { value: "AFTERNOON", label: "Buổi chiều 13:00 - 17:00" },
-      { value: "EVENING", label: "Buổi tối 18:00 - 21:00" },
+      { value: "EVENING", label: "Buổi tối 18:00 - 20:00" },
       { value: "CUSTOM", label: "Tự chọn khoảng giờ" },
     ],
   };
@@ -350,7 +359,7 @@ function parsePayload(data = {}, existed = {}) {
 
   if (flexibleTimeSlot === "EVENING") {
     preferredTimeFrom = "18:00:00";
-    preferredTimeTo = "21:00:00";
+    preferredTimeTo = "20:00:00";
   }
 
   if (flexibleTimeSlot === "ANY") {
@@ -697,7 +706,7 @@ async function create(userId, data = {}) {
     .input("Note", sql.NVarChar, payload.note)
     .input("AcceptOtherTechnician", sql.Bit, payload.acceptOtherTechnician)
     .input("AcceptOtherTimeSlots", sql.Bit, payload.acceptOtherTimeSlots)
-    .input("ExpireAt", sql.DateTime, payload.preferredDate ? `${payload.preferredDate} 21:00:00` : null)
+    .input("ExpireAt", sql.DateTime, payload.preferredDate ? `${payload.preferredDate} 20:00:00` : null)
     .query(`
       INSERT INTO WaitingList
       (
@@ -749,6 +758,14 @@ async function create(userId, data = {}) {
     `);
 
   const inserted = result.recordset[0];
+
+  if (inserted && inserted.PreferredDate) {
+    const newDateStr = inserted.PreferredDate instanceof Date
+      ? inserted.PreferredDate.toISOString().slice(0, 10)
+      : String(inserted.PreferredDate).slice(0, 10);
+    runAutoMatch(newDateStr).catch(err => console.error("Auto match failed after create:", err.message));
+  }
+
   return inserted;
 }
 
@@ -858,7 +875,7 @@ async function update(userId, waitingId, data = {}) {
     .input("Note", sql.NVarChar, payload.note)
     .input("AcceptOtherTechnician", sql.Bit, payload.acceptOtherTechnician)
     .input("AcceptOtherTimeSlots", sql.Bit, payload.acceptOtherTimeSlots)
-    .input("ExpireAt", sql.DateTime, payload.preferredDate ? `${payload.preferredDate} 21:00:00` : null)
+    .input("ExpireAt", sql.DateTime, payload.preferredDate ? `${payload.preferredDate} 20:00:00` : null)
     .query(`
       UPDATE WaitingList
       SET
@@ -902,6 +919,13 @@ async function update(userId, waitingId, data = {}) {
     runAutoMatch(oldDateStr).catch(err => console.error("Auto match failed on old date after update:", err.message));
   }
 
+  if (updated && updated.PreferredDate) {
+    const newDateStr = updated.PreferredDate instanceof Date
+      ? updated.PreferredDate.toISOString().slice(0, 10)
+      : String(updated.PreferredDate).slice(0, 10);
+    runAutoMatch(newDateStr).catch(err => console.error("Auto match failed on new date after update:", err.message));
+  }
+
   return updated;
 }
 
@@ -927,7 +951,7 @@ async function cancel(userId, waitingId, data = {}) {
 
   if (!item) throw new Error("Không tìm thấy yêu cầu hàng chờ.");
 
-  if (!ACTIVE_STATUS.includes(item.Status)) {
+  if (!["WAITING", "NOTIFIED"].includes(item.Status)) {
     throw new Error("Chỉ có thể hủy yêu cầu đang chờ hoặc đã thông báo.");
   }
 
@@ -949,7 +973,7 @@ async function cancel(userId, waitingId, data = {}) {
   return result.recordset[0];
 }
 
-async function runAutoMatch(dateStr) {
+async function runAutoMatch(dateStr, canceledSlot = null) {
   const normalizeDateOnly = (val) => {
     if (!val) return new Date().toISOString().slice(0, 10);
     if (val instanceof Date) return val.toISOString().slice(0, 10);
@@ -962,7 +986,7 @@ async function runAutoMatch(dateStr) {
     return s.slice(0, 10);
   };
   const date = normalizeDateOnly(dateStr);
-  console.log(`[AutoMatch] Starting auto-match engine for date: ${date}`);
+  console.log(`[AutoMatch] Starting auto-match engine for date: ${date}`, canceledSlot ? `(Canceled slot: ${canceledSlot.startTime || canceledSlot.StartTime} - ${canceledSlot.endTime || canceledSlot.EndTime})` : "");
   const pool = await connectDB();
 
   const candidatesResult = await pool.request()
@@ -1002,6 +1026,8 @@ async function runAutoMatch(dateStr) {
   const appointmentsService = require("../appointments/appointments.service");
   const serviceIds = [...new Set(candidates.map(c => c.ServiceId))];
 
+  const targetStartTime = canceledSlot ? formatTimeOnly(canceledSlot.startTime || canceledSlot.StartTime) : null;
+
   for (const svcId of serviceIds) {
     const serviceCandidates = candidates.filter(c => c.ServiceId === svcId);
     const qualifiedEmps = employees.filter(e => canDoService(e.EmployeeId, svcId));
@@ -1026,6 +1052,10 @@ async function runAutoMatch(dateStr) {
         const startTime = `${slot.startTime}:00`;
         const endTime = `${slot.endTime}:00`;
 
+        if (targetStartTime && slot.startTime.slice(0, 5) !== targetStartTime.slice(0, 5)) {
+          continue;
+        }
+
         for (const cand of serviceCandidates) {
           if (cand.Status !== 'WAITING') continue;
 
@@ -1041,21 +1071,30 @@ async function runAutoMatch(dateStr) {
           let isExactTime = false;
           let timeOk = false;
 
-          if (cand.PreferredTimeFrom && cand.PreferredTimeTo) {
-            const prefFrom = formatTimeOnly(cand.PreferredTimeFrom);
-            const prefTo = formatTimeOnly(cand.PreferredTimeTo);
+          const prefFrom = cand.PreferredTimeFrom ? formatTimeOnly(cand.PreferredTimeFrom) : (cand.PreferredTime ? formatTimeOnly(cand.PreferredTime) : null);
+          const prefTo = cand.PreferredTimeTo ? formatTimeOnly(cand.PreferredTimeTo) : null;
+
+          if (prefFrom && prefTo) {
             if (startTime >= prefFrom && endTime <= prefTo) {
               isExactTime = true;
               timeOk = true;
             }
+          } else if (prefFrom) {
+            if (startTime.slice(0, 5) === prefFrom.slice(0, 5) || (startTime >= prefFrom && (!prefTo || endTime <= prefTo))) {
+              isExactTime = true;
+              timeOk = true;
+            }
           } else {
-            isExactTime = true;
+            // Flexible time request without a specific preferred time range
+            isExactTime = false;
             timeOk = true;
           }
 
           if (!timeOk && cand.AcceptOtherTimeSlots) {
             timeOk = true;
           }
+
+          const isCanceledSlotMatch = targetStartTime && startTime.slice(0, 5) === targetStartTime.slice(0, 5);
 
           if (techOk && timeOk) {
             potentialMatches.push({
@@ -1064,6 +1103,7 @@ async function runAutoMatch(dateStr) {
               slot,
               startTime,
               endTime,
+              isCanceledSlotMatch: isCanceledSlotMatch ? 1 : 0,
               isExactTime: isExactTime ? 1 : 0,
               isExactTech: isPreferredTech ? 1 : 0,
               priorityWeight: cand.PriorityLevel === 'URGENT' ? 3 : (cand.PriorityLevel === 'HIGH' ? 2 : 1)
@@ -1074,11 +1114,15 @@ async function runAutoMatch(dateStr) {
     }
 
     // Sort matching pairs by priority:
+    // 0. Exact match with canceled slot time (if auto-match triggered by cancellation)
     // 1. Exact time range match
     // 2. Exact technician match
     // 3. Priority level weight
     // 4. Oldest request first (FIFO)
     potentialMatches.sort((a, b) => {
+      if (a.isCanceledSlotMatch !== b.isCanceledSlotMatch) {
+        return b.isCanceledSlotMatch - a.isCanceledSlotMatch;
+      }
       if (a.isExactTime !== b.isExactTime) {
         return b.isExactTime - a.isExactTime;
       }
@@ -1126,7 +1170,7 @@ async function runAutoMatch(dateStr) {
                 MatchedDate = @MatchedDate,
                 MatchedStartTime = CAST(@MatchedStartTime AS TIME),
                 MatchedEndTime = CAST(@MatchedEndTime AS TIME),
-                HoldExpiresAt = @HoldExpiresAt,
+                HoldExpiresAt = DATEADD(minute, 15, GETUTCDATE()),
                 UpdatedAt = GETDATE()
             WHERE WaitingId = @WaitingId
           `);
@@ -1211,6 +1255,7 @@ async function confirmMatch(userId, waitingId) {
         w.MatchedEmployeeId,
         w.MatchedDate,
         w.HoldExpiresAt,
+        CASE WHEN w.HoldExpiresAt > GETUTCDATE() THEN 1 ELSE 0 END AS IsHoldValid,
         w.Status,
         w.Note,
         s.Price,
@@ -1229,7 +1274,7 @@ async function confirmMatch(userId, waitingId) {
     throw new Error("Yêu cầu hàng chờ không ở trạng thái được ghép lịch.");
   }
 
-  if (new Date(item.HoldExpiresAt) <= new Date()) {
+  if (!item.IsHoldValid) {
     throw new Error("Khung giờ giữ chỗ đã hết hạn 15 phút.");
   }
 

@@ -115,12 +115,12 @@ async function validateAvailability(technicianId, startTime, endTime, excludeApp
     throw new Error("Thời gian bắt đầu phải trước thời gian kết thúc");
   }
 
-  // 1. Check salon open hours only (08:00 - 22:00)
+  // 1. Check salon open hours only (08:00 - 20:00)
   // Shift registration is for internal attendance management only, not for booking control.
   const SALON_OPEN  = "08:00:00";
-  const SALON_CLOSE = "22:00:00";
+  const SALON_CLOSE = "20:00:00";
   if (reqStart < SALON_OPEN || reqEnd > SALON_CLOSE) {
-    throw new Error(`Thời gian hẹn nằm ngoài giờ mở cửa của salon (08:00 - 22:00)`);
+    throw new Error(`Thời gian hẹn nằm ngoài giờ mở cửa của salon (08:00 - 20:00)`);
   }
 
   // 2. Check overlap in Appointments
@@ -178,6 +178,7 @@ async function calculateSlotsInternal({
   serviceId,
   appointmentDate,
   excludeAppointmentId = null,
+  excludeWaitingId = null,
   includeAllSlots = false,
 }) {
   const selectedService = await getServiceById(Number(serviceId));
@@ -192,16 +193,25 @@ async function calculateSlotsInternal({
       SELECT 
         CONVERT(VARCHAR(8), ws.StartTime, 108) AS StartTime,
         CONVERT(VARCHAR(8), ws.EndTime, 108) AS EndTime
-      FROM ShiftRegistrations sr
-      JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
-      WHERE sr.TechnicianId = @EmployeeId
-        AND sr.Status = 'APPROVED'
-        AND ws.ShiftDate = @AppointmentDate
+      FROM WorkShifts ws
+      LEFT JOIN ShiftRegistrations sr ON ws.ShiftId = sr.ShiftId AND sr.TechnicianId = @EmployeeId
+      WHERE ws.ShiftDate = @AppointmentDate
+        AND (
+          (sr.TechnicianId = @EmployeeId AND sr.Status = 'APPROVED')
+          OR (ws.ShiftName <> N'Cả Ngày' AND EXISTS (
+            SELECT 1 FROM Appointments a
+            WHERE a.EmployeeId = @EmployeeId
+              AND a.AppointmentDate = ws.ShiftDate
+              AND a.Status NOT IN ('CANCELLED', 'NO_SHOW')
+              AND CONVERT(VARCHAR(5), a.StartTime, 108) >= CONVERT(VARCHAR(5), ws.StartTime, 108)
+              AND CONVERT(VARCHAR(5), a.StartTime, 108) < CONVERT(VARCHAR(5), ws.EndTime, 108)
+          ))
+        )
     `);
 
   const shifts = shiftsRes.recordset;
   let shiftStart = "08:00:00";
-  let shiftEnd = "18:00:00";
+  let shiftEnd = "20:00:00";
 
   if (shifts.length > 0) {
     shifts.sort((a, b) => a.StartTime.localeCompare(b.StartTime));
@@ -211,15 +221,21 @@ async function calculateSlotsInternal({
     shiftEnd = endTimes[endTimes.length - 1];
   }
 
+  // Enforce global salon hours limit (08:00 - 20:00)
+  if (shiftStart < "08:00:00") {
+    shiftStart = "08:00:00";
+  }
+  if (shiftEnd > "20:00:00") {
+    shiftEnd = "20:00:00";
+  }
+
   const bookedResult = await pool
     .request()
     .input("EmployeeId", sql.Int, Number(employeeId))
     .input("AppointmentDate", sql.Date, appointmentDate)
-    .input(
-      "ExcludeAppointmentId",
-      sql.Int,
-      excludeAppointmentId ? Number(excludeAppointmentId) : null,
-    ).query(`
+    .input("ExcludeAppointmentId", sql.Int, excludeAppointmentId ? Number(excludeAppointmentId) : null)
+    .input("ExcludeWaitingId", sql.Int, excludeWaitingId ? Number(excludeWaitingId) : null)
+    .query(`
       SELECT
         CONVERT(VARCHAR(8), StartTime, 108) AS StartTime,
         CONVERT(VARCHAR(8), EndTime, 108) AS EndTime
@@ -237,6 +253,7 @@ async function calculateSlotsInternal({
         AND MatchedDate = @AppointmentDate
         AND Status = 'MATCHED'
         AND HoldExpiresAt > GETUTCDATE()
+        AND (CAST(@ExcludeWaitingId AS INT) IS NULL OR WaitingId <> CAST(@ExcludeWaitingId AS INT))
     `);
 
   const booked = bookedResult.recordset.map((item) => ({
@@ -256,7 +273,7 @@ async function calculateSlotsInternal({
 
     if (slotEnd <= shiftEnd) {
       const isInRegisteredShift = shifts.length === 0
-        ? (slotStart >= "08:00:00" && slotEnd <= "18:00:00")
+        ? (slotStart >= "08:00:00" && slotEnd <= "20:00:00")
         : shifts.some(s => slotStart >= s.StartTime && slotEnd <= s.EndTime);
 
       if (isInRegisteredShift) {
@@ -313,36 +330,7 @@ async function getSlotAlternatives(employeeId, serviceId, appointmentDate, limit
 
     const techs = otherTechsResult.recordset;
 
-    // 1. Same day, other technicians
-    for (const tech of techs) {
-      if (alternatives.length >= limit) break;
-      try {
-        const techSlots = await calculateSlotsInternal({
-          employeeId: tech.EmployeeId,
-          serviceId,
-          appointmentDate,
-        });
-        for (const slot of techSlots) {
-          if (alternatives.length >= limit) break;
-          if (slot.available !== false) {
-            alternatives.push({
-              type: 1,
-              label: `Hôm nay với KTV ${tech.FullName}`,
-              employeeId: tech.EmployeeId,
-              employeeName: tech.FullName,
-              imageUrl: tech.ImageUrl,
-              date: appointmentDate,
-              startTime: slot.startTime,
-              endTime: slot.endTime,
-            });
-          }
-        }
-      } catch (err) {
-        // Skip errors
-      }
-    }
-
-    // 2. Future days (next 7 days), preferred technician
+    // 1. Future days (next 7 days), preferred technician
     for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
       if (alternatives.length >= limit) break;
       const futureDate = new Date(appointmentDate);
@@ -366,6 +354,35 @@ async function getSlotAlternatives(employeeId, serviceId, appointmentDate, limit
               employeeName: preferredEmployee.FullName,
               imageUrl: preferredEmployee.ImageUrl,
               date: futureDateString,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+            });
+          }
+        }
+      } catch (err) {
+        // Skip errors
+      }
+    }
+
+    // 2. Same day, other technicians
+    for (const tech of techs) {
+      if (alternatives.length >= limit) break;
+      try {
+        const techSlots = await calculateSlotsInternal({
+          employeeId: tech.EmployeeId,
+          serviceId,
+          appointmentDate,
+        });
+        for (const slot of techSlots) {
+          if (alternatives.length >= limit) break;
+          if (slot.available !== false) {
+            alternatives.push({
+              type: 1,
+              label: `Hôm nay với KTV ${tech.FullName}`,
+              employeeId: tech.EmployeeId,
+              employeeName: tech.FullName,
+              imageUrl: tech.ImageUrl,
+              date: appointmentDate,
               startTime: slot.startTime,
               endTime: slot.endTime,
             });
@@ -423,7 +440,7 @@ async function getSlotAlternatives(employeeId, serviceId, appointmentDate, limit
  * Returns available slots for a day (production-grade query handling).
  */
 async function getAvailableSlots(query) {
-  const { employeeId, serviceId, appointmentDate, excludeAppointmentId, includeAlternatives, includeAllSlots } = query || {};
+  const { employeeId, serviceId, appointmentDate, excludeAppointmentId, excludeWaitingId, includeAlternatives, includeAllSlots } = query || {};
   if (!employeeId) throw new Error("Vui lòng chọn kỹ thuật viên");
   if (!serviceId) throw new Error("Vui lòng chọn dịch vụ");
   if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn");
@@ -433,6 +450,7 @@ async function getAvailableSlots(query) {
     serviceId: Number(serviceId),
     appointmentDate,
     excludeAppointmentId: excludeAppointmentId ? Number(excludeAppointmentId) : null,
+    excludeWaitingId: excludeWaitingId ? Number(excludeWaitingId) : null,
     includeAllSlots: String(includeAllSlots) === "true",
   });
 

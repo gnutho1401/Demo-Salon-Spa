@@ -1,10 +1,11 @@
 const router = require("express").Router();
 const controller = require("./ai.controller");
-const stylistController = require("./stylist/stylist.controller");
-const hairController = require("./stylist/hair.controller");
-const authMiddleware = require("../../middlewares/auth.middleware");
-const allowRoles = require("../../middlewares/role.middleware");
-const { verifyToken } = require("../../utils/jwt");
+const stylistController = require("../stylist/stylist.controller");
+const hairController = require("../stylist/hair.controller");
+const skinController = require("../skin/skin.controller");
+const authMiddleware = require("../../../middlewares/auth.middleware");
+const allowRoles = require("../../../middlewares/role.middleware");
+const { verifyToken } = require("../../../utils/jwt");
 
 function optionalAuthMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -29,6 +30,8 @@ router.delete("/my/chat", authMiddleware, controller.clearMyChatHistory);
 router.post("/stylist/analyze", authMiddleware, stylistController.analyze);
 router.post("/stylist/tryon", authMiddleware, hairController.tryOn);
 router.get("/stylist/history", authMiddleware, stylistController.getHistory);
+router.post("/skin/analyze", authMiddleware, skinController.analyze);
+router.get("/skin/history", authMiddleware, skinController.getHistory);
 router.get(
   "/",
   authMiddleware,

@@ -75,6 +75,46 @@ async function getUserByEmail(email) {
   return result.recordset[0];
 }
 
+async function getUserByGoogleId(googleId) {
+  if (!googleId) return null;
+
+  const pool = await connectDB();
+  const result = await pool
+    .request()
+    .input("GoogleId", sql.NVarChar, googleId).query(`
+      SELECT
+        u.UserId,
+        u.FullName,
+        u.Email,
+        u.Phone,
+        u.PasswordHash,
+        u.RoleId,
+        u.Status,
+        u.IsVerified,
+        u.AvatarUrl,
+        u.GoogleId,
+        r.RoleName,
+        c.CustomerId,
+        c.Gender,
+        c.DateOfBirth,
+        c.Address,
+        c.LoyaltyPoints,
+        COALESCE(ml.LevelName, currentLevel.LevelName, N'Normal') AS MembershipLevel
+      FROM Users u
+      JOIN Roles r ON u.RoleId = r.RoleId
+      LEFT JOIN Customers c ON u.UserId = c.UserId
+      LEFT JOIN MembershipLevels ml ON c.MembershipLevelId = ml.MembershipLevelId
+      OUTER APPLY (
+        SELECT TOP 1 * FROM MembershipLevels x
+        WHERE x.MinPoints <= c.LoyaltyPoints
+        ORDER BY x.MinPoints DESC
+      ) currentLevel
+      WHERE u.GoogleId = @GoogleId
+    `);
+
+  return result.recordset[0];
+}
+
 async function getUserByPhone(phone) {
   if (!phone) return null;
 
@@ -92,6 +132,7 @@ async function getUserByPhone(phone) {
 function publicUser(user) {
   const clone = { ...user };
   delete clone.PasswordHash;
+  delete clone.GoogleId;
   return clone;
 }
 
@@ -338,14 +379,25 @@ async function googleLogin(idToken) {
   if (!process.env.GOOGLE_CLIENT_ID) {
     throw new Error("Backend chưa cấu hình GOOGLE_CLIENT_ID");
   }
+  if (!idToken || typeof idToken !== "string") {
+    throw new Error("Thiếu Google ID token");
+  }
 
   const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
+  let ticket;
+  try {
+    ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+  } catch (_) {
+    throw new Error("Google ID token không hợp lệ hoặc đã hết hạn");
+  }
+
   const payload = ticket.getPayload();
-  console.log("Google Login Payload:", payload);
+  if (!payload?.sub || !payload?.email || payload.email_verified !== true) {
+    throw new Error("Tài khoản Google chưa có email đã xác minh");
+  }
 
   const email = normalizeEmail(payload.email);
   const fullName = payload.name || email;
@@ -353,7 +405,8 @@ async function googleLogin(idToken) {
   const googleId = payload.sub;
   const pool = await connectDB();
 
-  let user = await getUserByEmail(email);
+  let user = await getUserByGoogleId(googleId);
+  if (!user) user = await getUserByEmail(email);
 
   if (!user) {
     const transaction = new sql.Transaction(pool);
@@ -393,9 +446,21 @@ async function googleLogin(idToken) {
       throw err;
     }
   } else {
+    if (user.Status && user.Status !== "ACTIVE") {
+      throw new Error("Tài khoản đã bị khóa hoặc không hoạt động");
+    }
+    if (user.GoogleId && user.GoogleId !== googleId) {
+      throw new Error("Email này đã liên kết với một tài khoản Google khác");
+    }
+    if (!user.GoogleId && user.RoleName !== "CUSTOMER") {
+      throw new Error(
+        "Tài khoản nhân viên phải đăng nhập bằng mật khẩu trước khi liên kết Google",
+      );
+    }
+
     await pool
       .request()
-      .input("Email", sql.NVarChar, email)
+      .input("UserId", sql.Int, user.UserId)
       .input("GoogleId", sql.NVarChar, googleId)
       .input("AvatarUrl", sql.NVarChar, avatarUrl).query(`
         UPDATE Users
@@ -403,11 +468,13 @@ async function googleLogin(idToken) {
             GoogleId = @GoogleId,
             AvatarUrl = COALESCE(@AvatarUrl, AvatarUrl),
             UpdatedAt = GETDATE()
-        WHERE Email = @Email
+        WHERE UserId = @UserId
       `);
   }
 
-  user = await getUserByEmail(email);
+  user = await getUserByGoogleId(googleId);
+  if (!user) throw new Error("Không thể tải tài khoản sau khi đăng nhập Google");
+
   const token = createToken(user);
   return {
     message: "Đăng nhập Google thành công",

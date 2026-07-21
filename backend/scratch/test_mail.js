@@ -1,37 +1,19 @@
-require('dotenv').config();
-const nodemailer = require('nodemailer');
+require('dotenv').config({ path: '.env' });
+const { sendMail } = require('../src/utils/sendMail');
 
-console.log('Testing email configuration...');
-console.log('EMAIL_USER:', process.env.EMAIL_USER);
-console.log('EMAIL_PASS:', process.env.EMAIL_PASS ? '********' : 'Not Set');
-
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-  console.error('Error: EMAIL_USER or EMAIL_PASS is not configured in .env file!');
-  process.exit(1);
+async function test() {
+  console.log('EMAIL_USER:', process.env.EMAIL_USER);
+  console.log('EMAIL_PASS:', process.env.EMAIL_PASS ? '***' : 'not defined');
+  try {
+    const result = await sendMail({
+      to: 'kiennt.se.work@gmail.com', // Let's use a dummy test email
+      subject: 'Test email from BeautySalon',
+      html: '<h1>Test Email</h1>'
+    });
+    console.log('Result:', result);
+  } catch (err) {
+    console.error('Error:', err);
+  }
 }
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-const mailOptions = {
-  from: `Beauty Salon Test <${process.env.EMAIL_USER}>`,
-  to: process.env.EMAIL_USER,
-  subject: 'Test Email from Beauty Salon',
-  text: 'If you receive this, your email configuration is working perfectly!',
-  html: '<b>If you receive this, your email configuration is working perfectly!</b>',
-};
-
-transporter.sendMail(mailOptions, (error, info) => {
-  if (error) {
-    console.error('Failed to send email. Error details:');
-    console.error(error);
-  } else {
-    console.log('Email sent successfully!');
-    console.log('Response:', info.response);
-  }
-});
+test();

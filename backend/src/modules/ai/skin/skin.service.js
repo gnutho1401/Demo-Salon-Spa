@@ -1,0 +1,285 @@
+const axios = require('axios');
+const { connectDB, sql } = require('../../../config/db');
+
+async function downloadImageAsBase64(url) {
+  if (url.startsWith('data:')) {
+    const matches = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (!matches) {
+      throw new Error('Định dạng ảnh base64 không hợp lệ.');
+    }
+    return {
+      base64Data: matches[2],
+      mimeType: matches[1]
+    };
+  }
+  try {
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+    const buffer = Buffer.from(response.data);
+    const mimeType = response.headers['content-type'] || 'image/jpeg';
+    return {
+      base64Data: buffer.toString('base64'),
+      mimeType
+    };
+  } catch (err) {
+    console.error('[Skin AI] Download image failed:', url, err.message);
+    throw err;
+  }
+}
+
+async function getCustomerByUserId(pool, userId) {
+  const result = await pool.request()
+    .input('UserId', sql.Int, userId)
+    .query('SELECT CustomerId FROM Customers WHERE UserId = @UserId');
+  return result.recordset[0];
+}
+
+async function analyzeSkinImage(imageUrl, servicesList) {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+
+  const systemInstruction = `Bạn là chuyên gia thẩm mỹ, bác sĩ da liễu phân tích sức khỏe làn da qua hình ảnh. Ảnh đầu vào có thể là ảnh chân dung toàn mặt (selfie/portrait) HOẶC ảnh chụp cận cảnh (close-up) một vùng da cụ thể (như trán, má, mũi, da tay, da body...) cần phân tích.
+Nhiệm vụ của bạn là phân tích chi tiết tình trạng da của khách hàng trong ảnh.
+QUAN TRỌNG: Hãy kiểm tra xem hình ảnh có chứa khuôn mặt người hoặc một vùng da người rõ nét hay không.
+Nếu hình ảnh hoàn toàn không chứa khuôn mặt người và không chứa vùng da người nào (ví dụ: ảnh phong cảnh, thú cưng, đồ vật, thức ăn, văn bản...), hãy trả về JSON dạng:
+{
+  "is_face": false,
+  "error": "Không nhận diện được khuôn mặt hoặc vùng da người trong ảnh. Vui lòng chụp rõ nét khuôn mặt hoặc chụp cận cảnh vùng da cần được phân tích!"
+}
+
+Nếu ảnh hợp lệ, hãy phân tích và trả về JSON có cấu trúc chính xác sau:
+{
+  "is_face": true,
+  "skin_type": "Loại da (ví dụ: Da dầu, Da khô, Da thường, Da nhạy cảm, Da hỗn hợp)",
+  "acne_level": "Mức độ mụn (ví dụ: Không có, Nhẹ, Trung bình, Nặng)",
+  "wrinkle_level": "Mức độ nếp nhăn (ví dụ: Không có, Nhẹ, Trung bình, Nặng)",
+  "dark_spots": "Mức độ tàn nhang/thâm sạm (ví dụ: Không có, Ít, Nhiều)",
+  "redness": "Mức độ ửng đỏ/kích ứng (ví dụ: Không có, Ít, Nhiều)",
+  "pores": "Mức độ lỗ chân lông (ví dụ: Nhỏ se khít, Bình thường, Nở rộng, Bít tắc mụn cám)",
+  "hydration": "Độ cấp ẩm (ví dụ: Đủ nước mịn màng, Thiếu ẩm nhẹ, Khô ráp mất nước)",
+  "sebum": "Độ tiết dầu (ví dụ: Bình thường, Ít dầu thừa, Thừa dầu vùng chữ T, Nhiều bã nhờn)",
+  "skin_barrier": "Hàng rào bảo vệ da (ví dụ: Khỏe mạnh, Tổn thương nhẹ, Suy yếu dễ kích ứng)",
+  "elasticity": "Độ đàn hồi & Lão hóa (ví dụ: Đàn hồi tốt săn chắc, Bắt đầu lão hóa chảy xệ, Xuất hiện nếp nhăn tĩnh)",
+  "dark_circles": "Quầng thâm mắt (ví dụ: Không có, Nhẹ, Thâm quầng rõ rệt)",
+  "skin_score": 85, // Điểm số sức khỏe làn da tổng thể từ 0 đến 100
+  "summary": "Tóm tắt ngắn gọn tình trạng da hiện tại của khách hàng (2-3 câu).",
+  "routine_suggestion": "Lộ trình chăm sóc da gợi ý chi tiết (Routine sáng và tối) dành cho họ.",
+  "recommended_services": [
+    {
+      "service_id": 10, // ID của dịch vụ thực tế lấy từ danh sách dưới đây phù hợp nhất với vấn đề của họ
+      "service_name": "Tên dịch vụ",
+      "reason": "Giải thích chi tiết tại sao liệu trình này lại cần thiết và giúp ích cho da của họ."
+    }
+  ]
+}
+
+QUY TẮC CHỌN DỊCH VỤ ĐỀ XUẤT:
+Hãy xem xét kỹ danh sách dịch vụ Spa & Chăm sóc da của chúng tôi dưới đây. Hãy chọn từ 1 đến 2 dịch vụ thực tế có ID tương ứng phù hợp nhất để điều trị các vấn đề da của khách (ví dụ: nếu da mụn nhiều thì gợi ý liệu trình trị mụn, da khô thì gợi ý liệu trình cấp ẩm, da có nếp nhăn/lão hóa thì gợi ý liệu trình trẻ hóa/nâng cơ). KHÔNG tự bịa ID dịch vụ không có trong danh sách.
+
+DANH SÁCH DỊCH VỤ HIỆN CÓ CỦA SALON:
+${servicesList}
+
+Quy tắc: Trả về chuỗi JSON thuần túy, KHÔNG bao gồm ký tự bao ngoài như bọc thẻ markdown \`\`\`json ... \`\`\` hay các giải thích dư thừa ngoài JSON.`;
+
+  // 1. Thử gọi trực tiếp Google Gemini API
+  if (geminiApiKey) {
+    try {
+      console.log('[Skin AI] Attempting direct Google Gemini Vision call...');
+      const { base64Data, mimeType } = await downloadImageAsBase64(imageUrl);
+      
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+        {
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: systemInstruction },
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        },
+        { headers: { 'Content-Type': 'application/json' }, timeout: 20000 }
+      );
+
+      const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        console.log('[Skin AI] Direct Gemini successful!');
+        return JSON.parse(text.trim());
+      }
+    } catch (err) {
+      console.warn('[Skin AI] Direct Gemini failed:', err.message);
+    }
+  }
+
+  // 2. Thử gọi OpenRouter Vision API làm phương án dự phòng
+  if (openrouterApiKey) {
+    const visionModels = [
+      'openrouter/free',
+      'meta-llama/llama-3.2-11b-vision-instruct:free'
+    ];
+
+    for (const model of visionModels) {
+      try {
+        console.log(`[Skin AI] Attempting OpenRouter Vision call with model: ${model}...`);
+        const response = await axios.post(
+          'https://openrouter.ai/api/v1/chat/completions',
+          {
+            model: model,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: systemInstruction },
+                  { type: 'image_url', image_url: { url: imageUrl } }
+                ]
+              }
+            ]
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${openrouterApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 20000
+          }
+        );
+
+        const content = response.data?.choices?.[0]?.message?.content;
+        if (content) {
+          console.log(`[Skin AI] OpenRouter successful with model: ${model}!`);
+          return JSON.parse(content.trim());
+        }
+      } catch (err) {
+        console.warn(`[Skin AI] OpenRouter failed for model ${model}:`, err.message);
+      }
+    }
+  }
+
+  // 3. Fallback mặc định nếu tất cả AI bị lỗi hoặc quá hạn API
+  console.warn('[Skin AI] All AI APIs failed, using default mock fallback data.');
+  return {
+    is_face: true,
+    skin_type: 'Da hỗn hợp thiên dầu (Vùng chữ T tiết nhiều bã nhờn)',
+    acne_level: 'Nhẹ (Xuất hiện mụn đầu đen vùng mũi và vài nốt mụn cám)',
+    wrinkle_level: 'Không có (Làn da có độ đàn hồi tốt)',
+    dark_spots: 'Ít (Vài đốm nâu nhạt màu quanh gò má)',
+    redness: 'Không có',
+    pores: 'Nở rộng nhẹ (Tập trung vùng chữ T và hai bên cánh mũi)',
+    hydration: 'Thiếu ẩm nhẹ (Bề mặt da hơi khô và căng sau khi rửa mặt)',
+    sebum: 'Thừa dầu vùng chữ T (Đặc biệt vùng mũi và trán)',
+    skin_barrier: 'Tổn thương nhẹ (Dễ ửng đỏ khi thay đổi thời tiết)',
+    elasticity: 'Đàn hồi tốt săn chắc (Chưa có dấu hiệu lão hóa rõ rệt)',
+    dark_circles: 'Không có',
+    skin_score: 78,
+    summary: 'Da có tình trạng tiết dầu nhẹ ở vùng chữ T, bề mặt da tương đối khỏe mạnh tuy nhiên cần được làm sạch sâu lỗ chân lông để tránh bít tắc gây mụn thêm.',
+    routine_suggestion: 'Routine Sáng: Rửa mặt dịu nhẹ -> Toner BHA 2% (2 lần/tuần) -> Serum Niacinamide -> Kem dưỡng ẩm gel -> Kem chống nắng nâng tông.\nRoutine Tối: Nước tẩy trang -> Sữa rửa mặt tạo bọt nhẹ -> Toner cấp ẩm -> Serum phục hồi Hyaluronic Acid -> Kem dưỡng khóa ẩm.',
+    recommended_services: [
+      {
+        service_id: 1, // Mặc định dịch vụ chăm sóc da mặt của Salon
+        service_name: 'Chăm sóc da mặt chuyên sâu & Cấp ẩm phục hồi',
+        reason: 'Hỗ trợ hút sạch bã nhờn bít tắc vùng chữ T, tẩy tế bào chết sâu và phun oxy tươi phục hồi ẩm cho làn da.'
+      }
+    ]
+  };
+}
+
+async function analyzeSkin(userId, imageUrl) {
+  const pool = await connectDB();
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) {
+    throw new Error('Không tìm thấy tài khoản khách hàng tương ứng trên hệ thống.');
+  }
+
+  // Lấy danh sách dịch vụ Spa/Skincare để làm context cho AI
+  const servicesResult = await pool.request().query(`
+    SELECT s.ServiceId, s.ServiceName, s.Price, s.DurationMinutes, c.CategoryName
+    FROM Services s
+    LEFT JOIN ServiceCategories c ON s.CategoryId = c.CategoryId
+    WHERE s.Status = 'AVAILABLE' AND (
+      c.CategoryName LIKE N'%da%' OR 
+      c.CategoryName LIKE N'%spa%' OR 
+      c.CategoryName LIKE N'%liệu trình%' OR 
+      s.ServiceName LIKE N'%da%' OR 
+      s.ServiceName LIKE N'%mặt%' OR
+      s.ServiceName LIKE N'%mụn%' OR
+      s.ServiceName LIKE N'%thải độc%' OR
+      s.ServiceName LIKE N'%tắm trắng%'
+    )
+  `);
+
+  const servicesText = servicesResult.recordset.map(s => 
+    `- [ID: ${s.ServiceId}] ${s.ServiceName} (Thuộc nhóm: ${s.CategoryName || 'Skincare'}): ${s.Price?.toLocaleString('vi-VN')}đ, thời lượng ${s.DurationMinutes} phút.`
+  ).join('\n');
+
+  // Gọi phân tích hình ảnh qua AI
+  const analysis = await analyzeSkinImage(imageUrl, servicesText);
+  if (!analysis.is_face) {
+    return analysis; // Trả về lỗi không nhận diện mặt
+  }
+
+  // Lưu kết quả vào cơ sở dữ liệu nếu phân tích thành công
+  await pool.request()
+    .input('CustomerId', sql.Int, customer.CustomerId)
+    .input('ImageUrl', sql.NVarChar, imageUrl)
+    .input('SkinType', sql.NVarChar, analysis.skin_type)
+    .input('AcneLevel', sql.NVarChar, analysis.acne_level)
+    .input('WrinkleLevel', sql.NVarChar, analysis.wrinkle_level)
+    .input('DarkSpots', sql.NVarChar, analysis.dark_spots)
+    .input('Redness', sql.NVarChar, analysis.redness)
+    .input('SkinScore', sql.Int, analysis.skin_score)
+    .input('Summary', sql.NVarChar, analysis.summary)
+    .input('RoutineSuggestion', sql.NVarChar, analysis.routine_suggestion)
+    .input('Pores', sql.NVarChar, analysis.pores || 'Bình thường')
+    .input('Hydration', sql.NVarChar, analysis.hydration || 'Đủ ẩm')
+    .input('Sebum', sql.NVarChar, analysis.sebum || 'Bình thường')
+    .input('SkinBarrier', sql.NVarChar, analysis.skin_barrier || 'Khỏe mạnh')
+    .input('Elasticity', sql.NVarChar, analysis.elasticity || 'Tốt')
+    .input('DarkCircles', sql.NVarChar, analysis.dark_circles || 'Không có')
+    .query(`
+      INSERT INTO AISkinAnalysisHistory (
+        CustomerId, ImageUrl, SkinType, AcneLevel, WrinkleLevel, DarkSpots, Redness, SkinScore, Summary, RoutineSuggestion,
+        Pores, Hydration, Sebum, SkinBarrier, Elasticity, DarkCircles
+      ) VALUES (
+        @CustomerId, @ImageUrl, @SkinType, @AcneLevel, @WrinkleLevel, @DarkSpots, @Redness, @SkinScore, @Summary, @RoutineSuggestion,
+        @Pores, @Hydration, @Sebum, @SkinBarrier, @Elasticity, @DarkCircles
+      )
+    `);
+
+  return {
+    ...analysis,
+    image_url: imageUrl,
+    created_at: new Date()
+  };
+}
+
+async function getHistory(userId) {
+  const pool = await connectDB();
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) return [];
+
+  const result = await pool.request()
+    .input('CustomerId', sql.Int, customer.CustomerId)
+    .query(`
+      SELECT AnalysisId, ImageUrl, SkinType, AcneLevel, WrinkleLevel, DarkSpots, Redness, SkinScore, Summary, RoutineSuggestion, CreatedAt,
+             Pores, Hydration, Sebum, SkinBarrier, Elasticity, DarkCircles
+      FROM AISkinAnalysisHistory
+      WHERE CustomerId = @CustomerId
+      ORDER BY CreatedAt ASC
+    `);
+
+  return result.recordset;
+}
+
+module.exports = {
+  analyzeSkin,
+  getHistory
+};

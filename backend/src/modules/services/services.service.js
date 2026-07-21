@@ -41,7 +41,28 @@ async function getById(id) {
       WHERE s.ServiceId = @ServiceId
     `);
 
-  return result.recordset[0];
+  const service = result.recordset[0];
+  if (!service) return null;
+
+  const reviewsResult = await pool.request().input("ServiceId", sql.Int, id).query(`
+      SELECT 
+        r.ReviewId,
+        r.Rating,
+        r.Comment,
+        r.CreatedAt,
+        u.FullName AS CustomerName,
+        u.AvatarUrl AS CustomerAvatar
+      FROM Reviews r
+      JOIN Customers c ON r.CustomerId = c.CustomerId
+      JOIN Users u ON c.UserId = u.UserId
+      WHERE r.ServiceId = @ServiceId AND r.Status = 'APPROVED'
+      ORDER BY r.CreatedAt DESC
+    `);
+
+  return {
+    ...service,
+    Reviews: reviewsResult.recordset,
+  };
 }
 
 async function create(data) {

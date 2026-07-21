@@ -438,6 +438,7 @@ describe("Member 1 - Auth Service Unit Tests", () => {
       getPayload: () => ({
         sub: "google-sub-id",
         email: "google@example.com",
+        email_verified: true,
         name: "Google User",
       }),
     });
@@ -446,11 +447,12 @@ describe("Member 1 - Auth Service Unit Tests", () => {
         UserId: 1,
         FullName: "Google User",
         Email: "google@example.com",
+        GoogleId: "google-sub-id",
         Status: "ACTIVE",
         IsVerified: true,
         RoleName: "CUSTOMER",
       }],
-    }); // 1. getUserByEmail
+    }); // 1. getUserByGoogleId
     mockQuery.mockResolvedValueOnce({
       rowsAffected: [1],
     }); // 2. UPDATE Users
@@ -459,11 +461,12 @@ describe("Member 1 - Auth Service Unit Tests", () => {
         UserId: 1,
         FullName: "Google User",
         Email: "google@example.com",
+        GoogleId: "google-sub-id",
         Status: "ACTIVE",
         IsVerified: true,
         RoleName: "CUSTOMER",
       }],
-    }); // 3. getUserByEmail again
+    }); // 3. getUserByGoogleId again
 
     // Act
     const result = await googleLogin(googleToken);

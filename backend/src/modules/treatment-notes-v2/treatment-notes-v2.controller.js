@@ -3,7 +3,7 @@ const { success, error } = require("../../utils/response");
 
 // Helper to determine if the user has Admin/Manager level access
 function checkAdminAccess(req) {
-  const role = String(req.user?.RoleName || "").toUpperCase();
+  const role = String(req.user?.role || "").toUpperCase();
   return role === "ADMIN" || role === "MANAGER";
 }
 
@@ -40,9 +40,10 @@ async function getCustomerHistory(req, res) {
 async function getNoteByAppointment(req, res) {
   try {
     const appointmentId = Number(req.params.id);
+    const serviceId = req.query.serviceId ? Number(req.query.serviceId) : null;
     const isAdmin = checkAdminAccess(req);
 
-    const note = await service.getNoteByAppointment(appointmentId, isAdmin);
+    const note = await service.getNoteByAppointment(appointmentId, serviceId, isAdmin);
     if (!note) {
       return success(res, null, "Không tìm thấy ghi chú trị liệu cho lịch hẹn này.", 200);
     }
@@ -128,6 +129,26 @@ async function getAnalytics(req, res) {
   }
 }
 
+async function generateAINote(req, res) {
+  try {
+    const { rawText, serviceName, categoryName } = req.body;
+    const result = await service.generateAINote(rawText, serviceName, categoryName);
+    return success(res, result, "Sinh ghi chú tự động thành công.");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function getCustomerAIInsights(req, res) {
+  try {
+    const customerId = Number(req.params.id);
+    const result = await service.getCustomerAIInsights(customerId);
+    return success(res, result, "Lấy phân tích AI khách hàng thành công.");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
   createNote,
   getCustomerHistory,
@@ -136,5 +157,7 @@ module.exports = {
   updateNote,
   finalizeNote,
   searchNotes,
-  getAnalytics
+  getAnalytics,
+  generateAINote,
+  getCustomerAIInsights
 };

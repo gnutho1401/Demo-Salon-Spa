@@ -1,6 +1,6 @@
-const { sql, connectDB } = require('../../config/db');
-const { generateContent } = require('../../config/gemini');
-const { sendMail } = require('../../utils/sendMail');
+const { sql, connectDB } = require('../../../config/db');
+const { generateContent } = require('../../../config/gemini');
+const { sendMail } = require('../../../utils/sendMail');
 
 async function getCustomerByUserId(pool, userId) {
   if (!userId) return null;
@@ -174,7 +174,7 @@ async function buildSalonContext(pool, userId) {
 
   const techniciansList = employeesResult.recordset.map(e => {
     const shifts = employeeShiftsMap[e.EmployeeId] || [];
-    const shiftsStr = shifts.length > 0 ? shifts.join(', ') : 'Không có ca làm việc';
+    const shiftsStr = shifts.length > 0 ? shifts.join(', ') : 'Trực full ca salon (08:00 - 20:00 hàng ngày)';
     return `- [Stylist ID: ${e.EmployeeId}] ${e.FullName} (${e.Position || 'Kỹ thuật viên'}): Chuyên môn: ${e.Specialization || 'Chăm sóc chung'}, ${e.YearsOfExperience} năm kinh nghiệm, Đánh giá: ${e.AverageRating}/5. Lịch trực 3 ngày tới: ${shiftsStr}`;
   }).join('\n');
 
@@ -864,7 +864,7 @@ async function sendVoucherToCustomer(customerId, voucherId, discountPercent) {
 
   if (discountPercent) {
     discountVal = Number(discountPercent);
-    voucherCode = `CRM${discountVal}${customerId}${Math.floor(1000 + Math.random() * 9000)}`;
+    voucherCode = `CRM${discountVal}C${customerId}R${Math.floor(1000 + Math.random() * 9000)}`;
     
     const voucherInsert = await pool.request()
       .input("Code", sql.NVarChar, voucherCode)

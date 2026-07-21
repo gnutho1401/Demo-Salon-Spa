@@ -1,5 +1,5 @@
 const service = require('./ai.service');
-const { success, error } = require('../../utils/response');
+const { success, error } = require('../../../utils/response');
 
 async function getAll(req, res) { try { return success(res, await service.getAll()); } catch (err) { return error(res, err.message); } }
 async function getMine(req, res) { try { return success(res, await service.getMine(req.user.userId)); } catch (err) { return error(res, err.message, 400); } }
