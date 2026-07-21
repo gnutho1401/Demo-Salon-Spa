@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import CustomerLayout from "../../components/layout/CustomerLayout";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
-const FALLBACK_AVATAR = "/images/default-avatar.png";
+const FALLBACK_AVATAR = "/images/avatars/default-avatar.png";
 
 function formatDate(value) {
   if (!value) return "-";

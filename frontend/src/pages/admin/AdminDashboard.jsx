@@ -16,7 +16,7 @@ import {
   Bar,
 } from "recharts";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("vi-VN", {
@@ -69,8 +69,10 @@ function safeAvatar(url) {
 
 /* ─────────── Stat Card (clickable) ─────────── */
 function StatCard({ label, value, note, icon, colorClass, onClick }) {
+  const CardElement = onClick ? "button" : "article";
   return (
-    <article
+    <CardElement
+      type={onClick ? "button" : undefined}
       className={`admin-stat-card-new ${colorClass || ""}`}
       onClick={onClick}
       style={{ cursor: onClick ? "pointer" : "default", position: "relative" }}
@@ -87,7 +89,7 @@ function StatCard({ label, value, note, icon, colorClass, onClick }) {
           fontSize: "11px", fontWeight: "700", color: "#e8396c", opacity: 0.7
         }}>Xem chi tiết →</span>
       )}
-    </article>
+    </CardElement>
   );
 }
 
@@ -109,8 +111,29 @@ function InfoRow({ label, value, valueColor }) {
   );
 }
 
+function ActionChip({ children, onClick, urgent = false }) {
+  return (
+    <button
+      className={`dashboard-action-chip${urgent ? " is-urgent" : ""}`}
+      type="button"
+      onClick={onClick}
+    >
+      {children}
+      <span aria-hidden="true">→</span>
+    </button>
+  );
+}
+
 /* ─────────── Mini Panel ─────────── */
-function MiniPanel({ title, icon, children, linkLabel, onLink }) {
+function MiniPanel({
+  title,
+  icon,
+  children,
+  linkLabel,
+  onLink,
+  secondaryLinkLabel,
+  onSecondaryLink,
+}) {
   return (
     <div
       style={{
@@ -136,28 +159,45 @@ function MiniPanel({ title, icon, children, linkLabel, onLink }) {
         {icon} {title}
       </h4>
       <div style={{ flex: 1 }}>{children}</div>
-      {linkLabel && onLink && (
-        <button
-          onClick={onLink}
-          style={{
-            marginTop: 12,
-            background: "none",
-            border: "1px solid #f6d0db",
-            borderRadius: "999px",
-            color: "#e8396c",
-            fontSize: "12px",
-            fontWeight: "700",
-            padding: "5px 14px",
-            cursor: "pointer",
-            alignSelf: "flex-start",
-            transition: "background 0.2s",
-          }}
-          onMouseEnter={(e) => e.target.style.background = "#fdf0f4"}
-          onMouseLeave={(e) => e.target.style.background = "none"}
-        >
-          {linkLabel} →
-        </button>
-      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+        {linkLabel && onLink && (
+          <button
+            onClick={onLink}
+            style={{
+              background: "none",
+              border: "1px solid #f6d0db",
+              borderRadius: "999px",
+              color: "#e8396c",
+              fontSize: "12px",
+              fontWeight: "700",
+              padding: "5px 14px",
+              cursor: "pointer",
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "#fdf0f4"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+          >
+            {linkLabel} →
+          </button>
+        )}
+        {secondaryLinkLabel && onSecondaryLink && (
+          <button
+            onClick={onSecondaryLink}
+            style={{
+              background: "none",
+              border: "1px solid #ead8bd",
+              borderRadius: "999px",
+              color: "#8a653a",
+              fontSize: "12px",
+              fontWeight: "700",
+              padding: "5px 14px",
+              cursor: "pointer",
+            }}
+          >
+            {secondaryLinkLabel} →
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -332,10 +372,7 @@ export default function AdminDashboard() {
       {!loading && data && (
         <>
           {/* ── 8 Thẻ thống kê chính ── */}
-          <div
-            className="dashboard-stats-grid"
-            style={{ gridTemplateColumns: "repeat(4, 1fr)" }}
-          >
+          <div className="dashboard-stats-grid">
             <StatCard
               label="DOANH THU HÔM NAY"
               value={formatMoney(summary.revenueToday)}
@@ -409,124 +446,47 @@ export default function AdminDashboard() {
             summary.pendingFeedbacks > 0 ||
             summary.pendingRefunds > 0 ||
             summary.pendingPayouts > 0) && (
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 10,
-                background: "linear-gradient(135deg, #fffbeb, #fff7f0)",
-                border: "1px solid #fde68a",
-                borderRadius: "20px",
-                padding: "14px 20px",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontWeight: "800",
-                  color: "#92400e",
-                  fontSize: "13px",
-                }}
-              >
-                ⚠️ CẦN XỬ LÝ:
-              </span>
-              {summary.pendingAppointments > 0 && (
-                <span
-                  onClick={() => navigate("/admin/reports")}
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingAppointments} lịch hẹn chờ duyệt →
-                </span>
-              )}
-              {summary.pendingPayments > 0 && (
-                <span
-                  onClick={() => navigate("/admin/reports")}
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingPayments} giao dịch chờ thanh toán →
-                </span>
-              )}
-              {summary.pendingReviews > 0 && (
-                <span
-                  onClick={() => navigate("/admin/reviews")}
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingReviews} đánh giá chờ duyệt →
-                </span>
-              )}
-              {summary.pendingFeedbacks > 0 && (
-                <span
-                  onClick={() => navigate("/admin/feedbacks")}
-                  style={{
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingFeedbacks} phản hồi chưa đọc →
-                </span>
-              )}
-              {summary.pendingRefunds > 0 && (
-                <span
-                  onClick={() => navigate("/admin/refunds")}
-                  style={{
-                    background: "#fee2e2",
-                    color: "#991b1b",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingRefunds} hoàn tiền chờ xử lý →
-                </span>
-              )}
-              {summary.pendingPayouts > 0 && (
-                <span
-                  onClick={() => navigate("/admin/employees")}
-                  style={{
-                    background: "#fee2e2",
-                    color: "#991b1b",
-                    padding: "3px 12px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  {summary.pendingPayouts} yêu cầu payout chờ duyệt →
-                </span>
-              )}
-            </div>
+            <section className="dashboard-action-rail" aria-labelledby="operations-pulse-title">
+              <div className="dashboard-action-heading">
+                <span className="dashboard-action-symbol" aria-hidden="true">!</span>
+                <div>
+                  <p>Nhịp vận hành</p>
+                  <h2 id="operations-pulse-title">Việc cần xử lý</h2>
+                </div>
+              </div>
+              <div className="dashboard-action-list">
+                {summary.pendingAppointments > 0 && (
+                  <ActionChip onClick={() => navigate("/admin/reports")}>
+                    {summary.pendingAppointments} lịch hẹn chờ duyệt
+                  </ActionChip>
+                )}
+                {summary.pendingPayments > 0 && (
+                  <ActionChip onClick={() => navigate("/admin/reports")}>
+                    {summary.pendingPayments} giao dịch chờ thanh toán
+                  </ActionChip>
+                )}
+                {summary.pendingReviews > 0 && (
+                  <ActionChip onClick={() => navigate("/admin/reviews")}>
+                    {summary.pendingReviews} đánh giá chờ duyệt
+                  </ActionChip>
+                )}
+                {summary.pendingFeedbacks > 0 && (
+                  <ActionChip onClick={() => navigate("/admin/feedbacks")}>
+                    {summary.pendingFeedbacks} phản hồi chưa đọc
+                  </ActionChip>
+                )}
+                {summary.pendingRefunds > 0 && (
+                  <ActionChip urgent onClick={() => navigate("/admin/refunds")}>
+                    {summary.pendingRefunds} hoàn tiền chờ xử lý
+                  </ActionChip>
+                )}
+                {summary.pendingPayouts > 0 && (
+                  <ActionChip urgent onClick={() => navigate("/admin/employees")}>
+                    {summary.pendingPayouts} payout chờ duyệt
+                  </ActionChip>
+                )}
+              </div>
+            </section>
           )}
 
           {/* ── Tab điều hướng ── */}
@@ -714,7 +674,14 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 16 }}>
-                  <MiniPanel title="Tài Khoản Người Dùng" icon="👤" linkLabel="Quản lý users" onLink={() => navigate("/admin/users")}>
+                  <MiniPanel
+                    title="Nhân sự & khách hàng"
+                    icon="👥"
+                    linkLabel="Quản lý nhân viên"
+                    onLink={() => navigate("/admin/employees")}
+                    secondaryLinkLabel="Quản lý khách hàng"
+                    onSecondaryLink={() => navigate("/admin/customers")}
+                  >
                     <InfoRow label="Đang hoạt động" value={summary.activeUsers ?? 0} valueColor="#10b981" />
                     <InfoRow label="Không hoạt động" value={summary.inactiveUsers ?? 0} />
                     <InfoRow label="Bị khóa (Banned)" value={summary.bannedUsers ?? 0} valueColor="#ef4444" />
@@ -1167,13 +1134,7 @@ export default function AdminDashboard() {
           {activeTab === "appointments" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               {/* KPI cards */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 16,
-                }}
-              >
+              <div className="dashboard-appointment-kpis">
                 {[
                   {
                     label: "Hôm nay",

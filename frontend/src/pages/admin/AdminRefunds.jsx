@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axiosClient from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 import "../../styles/pages/admin.css";
 
 function money(value) {
@@ -26,6 +27,8 @@ export default function AdminRefunds() {
   const [selectedRefundId, setSelectedRefundId] = useState(null);
 
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
+  const [confirmRefund, setConfirmRefund] = useState(null);
+  const [processingRefund, setProcessingRefund] = useState(false);
 
   function showToast(message, type = "success") {
     setToast({ open: true, message, type });
@@ -106,13 +109,6 @@ export default function AdminRefunds() {
   }, [allRefunds, statusFilter, keyword]);
 
   async function processRefund(id, manual = false) {
-    const confirmMessage = manual
-      ? "Xác nhận bạn đã chuyển khoản hoàn tiền thủ công cho khách hàng này (bên ngoài hệ thống)?"
-      : "Xác nhận thực hiện hoàn tiền tự động qua cổng PayOS cho khách hàng này?";
-
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
     try {
       setError("");
       setSuccessMsg("");
@@ -127,6 +123,21 @@ export default function AdminRefunds() {
       const errText = err.response?.data?.message || "Xử lý hoàn tiền thất bại";
       setError(errText);
       showToast(errText, "error");
+    }
+  }
+
+  function requestRefund(refund, manual) {
+    setConfirmRefund({ refund, manual });
+  }
+
+  async function handleConfirmRefund() {
+    if (!confirmRefund) return;
+    setProcessingRefund(true);
+    try {
+      await processRefund(confirmRefund.refund.RefundId, confirmRefund.manual);
+      setConfirmRefund(null);
+    } finally {
+      setProcessingRefund(false);
     }
   }
 
@@ -391,7 +402,7 @@ export default function AdminRefunds() {
                           <>
                             <button
                               className="refund-btn-payout-auto"
-                              onClick={() => processRefund(r.RefundId, false)}
+                              onClick={() => requestRefund(r, false)}
                             >
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -400,7 +411,7 @@ export default function AdminRefunds() {
                             </button>
                             <button
                               className="refund-btn-payout-manual"
-                              onClick={() => processRefund(r.RefundId, true)}
+                              onClick={() => requestRefund(r, true)}
                             >
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -412,7 +423,7 @@ export default function AdminRefunds() {
                         ) : (
                           <button
                             className="refund-btn-payout-manual"
-                            onClick={() => processRefund(r.RefundId, true)}
+                            onClick={() => requestRefund(r, true)}
                           >
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -456,6 +467,32 @@ export default function AdminRefunds() {
             ))
           )}
         </div>
+
+        <AdminConfirmDialog
+          open={Boolean(confirmRefund)}
+          title={confirmRefund?.manual ? "Xác nhận đã hoàn tiền thủ công?" : "Hoàn tiền qua PayOS?"}
+          description={
+            confirmRefund?.manual
+              ? "Chỉ tiếp tục khi tiền đã được chuyển bên ngoài hệ thống. Thao tác này sẽ đánh dấu yêu cầu là đã hoàn tất."
+              : "Hệ thống sẽ gửi lệnh hoàn tiền thật đến PayOS. Vui lòng đối chiếu khách hàng và số tiền trước khi tiếp tục."
+          }
+          details={
+            confirmRefund ? (
+              <>
+                <strong>{confirmRefund.refund.CustomerName || "Khách hàng"}</strong>
+                <span> · {money(confirmRefund.refund.RefundAmount)}</span>
+                {confirmRefund.refund.TransactionCode ? (
+                  <div>Mã giao dịch: {confirmRefund.refund.TransactionCode}</div>
+                ) : null}
+              </>
+            ) : null
+          }
+          confirmLabel={confirmRefund?.manual ? "Đã chuyển tiền" : "Hoàn qua PayOS"}
+          tone="danger"
+          busy={processingRefund}
+          onCancel={() => setConfirmRefund(null)}
+          onConfirm={handleConfirmRefund}
+        />
 
         {/* Modal từ chối hoàn tiền */}
         {rejectModalOpen && (

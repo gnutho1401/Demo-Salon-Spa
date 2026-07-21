@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { GoogleLogin } from "@react-oauth/google";
 import axiosClient from "../../api/axiosClient";
+import SocialAuthButtons from "../../components/auth/SocialAuthButtons";
 import { useAuth } from "../../context/AuthContext";
 
 function redirectByRole(navigate, role) {
@@ -13,8 +13,10 @@ function redirectByRole(navigate, role) {
     navigate("/receptionist");
   } else if (r === "TECHNICIAN" || r === "STYLIST") {
     navigate("/technician");
-  } else {
+  } else if (r === "CUSTOMER") {
     navigate("/customer");
+  } else {
+    navigate("/");
   }
 }
 
@@ -40,6 +42,7 @@ export default function Login() {
   });
 
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const redirectUrl =
     searchParams.get("redirectUrl") ||
@@ -50,8 +53,9 @@ export default function Login() {
 
   const handleRedirectAfterLogin = (data) => {
     const role = getRoleFromResponse(data);
+    const normalizedRole = String(role || "").toUpperCase();
 
-    if (redirectUrl) {
+    if (normalizedRole === "CUSTOMER" && redirectUrl) {
       const target = redirectUrl.startsWith("/")
         ? redirectUrl
         : "/customer/booking";
@@ -77,45 +81,56 @@ export default function Login() {
     redirectByRole(navigate, role);
   };
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const authenticate = async (credentials) => {
     setError("");
+    setSubmitting(true);
 
     try {
-      const res = await axiosClient.post("/auth/login", form);
+      const res = await axiosClient.post("/auth/login", credentials);
       login(res.data);
       handleRedirectAfterLogin(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || "Email hoặc mật khẩu chưa đúng.");
+      setError(
+        err.response?.data?.message || "Email hoặc mật khẩu chưa đúng.",
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    try {
-      setError("");
+  const submit = async (e) => {
+    e.preventDefault();
+    await authenticate(form);
+  };
 
-      const res = await axiosClient.post("/auth/google-login", {
-        idToken: credentialResponse.credential,
-      });
-
-      login(res.data);
-      handleRedirectAfterLogin(res.data);
-    } catch (err) {
-      setError(err.response?.data?.message || "Đăng nhập Google thất bại");
-    }
+  const handleSocialAuthenticated = (data) => {
+    login(data);
+    handleRedirectAfterLogin(data);
   };
 
   return (
     <div className="auth-page">
+      {/* Background dynamic animated mesh orbs */}
+      <div className="auth-bg-decor">
+        <div className="auth-orb auth-orb-1"></div>
+        <div className="auth-orb auth-orb-2"></div>
+        <div className="auth-orb auth-orb-3"></div>
+      </div>
+
       <form className="auth-card" onSubmit={submit}>
         <div className="eyebrow">Welcome back</div>
         <h2>Đăng nhập</h2>
 
         {error && <p className="auth-error">{error}</p>}
 
-        <label>Email</label>
+        <label htmlFor="login-email">Email</label>
         <input
+          id="login-email"
+          name="email"
           placeholder="Nhập email"
+          type="email"
+          autoComplete="email"
+          required
           value={form.email}
           onChange={(e) =>
             setForm({
@@ -125,10 +140,14 @@ export default function Login() {
           }
         />
 
-        <label>Mật khẩu</label>
+        <label htmlFor="login-password">Mật khẩu</label>
         <input
+          id="login-password"
+          name="password"
           placeholder="Nhập mật khẩu"
           type="password"
+          autoComplete="current-password"
+          required
           value={form.password}
           onChange={(e) =>
             setForm({
@@ -138,8 +157,13 @@ export default function Login() {
           }
         />
 
-        <button className="btn" style={{ width: "100%", marginTop: 10 }}>
-          Đăng nhập
+        <button
+          className="btn"
+          type="submit"
+          disabled={submitting}
+          style={{ width: "100%", marginTop: 10 }}
+        >
+          {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
         </button>
 
         <div className="auth-links">
@@ -152,15 +176,14 @@ export default function Login() {
         </div>
 
         <div className="auth-divider">
-          <span>hoặc</span>
+          <span>hoặc tiếp tục với</span>
         </div>
 
-        <div className="google-box">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError("Đăng nhập Google thất bại")}
-          />
-        </div>
+        <SocialAuthButtons
+          intent="login"
+          onAuthenticated={handleSocialAuthenticated}
+          onError={setError}
+        />
 
         <p className="muted">
           Chưa có tài khoản?{" "}

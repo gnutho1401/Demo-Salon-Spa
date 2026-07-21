@@ -25,6 +25,7 @@ export default function MembershipPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [vipCountdown, setVipCountdown] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -45,6 +46,31 @@ export default function MembershipPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // VIP countdown timer
+  useEffect(() => {
+    if (!mine?.VIPExpiredAt) {
+      setVipCountdown(null);
+      return;
+    }
+    const expiry = new Date(mine.VIPExpiredAt).getTime();
+    const tick = () => {
+      const now = Date.now();
+      const diff = expiry - now;
+      if (diff <= 0) {
+        setVipCountdown(null);
+        // Reload to get updated membership info
+        window.location.reload();
+        return;
+      }
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setVipCountdown(`${mins} phút ${secs < 10 ? "0" : ""}${secs} giây`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [mine?.VIPExpiredAt]);
 
   const summary = useMemo(() => {
     return {
@@ -125,6 +151,28 @@ export default function MembershipPage() {
         </section>
 
         {error && <div className="reward-alert error">{error}</div>}
+
+        {vipCountdown && (
+          <div style={{
+            background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+            border: '2px solid #f59e0b',
+            borderRadius: '16px',
+            padding: '16px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            boxShadow: '0 4px 15px rgba(245, 158, 11, 0.2)',
+            animation: 'pulseRankGlow 2s infinite'
+          }}>
+            <span style={{ fontSize: '1.8rem' }}>⏳</span>
+            <div>
+              <strong style={{ color: '#92400e', fontSize: '1rem' }}>Đặc quyền VIP tạm thời đang hoạt động!</strong>
+              <p style={{ margin: '4px 0 0', color: '#78350f', fontSize: '0.9rem' }}>
+                Hạng VIP đặc cách của bạn sẽ hết hiệu lực sau: <strong style={{ color: '#dc2626', fontSize: '1.1rem' }}>{vipCountdown}</strong>
+              </p>
+            </div>
+          </div>
+        )}
 
         <section className="reward-stats">
           <div className="reward-stats-card">

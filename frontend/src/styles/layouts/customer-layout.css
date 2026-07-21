@@ -33,6 +33,13 @@
   background: linear-gradient(135deg, #ff5ea8, #ef4f83);
   color: #fff;
   box-shadow: 0 18px 45px rgba(239, 79, 131, 0.25);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.customer-pink-brand:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 22px 55px rgba(239, 79, 131, 0.4);
+  background: linear-gradient(135deg, #ff7dbd, #ff5ea8);
 }
 
 .customer-pink-brand-icon {
@@ -42,6 +49,12 @@
   place-items: center;
   border-radius: 17px;
   background: rgba(255, 255, 255, 0.2);
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.4s ease;
+}
+
+.customer-pink-brand:hover .customer-pink-brand-icon {
+  transform: rotate(360deg) scale(1.15);
+  background-color: rgba(255, 255, 255, 0.35);
 }
 
 .customer-pink-brand strong,
@@ -242,6 +255,7 @@
 .customer-pink-main {
   min-width: 0;
   padding: 28px 34px 42px;
+  will-change: transform, opacity, filter;
 }
 
 @media (max-width: 1100px) {
@@ -293,3 +307,294 @@
   z-index: 10;
   line-height: 1;
 }
+
+/* --- Premium Animations & Dynamic Interaction Effects for Customer Portal --- */
+
+/* Dynamic, page-specific entrance animations optimized for maximum smoothness (60FPS) */
+
+/* 1. Overview/Dashboard - Soft scale-up glide */
+@keyframes animOverviewIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.customer-pink-main.anim-overview {
+  animation: animOverviewIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 2. Booking - Soft left slide-in */
+@keyframes animBookingIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-15px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.customer-pink-main.anim-booking {
+  animation: animBookingIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 3. My Appointments - 3D depth zoom & subtle slide-in from right */
+@keyframes animAppointmentsIn {
+  0% {
+    opacity: 0;
+    transform: perspective(1000px) rotateY(-4deg) translateX(15px) translateZ(-15px);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1000px) rotateY(0deg) translateX(0) translateZ(0);
+  }
+}
+.customer-pink-main.anim-appointments {
+  animation: animAppointmentsIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 4. Service History - Nostalgic soft blur-down fade */
+@keyframes animHistoryIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+.customer-pink-main.anim-history {
+  animation: animHistoryIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 5. Payments - Crisp zoom */
+@keyframes animPaymentsIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.customer-pink-main.anim-payments {
+  animation: animPaymentsIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 6. Packages - Soft bottom-right diagonal slide */
+@keyframes animPackagesIn {
+  0% {
+    opacity: 0;
+    transform: translate(12px, 12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+.customer-pink-main.anim-packages {
+  animation: animPackagesIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 7. Membership - Radiant rise */
+@keyframes animMembershipIn {
+  0% {
+    opacity: 0;
+    transform: translateY(15px);
+    filter: brightness(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: brightness(1);
+  }
+}
+.customer-pink-main.anim-membership {
+  animation: animMembershipIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 8. Vouchers - Soft rotation glide */
+@keyframes animVouchersIn {
+  0% {
+    opacity: 0;
+    transform: rotate(-1deg) scale(0.985) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+}
+.customer-pink-main.anim-vouchers {
+  animation: animVouchersIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 9. Waiting list - Soft desaturate fade-in */
+@keyframes animWaitingIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.99);
+    filter: grayscale(0.4);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: grayscale(0);
+  }
+}
+.customer-pink-main.anim-waiting {
+  animation: animWaitingIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 10. Notifications - Slide down from top */
+@keyframes animNotificationsIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.customer-pink-main.anim-notifications {
+  animation: animNotificationsIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 11. AI Assistant & Counselors - Glowing blur reveal */
+@keyframes animAiIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+    filter: blur(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+.customer-pink-main.anim-ai {
+  animation: animAiIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 12. Feedback - Smooth vertical expansion */
+@keyframes animFeedbackIn {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.95);
+    transform-origin: top;
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+    transform-origin: top;
+  }
+}
+.customer-pink-main.anim-feedback {
+  animation: animFeedbackIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 13. Reviews - Soft glide up */
+@keyframes animReviewsIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.customer-pink-main.anim-reviews {
+  animation: animReviewsIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 14. Profile - perspective horizontal Y-axis slide reveal */
+@keyframes animProfileIn {
+  0% {
+    opacity: 0;
+    transform: perspective(1000px) rotateY(4deg) translateX(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1000px) rotateY(0deg) translateX(0);
+  }
+}
+.customer-pink-main.anim-profile {
+  animation: animProfileIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 15. Default page - Classic fade-in with slide-up */
+@keyframes animDefaultIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.customer-pink-main.anim-default {
+  animation: animDefaultIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Springy transition animations for hover and tactile active clicks */
+.customer-pink-shell button,
+.customer-pink-shell a,
+.customer-pink-shell .customer-pink-nav-link,
+.customer-pink-shell .glow-card,
+.customer-pink-shell .option-card,
+.customer-pink-shell .booking-tab,
+.customer-pink-shell .booking-service-card,
+.customer-pink-shell .booking-package-card,
+.customer-pink-shell .booking-employee-card,
+.customer-pink-shell .booking-time-btn,
+.customer-pink-shell .booking-my-voucher-card,
+.customer-pink-shell .reschedule-employee-card,
+.customer-pink-shell .reschedule-slot-btn,
+.customer-pink-shell .history-service-card-pro,
+.customer-pink-shell .service-history-stats article,
+.customer-pink-shell .favorite-employee-btn,
+.customer-pink-shell .rf-item,
+.customer-pink-shell .waiting-cancel-btn,
+.customer-pink-shell .profile-info-list div {
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease, background-color 0.25s ease, color 0.25s ease !important;
+}
+
+/* Tactile scale-down click feedback */
+.customer-pink-shell button:active,
+.customer-pink-shell a:active,
+.customer-pink-shell .customer-pink-nav-link:active,
+.customer-pink-shell .glow-card:active,
+.customer-pink-shell .option-card:active,
+.customer-pink-shell .booking-tab:active,
+.customer-pink-shell .booking-service-card:active,
+.customer-pink-shell .booking-package-card:active,
+.customer-pink-shell .booking-employee-card:active,
+.customer-pink-shell .booking-time-btn:active,
+.customer-pink-shell .booking-my-voucher-card:active,
+.customer-pink-shell .reschedule-employee-card:active,
+.customer-pink-shell .reschedule-slot-btn:active,
+.customer-pink-shell .history-service-card-pro:active,
+.customer-pink-shell .service-history-stats article:active,
+.customer-pink-shell .favorite-employee-btn:active,
+.customer-pink-shell .rf-item:active,
+.customer-pink-shell .waiting-cancel-btn:active,
+.customer-pink-shell .profile-info-list div:active {
+  transform: scale(0.96) !important;
+}
+
+/* Highlight click effect on sidebar navigation links */
+.customer-pink-nav-link:active {
+  background-color: #fff0f6 !important;
+}
+

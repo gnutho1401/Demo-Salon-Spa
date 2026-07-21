@@ -8,7 +8,7 @@ const menuGroups = [
   {
     title: "Tổng quan",
     items: [
-      { to: "/customer", icon: "🏠", label: "Dashboard", end: true },
+      { to: "/customer", icon: "🏠", label: "Tổng quan", end: true },
       { to: "/customer/booking", icon: "📅", label: "Đặt lịch hẹn" },
       { to: "/customer/appointments", icon: "🧾", label: "Lịch hẹn của tôi" },
       { to: "/customer/service-history", icon: "💆", label: "Lịch sử dịch vụ" },
@@ -26,10 +26,10 @@ const menuGroups = [
   {
     title: "Chăm sóc khách hàng",
     items: [
-      { to: "/customer/waiting-list", icon: "⏳", label: "Hàng chờ" },
       { to: "/customer/notifications", icon: "🔔", label: "Thông báo" },
       { to: "/customer/ai", icon: "✨", label: "AI tư vấn" },
       { to: "/customer/stylist-advisor", icon: "💇", label: "AI Stylist" },
+      { to: "/customer/skin-analyzer", icon: "🧬", label: "AI Phân tích da" },
       { to: "/customer/feedback", icon: "💌", label: "Phản hồi" },
       { to: "/customer/reviews", icon: "⭐", label: "Đánh giá" },
     ],
@@ -102,6 +102,25 @@ export default function CustomerLayout({ children }) {
   const email = user?.Email || user?.email || "customer@beautyms.com";
   const avatar = user?.AvatarUrl || user?.avatarUrl || user?.Avatar || "";
   const initial = displayName.trim().charAt(0).toUpperCase() || "K";
+
+  const getPageClass = () => {
+    const path = location.pathname;
+    if (path === '/customer') return 'anim-overview';
+    if (path.startsWith('/customer/booking')) return 'anim-booking';
+    if (path.startsWith('/customer/appointments')) return 'anim-appointments';
+    if (path.startsWith('/customer/service-history')) return 'anim-history';
+    if (path.startsWith('/customer/payments')) return 'anim-payments';
+    if (path.startsWith('/customer/packages')) return 'anim-packages';
+    if (path.startsWith('/customer/membership')) return 'anim-membership';
+    if (path.startsWith('/customer/vouchers')) return 'anim-vouchers';
+    if (path.startsWith('/customer/waiting-list')) return 'anim-waiting';
+    if (path.startsWith('/customer/notifications')) return 'anim-notifications';
+    if (path.startsWith('/customer/ai') || path.startsWith('/customer/stylist-advisor') || path.startsWith('/customer/skin-analyzer')) return 'anim-ai';
+    if (path.startsWith('/customer/feedback')) return 'anim-feedback';
+    if (path.startsWith('/customer/reviews')) return 'anim-reviews';
+    if (path.startsWith('/customer/profile')) return 'anim-profile';
+    return 'anim-default';
+  };
 
   const handleLogout = () => {
     logout();
@@ -203,7 +222,7 @@ export default function CustomerLayout({ children }) {
             </div>
           </header>
 
-          <main className="customer-pink-main">{children}</main>
+          <main className={`customer-pink-main ${getPageClass()}`} key={location.pathname}>{children}</main>
         </section>
       </div>
     </GuestLayout>

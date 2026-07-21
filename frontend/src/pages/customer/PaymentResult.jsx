@@ -3,6 +3,28 @@ import { Link, useSearchParams } from "react-router-dom";
 import CustomerLayout from "../../components/layout/CustomerLayout";
 import axiosClient from "../../api/axiosClient";
 
+const STATUS_MAP = {
+  PENDING_PAYMENT: "Chờ thanh toán",
+  PENDING: "Chờ xác nhận",
+  CONFIRMED: "Đã xác nhận",
+  CHECKED_IN: "Đã check-in",
+  IN_PROGRESS: "Đang thực hiện",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+  REFUND_PENDING: "Chờ hoàn tiền",
+  REFUNDED: "Đã hoàn tiền",
+  NO_SHOW: "Vắng mặt",
+};
+
+const PAYMENT_MAP = {
+  UNPAID: "Chưa thanh toán",
+  PENDING: "Đang chờ thanh toán",
+  PAID: "Đã thanh toán",
+  FAILED: "Thanh toán thất bại",
+  REFUND_PENDING: "Chờ hoàn tiền",
+  REFUNDED: "Đã hoàn tiền",
+};
+
 export default function PaymentResult() {
   const [params] = useSearchParams();
   const status = params.get("status");
@@ -79,7 +101,7 @@ export default function PaymentResult() {
               ? "Đang kiểm tra trạng thái thanh toán mới nhất..."
               : success
                 ? "Giao dịch đã được hệ thống ghi nhận. Lịch hẹn của bạn đã được xác nhận."
-                : "Giao dịch chưa hoàn tất hoặc VNPay đã từ chối thanh toán."}
+                : "Giao dịch chưa hoàn tất hoặc cổng thanh toán đã từ chối."}
           </p>
 
           <div className="result-info-grid">
@@ -90,12 +112,16 @@ export default function PaymentResult() {
 
             <div className="result-info-item">
               <span>Trạng thái lịch</span>
-              <strong>{appointment?.Status || "Đang kiểm tra"}</strong>
+              <strong>
+                {STATUS_MAP[appointment?.Status] || appointment?.Status || "Đang kiểm tra"}
+              </strong>
             </div>
 
             <div className="result-info-item">
               <span>Trạng thái thanh toán</span>
-              <strong>{appointment?.PaymentStatus || "UNPAID"}</strong>
+              <strong>
+                {PAYMENT_MAP[appointment?.PaymentStatus] || appointment?.PaymentStatus || "Chưa thanh toán"}
+              </strong>
             </div>
 
             <div className="result-info-item">

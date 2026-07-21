@@ -1,57 +1,250 @@
+/* Header Wrapper - Normal flow by default, pushes content down instead of overlaying */
+.header-wrapper {
+  position: sticky;
+  top: -44px; /* Pins the navbar at the top once the 44px topbar has scrolled out of view */
+  width: 100%;
+  z-index: 1000;
+  background: #fff6f9;
+  transition: transform 0.3s ease, background 0.3s ease;
+}
+
+/* Topbar - Vibrant pink gradient matching the primary brand colors */
 .topbar {
   height: 44px;
-  background: linear-gradient(90deg, #ef4f83, #f85c91);
-  color: var(--white);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 46px;
-  font-size: 13px;
-  border-radius: 0 0 18px 18px;
+  padding: 0 64px;
+  font-size: 13.5px;
+  font-weight: 600;
+  background: linear-gradient(90deg, #ff5ea8 0%, #ef4f83 100%);
+  color: #ffffff;
+  border-bottom: none;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
 }
 
+.topbar-promo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-promo .promo-tag {
+  background: #ffffff;
+  color: #ef4f83;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 900;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.topbar-info {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.topbar-info span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.topbar-info strong {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Navbar - Soft warm pink tint that blends seamlessly with the hero section */
 .navbar {
-  height: 82px;
+  height: 86px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 64px;
-  background: rgba(255, 255, 255, .88);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  box-shadow: 0 8px 28px rgba(239, 79, 131, .08);
+  box-sizing: border-box;
+  background: #fff6f9;
+  border-bottom: 1px solid #ffe3ec;
+  transition: height 0.3s ease, background 0.3s ease, box-shadow 0.3s ease, border-bottom 0.3s ease;
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--pink);
+  gap: 12px;
   font-weight: 800;
   font-size: 28px;
-  font-family: var(--font-heading);
+  text-decoration: none;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: #ef4f83;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
 }
 
-.logo span {
-  font-size: 14px;
+.logo:hover {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.logo span.logo-icon {
+  font-size: 34px;
+  filter: drop-shadow(0 2px 6px rgba(239, 79, 131, 0.15));
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.4s ease;
+  display: inline-block;
+}
+
+.logo:hover span.logo-icon {
+  transform: rotate(360deg) scale(1.25);
+  filter: drop-shadow(0 0 12px rgba(255, 94, 168, 0.8)) drop-shadow(0 0 25px rgba(255, 224, 235, 0.6));
+}
+
+.logo div {
+  line-height: 1.1;
+  background: linear-gradient(120deg, #ef4f83 0%, #ff5ea8 30%, #ffb7b2 50%, #ff5ea8 70%, #ef4f83 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: background-position 0.6s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.logo:hover div {
+  background-position: right center;
+  transform: translateX(2px);
+}
+
+.logo div span {
+  font-size: 12px;
   display: block;
+  letter-spacing: 2px;
+  text-transform: uppercase;
   color: #e96a95;
-  font-family: var(--font-body);
+  -webkit-text-fill-color: #e96a95;
+  margin-top: 2px;
+  transition: color 0.4s ease, -webkit-text-fill-color 0.4s ease, letter-spacing 0.4s ease;
 }
 
-.logo-icon { font-size: 34px; }
+.logo:hover div span {
+  color: #ff5ea8;
+  -webkit-text-fill-color: #ff5ea8;
+  letter-spacing: 4px;
+}
 
+/* Navigation Links - Large and spaced out */
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 34px;
-  font-size: 14px;
+  gap: 36px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
-.nav-links a:hover,
-.active {
-  color: var(--pink);
-  font-weight: 700;
+.nav-links a:not(.btn) {
+  text-decoration: none;
+  position: relative;
+  padding: 8px 0;
+  color: #4a3845;
+  transition: color 0.25s ease;
+}
+
+.nav-links a:not(.btn)::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 3px;
+  background: #ef4f83;
+  border-radius: 99px;
+  transform: translateX(-50%);
+  transition: width 0.25s ease;
+}
+
+.nav-links a:not(.btn):hover::after,
+.nav-links a:not(.btn).active::after {
+  width: 100%;
+}
+
+.nav-links a:not(.btn):hover,
+.nav-links a:not(.btn).active {
+  color: #ef4f83;
+}
+
+/* Header Action Buttons */
+.nav-links .btn {
+  padding: 11px 24px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 14px;
+  transition: all 0.25s ease;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.nav-links .btn-outline {
+  border: 1.5px solid #ef4f83;
+  color: #ef4f83;
+  background: #ffffff;
+}
+
+.nav-links .btn-outline:hover {
+  background: #fff0f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(239, 79, 131, 0.1);
+}
+
+.nav-links button.btn:not(.btn-outline),
+.nav-links a.btn:not(.btn-outline) {
+  background: linear-gradient(135deg, #ff5ea8, #ef4f83);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 15px rgba(239, 79, 131, 0.35);
+}
+
+.nav-links button.btn:not(.btn-outline):hover,
+.nav-links a.btn:not(.btn-outline):hover {
+  background: linear-gradient(135deg, #ff7dbd, #ff5ea8);
+  box-shadow: 0 6px 20px rgba(239, 79, 131, 0.5);
+  transform: translateY(-2px);
+}
+
+
+/* ------------------------------------------------
+   STATE 1: TRANSPARENT / DEFAULT (At the top)
+   ------------------------------------------------ */
+.is-transparent {
+  background: #fff6f9;
+}
+
+
+/* ------------------------------------------------
+   STATE 2: SCROLLED (Sticky frosted pink glass)
+   ------------------------------------------------ */
+.is-scrolled .navbar {
+  height: 76px; /* Smooth height reduction */
+  background: rgba(255, 246, 249, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(239, 79, 131, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.is-scrolled .nav-links .btn-outline {
+  background: #ffffff;
+  border: 1.5px solid #ef4f83;
+}
+
+
+/* Responsive styles */
+@media (max-width: 1024px) {
+  .topbar {
+    display: none;
+  }
+  .navbar {
+    padding: 0 32px;
+  }
+  .nav-links {
+    gap: 20px;
+  }
 }

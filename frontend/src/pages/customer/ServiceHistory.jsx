@@ -3,8 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import CustomerLayout from "../../components/layout/CustomerLayout";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
-const FALLBACK_SERVICE = "/images/default-service.png";
-const FALLBACK_AVATAR = "/images/default-avatar.png";
+const FALLBACK_SERVICE = "/images/services/default-service.png";
+const FALLBACK_AVATAR = "/images/avatars/default-avatar.png";
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString("vi-VN") + "đ";
@@ -395,9 +395,9 @@ export default function ServiceHistory() {
             <div className="stat-card-content">
               <p>Tổng chi tiêu</p>
               <strong>
-                {loading ? "..." : formatMoney(filteredStats.spent)}
+                {loading ? "..." : formatMoney(stats.totalSpent)}
               </strong>
-              <small>Hoàn thành thực tế</small>
+              <small>Tổng tích lũy thực tế</small>
             </div>
           </article>
 
@@ -683,6 +683,9 @@ function HistoryCard({
 }) {
   const reviewed = Number(item.ReviewId || 0) > 0;
 
+  const displayPrice = item.Price;
+  const isPackagePaid = item.PaidPrice === 0 || item.CustomerPackageId || item.PackageName;
+
   return (
     <article className="history-service-card-pro">
       <div className="history-service-image">
@@ -699,7 +702,12 @@ function HistoryCard({
             <small>{appointmentCode(item.AppointmentId)}</small>
             <h3>{item.ServiceName || "Dịch vụ"}</h3>
           </div>
-          <b className="history-card-price">{formatMoney(item.Price)}</b>
+          <div className="history-card-price-group">
+            <b className="history-card-price">{formatMoney(displayPrice)}</b>
+            {isPackagePaid && (
+              <span className="badge-package-paid">Thanh toán bằng Combo</span>
+            )}
+          </div>
         </div>
 
         <p className="history-card-desc">
@@ -707,44 +715,92 @@ function HistoryCard({
         </p>
 
         <div className="history-info-grid">
-          <div>
-            <span>Ngày thực hiện</span>
-            <b>
-              {formatDate(item.AppointmentDate)} · {formatTime(item.StartTime)}
-            </b>
-          </div>
-
-          <div>
-            <span>Kỹ thuật viên</span>
-            <b>{item.EmployeeName || "Chưa có"}</b>
-          </div>
-
-          <div>
-            <span>Chi nhánh</span>
-            <b>{item.BranchName || "Chưa có"}</b>
-          </div>
-
-          <div>
-            <span>Thanh toán</span>
-            <span className={`payment-status-badge ${paymentBadgeClass(item.PaymentStatus)}`}>
-              {paymentText(item.PaymentStatus)}
+          <div className="info-item">
+            <span className="info-icon icon-calendar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
             </span>
+            <div className="info-text">
+              <span>Ngày thực hiện</span>
+              <b>{formatDate(item.AppointmentDate)} · {formatTime(item.StartTime)}</b>
+            </div>
           </div>
 
-          <div>
-            <span>Thời lượng</span>
-            <b>{item.DurationMinutes || 0} phút</b>
+          <div className="info-item">
+            <span className="info-icon icon-user">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </span>
+            <div className="info-text">
+              <span>Kỹ thuật viên</span>
+              <b>{item.EmployeeName || "Chưa có"}</b>
+            </div>
           </div>
 
-          <div>
-            <span>Voucher / Combo</span>
-            <b className="voucher-code-text">{item.VoucherCode || item.PackageName || "Không dùng"}</b>
+          <div className="info-item">
+            <span className="info-icon icon-map">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </span>
+            <div className="info-text">
+              <span>Chi nhánh</span>
+              <b>{item.BranchName || "Chưa có"}</b>
+            </div>
+          </div>
+
+          <div className="info-item">
+            <span className="info-icon icon-payment">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                <line x1="1" y1="10" x2="23" y2="10"></line>
+              </svg>
+            </span>
+            <div className="info-text">
+              <span>Thanh toán</span>
+              <span className={`payment-status-badge ${paymentBadgeClass(item.PaymentStatus)}`}>
+                {paymentText(item.PaymentStatus)}
+              </span>
+            </div>
+          </div>
+
+          <div className="info-item">
+            <span className="info-icon icon-clock">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </span>
+            <div className="info-text">
+              <span>Thời lượng</span>
+              <b>{item.DurationMinutes || 0} phút</b>
+            </div>
+          </div>
+
+          <div className="info-item">
+            <span className="info-icon icon-tag">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+              </svg>
+            </span>
+            <div className="info-text">
+              <span>Voucher / Combo</span>
+              <b className="voucher-code-text">{item.VoucherCode || item.PackageName || "Không dùng"}</b>
+            </div>
           </div>
         </div>
 
         <div className="history-employee-mini">
           <img
-            src={resolveFileUrl(item.EmployeeImageUrl) || FALLBACK_AVATAR}
+            src={resolveFileUrl(item.EmployeeImageUrl || FALLBACK_AVATAR)}
             alt={item.EmployeeName}
           />
 

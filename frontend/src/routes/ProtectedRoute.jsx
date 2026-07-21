@@ -42,7 +42,7 @@ function ProtectedRoute({ children, allowedRoles }) {
       return <Navigate to="/technician" replace />;
     }
 
-    return <Navigate to="/customer" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;

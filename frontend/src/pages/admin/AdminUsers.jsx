@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const emptyForm = {
   FullName: "",
@@ -1186,7 +1186,7 @@ export default function AdminUsers() {
       {/* DETAIL MODAL (React Portal) */}
       {selected && createPortal(
         <div className="admin-modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="admin-modal-wrapper" style={{ maxWidth: 750 }} onClick={(e) => e.stopPropagation()}>
+          <div className="admin-modal-wrapper admin-user-detail-modal" style={{ maxWidth: 750 }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-profile-header">
               {renderAvatar(selected, 64)}
               <div>

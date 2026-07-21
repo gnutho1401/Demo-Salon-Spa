@@ -26,7 +26,7 @@ const paymentOptions = [
   "REFUNDED",
 ];
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function avatarUrl(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
@@ -106,6 +106,7 @@ export default function ReceptionistAppointments() {
   const [items, setItems] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [services, setServices] = useState([]);
+  const [branches, setBranches] = useState([]);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -117,10 +118,13 @@ export default function ReceptionistAppointments() {
   const [filters, setFilters] = useState({
     customer: "",
     date: todayStr,
+    fromDate: "",
+    toDate: "",
     status: "",
     technicianId: "",
     serviceId: "",
     paymentStatus: "",
+    branchId: "",
   });
 
   const [activeTab, setActiveTab] = useState("ALL");
@@ -133,10 +137,13 @@ export default function ReceptionistAppointments() {
       const params = {
         customer: nextFilters.customer || undefined,
         date: nextFilters.date || undefined,
+        fromDate: nextFilters.fromDate || undefined,
+        toDate: nextFilters.toDate || undefined,
         status: nextFilters.status || undefined,
         technicianId: nextFilters.technicianId || undefined,
         serviceId: nextFilters.serviceId || undefined,
         paymentStatus: nextFilters.paymentStatus || undefined,
+        branchId: nextFilters.branchId || undefined,
       };
 
       const res = await axiosClient.get("/receptionist/appointments", {
@@ -170,10 +177,20 @@ export default function ReceptionistAppointments() {
     }
   }
 
+  async function loadBranches() {
+    try {
+      const res = await axiosClient.get("/employees/branches");
+      setBranches(res.data.data || res.data || []);
+    } catch {
+      setBranches([]);
+    }
+  }
+
   useEffect(() => {
     load();
     loadTechnicians();
     loadServices();
+    loadBranches();
   }, []);
 
   const stats = useMemo(() => {
@@ -221,10 +238,13 @@ export default function ReceptionistAppointments() {
     const reset = {
       customer: "",
       date: "",
+      fromDate: "",
+      toDate: "",
       status: "",
       technicianId: "",
       serviceId: "",
       paymentStatus: "",
+      branchId: "",
     };
 
     setFilters(reset);
@@ -316,7 +336,7 @@ export default function ReceptionistAppointments() {
             <div className="rx-title-icon" style={{ fontSize: "2rem" }}>📅</div>
             <div>
               <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "#3d2e26", margin: 0 }}>Lịch hẹn làm đẹp</h1>
-              <p style={{ margin: "4px 0 0 0", color: "#7c6f68", fontSize: "0.9rem" }}>Điều phối, Check-in, Bắt đầu liệu trình và Quản lý lịch khách hàng</p>
+              <p style={{ margin: "4px 0 0 0", color: "#7c6f68", fontSize: "0.9rem" }}>Check-in, Bắt đầu liệu trình và Quản lý lịch khách hàng</p>
             </div>
           </div>
 
@@ -341,7 +361,7 @@ export default function ReceptionistAppointments() {
 
         {/* Filter Card */}
         <form onSubmit={onSubmit} className="rx-filter-card" style={{ background: "#fff", border: "1px solid #f4e7dd", borderRadius: 14, padding: 18, marginBottom: 24 }}>
-          <div className="rx-filter-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 16 }}>
+          <div className="rx-filter-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 16 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Tìm khách hàng</span>
               <input
@@ -353,13 +373,19 @@ export default function ReceptionistAppointments() {
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Ngày hẹn</span>
-              <input
-                type="date"
-                value={filters.date}
-                onChange={(e) => setFilters((p) => ({ ...p, date: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "8px 12px", outline: "none", fontSize: 13 }}
-              />
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Chi nhánh</span>
+              <select
+                value={filters.branchId}
+                onChange={(e) => setFilters((p) => ({ ...p, branchId: e.target.value }))}
+                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13, background: "#fff" }}
+              >
+                <option value="">Tất cả chi nhánh</option>
+                {branches.map((b) => (
+                  <option key={b.BranchId} value={b.BranchId}>
+                    {b.BranchName}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -410,6 +436,36 @@ export default function ReceptionistAppointments() {
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Ngày cụ thể</span>
+              <input
+                type="date"
+                value={filters.date}
+                onChange={(e) => setFilters((p) => ({ ...p, date: e.target.value }))}
+                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "8px 12px", outline: "none", fontSize: 13 }}
+              />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Từ ngày</span>
+              <input
+                type="date"
+                value={filters.fromDate}
+                onChange={(e) => setFilters((p) => ({ ...p, fromDate: e.target.value }))}
+                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "8px 12px", outline: "none", fontSize: 13 }}
+              />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Đến ngày</span>
+              <input
+                type="date"
+                value={filters.toDate}
+                onChange={(e) => setFilters((p) => ({ ...p, toDate: e.target.value }))}
+                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "8px 12px", outline: "none", fontSize: 13 }}
+              />
             </label>
           </div>
 

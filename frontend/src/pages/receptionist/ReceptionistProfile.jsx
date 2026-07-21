@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function avatar(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;

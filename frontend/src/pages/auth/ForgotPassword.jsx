@@ -19,17 +19,26 @@ export default function ForgotPassword() {
     }
   };
 
-  return <div className="auth-page">
-    <form className="auth-card" onSubmit={submit}>
-      <div className="eyebrow">Password recovery</div>
-      <h2>Quên mật khẩu</h2>
-      {message && <p className={isError ? 'auth-error' : 'auth-success'}>{message}</p>}
+  return (
+    <div className="auth-page">
+      {/* Background dynamic animated mesh orbs */}
+      <div className="auth-bg-decor">
+        <div className="auth-orb auth-orb-1"></div>
+        <div className="auth-orb auth-orb-2"></div>
+        <div className="auth-orb auth-orb-3"></div>
+      </div>
 
-      <label>Email</label>
-      <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Nhập email tài khoản" />
+      <form className="auth-card" onSubmit={submit}>
+        <div className="eyebrow">Password recovery</div>
+        <h2>Quên mật khẩu</h2>
+        {message && <p className={isError ? 'auth-error' : 'auth-success'}>{message}</p>}
 
-      <button className="btn" style={{width:'100%',marginTop:10}}>Gửi link đặt lại</button>
-      <p className="muted"><Link className="see-all" to="/login">Quay lại đăng nhập</Link></p>
-    </form>
-  </div>;
+        <label>Email</label>
+        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Nhập email tài khoản" />
+
+        <button className="btn" style={{width:'100%',marginTop:10}}>Gửi link đặt lại</button>
+        <p className="muted"><Link className="see-all" to="/login">Quay lại đăng nhập</Link></p>
+      </form>
+    </div>
+  );
 }

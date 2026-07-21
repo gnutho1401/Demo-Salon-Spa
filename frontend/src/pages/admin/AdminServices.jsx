@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
 const DEFAULT_IMAGE = "/images/services/skincare.png";
 
@@ -50,6 +51,8 @@ export default function AdminServices() {
   const [saving, setSaving] = useState(false);
   const [savingTech, setSavingTech] = useState(false);
   const [error, setError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [detailTechnicians, setDetailTechnicians] = useState([]);
   const [loadingDetailTech, setLoadingDetailTech] = useState(false);
@@ -356,11 +359,6 @@ export default function AdminServices() {
   }
 
   async function changeStatus(item, nextStatus) {
-    const ok = window.confirm(
-      `Bạn muốn đổi trạng thái dịch vụ "${item.ServiceName}" thành ${nextStatus}?`,
-    );
-    if (!ok) return;
-
     try {
       setError("");
       await axiosClient.patch(`/admin/services/${item.ServiceId}/status`, {
@@ -378,11 +376,6 @@ export default function AdminServices() {
   }
 
   async function remove(item) {
-    const ok = window.confirm(
-      `Bạn chắc chắn muốn xóa dịch vụ "${item.ServiceName}"?`,
-    );
-    if (!ok) return;
-
     try {
       setError("");
       await axiosClient.delete(`/admin/services/${item.ServiceId}`);
@@ -392,6 +385,29 @@ export default function AdminServices() {
       setError(
         err?.response?.data?.message || err?.message || "Xóa dịch vụ thất bại",
       );
+    }
+  }
+
+  function requestStatusChange(item, nextStatus) {
+    setConfirmAction({ type: "status", item, nextStatus });
+  }
+
+  function requestRemove(item) {
+    setConfirmAction({ type: "delete", item });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmAction.type === "delete") {
+        await remove(confirmAction.item);
+      } else {
+        await changeStatus(confirmAction.item, confirmAction.nextStatus);
+      }
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -1231,14 +1247,14 @@ export default function AdminServices() {
                   {item.Status !== "AVAILABLE" ? (
                     <button
                       className="card-btn"
-                      onClick={() => changeStatus(item, "AVAILABLE")}
+                      onClick={() => requestStatusChange(item, "AVAILABLE")}
                     >
                       Mở bán
                     </button>
                   ) : (
                     <button
                       className="card-btn"
-                      onClick={() => changeStatus(item, "INACTIVE")}
+                      onClick={() => requestStatusChange(item, "INACTIVE")}
                     >
                       Tạm ngưng
                     </button>
@@ -1246,7 +1262,7 @@ export default function AdminServices() {
 
                   <button
                     className="card-btn danger"
-                    onClick={() => remove(item)}
+                    onClick={() => requestRemove(item)}
                   >
                     Xóa
                   </button>
@@ -1518,6 +1534,35 @@ export default function AdminServices() {
           </form>
         </div>
       ) : null}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title={
+          confirmAction?.type === "delete"
+            ? "Xóa dịch vụ khỏi hệ thống?"
+            : "Cập nhật trạng thái dịch vụ?"
+        }
+        description={
+          confirmAction?.type === "delete"
+            ? "Dịch vụ có thể đang được tham chiếu bởi lịch hẹn hoặc gói dịch vụ. Hãy chỉ xóa khi bạn chắc chắn không còn sử dụng."
+            : "Thay đổi này ảnh hưởng ngay đến khả năng khách hàng nhìn thấy và đặt dịch vụ."
+        }
+        details={
+          confirmAction ? (
+            <>
+              <strong>{confirmAction.item.ServiceName}</strong>
+              {confirmAction.type === "status" ? (
+                <span> · Trạng thái mới: {confirmAction.nextStatus}</span>
+              ) : null}
+            </>
+          ) : null
+        }
+        confirmLabel={confirmAction?.type === "delete" ? "Xóa dịch vụ" : "Cập nhật"}
+        tone={confirmAction?.type === "delete" ? "danger" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }

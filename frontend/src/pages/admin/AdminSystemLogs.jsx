@@ -6,6 +6,7 @@ export default function AdminSystemLogs() {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [notice, setNotice] = useState("");
 
   // Available filter options loaded from backend
   const [filterOptions, setFilterOptions] = useState({
@@ -141,6 +142,7 @@ export default function AdminSystemLogs() {
   // Export to CSV
   const exportToCSV = async () => {
     setLoading(true);
+    setNotice("");
     try {
       // Fetch up to 100,000 logs matching the current filters for export
       const params = {
@@ -153,7 +155,7 @@ export default function AdminSystemLogs() {
       const allLogs = resData.logs || [];
 
       if (allLogs.length === 0) {
-        alert("Không có dữ liệu nhật ký phù hợp để xuất!");
+        setNotice("Không có dữ liệu nhật ký phù hợp để xuất file.");
         return;
       }
 
@@ -195,9 +197,14 @@ export default function AdminSystemLogs() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Export error", err);
-      alert("Đã xảy ra lỗi khi xuất file!");
+      setNotice(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Đã xảy ra lỗi khi xuất file nhật ký.",
+      );
     } finally {
       setLoading(false);
     }
@@ -453,6 +460,12 @@ export default function AdminSystemLogs() {
           Xuất Nhật Ký CSV
         </button>
       </div>
+
+      {notice ? (
+        <div className="admin-error-card" role="alert" style={{ marginBottom: 20 }}>
+          {notice}
+        </div>
+      ) : null}
 
       {/* Filters Section */}
       <div className="filter-card">

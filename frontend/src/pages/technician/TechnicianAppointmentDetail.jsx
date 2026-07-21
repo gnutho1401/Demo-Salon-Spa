@@ -3,8 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import TechnicianLayout from "../../layouts/TechnicianLayout";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
-const DEFAULT_SERVICE_IMAGE = "/images/default-service.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
+const DEFAULT_SERVICE_IMAGE = "/images/services/default-service.png";
 
 function formatTime(value) {
   if (!value) return "";
@@ -169,8 +169,10 @@ export default function TechnicianAppointmentDetail() {
       try {
         const resReq = await axiosClient.get("/reschedule/technician/reschedule-requests");
         const list = resReq.data?.data || [];
-        const pending = list.find(r => Number(r.AppointmentId) === Number(id) && r.Status === "PENDING");
-        setRescheduleRequest(pending || null);
+        // Lấy request mới nhất của appointment này (bất kể trạng thái)
+        const allForAppt = list.filter(r => Number(r.AppointmentId) === Number(id));
+        const latest = allForAppt.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt))[0] || null;
+        setRescheduleRequest(latest);
       } catch (errReq) {
         console.warn("Failed to load reschedule requests:", errReq);
       }
@@ -206,6 +208,20 @@ export default function TechnicianAppointmentDetail() {
       await load();
     } catch (err) {
       alert(err.response?.data?.message || "Không thể gửi yêu cầu đề xuất đổi lịch");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  async function cancelReschedule() {
+    if (!rescheduleRequest || !window.confirm("Bạn có chắc chắn muốn hủy yêu cầu đề xuất đổi lịch này không?")) return;
+    try {
+      setActionLoading("cancel_reschedule");
+      await axiosClient.put(`/reschedule/technician/reschedule-requests/${rescheduleRequest.RequestId}/cancel`);
+      alert("Đã hủy yêu cầu đề xuất đổi lịch thành công!");
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Không thể hủy yêu cầu đề xuất đổi lịch");
     } finally {
       setActionLoading("");
     }
@@ -278,6 +294,11 @@ export default function TechnicianAppointmentDetail() {
     try {
       setActionLoading(type);
       await axiosClient.patch(url);
+      if (type === "complete") {
+        const firstSvcId = services[0]?.ServiceId;
+        navigate(`/technician/treatment-notes?appointmentId=${id}${firstSvcId ? `&serviceId=${firstSvcId}` : ""}`);
+        return;
+      }
       await load();
     } catch (err) {
       alert(err.response?.data?.message || "Thao tác thất bại");
@@ -398,7 +419,7 @@ export default function TechnicianAppointmentDetail() {
                               "Dịch vụ chăm sóc chuyên nghiệp tại salon."}
                           </p>
 
-                          <div className="tech-apd-service-meta">
+                          <div className="tech-apd-service-meta" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                             <span>
                               ◷{" "}
                               {srv.DurationMinutes ||
@@ -406,14 +427,82 @@ export default function TechnicianAppointmentDetail() {
                                 0}{" "}
                               phút
                             </span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const curDur = srv.DurationMinutes || detail.DurationMinutes || 60;
+                                const val = window.prompt("Nhập thời lượng dịch vụ mới (tính theo phút):", curDur);
+                                if (!val) return;
+                                const num = Number(val);
+                                if (isNaN(num) || num <= 0) {
+                                  alert("Thời lượng phải là số lớn hơn 0");
+                                  return;
+                                }
+                                try {
+                                  setActionLoading("update_duration");
+                                  await axiosClient.patch(`/technician/appointments/${id}/duration`, { durationMinutes: num });
+                                  alert("Đã cập nhật thời gian thực hiện dịch vụ thành công!");
+                                  await load();
+                                } catch (err) {
+                                  alert(err.response?.data?.message || "Không thể đổi thời gian dịch vụ");
+                                } finally {
+                                  setActionLoading("");
+                                }
+                              }}
+                              style={{
+                                background: "#faf5ff",
+                                border: "1px solid #d8b4fe",
+                                borderRadius: "6px",
+                                padding: "3px 8px",
+                                fontSize: "0.75rem",
+                                fontWeight: "700",
+                                color: "#6b21a8",
+                                cursor: "pointer",
+                                transition: "all 0.2s"
+                              }}
+                              title="Thay đổi thời gian thực hiện dịch vụ ca hẹn này"
+                            >
+                              ✏️ Đổi thời gian
+                            </button>
                             <span>◉ {money(srv.Price)}</span>
                           </div>
 
-                          <div className="tech-apd-tags">
-                            <span>{srv.CategoryName || "Dịch vụ"}</span>
-                            <small>
-                              {index + 1}/{services.length}
-                            </small>
+                          <div className="tech-apd-tags" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <span>{srv.CategoryName || "Dịch vụ"}</span>
+                              <small>
+                                {index + 1}/{services.length}
+                              </small>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const canAccess = ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase());
+                                if (!canAccess) {
+                                  alert("Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.");
+                                  return;
+                                }
+                                navigate(`/technician/treatment-notes?appointmentId=${detail.AppointmentId}&serviceId=${srv.ServiceId}`);
+                              }}
+                              style={{
+                                backgroundColor: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "#2f593a" : "#cbd5e0",
+                                color: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "#ffffff" : "#718096",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "6px 12px",
+                                fontSize: "0.78rem",
+                                fontWeight: "600",
+                                cursor: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "pointer" : "not-allowed",
+                                outline: "none",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                              className={["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "hover-scale" : ""}
+                              title={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
+                            >
+                              📝 Ghi chú & Phác đồ
+                            </button>
                           </div>
                         </div>
                       </article>
@@ -475,21 +564,30 @@ export default function TechnicianAppointmentDetail() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => navigate(`/technician/treatment-notes?appointmentId=${detail.AppointmentId}`)}
+                      onClick={() => {
+                        const canAccess = ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase());
+                        if (!canAccess) {
+                          alert("Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.");
+                          return;
+                        }
+                        const firstSvcId = services[0]?.ServiceId;
+                        navigate(`/technician/treatment-notes?appointmentId=${detail.AppointmentId}${firstSvcId ? `&serviceId=${firstSvcId}` : ""}`);
+                      }}
                       style={{
-                        backgroundColor: "#2f593a",
-                        color: "#ffffff",
+                        backgroundColor: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "#2f593a" : "#cbd5e0",
+                        color: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "#ffffff" : "#718096",
                         border: "none",
                         borderRadius: "8px",
                         padding: "10px 18px",
                         fontWeight: "600",
-                        cursor: "pointer",
+                        cursor: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "pointer" : "not-allowed",
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
                         transition: "all 0.2s"
                       }}
-                      className="hover-scale"
+                      className={["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "hover-scale" : ""}
+                      title={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
                     >
                       Viết & Xem chi tiết phác đồ →
                     </button>
@@ -589,26 +687,163 @@ export default function TechnicianAppointmentDetail() {
                   </div>
                 </div>
 
-                {/* Reschedule Request Card */}
-                {["PENDING_PAYMENT", "PENDING", "CONFIRMED", "PAID"].includes(status) && (
+                {/* Reschedule Request Card - chỉ hiện khi status = CONFIRMED hoặc đang có request */}
+                {(status === "CONFIRMED" || (rescheduleRequest && ["PENDING", "AWAITING_CUSTOMER", "APPROVED", "REJECTED", "CUSTOMER_REJECTED"].includes(rescheduleRequest.Status))) && (
                   <div className="tech-apd-card" style={{ borderLeft: "4px solid #d4a94f" }}>
                     <div className="tech-apd-card-title" style={{ color: "#7a5e44", display: "flex", alignItems: "center", gap: "8px" }}>
                       📅 Đề xuất đổi lịch hẹn
                     </div>
                     <div style={{ marginTop: "12px", color: "#4a5568", fontSize: "0.9rem", lineHeight: "1.45" }}>
-                      <p style={{ margin: "0 0 16px 0" }}>
-                        Nếu bạn bận đột xuất hoặc khách hàng yêu cầu dời giờ, bạn có thể tạo đề xuất giờ mới để gửi cho Lễ tân duyệt.
-                      </p>
+                      {status === "CONFIRMED" && (
+                        <p style={{ margin: "0 0 16px 0" }}>
+                          Nếu bạn bận đột xuất hoặc khách hàng yêu cầu dời giờ, bạn có thể tạo đề xuất giờ mới để gửi cho Lễ tân duyệt.
+                        </p>
+                      )}
                       
                       {rescheduleRequest ? (
-                        <div style={{ background: "#fcf8e3", border: "1px solid #faebcc", color: "#8a6d3b", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
-                          <b style={{ display: "block", marginBottom: "4px" }}>Đang chờ duyệt đổi lịch:</b>
-                          <div>Đề xuất: <b>{safeDate(rescheduleRequest.RequestedDate)}</b> lúc <b>{String(rescheduleRequest.RequestedStartTime).slice(0, 5)}</b></div>
-                          <div style={{ fontSize: "0.75rem", color: "#8a6d3b", opacity: 0.8, marginTop: "6px" }}>
-                            Lý do: {rescheduleRequest.Reason || "—"}
+                        rescheduleRequest.Status === "PENDING" ? (
+                          <div style={{ background: "#fcf8e3", border: "1px solid #faebcc", color: "#8a6d3b", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
+                            <b style={{ display: "block", marginBottom: "4px" }}>Đang chờ duyệt đổi lịch:</b>
+                            <div>Đề xuất: <b>{safeDate(rescheduleRequest.RequestedDate)}</b> lúc <b>{String(rescheduleRequest.RequestedStartTime).slice(0, 5)}</b></div>
+                            <div style={{ fontSize: "0.75rem", color: "#8a6d3b", opacity: 0.8, marginTop: "6px", marginBottom: "10px" }}>
+                              Lý do: {rescheduleRequest.Reason || "—"}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={cancelReschedule}
+                              disabled={actionLoading === "cancel_reschedule"}
+                              style={{
+                                backgroundColor: "#ffffff",
+                                color: "#c53030",
+                                border: "1px solid #e53e3e",
+                                borderRadius: "8px",
+                                padding: "6px 12px",
+                                fontWeight: "700",
+                                fontSize: "0.78rem",
+                                cursor: "pointer",
+                                width: "100%",
+                              }}
+                            >
+                              {actionLoading === "cancel_reschedule" ? "Đang xử lý..." : "🚫 Hủy đề xuất đổi lịch"}
+                            </button>
                           </div>
-                        </div>
-                      ) : (
+                        ) : rescheduleRequest.Status === "AWAITING_CUSTOMER" ? (
+                          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e40af", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
+                            <b style={{ display: "block", marginBottom: "4px" }}>⏳ Lễ tân đã duyệt – Chờ khách hàng xác nhận:</b>
+                            <div>Đề xuất: <b>{safeDate(rescheduleRequest.RequestedDate)}</b> lúc <b>{String(rescheduleRequest.RequestedStartTime).slice(0, 5)} – {String(rescheduleRequest.RequestedEndTime).slice(0, 5)}</b></div>
+                            <div style={{ fontSize: "0.75rem", marginTop: "6px", opacity: 0.8, marginBottom: "10px" }}>
+                              Khách hàng sẽ nhận được thông báo và cần xác nhận trước khi lịch được thay đổi.
+                            </div>
+                            <button
+                              type="button"
+                              onClick={cancelReschedule}
+                              disabled={actionLoading === "cancel_reschedule"}
+                              style={{
+                                backgroundColor: "#ffffff",
+                                color: "#c53030",
+                                border: "1px solid #e53e3e",
+                                borderRadius: "8px",
+                                padding: "6px 12px",
+                                fontWeight: "700",
+                                fontSize: "0.78rem",
+                                cursor: "pointer",
+                                width: "100%",
+                              }}
+                            >
+                              {actionLoading === "cancel_reschedule" ? "Đang xử lý..." : "🚫 Hủy đề xuất đổi lịch"}
+                            </button>
+                          </div>
+                        ) : rescheduleRequest.Status === "APPROVED" ? (
+                          <div style={{ background: "#f0fff4", border: "1px solid #9ae6b4", color: "#276749", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
+                            <b style={{ display: "block", marginBottom: "6px" }}>✅ Đề xuất đổi lịch đã được duyệt!</b>
+                            <div>Lịch hẹn đã được cập nhật sang:</div>
+                            <div style={{ marginTop: "6px", fontWeight: "700", fontSize: "0.9rem" }}>
+                              📅 {safeDate(rescheduleRequest.RequestedDate)} lúc {String(rescheduleRequest.RequestedStartTime).slice(0, 5)} – {String(rescheduleRequest.RequestedEndTime).slice(0, 5)}
+                            </div>
+                            {rescheduleRequest.Notes && (
+                              <div style={{ marginTop: "8px", fontSize: "0.78rem", opacity: 0.8 }}>Ghi chú lễ tân: {rescheduleRequest.Notes}</div>
+                            )}
+                            {status === "CONFIRMED" && (
+                              <button
+                                type="button"
+                                onClick={() => setShowRescheduleModal(true)}
+                                style={{
+                                  marginTop: "10px",
+                                  backgroundColor: "#FAF6F0",
+                                  color: "#7a5e44",
+                                  border: "1px solid #d4a94f",
+                                  borderRadius: "10px",
+                                  padding: "8px 16px",
+                                  fontWeight: "700",
+                                  fontSize: "0.82rem",
+                                  cursor: "pointer",
+                                  width: "100%",
+                                }}
+                              >
+                                Đề xuất đổi lịch mới →
+                              </button>
+                            )}
+                          </div>
+                        ) : rescheduleRequest.Status === "SYSTEM_CANCELLED" ? (
+                          <div style={{ background: "#fff5f5", border: "1px solid #fed7d7", color: "#c53030", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
+                            <b style={{ display: "block", marginBottom: "4px" }}>⚠️ Đề xuất dời lịch đã bị hệ thống tự động hủy!</b>
+                            <div>Lý do: {rescheduleRequest.Notes || "Khung giờ đề xuất đã có khách hàng khác đặt trước."}</div>
+                            <div style={{ fontSize: "0.78rem", opacity: 0.85, marginTop: "6px" }}>
+                              Đề xuất cũ: {safeDate(rescheduleRequest.RequestedDate)} lúc {String(rescheduleRequest.RequestedStartTime).slice(0, 5)}
+                            </div>
+                            {status === "CONFIRMED" && (
+                              <button
+                                type="button"
+                                onClick={() => setShowRescheduleModal(true)}
+                                style={{
+                                  marginTop: "10px",
+                                  backgroundColor: "#FAF6F0",
+                                  color: "#7a5e44",
+                                  border: "1px solid #d4a94f",
+                                  borderRadius: "10px",
+                                  padding: "8px 16px",
+                                  fontWeight: "700",
+                                  fontSize: "0.82rem",
+                                  cursor: "pointer",
+                                  width: "100%",
+                                }}
+                              >
+                                Đề xuất đổi lịch mới →
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ background: "#fff5f5", border: "1px solid #fed7d7", color: "#c53030", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
+                            <b style={{ display: "block", marginBottom: "4px" }}>❌ Đề xuất đổi lịch bị từ chối</b>
+                            <div style={{ fontSize: "0.78rem", opacity: 0.85, marginTop: "4px" }}>
+                              Đề xuất: {safeDate(rescheduleRequest.RequestedDate)} lúc {String(rescheduleRequest.RequestedStartTime).slice(0, 5)}
+                            </div>
+                            {rescheduleRequest.Notes && (
+                              <div style={{ marginTop: "8px", fontSize: "0.78rem" }}>Lý do từ chối: {rescheduleRequest.Notes}</div>
+                            )}
+                            {status === "CONFIRMED" && (
+                              <button
+                                type="button"
+                                onClick={() => setShowRescheduleModal(true)}
+                                style={{
+                                  marginTop: "10px",
+                                  backgroundColor: "#FAF6F0",
+                                  color: "#7a5e44",
+                                  border: "1px solid #d4a94f",
+                                  borderRadius: "10px",
+                                  padding: "8px 16px",
+                                  fontWeight: "700",
+                                  fontSize: "0.82rem",
+                                  cursor: "pointer",
+                                  width: "100%",
+                                }}
+                              >
+                                Đề xuất đổi lịch mới →
+                              </button>
+                            )}
+                          </div>
+                        )
+                      ) : status === "CONFIRMED" ? (
                         <button
                           type="button"
                           onClick={() => setShowRescheduleModal(true)}
@@ -628,7 +863,7 @@ export default function TechnicianAppointmentDetail() {
                         >
                           Đề xuất đổi lịch →
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -791,11 +1026,17 @@ export default function TechnicianAppointmentDetail() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        navigate(
-                          `/technician/treatment-notes?appointmentId=${detail.AppointmentId}`,
-                        )
-                      }
+                      onClick={() => {
+                        const canAccess = ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase());
+                        if (!canAccess) {
+                          alert("Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.");
+                          return;
+                        }
+                        const firstSvcId = services[0]?.ServiceId;
+                        navigate(`/technician/treatment-notes?appointmentId=${detail.AppointmentId}${firstSvcId ? `&serviceId=${firstSvcId}` : ""}`);
+                      }}
+                      style={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? { opacity: 0.5, cursor: "not-allowed" } : {}}
+                      title={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
                     >
                       ✎ Ghi chú dịch vụ <span>›</span>
                     </button>

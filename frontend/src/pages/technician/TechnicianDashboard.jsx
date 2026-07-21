@@ -74,7 +74,6 @@ const getStatusBadgeStyle = (status) => {
 export default function TechnicianDashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState("");
-  const [durationText, setDurationText] = useState("00:00:00");
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
 
@@ -94,29 +93,6 @@ export default function TechnicianDashboard() {
       })
       .catch(() => {});
   }, []);
-
-  // Duration ticking timer logic
-  useEffect(() => {
-    if (!dashboard?.todayAttendance?.RawCheckInTime || dashboard?.todayAttendance?.CheckOutTime) {
-      setDurationText("00:00:00");
-      return;
-    }
-    const checkInDate = new Date(dashboard.todayAttendance.RawCheckInTime);
-    const interval = setInterval(() => {
-      const diffMs = new Date() - checkInDate;
-      if (diffMs < 0) {
-        setDurationText("00:00:00");
-        return;
-      }
-      const hours = Math.floor(diffMs / 3600000);
-      const minutes = Math.floor((diffMs % 3600000) / 60000);
-      const seconds = Math.floor((diffMs % 60000) / 1000);
-      setDurationText(
-        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-      );
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [dashboard]);
 
   const stats = useMemo(() => {
     const raw = dashboard?.stats || {};
@@ -161,6 +137,7 @@ export default function TechnicianDashboard() {
       const dateStr = d.toISOString().slice(0, 10);
       
       const matched = (dashboard?.weeklySchedule || []).find(s => {
+        if (!s || !s.ShiftDate) return false;
         const sDate = s.ShiftDate.toISOString ? s.ShiftDate.toISOString().slice(0, 10) : String(s.ShiftDate).slice(0, 10);
         return sDate === dateStr;
       });
@@ -171,7 +148,7 @@ export default function TechnicianDashboard() {
         fullDateLabel: d.toLocaleDateString("vi-VN", { day: 'numeric', month: 'numeric' }),
         isToday: d.toDateString() === today.toDateString(),
         shiftName: matched ? matched.ShiftType : (dashboard?.weeklySchedule?.length > 0 ? "Nghỉ" : (i === 2 || i === 6 ? "Nghỉ" : "Ca sáng")),
-        hours: matched ? `${matched.StartTime} - ${matched.EndTime}` : (dashboard?.weeklySchedule?.length > 0 ? "" : (i === 2 || i === 6 ? "" : (i === 4 ? "13:00 - 22:00" : "08:00 - 17:00")))
+        hours: matched ? `${matched.StartTime} - ${matched.EndTime}` : (dashboard?.weeklySchedule?.length > 0 ? "" : (i === 2 || i === 6 ? "" : (i === 4 ? "13:00 - 20:00" : "08:00 - 17:00")))
       });
     }
     return days;
@@ -214,9 +191,6 @@ export default function TechnicianDashboard() {
       </TechnicianLayout>
     );
   }
-
-  const isPunching = dashboard?.todayAttendance && !dashboard.todayAttendance.CheckOutTime;
-  const punchText = isPunching ? "Kết thúc ca làm" : "Bắt đầu ca làm";
 
   return (
     <TechnicianLayout>
@@ -271,28 +245,6 @@ export default function TechnicianDashboard() {
                 }}>{unreadCount}</span>
               )}
             </div>
-
-            <button 
-              onClick={() => navigate("/technician/attendance")}
-              style={{
-                backgroundColor: "#2f593a",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "20px",
-                padding: "10px 20px",
-                fontSize: "0.85rem",
-                fontWeight: "bold",
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(47, 89, 58, 0.2)",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                transition: "all 0.2s"
-              }}
-              className="hover-scale"
-            >
-              <span>▶</span> {punchText}
-            </button>
           </div>
         </header>
 
@@ -305,7 +257,7 @@ export default function TechnicianDashboard() {
             <div>
               <div style={{ fontSize: "0.75rem", color: "#a0aec0", fontWeight: "bold" }}>Ca làm hôm nay</div>
               <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#2f593a", margin: "4px 0" }}>
-                {dashboard?.todayShift ? `${dashboard.todayShift.StartTime} - ${dashboard.todayShift.EndTime}` : "08:00 - 22:00"}
+                {dashboard?.todayShift ? `${dashboard.todayShift.StartTime} - ${dashboard.todayShift.EndTime}` : "08:00 - 20:00"}
               </div>
               <span style={{ fontSize: "0.7rem", backgroundColor: "#e6f4ea", color: "#137333", padding: "2px 8px", borderRadius: "10px", fontWeight: "bold" }}>
                 Ca trực: {dashboard?.todayShift?.ShiftType || "Cả ngày"}
@@ -355,8 +307,8 @@ export default function TechnicianDashboard() {
 
         </section>
 
-        {/* MIDDLE SECTION (3 COLUMNS) */}
-        <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "24px" }}>
+        {/* MIDDLE SECTION (2 COLUMNS) */}
+        <section style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "20px", marginBottom: "24px" }}>
           
           {/* Column 1: Lịch hẹn hôm nay */}
           <div style={{ backgroundColor: "#ffffff", borderRadius: "20px", padding: "20px", border: "1px solid #e2dcd0", boxShadow: "0 4px 12px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
@@ -412,68 +364,7 @@ export default function TechnicianDashboard() {
             </button>
           </div>
 
-          {/* Column 2: Ca làm của tôi */}
-          <div style={{ backgroundColor: "#ffffff", borderRadius: "20px", padding: "20px", border: "1px solid #e2dcd0", boxShadow: "0 4px 12px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: "bold", color: "#2f593a" }}>Ca làm của tôi</h3>
-              <span style={{ fontSize: "0.75rem", backgroundColor: isPunching ? "#e6f4ea" : "#fce8e6", color: isPunching ? "#137333" : "#c5221f", padding: "3px 8px", borderRadius: "10px", fontWeight: "bold" }}>
-                {isPunching ? "🟢 Đang làm" : "🔴 Chưa vào ca"}
-              </span>
-            </div>
-
-            <div style={{ padding: "12px", backgroundColor: "#fcfaf6", borderRadius: "12px", border: "1px solid #e2dcd0", marginBottom: "16px" }}>
-              <div style={{ fontSize: "1.25rem", fontWeight: "bold", color: "#2f593a" }}>
-                {dashboard?.todayShift ? `${dashboard.todayShift.StartTime} - ${dashboard.todayShift.EndTime}` : "08:00 - 22:00"}
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "#718096", marginTop: "4px" }}>
-                Ca trực: {dashboard?.todayShift?.ShiftType || "Cả ngày"}
-              </div>
-            </div>
-
-            <div style={{ textAlign: "center", margin: "12px 0" }}>
-              <div style={{ fontSize: "0.75rem", color: "#a0aec0", textTransform: "uppercase", fontWeight: "bold" }}>Thời gian đã làm</div>
-              <div style={{ fontSize: "2.2rem", fontWeight: "bold", color: "#2f593a", letterSpacing: "1px", margin: "4px 0" }}>
-                {durationText}
-              </div>
-              {/* Progress bar */}
-              <div style={{ width: "100%", height: "4px", backgroundColor: "#edf2f7", borderRadius: "2px", overflow: "hidden" }}>
-                <div style={{ width: isPunching ? "55%" : "0%", height: "100%", backgroundColor: "#2f593a", borderRadius: "2px", transition: "width 1s" }} />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.8rem", color: "#718096", margin: "12px 0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Giờ check-in:</span>
-                <span style={{ fontWeight: "bold", color: "#2f593a" }}>✓ {dashboard?.todayAttendance?.CheckInTime || "--:--"}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Dự kiến check-out:</span>
-                <span style={{ fontWeight: "bold", color: "#2f593a" }}>✓ {dashboard?.todayShift?.EndTime ? `${dashboard.todayShift.EndTime} PM` : "10:00 PM"}</span>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => navigate("/technician/attendance")}
-              style={{
-                width: "100%",
-                padding: "12px",
-                borderRadius: "14px",
-                border: "none",
-                backgroundColor: isPunching ? "#2f593a" : "#4a5568",
-                color: "#ffffff",
-                fontSize: "0.85rem",
-                fontWeight: "bold",
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-                transition: "all 0.2s"
-              }}
-              className="hover-scale"
-            >
-              📥 {punchText}
-            </button>
-          </div>
-
-          {/* Column 3: Lịch trong tuần */}
+          {/* Column 2: Lịch trong tuần */}
           <div style={{ backgroundColor: "#ffffff", borderRadius: "20px", padding: "20px", border: "1px solid #e2dcd0", boxShadow: "0 4px 12px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
               <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: "bold", color: "#2f593a" }}>Lịch trong tuần</h3>
@@ -653,10 +544,9 @@ export default function TechnicianDashboard() {
         {/* QUICK ACTIONS ROW */}
         <section style={{ backgroundColor: "#ffffff", borderRadius: "20px", padding: "20px", border: "1px solid #e2dcd0", boxShadow: "0 4px 12px rgba(0,0,0,0.03)", marginBottom: "24px" }}>
           <h3 style={{ margin: "0 0 16px 0", fontSize: "1rem", fontWeight: "bold", color: "#2f593a" }}>Thao tác nhanh</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: "10px", textAlign: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: "10px", textAlign: "center" }}>
             {[
               { label: "Thêm lịch hẹn", icon: "🗓️", bg: "#f7fafc", color: "#805ad5", to: "/technician/appointments" },
-              { label: "Check In/Out", icon: "🕒", bg: "#f7fafc", color: "#3182ce", to: "/technician/attendance" },
               { label: "Lịch làm việc", icon: "📅", bg: "#f7fafc", color: "#38a169", to: "/technician/schedule" },
               { label: "Khách hàng", icon: "👥", bg: "#f7fafc", color: "#319795", to: "/technician/customers" },
               { label: "Doanh thu", icon: "📊", bg: "#f7fafc", color: "#d69e2e", to: "/technician/earnings" },

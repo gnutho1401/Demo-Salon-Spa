@@ -4,8 +4,8 @@ import CustomerLayout from "../../components/layout/CustomerLayout";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import "../../styles/pages/customer-appointment-detail-v2.css";
 
-const FALLBACK_SERVICE = "/images/default-service.png";
-const FALLBACK_AVATAR = "/images/default-avatar.png";
+const FALLBACK_SERVICE = "/images/services/default-service.png";
+const FALLBACK_AVATAR = "/images/avatars/default-avatar.png";
 
 const POPULAR_BANKS = [
   { bin: "970436", name: "VCB - Vietcombank" },
@@ -239,6 +239,9 @@ function formatReason(reason) {
   if (lower.includes("payment completed via vnpay")) {
     return "Thanh toán trực tuyến thành công qua cổng VNPay.";
   }
+  if (lower.includes("payment completed via payos")) {
+    return "Thanh toán trực tuyến thành công qua cổng PayOS.";
+  }
   if (lower.includes("status updated by system auto-expire due to payment failure or timeout")) {
     return "Hệ thống tự động hủy lịch do hết hạn chờ thanh toán cọc.";
   }
@@ -291,6 +294,8 @@ export default function AppointmentDetail() {
   const [showCancel, setShowCancel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [rescheduleActionLoading, setRescheduleActionLoading] = useState(""); // 'confirm' | 'reject'
+  const [pendingReschedule, setPendingReschedule] = useState(null); // AWAITING_CUSTOMER request
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -328,6 +333,13 @@ export default function AppointmentDetail() {
         Reviews: parseJson(data.ReviewsJson),
         StatusHistory: parseJson(data.StatusHistoryJson),
       });
+      // Load pending reschedule request của khách hàng
+      try {
+        const rRes = await axiosClient.get(`/reschedule/customer/appointments/${id}/pending-reschedule`);
+        setPendingReschedule(rRes.data?.data || null);
+      } catch (_) {
+        setPendingReschedule(null);
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Không tải được chi tiết lịch hẹn");
     } finally {
@@ -337,11 +349,45 @@ export default function AppointmentDetail() {
 
   useEffect(() => { load(); }, [id]);
 
+  // Xác nhận đổi lịch
+  async function handleConfirmReschedule() {
+    if (!pendingReschedule) return;
+    try {
+      setRescheduleActionLoading("confirm");
+      await axiosClient.put(`/reschedule/customer/reschedule-requests/${pendingReschedule.RequestId}/confirm`);
+      setMessage("✅ Đã xác nhận đổi lịch thành công! Lịch hẹn đã được cập nhật.");
+      setPendingReschedule(null);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Xác nhận thất bại");
+    } finally {
+      setRescheduleActionLoading("");
+    }
+  }
+
+  // Từ chối đổi lịch
+  async function handleRejectReschedule() {
+    if (!pendingReschedule) return;
+    try {
+      setRescheduleActionLoading("reject");
+      await axiosClient.put(`/reschedule/customer/reschedule-requests/${pendingReschedule.RequestId}/reject`);
+      setMessage("❌ Đã từ chối đổi lịch. Lịch hẹn giữ nguyên.");
+      setPendingReschedule(null);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Từ chối thất bại");
+    } finally {
+      setRescheduleActionLoading("");
+    }
+  }
+
   const services = appointment?.Services || [];
   const payments = appointment?.Payments || [];
   const refunds = appointment?.Refunds || [];
   const reviews = appointment?.Reviews || [];
-  const histories = appointment?.StatusHistory || [];
+  const histories = useMemo(() => {
+    return [...(appointment?.StatusHistory || [])].reverse();
+  }, [appointment]);
 
   const progress = useMemo(() => {
     const status = String(appointment?.Status || "").toUpperCase();
@@ -602,6 +648,90 @@ export default function AppointmentDetail() {
           })}
         </section>
 
+        {/* ── PENDING RESCHEDULE BANNER - khách xác nhận/từ chối đổi lịch ── */}
+        {pendingReschedule && (
+          <div style={{
+            margin: "0 0 20px 0",
+            background: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+            border: "2px solid #f59e0b",
+            borderRadius: "16px",
+            padding: "20px 22px",
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "16px" }}>
+              <span style={{ fontSize: "1.6rem", flexShrink: 0 }}>📅</span>
+              <div style={{ flex: 1 }}>
+                <b style={{ display: "block", color: "#92400e", fontSize: "0.95rem", marginBottom: "6px" }}>
+                  Kỹ thuật viên đề xuất dời lịch hẹn của bạn
+                </b>
+                <span style={{ color: "#78350f", fontSize: "0.85rem", display: "block", marginBottom: "10px" }}>
+                  Lễ tân đã phê duyệt đề xuất này. Vui lòng xác nhận hoặc từ chối thay đổi.
+                </span>
+                <div style={{
+                  background: "rgba(255,255,255,0.7)",
+                  borderRadius: "10px",
+                  padding: "12px 16px",
+                  border: "1px solid #fcd34d",
+                  marginBottom: "14px",
+                }}>
+                  <div style={{ fontSize: "0.8rem", color: "#92400e", fontWeight: 600, marginBottom: "4px" }}>THỚI GIAN ĐỀ XUẤT MỚI</div>
+                  <div style={{ fontSize: "1rem", fontWeight: 700, color: "#78350f" }}>
+                    📅 {pendingReschedule.RequestedDate
+                      ? new Date(pendingReschedule.RequestedDate).toLocaleDateString("vi-VN", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" })
+                      : ""}
+                  </div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#78350f", marginTop: "4px" }}>
+                    ⏰ {String(pendingReschedule.RequestedStartTime || "").slice(0, 5)} – {String(pendingReschedule.RequestedEndTime || "").slice(0, 5)}
+                  </div>
+                  {pendingReschedule.Reason && (
+                    <div style={{ fontSize: "0.82rem", color: "#a16207", marginTop: "8px", fontStyle: "italic" }}>
+                      Lý do: {pendingReschedule.Reason}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <button
+                    onClick={handleConfirmReschedule}
+                    disabled={rescheduleActionLoading !== ""}
+                    style={{
+                      flex: 1,
+                      padding: "11px",
+                      background: "#16a34a",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "10px",
+                      fontWeight: 700,
+                      fontSize: "0.9rem",
+                      cursor: rescheduleActionLoading ? "not-allowed" : "pointer",
+                      opacity: rescheduleActionLoading ? 0.7 : 1,
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {rescheduleActionLoading === "confirm" ? "⏳ Đang xử lý..." : "✅ Xác nhận đổi lịch"}
+                  </button>
+                  <button
+                    onClick={handleRejectReschedule}
+                    disabled={rescheduleActionLoading !== ""}
+                    style={{
+                      flex: 1,
+                      padding: "11px",
+                      background: "#fff",
+                      color: "#dc2626",
+                      border: "2px solid #dc2626",
+                      borderRadius: "10px",
+                      fontWeight: 700,
+                      fontSize: "0.9rem",
+                      cursor: rescheduleActionLoading ? "not-allowed" : "pointer",
+                      opacity: rescheduleActionLoading ? 0.7 : 1,
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {rescheduleActionLoading === "reject" ? "⏳ Đang xử lý..." : "❌ Giữ nguyên lịch cũ"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* ── MAIN CONTENT GRID ── */}
         <div className="ap-v2-grid">
           
@@ -663,6 +793,114 @@ export default function AppointmentDetail() {
                 )}
               </div>
             </div>
+
+            {/* Treatment Notes Panel */}
+            {appointment?.TreatmentNotes && appointment.TreatmentNotes.length > 0 && (
+              <div className="ap-v2-panel" style={{ borderLeft: "4px solid #10b981" }}>
+                <div className="ap-v2-panel-title">
+                  <h3>📝 Phác đồ điều trị & Lời khuyên của Kỹ thuật viên</h3>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginTop: "16px" }}>
+                  {appointment.TreatmentNotes.map((note, idx) => (
+                    <div key={note.id || idx} style={{ borderBottom: idx < appointment.TreatmentNotes.length - 1 ? "1px dashed var(--ap-border)" : "none", paddingBottom: "20px" }}>
+                      <h4 style={{ color: "var(--ap-text-main)", fontSize: "1.05rem", fontWeight: "600", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                        ✨ Dịch vụ: {note.ServiceName} <span style={{ fontSize: "0.85rem", color: "var(--ap-text-sub)", fontWeight: "normal" }}>— KTV thực hiện: <b>{note.TechnicianName}</b></span>
+                      </h4>
+                      
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+                        <div>
+                          {note.before_condition && (
+                            <p style={{ fontSize: "0.9rem", color: "var(--ap-text-main)", margin: "6px 0", lineHeight: "1.4" }}>
+                              <strong style={{ color: "var(--ap-text-sub)" }}>Tình trạng ban đầu:</strong> {note.before_condition}
+                            </p>
+                          )}
+                          {note.after_result && (
+                            <p style={{ fontSize: "0.9rem", color: "var(--ap-text-main)", margin: "6px 0", lineHeight: "1.4" }}>
+                              <strong style={{ color: "var(--ap-text-sub)" }}>Kết quả thực hiện:</strong> {note.after_result}
+                            </p>
+                          )}
+                          {note.technician_notes && (
+                            <p style={{ fontSize: "0.9rem", color: "var(--ap-text-main)", margin: "6px 0", lineHeight: "1.4" }}>
+                              <strong style={{ color: "var(--ap-text-sub)" }}>Ghi chú của KTV:</strong> {note.technician_notes}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          {/* Steps performed */}
+                          {note.procedure_steps && note.procedure_steps.length > 0 && (
+                            <div style={{ marginBottom: "12px" }}>
+                              <strong style={{ fontSize: "0.9rem", color: "var(--ap-text-main)" }}>Quy trình thực hiện chi tiết:</strong>
+                              <ol style={{ margin: "6px 0 0 18px", padding: 0, fontSize: "0.88rem", color: "var(--ap-text-sub)", lineHeight: "1.5" }}>
+                                {note.procedure_steps.map((step, sIdx) => (
+                                  <li key={sIdx} style={{ marginBottom: "4px" }}>{step}</li>
+                                ))}
+                              </ol>
+                            </div>
+                          )}
+
+                          {/* Products used */}
+                          {note.products_used && note.products_used.length > 0 && (
+                            <div>
+                              <strong style={{ fontSize: "0.9rem", color: "var(--ap-text-main)" }}>Sản phẩm đã sử dụng:</strong>
+                              <ul style={{ margin: "6px 0 0 18px", padding: 0, fontSize: "0.88rem", color: "var(--ap-text-sub)", listStyleType: "circle", lineHeight: "1.5" }}>
+                                {note.products_used.map((prod, pIdx) => (
+                                  <li key={pIdx} style={{ marginBottom: "4px" }}>{prod}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Recommendations */}
+                      {note.recommendations && typeof note.recommendations === "string" && note.recommendations.trim() && (
+                        <div style={{ marginTop: "16px", padding: "12px 16px", background: "rgba(16, 185, 129, 0.08)", borderRadius: "8px", borderLeft: "4px solid #10b981" }}>
+                          <strong style={{ fontSize: "0.9rem", color: "#10b981", display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                            💡 Khuyến nghị chăm sóc tại nhà:
+                          </strong>
+                          <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--ap-text-main)", lineHeight: "1.5" }}>
+                            {note.recommendations}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Images */}
+                      {((note.before_images && note.before_images.length > 0) || 
+                        (note.after_images && note.after_images.length > 0) || 
+                        (note.detailed_images && note.detailed_images.length > 0)) && (
+                        <div style={{ marginTop: "16px" }}>
+                          <strong style={{ fontSize: "0.9rem", color: "var(--ap-text-main)", display: "block", marginBottom: "8px" }}>🖼️ Hình ảnh thực tế trị liệu:</strong>
+                          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                            {/* Before images */}
+                            {note.before_images && note.before_images.map((src, imgIdx) => (
+                              <div key={`b-${imgIdx}`} style={{ position: "relative" }}>
+                                <img src={resolveFileUrl(src)} alt="Before" style={{ width: "100px", height: "100px", objectFit: "cover", borderRadius: "8px", border: "1.5px solid var(--ap-border)" }} />
+                                <span style={{ position: "absolute", bottom: "4px", left: "4px", background: "#3b82f6", color: "#fff", fontSize: "0.62rem", fontWeight: "bold", padding: "2px 6px", borderRadius: "4px" }}>TRƯỚC</span>
+                              </div>
+                            ))}
+                            {/* After images */}
+                            {note.after_images && note.after_images.map((src, imgIdx) => (
+                              <div key={`a-${imgIdx}`} style={{ position: "relative" }}>
+                                <img src={resolveFileUrl(src)} alt="After" style={{ width: "100px", height: "100px", objectFit: "cover", borderRadius: "8px", border: "1.5px solid var(--ap-border)" }} />
+                                <span style={{ position: "absolute", bottom: "4px", left: "4px", background: "#10b981", color: "#fff", fontSize: "0.62rem", fontWeight: "bold", padding: "2px 6px", borderRadius: "4px" }}>SAU</span>
+                              </div>
+                            ))}
+                            {/* Detailed images */}
+                            {note.detailed_images && note.detailed_images.map((src, imgIdx) => (
+                              <div key={`d-${imgIdx}`} style={{ position: "relative" }}>
+                                <img src={resolveFileUrl(src)} alt="Detail" style={{ width: "100px", height: "100px", objectFit: "cover", borderRadius: "8px", border: "1.5px solid var(--ap-border)" }} />
+                                <span style={{ position: "absolute", bottom: "4px", left: "4px", background: "#6b7280", color: "#fff", fontSize: "0.62rem", fontWeight: "bold", padding: "2px 6px", borderRadius: "4px" }}>CHI TIẾT</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Status History Timeline Panel */}
             <div className="ap-v2-panel">

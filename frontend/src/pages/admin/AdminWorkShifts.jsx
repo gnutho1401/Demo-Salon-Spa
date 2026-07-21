@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import AdminConfirmDialog from "../../components/admin/AdminConfirmDialog";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const emptyForm = {
   employeeId: "",
@@ -52,6 +53,8 @@ export default function AdminWorkShifts() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   async function load() {
     try {
@@ -226,15 +229,7 @@ export default function AdminWorkShifts() {
     }
   }
 
-  async function remove(item) {
-    const ok = window.confirm(
-      `Bạn chắc chắn muốn xóa ca làm của ${item.EmployeeName} ngày ${dateText(
-        item.ShiftDate,
-      )}?`,
-    );
-
-    if (!ok) return;
-
+  async function applyRemove(item) {
     try {
       setError("");
       await axiosClient.delete(`/admin/work-shifts/${item.ShiftId}`);
@@ -244,6 +239,21 @@ export default function AdminWorkShifts() {
       setError(
         err?.response?.data?.message || err?.message || "Xóa ca làm thất bại",
       );
+    }
+  }
+
+  function remove(item) {
+    setConfirmAction({ type: "delete", item });
+  }
+
+  async function handleConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      await applyRemove(confirmAction.item);
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -1123,6 +1133,25 @@ export default function AdminWorkShifts() {
           </form>
         </div>
       ) : null}
+
+      <AdminConfirmDialog
+        open={Boolean(confirmAction)}
+        title="Xóa ca làm việc?"
+        description="Ca làm sẽ biến mất khỏi lịch phân công. Hãy kiểm tra nhân viên và ngày làm trước khi tiếp tục."
+        details={
+          confirmAction ? (
+            <>
+              <strong>{confirmAction.item.EmployeeName}</strong>
+              <span> · {dateText(confirmAction.item.ShiftDate)}</span>
+            </>
+          ) : null
+        }
+        confirmLabel="Xóa ca làm"
+        tone="danger"
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmedAction}
+      />
     </section>
   );
 }
