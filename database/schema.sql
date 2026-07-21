@@ -918,6 +918,41 @@ SELECT UserId, 1, N'Chuyên viên Skincare', N'Skincare, Anti Aging', 11200000, 
 FROM Users WHERE Email = 'thanhtam@salon.com';
 GO
 
+/* Ensure every internal account is represented in the employee module. */
+INSERT INTO Employees
+    (UserId, BranchId, Position, Specialization, Salary, HireDate, YearsOfExperience, Bio, ImageUrl, Status)
+SELECT
+    u.UserId,
+    CASE
+        WHEN u.Email IN ('receptionist@salon.com', 'receptionist1@salon.com') THEN 1
+        WHEN u.Email = 'receptionist2@salon.com' THEN 2
+        WHEN u.Email = 'receptionist3@salon.com' THEN 3
+        ELSE NULL
+    END,
+    CASE r.RoleName
+        WHEN 'ADMIN' THEN N'Quản trị hệ thống'
+        WHEN 'MANAGER' THEN N'Quản lý Salon'
+        WHEN 'RECEPTIONIST' THEN N'Lễ tân'
+        ELSE N'Kỹ thuật viên'
+    END,
+    CASE r.RoleName
+        WHEN 'ADMIN' THEN N'Quản trị & phân quyền'
+        WHEN 'MANAGER' THEN N'Điều hành Salon'
+        WHEN 'RECEPTIONIST' THEN N'Chăm sóc khách hàng'
+        ELSE NULL
+    END,
+    NULL,
+    CAST(u.CreatedAt AS DATE),
+    0,
+    N'Hồ sơ tài khoản nội bộ Salon.',
+    u.AvatarUrl,
+    u.Status
+FROM Users u
+JOIN Roles r ON r.RoleId = u.RoleId
+WHERE r.RoleName IN ('ADMIN', 'MANAGER', 'RECEPTIONIST', 'TECHNICIAN')
+  AND NOT EXISTS (SELECT 1 FROM Employees e WHERE e.UserId = u.UserId);
+GO
+
 /* Map service to employee */
 INSERT INTO EmployeeServices (EmployeeId, ServiceId)
 SELECT e.EmployeeId, s.ServiceId
