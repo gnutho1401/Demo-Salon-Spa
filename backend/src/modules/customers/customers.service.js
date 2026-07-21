@@ -272,14 +272,14 @@ async function getMyDashboard(userId) {
         (SELECT COUNT(*) FROM Appointments WHERE CustomerId = @CustomerId AND Status = 'REFUND_PENDING') AS RefundPendingAppointments,
 
         (SELECT COUNT(*) 
-         FROM Invoices i 
-         JOIN Appointments a ON i.AppointmentId = a.AppointmentId 
-         WHERE a.CustomerId = @CustomerId AND i.Status = 'UNPAID') AS UnpaidInvoices,
+         FROM Appointments a
+         LEFT JOIN Invoices i ON i.AppointmentId = a.AppointmentId
+         WHERE a.CustomerId = @CustomerId AND a.Status = 'PENDING_PAYMENT') AS UnpaidInvoices,
 
-        (SELECT ISNULL(SUM(i.FinalAmount), 0) 
-         FROM Invoices i 
-         JOIN Appointments a ON i.AppointmentId = a.AppointmentId 
-         WHERE a.CustomerId = @CustomerId AND i.Status = 'UNPAID') AS UnpaidAmount,
+        (SELECT ISNULL(SUM(COALESCE(i.FinalAmount, i.TotalAmount, 0)), 0) 
+         FROM Appointments a
+         LEFT JOIN Invoices i ON i.AppointmentId = a.AppointmentId
+         WHERE a.CustomerId = @CustomerId AND a.Status = 'PENDING_PAYMENT') AS UnpaidAmount,
 
         (SELECT ISNULL(SUM(p.Amount), 0) 
          FROM Payments p 
@@ -365,22 +365,23 @@ async function getMyDashboard(userId) {
     .input("CustomerId", sql.Int, customer.CustomerId).query(`
       SELECT TOP 5
         i.InvoiceId,
-        i.AppointmentId,
+        a.AppointmentId,
         i.TotalAmount,
         i.DiscountAmount,
-        i.FinalAmount,
-        i.Status,
+        COALESCE(i.FinalAmount, i.TotalAmount, 0) AS FinalAmount,
+        COALESCE(i.Status, 'UNPAID') AS Status,
         i.CreatedAt,
         a.AppointmentDate,
+        a.Status AS AppointmentStatus,
         CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
         STRING_AGG(s.ServiceName, N', ') AS ServiceNames
-      FROM Invoices i
-      JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+      FROM Appointments a
+      LEFT JOIN Invoices i ON i.AppointmentId = a.AppointmentId
       LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
       LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
-      WHERE a.CustomerId = @CustomerId AND i.Status = 'UNPAID'
-      GROUP BY i.InvoiceId, i.AppointmentId, i.TotalAmount, i.DiscountAmount, i.FinalAmount, i.Status, i.CreatedAt, a.AppointmentDate, a.StartTime
-      ORDER BY i.CreatedAt DESC, i.InvoiceId DESC
+      WHERE a.CustomerId = @CustomerId AND a.Status = 'PENDING_PAYMENT'
+      GROUP BY i.InvoiceId, a.AppointmentId, i.TotalAmount, i.DiscountAmount, i.FinalAmount, i.Status, i.CreatedAt, a.AppointmentDate, a.StartTime, a.Status
+      ORDER BY a.AppointmentDate ASC, a.AppointmentId DESC
     `);
 
   const recentPayments = await pool
@@ -857,7 +858,8 @@ async function getMyServiceHistory(userId) {
 
         aps.AppointmentServiceId,
         aps.ServiceId,
-        aps.Price,
+        aps.Price AS Price,
+        s.Price AS ServicePrice,
 
         s.ServiceName,
         s.Description AS ServiceDescription,
@@ -999,14 +1001,34 @@ async function getMyServiceHistory(userId) {
   const categoryMap = new Map();
   const monthMap = new Map();
 
-  let totalSpent = 0;
+  const appointmentSpentRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query(`
+      SELECT SUM(i.FinalAmount) AS AppointmentSpent
+      FROM Invoices i
+      JOIN Appointments a ON i.AppointmentId = a.AppointmentId
+      WHERE a.CustomerId = @CustomerId AND i.Status = 'PAID'
+    `);
+
+  const packageSpentRes = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .query(`
+      SELECT SUM(pp.Amount) AS PackageSpent
+      FROM PackagePayments pp
+      JOIN CustomerPackages cp ON pp.CustomerPackageId = cp.CustomerPackageId
+      WHERE cp.CustomerId = @CustomerId AND pp.Status = 'PAID'
+    `);
+
+  const appSum = appointmentSpentRes.recordset[0]?.AppointmentSpent || 0;
+  const pkgSum = packageSpentRes.recordset[0]?.PackageSpent || 0;
+  const totalSpent = appSum + pkgSum;
+
   let reviewedCount = 0;
   let totalRating = 0;
   let totalDuration = 0;
 
   for (const item of items) {
     const amount = Number(item.Price || 0);
-    totalSpent += amount;
     totalDuration += Number(item.DurationMinutes || 0);
 
     if (item.ReviewId) {
@@ -1321,7 +1343,30 @@ async function remove(id) {
   return { id };
 }
 
+async function getPublicReviews() {
+  const pool = await connectDB();
+  const result = await pool.request().query(`
+    SELECT TOP 10
+      r.ReviewId,
+      r.Rating,
+      r.Comment,
+      r.CreatedAt,
+      COALESCE(cu.FullName, N'Khách hàng ẩn danh') AS CustomerName,
+      COALESCE(s.ServiceName, N'Dịch vụ tổng hợp') AS ServiceName
+    FROM Reviews r
+    LEFT JOIN Customers c ON r.CustomerId = c.CustomerId
+    LEFT JOIN Users cu ON c.UserId = cu.UserId
+    LEFT JOIN Services s ON r.ServiceId = s.ServiceId
+    WHERE r.Rating = 5 
+      AND r.Comment IS NOT NULL 
+      AND LEN(LTRIM(RTRIM(r.Comment))) > 0
+    ORDER BY r.CreatedAt DESC
+  `);
+  return result.recordset;
+}
+
 module.exports = {
+  getPublicReviews,
   getAll,
   getById,
   getMyProfile,

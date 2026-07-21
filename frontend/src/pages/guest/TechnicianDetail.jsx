@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import { useAuth } from "../../context/AuthContext";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 export default function TechnicianDetail() {
   const { id } = useParams();
@@ -20,7 +20,7 @@ export default function TechnicianDetail() {
   }
 
   function image(url) {
-    return resolveFileUrl(url) || DEFAULT_AVATAR;
+    return resolveFileUrl(url || DEFAULT_AVATAR);
   }
 
   useEffect(() => {

@@ -14,7 +14,7 @@ function redirectByRole(navigate, role) {
   } else if (r === "TECHNICIAN" || r === "STYLIST") {
     navigate("/technician");
   } else {
-    navigate("/customer");
+    navigate("/");
   }
 }
 
@@ -107,6 +107,13 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      {/* Background dynamic animated mesh orbs */}
+      <div className="auth-bg-decor">
+        <div className="auth-orb auth-orb-1"></div>
+        <div className="auth-orb auth-orb-2"></div>
+        <div className="auth-orb auth-orb-3"></div>
+      </div>
+
       <form className="auth-card" onSubmit={submit}>
         <div className="eyebrow">Welcome back</div>
         <h2>Đăng nhập</h2>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
 const DEFAULT_IMAGE = "/images/services/skincare.png";
@@ -45,6 +45,7 @@ export default function AdminServices() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [scrollTargetId, setScrollTargetId] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,42 +61,42 @@ export default function AdminServices() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 180;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+      gridRef.current.scrollIntoView({ block: "start", behavior: "instant" });
     }
   };
 
-  const scrollToItem = (id, type = "service") => {
-    setTimeout(() => {
-      const element = document.getElementById(`${type}-card-${id}`);
-      if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - 180;
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth"
-        });
-        element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
-        element.style.borderColor = "#d6b57e";
-        element.style.boxShadow = "0 0 20px 5px rgba(214, 181, 126, 0.5)";
-        setTimeout(() => {
-          element.style.borderColor = "";
-          element.style.boxShadow = "";
-        }, 3000);
-      } else {
-        scrollToGrid();
-      }
-    }, 150);
+  const triggerScrollToItem = (id) => {
+    if (!id) return;
+    setScrollTargetId(id);
   };
 
-  async function load() {
+  useLayoutEffect(() => {
+    if (!scrollTargetId) return;
+
+    const el = document.getElementById(`service-card-${scrollTargetId}`);
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+
+      el.style.transition = "all 0.3s ease";
+      el.style.borderColor = "#d6b57e";
+      el.style.boxShadow = "0 0 30px 8px rgba(214, 181, 126, 0.8)";
+      el.style.transform = "scale(1.02)";
+
+      const timer = setTimeout(() => {
+        el.style.borderColor = "";
+        el.style.boxShadow = "";
+        el.style.transform = "";
+        setScrollTargetId(null);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [items, scrollTargetId]);
+
+  async function load(isSilent = false) {
     try {
       setError("");
-      setLoading(true);
+      if (!isSilent && items.length === 0) setLoading(true);
 
       const [listRes, categoryRes] = await Promise.all([
         axiosClient.get("/admin/services", {
@@ -312,9 +313,9 @@ export default function AdminServices() {
       }
 
       setShowModal(false);
-      await load();
+      await load(true);
       if (serviceId) {
-        scrollToItem(serviceId, "service");
+        triggerScrollToItem(serviceId);
       } else {
         scrollToGrid();
       }
@@ -341,9 +342,9 @@ export default function AdminServices() {
         },
       );
 
-      await load();
+      await load(true);
       setShowModal(false);
-      scrollToItem(editingId, "service");
+      triggerScrollToItem(editingId);
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -366,8 +367,8 @@ export default function AdminServices() {
       await axiosClient.patch(`/admin/services/${item.ServiceId}/status`, {
         status: nextStatus,
       });
-      await load();
-      scrollToGrid();
+      await load(true);
+      triggerScrollToItem(item.ServiceId);
     } catch (err) {
       setError(
         err?.response?.data?.message ||

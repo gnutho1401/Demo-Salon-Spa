@@ -67,6 +67,9 @@ function isVoucherUsable(voucher, amount, serviceName = "") {
   if (code.startsWith("FREEMS") && sName !== "massage cổ vai gáy") {
     return false;
   }
+  if (code.startsWith("FREEGD") && !sName.includes("gội đầu")) {
+    return false;
+  }
 
   return calcVoucherDiscount(voucher, amount) > 0;
 }
@@ -307,25 +310,32 @@ export default function PaymentPage() {
 
   const availableVouchers = useMemo(() => {
     const serviceName = appointment?.ServiceName || appointment?.ServiceNames || "";
+    const currentVid = voucherId ? String(voucherId) : null;
     
     return myVouchers
       .map((voucher) => {
+        const vid = String(voucher.VoucherId || voucher.voucherId);
+        const isCurrentlyApplied = currentVid && vid === currentVid;
         const discountAmount = calcVoucherDiscount(voucher, voucherBaseAmount);
 
         return {
           ...voucher,
           QuickDiscountAmount: discountAmount,
-          IsUsableNow: isVoucherUsable(voucher, voucherBaseAmount, serviceName),
+          IsUsableNow: isCurrentlyApplied || isVoucherUsable(voucher, voucherBaseAmount, serviceName),
+          IsCurrentlyApplied: isCurrentlyApplied,
         };
       })
       .filter((voucher) => voucher.IsUsableNow)
       .sort((a, b) => {
+        // Currently applied voucher always on top
+        if (a.IsCurrentlyApplied && !b.IsCurrentlyApplied) return -1;
+        if (!a.IsCurrentlyApplied && b.IsCurrentlyApplied) return 1;
         return (
           Number(b.QuickDiscountAmount || 0) -
           Number(a.QuickDiscountAmount || 0)
         );
       });
-  }, [myVouchers, voucherBaseAmount, appointment]);
+  }, [myVouchers, voucherBaseAmount, appointment, voucherId]);
 
   async function savePointsToDb(points) {
     try {
@@ -700,14 +710,17 @@ export default function PaymentPage() {
 
                         <button
                           type="button"
-                          disabled={!voucher.IsUsableNow}
+                          disabled={voucher.IsCurrentlyApplied || !voucher.IsUsableNow}
                           onClick={() => applyQuickVoucher(voucher)}
+                          style={voucher.IsCurrentlyApplied ? { background: "#10b981", color: "#fff", borderColor: "#10b981", opacity: 1, cursor: "default" } : undefined}
                         >
-                          {isSelected
-                            ? "Đang dùng"
-                            : voucher.IsUsableNow
-                              ? "Dùng ngay"
-                              : "Không đủ ĐK"}
+                          {voucher.IsCurrentlyApplied
+                            ? "✓ Đang dùng"
+                            : isSelected
+                              ? "Đang dùng"
+                              : voucher.IsUsableNow
+                                ? "Dùng ngay"
+                                : "Không đủ ĐK"}
                         </button>
                       </article>
                     );

@@ -46,7 +46,7 @@ export default function AdminAIMonitoring() {
     }
     const logsCard = document.getElementById("ai-logs-card-section");
     if (logsCard) {
-      logsCard.scrollIntoView({ behavior: "smooth" });
+      logsCard.scrollIntoView({ behavior: "instant" });
     }
   };
 

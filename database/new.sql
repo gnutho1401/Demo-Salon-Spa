@@ -118,7 +118,7 @@ CREATE TABLE [dbo].[Users](
 	[Phone] [nvarchar](20) NULL,
 	[PasswordHash] [nvarchar](255) NOT NULL,
 	[RoleId] [int] NOT NULL,
-	[AvatarUrl] [nvarchar](255) NULL,
+	[AvatarUrl] [nvarchar](1000) NULL,
 	[Status] [nvarchar](20) NOT NULL,
 	[IsVerified] [bit] NOT NULL,
 	[VerifyCode] [nvarchar](10) NULL,

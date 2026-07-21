@@ -2,12 +2,12 @@ const axios = require('axios');
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Models to try in order of preference on OpenRouter
+// Models to try in order of preference on OpenRouter (auto/free router handles free tier model selection)
 const MODELS = [
-  'openrouter/free',
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'google/gemma-4-31b-it:free',
-  'meta-llama/llama-3.2-3b-instruct:free'
+  'google/gemini-2.5-flash-lite',
+  'google/gemini-2.5-flash',
+  'openrouter/auto',
+  'google/gemini-2.5-pro'
 ];
 
 /**
@@ -18,44 +18,50 @@ const MODELS = [
  * @returns {Promise<string>} - Response text từ AI
  */
 async function generateContent(systemPrompt, userMessage, options = {}) {
-  const { jsonMode = false, maxTokens = 4096 } = options;
+  const { jsonMode = false, maxTokens = 8192 } = options;
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
 
-  // 1. Thử gọi Google Gemini trực tiếp
-  if (geminiApiKey) {
-    try {
-      console.log('[AI] Attempting call to direct Google Gemini API...');
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-        {
-          systemInstruction: {
-            parts: [{ text: systemPrompt }]
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: userMessage }]
+  // 1. Thử gọi Google Gemini trực tiếp (Chỉ khi có key hợp lệ dạng AIzaSy...)
+  if (geminiApiKey && geminiApiKey.startsWith('AIzaSy')) {
+    const gModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    for (const modelName of gModels) {
+      try {
+        console.log(`[AI] Attempting call to direct Google Gemini API (${modelName})...`);
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`,
+          {
+            systemInstruction: {
+              parts: [{ text: systemPrompt }]
+            },
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: userMessage }]
+              }
+            ],
+            generationConfig: {
+              maxOutputTokens: maxTokens,
+              ...(jsonMode ? { responseMimeType: 'application/json' } : {})
             }
-          ],
-          generationConfig: {
-            maxOutputTokens: maxTokens,
-            ...(jsonMode ? { responseMimeType: 'application/json' } : {})
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': geminiApiKey
+            },
+            timeout: 30000
           }
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 20000
-        }
-      );
+        );
 
-      const answer = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (answer) {
-        console.log('[AI] Success with Google Gemini direct API!');
-        return answer;
+        const answer = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (answer) {
+          console.log(`[AI] Success with Google Gemini direct API (${modelName})!`);
+          return answer;
+        }
+      } catch (err) {
+        console.warn(`[AI] Direct Gemini API (${modelName}) failed: ${err.response?.data?.error?.message || err.message}`);
       }
-    } catch (err) {
-      console.warn(`[AI] Direct Gemini API failed: ${err.message}. Falling back to OpenRouter...`);
     }
   }
 
@@ -64,21 +70,34 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
     throw new Error('Chưa cấu hình API Key cho Google Gemini (GEMINI_API_KEY) hoặc OpenRouter (OPENROUTER_API_KEY) trong file .env');
   }
 
+  // Nếu yêu cầu JSON, bổ sung instruction rõ ràng vào system prompt
+  const enhancedSystemPrompt = jsonMode
+    ? systemPrompt + '\n\nIMPORTANT: You MUST respond with ONLY valid JSON. No markdown, no explanation, no text before or after the JSON object.'
+    : systemPrompt;
+
   let lastError = null;
 
   for (const model of MODELS) {
     try {
       console.log(`[AI] Attempting OpenRouter call with model: ${model}`);
+
+      const requestBody = {
+        model: model,
+        messages: [
+          { role: 'system', content: enhancedSystemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        max_tokens: Math.min(maxTokens || 2000, 4000),
+      };
+
+      // Request JSON format if supported
+      if (jsonMode) {
+        requestBody.response_format = { type: 'json_object' };
+      }
+
       const response = await axios.post(
         OPENROUTER_URL,
-        {
-          model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage },
-          ],
-          max_tokens: maxTokens,
-        },
+        requestBody,
         {
           headers: {
             'Authorization': `Bearer ${openrouterApiKey}`,
@@ -86,7 +105,7 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
             'HTTP-Referer': 'http://localhost:5173',
             'X-Title': 'Beauty Salon AI Assistant',
           },
-          timeout: 20000,
+          timeout: 30000,
         }
       );
 
@@ -96,12 +115,18 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
         return answer;
       }
     } catch (err) {
-      console.warn(`[AI] OpenRouter model ${model} failed: ${err.message}`);
+      const errMsg = err.response?.data?.error?.message || err.message;
+      console.warn(`[AI] OpenRouter model ${model} failed: ${errMsg}`);
       lastError = err;
+      // Nếu bị giới hạn rate limit (429), không cần thử lặp lại các model khác vì cả tài khoản đều bị rate limit
+      if (err.response?.status === 429) {
+        console.warn('[AI] OpenRouter rate limit reached (429 - free-models-per-day limit).');
+        break;
+      }
     }
   }
 
-  throw new Error(`Tất cả các model AI đều thất bại. Lỗi cuối cùng: ${lastError ? lastError.message : 'Unknown'}`);
+  throw new Error(`AI API Rate Limit hoặc Hết Token: ${lastError ? (lastError.response?.data?.error?.message || lastError.message) : 'Unknown'}`);
 }
 
 module.exports = { generateContent };

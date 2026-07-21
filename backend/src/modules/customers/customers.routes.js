@@ -54,6 +54,7 @@ const reviewUpload = multer({
 });
 
 router.post("/contact", controller.createGuestContact);
+router.get("/public-reviews", controller.getPublicReviews);
 
 router.get("/me/dashboard", authMiddleware, controller.getMyDashboard);
 router.get("/me/profile", authMiddleware, controller.getMyProfile);

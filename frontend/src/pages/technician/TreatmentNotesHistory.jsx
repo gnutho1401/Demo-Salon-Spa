@@ -5,7 +5,7 @@ import "../../styles/pages/technician.css";
 import "../../styles/pages/treatment-notes.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const DEFAULT_SUMMARY = "Khách hàng hài lòng với mẫu nail hiện tại, màu sắc phù hợp với tông da. Móng chắc khỏe, không bị hư tổn. Tiếp tục duy trì liệu trình.";
 const DEFAULT_SKIN = "Móng hơi giòn, dễ gãy ở đầu móng\nDa quanh móng hơi khô\nMàu móng cũ đã phai\nKhông có dấu hiệu nấm hay viêm";

@@ -60,36 +60,31 @@ export default function AdminPackages() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 180;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+      gridRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
     }
   };
 
   const scrollToItem = (id, type = "package") => {
-    setTimeout(() => {
+    let attempts = 0;
+    const checkAndScroll = () => {
       const element = document.getElementById(`${type}-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - 180;
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth"
-        });
+        element.scrollIntoView({ block: "center", behavior: "smooth" });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
         element.style.boxShadow = "0 0 25px 6px rgba(214, 181, 126, 0.6)";
         setTimeout(() => {
           element.style.borderColor = "";
           element.style.boxShadow = "";
-        }, 3000);
+        }, 3500);
+      } else if (attempts < 15) {
+        attempts++;
+        setTimeout(checkAndScroll, 100);
       } else {
         scrollToGrid();
       }
-    }, 150);
+    };
+    setTimeout(checkAndScroll, 100);
   };
 
   async function load() {

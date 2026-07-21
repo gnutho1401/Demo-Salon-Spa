@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const emptyResponse = {
   AdminResponse: "",
@@ -126,36 +126,31 @@ export default function AdminFeedbacks() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 180;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+      gridRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
     }
   };
 
-  const scrollToItem = (id) => {
-    setTimeout(() => {
-      const element = document.getElementById(`feedback-card-${id}`);
+  const scrollToItem = (id, type = "feedback") => {
+    let attempts = 0;
+    const checkAndScroll = () => {
+      const element = document.getElementById(`${type}-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - 180;
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth"
-        });
+        element.scrollIntoView({ block: "center", behavior: "smooth" });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
         element.style.boxShadow = "0 0 25px 6px rgba(214, 181, 126, 0.6)";
         setTimeout(() => {
           element.style.borderColor = "";
           element.style.boxShadow = "";
-        }, 3000);
+        }, 3500);
+      } else if (attempts < 15) {
+        attempts++;
+        setTimeout(checkAndScroll, 100);
       } else {
         scrollToGrid();
       }
-    }, 150);
+    };
+    setTimeout(checkAndScroll, 100);
   };
 
   async function load() {

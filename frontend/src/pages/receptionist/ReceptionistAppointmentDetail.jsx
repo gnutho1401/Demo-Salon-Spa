@@ -4,7 +4,7 @@ import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
 import "../../styles/pages/receptionist.css";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function avatarUrl(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
@@ -47,6 +47,93 @@ function statusLabel(status) {
     NO_SHOW: "Khách không đến",
   };
   return map[status] || status || "-";
+}
+
+function formatReason(reason) {
+  if (!reason) return "Hệ thống tự động cập nhật trạng thái.";
+
+  const lower = String(reason).toLowerCase();
+
+  if (lower.includes("customer created appointment and waiting for payment")) {
+    return "Khách hàng tạo lịch hẹn và đang chờ thanh toán.";
+  }
+  if (lower.includes("receptionist checked in customer")) {
+    return "Lễ tân ghi nhận khách hàng đã check-in.";
+  }
+  if (lower.includes("receptionist started service")) {
+    return "Lễ tân ghi nhận bắt đầu thực hiện dịch vụ.";
+  }
+  if (lower.includes("receptionist completed service")) {
+    return "Lễ tân ghi nhận hoàn thành dịch vụ.";
+  }
+  if (lower.includes("receptionist checked-out customer")) {
+    return "Lễ tân thực hiện checkout (hoàn thành quy trình/ra về) cho khách.";
+  }
+  if (lower.includes("created walk-in appointment by receptionist")) {
+    return "Lễ tân tạo lịch hẹn trực tiếp tại cửa hàng.";
+  }
+  if (lower.includes("created walk-in appointment and checked in customer")) {
+    return "Lễ tân tạo lịch hẹn trực tiếp và đã check-in cho khách.";
+  }
+  if (lower.includes("created appointment with status pending_payment")) {
+    return "Đăng ký lịch hẹn thành công (Chờ khách hàng thanh toán cọc).";
+  }
+  if (lower.includes("created appointment with status confirmed")) {
+    return "Đăng ký lịch hẹn thành công (Đã xác nhận).";
+  }
+  if (lower.includes("invoice marked paid by receptionist")) {
+    return "Lễ tân xác nhận thanh toán trực tiếp thành công.";
+  }
+  if (lower.includes("walk-in appointment marked confirmed without invoice payment")) {
+    return "Lịch hẹn trực tiếp được xác nhận không cần thanh toán trước.";
+  }
+  if (lower.includes("appointment confirmed by receptionist")) {
+    return "Lễ tân phê duyệt xác nhận lịch hẹn thành công.";
+  }
+  if (lower.includes("payment completed via vnpay")) {
+    return "Thanh toán trực tuyến thành công qua cổng VNPay.";
+  }
+  if (lower.includes("payment completed via payos")) {
+    return "Thanh toán trực tuyến thành công qua cổng PayOS.";
+  }
+  if (lower.includes("status updated by system auto-expire due to payment failure or timeout")) {
+    return "Hệ thống tự động hủy lịch do hết hạn chờ thanh toán cọc.";
+  }
+  if (lower.includes("status updated by system auto-expire")) {
+    return "Hệ thống tự động hủy lịch do hết hạn chờ thanh toán.";
+  }
+  if (lower.includes("appointment rescheduled")) {
+    return "Dời lịch hẹn sang thời gian mới thành công.";
+  }
+  if (lower.includes("rescheduled successfully")) {
+    return "Dời lịch hẹn sang thời gian mới thành công.";
+  }
+  if (lower.includes("checked in by receptionist")) {
+    return "Khách hàng đã check-in tại quầy chi nhánh.";
+  }
+  if (lower.includes("changed status to in_progress")) {
+    return "Bắt đầu thực hiện liệu trình chăm sóc.";
+  }
+  if (lower.includes("changed status to completed")) {
+    return "Hoàn thành toàn bộ liệu trình dịch vụ.";
+  }
+  if (lower.includes("appointment status updated to no_show")) {
+    return "Khách hàng không đến đúng giờ hẹn (Hệ thống ghi nhận vắng mặt).";
+  }
+  if (lower.includes("appointment cancelled")) {
+    return "Lịch hẹn đã bị hủy.";
+  }
+  if (lower.includes("refund request created")) {
+    return "Gửi yêu cầu hoàn tiền thành công.";
+  }
+  if (lower.includes("refund approved")) {
+    return "Yêu cầu hoàn tiền đã được phê duyệt.";
+  }
+  if (lower.includes("refund completed")) {
+    return "Đã hoàn thành thủ tục trả lại tiền.";
+  }
+
+  return reason;
 }
 
 function formatTime(value) {
@@ -143,6 +230,7 @@ export default function ReceptionistAppointmentDetail() {
   
   const canNoShow = ["CONFIRMED", "PENDING", "PENDING_PAYMENT"].includes(status);
   const canEdit = !["COMPLETED", "CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(status);
+  const canReschedule = !["CHECKED_IN", "IN_PROGRESS", "COMPLETED", "CANCELLED", "REFUND_PENDING", "NO_SHOW"].includes(status) && !item?.CheckedInAt;
 
   const canMarkPaid =
     item?.InvoiceId &&
@@ -223,6 +311,36 @@ export default function ReceptionistAppointmentDetail() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(err.response?.data?.message || "Xác nhận thanh toán thất bại");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCompleteService() {
+    try {
+      setSaving(true);
+      setError("");
+      setSuccess("");
+      await axiosClient.put(`/receptionist/appointments/${id}/complete`);
+      const isPaid = item?.PaymentStatus === "PAID" || item?.CustomerPackageId;
+      if (isPaid) {
+        setSuccess("Đã hoàn thành dịch vụ & Checkout thành công!");
+        await load();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        setSuccess("Đã hoàn thành dịch vụ! Đang chuyển đến trang thanh toán...");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(() => {
+          if (item?.InvoiceId) {
+            navigate(`/receptionist/invoices/${item.InvoiceId}`);
+          } else {
+            navigate(`/receptionist/invoices`);
+          }
+        }, 1000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Thao tác thất bại");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSaving(false);
     }
@@ -500,7 +618,7 @@ export default function ReceptionistAppointmentDetail() {
       setError("");
       setSuccess("");
 
-      await axiosClient.put(`/receptionist/appointments/${id}/reschedule`, {
+      const res = await axiosClient.put(`/receptionist/appointments/${id}/reschedule`, {
         appointmentDate: rescheduleForm.appointmentDate,
         startTime: rescheduleForm.startTime,
         technicianId: Number(rescheduleForm.technicianId),
@@ -508,7 +626,7 @@ export default function ReceptionistAppointmentDetail() {
 
       await load();
       setShowReschedule(false);
-      setSuccess("Đổi lịch hẹn và phân công kỹ thuật viên thành công!");
+      setSuccess(res.data?.message || res.data?.data?.message || "Đã gửi đề xuất đổi lịch hẹn tới khách hàng để xác nhận!");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setError(err.response?.data?.message || "Đổi lịch thất bại");
@@ -707,7 +825,7 @@ export default function ReceptionistAppointmentDetail() {
                               {statusLabel(h.OldStatus) || "Khởi tạo"} →{" "}
                               {statusLabel(h.NewStatus)}
                             </b>
-                            <p style={{ margin: "4px 0" }}>{h.Reason || "Không có lý do chi tiết"}</p>
+                            <p style={{ margin: "4px 0" }}>{formatReason(h.Reason)}</p>
                             <small style={{ color: "#7d837d" }}>
                               Thực hiện: {h.ChangedByName || "Hệ thống"} •{" "}
                               {h.ChangedAt ? formatDateTime(h.ChangedAt) : ""}
@@ -957,30 +1075,33 @@ export default function ReceptionistAppointmentDetail() {
                     className="ra-btn green"
                     type="button"
                     disabled={saving}
-                    onClick={() =>
-                      runAction(
-                        `/receptionist/appointments/${id}/complete`,
-                        "Đã hoàn thành lịch hẹn thành công!",
-                      )
-                    }
+                    onClick={handleCompleteService}
                   >
-                    ★ Hoàn thành lịch hẹn
+                    {item?.PaymentStatus === "PAID" || item?.CustomerPackageId
+                      ? "★ Hoàn thành & Checkout"
+                      : "★ Hoàn thành & Thanh toán"}
                   </button>
                 )}
 
-                {canCheckout && (
+                {canCheckout && item?.PaymentStatus !== "PAID" && (
                   <button
                     className="ra-btn primary"
                     type="button"
                     disabled={saving}
-                    onClick={handleCheckout}
+                    onClick={() => {
+                      if (item?.InvoiceId) {
+                        navigate(`/receptionist/invoices/${item.InvoiceId}`);
+                      } else {
+                        navigate(`/receptionist/invoices`);
+                      }
+                    }}
                     style={{ background: "#d91f68", color: "#fff", fontWeight: "bold" }}
                   >
-                    🔔 Check-out & Khách rời salon
+                    💳 Đi tới thanh toán tính tiền
                   </button>
                 )}
 
-                {canEdit && (
+                {canReschedule && (
                   <button
                     className="ra-btn light"
                     type="button"

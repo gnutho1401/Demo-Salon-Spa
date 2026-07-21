@@ -31,6 +31,7 @@ async function getAll() {
         AND rv.Status = 'APPROVED'
     ) r
     WHERE e.Status = 'ACTIVE'
+      AND u.RoleId = 4
     ORDER BY e.EmployeeId ASC
   `);
 

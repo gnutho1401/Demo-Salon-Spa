@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 import axiosClient from "../../api/axiosClient";
 
 const emptyForm = {
@@ -51,6 +51,7 @@ export default function AdminVouchers() {
   const [editingId, setEditingId] = useState(null);
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [scrollTargetId, setScrollTargetId] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -62,42 +63,42 @@ export default function AdminVouchers() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 180;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+      gridRef.current.scrollIntoView({ block: "start", behavior: "instant" });
     }
   };
 
-  const scrollToItem = (id, type = "voucher") => {
-    setTimeout(() => {
-      const element = document.getElementById(`${type}-card-${id}`);
-      if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - 180;
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth"
-        });
-        element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
-        element.style.borderColor = "#d6b57e";
-        element.style.boxShadow = "0 0 25px 6px rgba(214, 181, 126, 0.6)";
-        setTimeout(() => {
-          element.style.borderColor = "";
-          element.style.boxShadow = "";
-        }, 3000);
-      } else {
-        scrollToGrid();
-      }
-    }, 150);
+  const triggerScrollToItem = (id) => {
+    if (!id) return;
+    setScrollTargetId(id);
   };
 
-  async function load() {
+  useLayoutEffect(() => {
+    if (!scrollTargetId) return;
+
+    const el = document.getElementById(`voucher-card-${scrollTargetId}`);
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+
+      el.style.transition = "all 0.3s ease";
+      el.style.borderColor = "#d6b57e";
+      el.style.boxShadow = "0 0 30px 8px rgba(214, 181, 126, 0.8)";
+      el.style.transform = "scale(1.02)";
+
+      const timer = setTimeout(() => {
+        el.style.borderColor = "";
+        el.style.boxShadow = "";
+        el.style.transform = "";
+        setScrollTargetId(null);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [items, scrollTargetId]);
+
+  async function load(isSilent = false) {
     try {
       setError("");
-      setLoading(true);
+      if (!isSilent && items.length === 0) setLoading(true);
 
       const res = await axiosClient.get("/admin/vouchers", {
         params: {
@@ -280,9 +281,9 @@ export default function AdminVouchers() {
       }
 
       setShowModal(false);
-      await load();
+      await load(true);
       if (voucherId) {
-        scrollToItem(voucherId, "voucher");
+        triggerScrollToItem(voucherId);
       } else {
         scrollToGrid();
       }
@@ -297,7 +298,7 @@ export default function AdminVouchers() {
 
   async function changeStatus(item, nextStatus) {
     const ok = window.confirm(
-      `Bạn muốn đổi trạng thái voucher "${item.Code}" thành ${nextStatus}?`,
+      `Bạn muốn đổi trạng thái mã "${item.Code}" thành ${nextStatus}?`,
     );
     if (!ok) return;
 
@@ -306,8 +307,8 @@ export default function AdminVouchers() {
       await axiosClient.patch(`/admin/vouchers/${item.VoucherId}/status`, {
         status: nextStatus,
       });
-      await load();
-      scrollToItem(item.VoucherId, "voucher");
+      await load(true);
+      triggerScrollToItem(item.VoucherId);
     } catch (err) {
       setError(
         err?.response?.data?.message ||

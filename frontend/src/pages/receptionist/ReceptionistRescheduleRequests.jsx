@@ -224,6 +224,9 @@ export default function ReceptionistRescheduleRequests() {
           .rx-badge-pending { background: #feebc8; color: #c05621; }
           .rx-badge-approved { background: #c6f6d5; color: #22543d; }
           .rx-badge-rejected { background: #fed7d7; color: #9b2c2c; }
+          .rx-badge-awaiting-customer { background: #dbeafe; color: #1e40af; }
+          .rx-badge-customer-rejected { background: #fde8e8; color: #991b1b; }
+          .rx-badge-system-cancelled { background: #fee2e2; color: #991b1b; }
 
           /* Details Columns */
           .rx-card-body {
@@ -382,8 +385,13 @@ export default function ReceptionistRescheduleRequests() {
                       <span style={{ fontSize: "0.75rem", color: "#a0aec0" }}>Gửi lúc: {createdAtDate}</span>
                     </div>
 
-                    <span className={`rx-card-badge rx-badge-${String(req.Status).toLowerCase()}`}>
-                      {req.Status === "PENDING" ? "Chờ duyệt" : req.Status === "APPROVED" ? "Đã duyệt" : "Bị từ chối"}
+                    <span className={`rx-card-badge rx-badge-${String(req.Status).toLowerCase().replaceAll("_", "-")}`}>
+                      {req.Status === "PENDING" ? "Chờ duyệt"
+                        : req.Status === "APPROVED" ? "Đã duyệt"
+                        : req.Status === "AWAITING_CUSTOMER" ? "Chờ KH xác nhận"
+                        : req.Status === "CUSTOMER_REJECTED" ? "KH từ chối"
+                        : req.Status === "SYSTEM_CANCELLED" ? "Tự động hủy (Trùng lịch)"
+                        : "Bị từ chối"}
                     </span>
                   </div>
 

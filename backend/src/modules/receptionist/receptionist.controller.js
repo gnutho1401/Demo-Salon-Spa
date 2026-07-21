@@ -599,4 +599,13 @@ module.exports = {
   getTechnicianWorkload,
   assignTechnician,
   transferAppointments,
+  updateAppointmentServiceStatus: async (req, res) => {
+    try {
+      const data = await service.updateAppointmentServiceStatus(req.params.id, req.body.status);
+      return success(res, data, "Cập nhật trạng thái bước dịch vụ thành công");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
 };
+

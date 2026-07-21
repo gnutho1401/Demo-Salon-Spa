@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
 const DEFAULT_IMAGE = "/images/promotion-default.jpg";
@@ -50,10 +50,13 @@ export default function AdminPromotions() {
   const [editingId, setEditingId] = useState(null);
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [scrollTargetId, setScrollTargetId] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   const [detailServices, setDetailServices] = useState([]);
   const [loadingDetailSvc, setLoadingDetailSvc] = useState(false);
@@ -64,42 +67,42 @@ export default function AdminPromotions() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 180;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+      gridRef.current.scrollIntoView({ block: "start", behavior: "instant" });
     }
   };
 
-  const scrollToItem = (id, type = "promotion") => {
-    setTimeout(() => {
-      const element = document.getElementById(`${type}-card-${id}`);
-      if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - 180;
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth"
-        });
-        element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
-        element.style.borderColor = "#d6b57e";
-        element.style.boxShadow = "0 0 20px 5px rgba(214, 181, 126, 0.5)";
-        setTimeout(() => {
-          element.style.borderColor = "";
-          element.style.boxShadow = "";
-        }, 3000);
-      } else {
-        scrollToGrid();
-      }
-    }, 150);
+  const triggerScrollToItem = (id) => {
+    if (!id) return;
+    setScrollTargetId(id);
   };
 
-  async function load() {
+  useLayoutEffect(() => {
+    if (!scrollTargetId) return;
+
+    const el = document.getElementById(`promotion-card-${scrollTargetId}`);
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+
+      el.style.transition = "all 0.3s ease";
+      el.style.borderColor = "#d6b57e";
+      el.style.boxShadow = "0 0 30px 8px rgba(214, 181, 126, 0.8)";
+      el.style.transform = "scale(1.02)";
+
+      const timer = setTimeout(() => {
+        el.style.borderColor = "";
+        el.style.boxShadow = "";
+        el.style.transform = "";
+        setScrollTargetId(null);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [items, scrollTargetId]);
+
+  async function load(isSilent = false) {
     try {
       setError("");
-      setLoading(true);
+      if (!isSilent && items.length === 0) setLoading(true);
 
       const [listRes, serviceRes] = await Promise.all([
         axiosClient.get("/admin/promotions", {
@@ -200,6 +203,7 @@ export default function AdminPromotions() {
 
   async function openDetail(item) {
     setSelected(item);
+    scrollToItem(item.PromotionId, "promotion");
     setDetailServices([]);
     setLoadingDetailSvc(true);
     try {
@@ -227,6 +231,8 @@ export default function AdminPromotions() {
     setEditingId(null);
     setForm(emptyForm);
     setSelectedServiceIds([]);
+    setImageFile(null);
+    setImagePreview("");
     setShowModal(true);
   }
 
@@ -255,6 +261,8 @@ export default function AdminPromotions() {
       );
 
       setShowModal(true);
+      setImageFile(null);
+      setImagePreview(item.ImageUrl ? resolveFileUrl(item.ImageUrl) : "");
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -308,10 +316,20 @@ export default function AdminPromotions() {
         promoId = created?.PromotionId || created?.id;
       }
 
+      if (imageFile && promoId) {
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        await axiosClient.post(`/admin/promotions/${promoId}/image`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
       setShowModal(false);
-      await load();
+      setImageFile(null);
+      setImagePreview("");
+      await load(true);
       if (promoId) {
-        scrollToItem(promoId, "promotion");
+        triggerScrollToItem(promoId);
       } else {
         scrollToGrid();
       }
@@ -328,7 +346,7 @@ export default function AdminPromotions() {
 
   async function changeStatus(item, nextStatus) {
     const ok = window.confirm(
-      `Bạn muốn đổi trạng thái "${item.Title}" thành ${nextStatus}?`,
+      `Bạn chắc chắn muốn chuyển trạng thái khuyến mãi "${item.Title}" sang ${nextStatus}?`,
     );
     if (!ok) return;
 
@@ -337,8 +355,8 @@ export default function AdminPromotions() {
       await axiosClient.patch(`/admin/promotions/${item.PromotionId}/status`, {
         status: nextStatus,
       });
-      await load();
-      scrollToItem(item.PromotionId, "promotion");
+      await load(true);
+      triggerScrollToItem(item.PromotionId);
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -1340,15 +1358,101 @@ export default function AdminPromotions() {
                 </select>
               </label>
 
-              <label>
-                ImageUrl
-                <input
-                  value={form.imageUrl}
-                  onChange={(e) =>
-                    setForm({ ...form, imageUrl: e.target.value })
-                  }
-                  placeholder="/images/promotion-default.jpg"
-                />
+              <label className="admin-form-wide">
+                Ảnh khuyến mãi
+                <div
+                  style={{
+                    border: '2px dashed #cbd5e1',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    background: '#f8fafc',
+                    transition: 'all 0.2s',
+                    position: 'relative',
+                  }}
+                  onClick={() => document.getElementById('promo-image-input')?.click()}
+                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#a0573a'; }}
+                  onDragLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && file.type.startsWith('image/')) {
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
+                >
+                  {(imagePreview || form.imageUrl) ? (
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <img
+                        src={imagePreview || resolveFileUrl(form.imageUrl)}
+                        alt="Preview"
+                        style={{
+                          maxHeight: '140px',
+                          maxWidth: '100%',
+                          borderRadius: '8px',
+                          objectFit: 'cover',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setImageFile(null);
+                          setImagePreview('');
+                          setForm({ ...form, imageUrl: '' });
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '-8px',
+                          right: '-8px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: '#ef4444',
+                          color: '#fff',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          display: 'grid',
+                          placeItems: 'center',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                        }}
+                      >
+                        ×
+                      </button>
+                      <p style={{ margin: '8px 0 0', fontSize: '11px', color: '#64748b' }}>
+                        {imageFile ? imageFile.name : 'Nhấn để thay ảnh'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <span style={{ fontSize: '36px', display: 'block', marginBottom: '8px' }}>📸</span>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
+                        Kéo thả ảnh vào đây hoặc nhấn để chọn
+                      </p>
+                      <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>
+                        JPG, PNG, WEBP • Tối đa 5MB
+                      </p>
+                    </div>
+                  )}
+                  <input
+                    id="promo-image-input"
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setImageFile(file);
+                        setImagePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  />
+                </div>
               </label>
 
               <label className="admin-form-wide">

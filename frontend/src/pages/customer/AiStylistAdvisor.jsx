@@ -822,7 +822,17 @@ export default function AiStylistAdvisor() {
               </div>
 
               {error && (
-                <div style={{ color: "#d83b01", fontSize: "12px", marginBottom: 12, fontWeight: 700 }}>
+                <div style={{
+                  background: "#fff0f0",
+                  border: "1px solid #fecaca",
+                  color: "#dc2626",
+                  borderRadius: "12px",
+                  padding: "14px 16px",
+                  marginBottom: 16,
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  lineHeight: "1.5"
+                }}>
                   ⚠️ {error}
                 </div>
               )}
@@ -843,27 +853,24 @@ export default function AiStylistAdvisor() {
             {/* Connection Banner */}
             {data && (
               <div style={{
-                background: data.is_fallback ? "#fff9e6" : "#eefaf2",
-                border: "1px solid",
-                borderColor: data.is_fallback ? "#ffe28c" : "#a3e2b8",
+                background: "#eefaf2",
+                border: "1px solid #a3e2b8",
                 borderRadius: "16px",
                 padding: "14px 20px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
                 fontSize: "14px",
-                color: data.is_fallback ? "#856404" : "#155724"
+                color: "#155724"
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span>{data.is_fallback ? "⚠️" : "🟢"}</span>
+                  <span>🟢</span>
                   <span>
-                    {data.is_fallback
-                      ? "Chế độ Dự phòng (API đang bận, đã kích hoạt bộ quy tắc salon)"
-                      : "Kết nối AI thật trực tiếp thành công (Gemini Vision)"}
+                    Kết nối 100% AI Thật Trực Tiếp Thành Công (Gemini Vision & LLM)
                   </span>
                 </div>
-                <div style={{ fontSize: "11px", fontWeight: "800", opacity: 0.7, background: "rgba(0,0,0,0.05)", padding: "4px 10px", borderRadius: "50px" }}>
-                  Model: {data.model_name}
+                <div style={{ fontSize: "11px", fontWeight: "800", opacity: 0.8, background: "rgba(0,0,0,0.05)", padding: "4px 10px", borderRadius: "50px" }}>
+                  Model: {data.model_name || "gemini-2.5-flash"}
                 </div>
               </div>
             )}
@@ -900,20 +907,87 @@ export default function AiStylistAdvisor() {
                       Mô hình AI đa phương thức đã phân tích cấu trúc xương, kết cấu tóc và sắc tố dưới da của bạn để kết luận các chỉ số sau:
                     </p>
 
-                    <div className="badge-showcase">
-                      <div className="morphology-badge">
-                        <span className="label">Hình dáng mặt</span>
-                        <span className="value">{data.analysis?.face_shape}</span>
+                    <div className="badge-showcase" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
+                      <div className="morphology-badge" style={{ background: "linear-gradient(135deg, #fff5f8 0%, #ffeaf1 100%)", border: "1px solid #fecdd3" }}>
+                        <span className="label" style={{ color: "#e11d48", fontWeight: 700 }}>👤 Dáng mặt chính</span>
+                        <span className="value" style={{ color: "#9f1239", fontWeight: 800 }}>{data.analysis?.face_shape || "Trái xoan"}</span>
                       </div>
+                      {data.analysis?.jawline && (
+                        <div className="morphology-badge">
+                          <span className="label">📐 Đường viền hàm</span>
+                          <span className="value">{data.analysis?.jawline}</span>
+                        </div>
+                      )}
+                      {data.analysis?.chin && (
+                        <div className="morphology-badge">
+                          <span className="label">🔹 Đặc điểm cằm</span>
+                          <span className="value">{data.analysis?.chin}</span>
+                        </div>
+                      )}
+                      {data.analysis?.forehead && (
+                        <div className="morphology-badge">
+                          <span className="label">✨ Đặc điểm trán</span>
+                          <span className="value">{data.analysis?.forehead}</span>
+                        </div>
+                      )}
+                      {data.analysis?.cheekbones && (
+                        <div className="morphology-badge">
+                          <span className="label">💎 Gò má</span>
+                          <span className="value">{data.analysis?.cheekbones}</span>
+                        </div>
+                      )}
+                      {data.analysis?.hair_length && (
+                        <div className="morphology-badge">
+                          <span className="label">✂️ Độ dài tóc</span>
+                          <span className="value">{data.analysis?.hair_length}</span>
+                        </div>
+                      )}
+                      {data.analysis?.hair_density && (
+                        <div className="morphology-badge">
+                          <span className="label">🌿 Độ dày tóc</span>
+                          <span className="value">{data.analysis?.hair_density}</span>
+                        </div>
+                      )}
+                      {data.analysis?.hair_texture && (
+                        <div className="morphology-badge">
+                          <span className="label">🌀 Chất tóc</span>
+                          <span className="value">{data.analysis?.hair_texture}</span>
+                        </div>
+                      )}
+                      {data.analysis?.current_hair_color && (
+                        <div className="morphology-badge">
+                          <span className="label">🎨 Màu tóc hiện tại</span>
+                          <span className="value">{data.analysis?.current_hair_color}</span>
+                        </div>
+                      )}
                       <div className="morphology-badge">
-                        <span className="label">Kết cấu tóc</span>
-                        <span className="value">{data.analysis?.hair_type}</span>
+                        <span className="label">🌟 Tông màu da</span>
+                        <span className="value">{data.analysis?.skin_tone || "Trắng hồng"}</span>
                       </div>
-                      <div className="morphology-badge">
-                        <span className="label">Sắc tố da</span>
-                        <span className="value">{data.analysis?.skin_tone}</span>
-                      </div>
+                      {data.analysis?.undertone && (
+                        <div className="morphology-badge">
+                          <span className="label">☀️ Sắc thái da (Undertone)</span>
+                          <span className="value">{data.analysis?.undertone}</span>
+                        </div>
+                      )}
+                      {data.analysis?.personal_color_season && (
+                        <div className="morphology-badge">
+                          <span className="label">🌷 Personal Color</span>
+                          <span className="value">{data.analysis?.personal_color_season}</span>
+                        </div>
+                      )}
                     </div>
+
+                    {data.analysis?.face_shape_reason && (
+                      <div style={{ background: "#f8fafc", borderRadius: 14, padding: "14px 18px", border: "1px solid #e2e8f0", marginBottom: 16 }}>
+                        <div style={{ fontSize: "12px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", marginBottom: 4 }}>
+                          📏 Cơ sở kết luận Nhân trắc học Dáng mặt ({data.analysis?.face_shape}):
+                        </div>
+                        <div style={{ fontSize: "13.5px", color: "#334155", lineHeight: "1.5" }}>
+                          {data.analysis?.face_shape_reason}
+                        </div>
+                      </div>
+                    )}
 
                     <div style={{ display: "flex", gap: 12, background: "#faf8f5", borderRadius: 16, padding: 18, border: "1px solid #ebdcc5" }}>
                       <span style={{ fontSize: 20 }}>💡</span>

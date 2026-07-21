@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const emptyForm = {
   FullName: "",
@@ -159,6 +159,9 @@ export default function AdminUsers() {
   const [showModal, setShowModal] = useState(false);
   const [passwordModal, setPasswordModal] = useState(null);
   const [newPassword, setNewPassword] = useState("");
+  const [scrollTargetId, setScrollTargetId] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -171,42 +174,42 @@ export default function AdminUsers() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 180;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+      gridRef.current.scrollIntoView({ block: "start", behavior: "instant" });
     }
   };
 
-  const scrollToItem = (id) => {
-    setTimeout(() => {
-      const element = document.getElementById(`user-card-${id}`);
-      if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - 180;
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth"
-        });
-        element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
-        element.style.borderColor = "#d6b57e";
-        element.style.boxShadow = "0 0 25px 6px rgba(214, 181, 126, 0.6)";
-        setTimeout(() => {
-          element.style.borderColor = "";
-          element.style.boxShadow = "";
-        }, 3000);
-      } else {
-        scrollToGrid();
-      }
-    }, 150);
+  const triggerScrollToItem = (id) => {
+    if (!id) return;
+    setScrollTargetId(id);
   };
 
-  async function load() {
+  useLayoutEffect(() => {
+    if (!scrollTargetId) return;
+
+    const el = document.getElementById(`user-card-${scrollTargetId}`);
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+
+      el.style.transition = "all 0.3s ease";
+      el.style.borderColor = "#d6b57e";
+      el.style.boxShadow = "0 0 30px 8px rgba(214, 181, 126, 0.8)";
+      el.style.transform = "scale(1.02)";
+
+      const timer = setTimeout(() => {
+        el.style.borderColor = "";
+        el.style.boxShadow = "";
+        el.style.transform = "";
+        setScrollTargetId(null);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [items, scrollTargetId]);
+
+  async function load(isSilent = false) {
     try {
       setError("");
-      setLoading(true);
+      if (!isSilent && items.length === 0) setLoading(true);
 
       const [userRes, roleRes, branchRes, mlRes] = await Promise.all([
         axiosClient.get("/admin/users", {
@@ -306,9 +309,11 @@ export default function AdminUsers() {
   function openCreate() {
     setEditingId(null);
     setForm(emptyForm);
-    setShowModal(true);
     setError("");
     setSuccessMsg("");
+    setImageFile(null);
+    setImagePreview("");
+    setShowModal(true);
   }
 
   function openEdit(item) {
@@ -339,7 +344,10 @@ export default function AdminUsers() {
       YearsOfExperience: item.YearsOfExperience || 0,
       Bio: item.Bio || "",
     });
+    setImageFile(null);
+    setImagePreview(item.AvatarUrl ? resolveFileUrl(item.AvatarUrl) : "");
     setShowModal(true);
+    triggerScrollToItem(item.UserId);
   }
 
   function validate() {
@@ -408,10 +416,20 @@ export default function AdminUsers() {
         uId = created?.UserId || created?.id;
       }
 
+      if (imageFile && uId) {
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        await axiosClient.post(`/admin/users/${uId}/avatar`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
       setShowModal(false);
-      await load();
+      setImageFile(null);
+      setImagePreview("");
+      await load(true);
       if (uId) {
-        scrollToItem(uId);
+        triggerScrollToItem(uId);
       } else {
         scrollToGrid();
       }
@@ -424,17 +442,39 @@ export default function AdminUsers() {
     }
   }
 
-  async function toggleStatus(item) {
+  async function changeStatus(item, nextStatus) {
+    const ok = window.confirm(
+      `Bạn chắc chắn muốn chuyển trạng thái tài khoản "${item.FullName}" sang ${nextStatus}?`,
+    );
+    if (!ok) return;
+
     try {
       setError("");
       setSuccessMsg("");
-      const next = item.Status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-      await axiosClient.patch(`/admin/users/${item.UserId}/status`, { status: next });
-      await load();
-      scrollToItem(item.UserId);
+      await axiosClient.patch(`/admin/users/${item.UserId}/status`, { status: nextStatus });
+      await load(true);
+      triggerScrollToItem(item.UserId);
     } catch (err) {
       setError(
         err?.response?.data?.message || err?.message || "Đổi trạng thái thất bại",
+      );
+    }
+  }
+
+  async function removeUser(item) {
+    const ok = window.confirm(
+      `Bạn chắc chắn muốn xóa người dùng "${item.FullName}" (${item.Email})?`,
+    );
+    if (!ok) return;
+
+    try {
+      setError("");
+      setSuccessMsg("");
+      await axiosClient.delete(`/admin/users/${item.UserId}`);
+      await load(true);
+    } catch (err) {
+      setError(
+        err?.response?.data?.message || err?.message || "Xóa người dùng thất bại",
       );
     }
   }
@@ -450,19 +490,18 @@ export default function AdminUsers() {
     try {
       setSaving(true);
       setError("");
-      setSuccessMsg("");
 
       await axiosClient.patch(`/admin/users/${passwordModal.UserId}/password`, {
         password: newPassword,
       });
 
-      setSuccessMsg(`Đặt lại mật khẩu thành công cho ${passwordModal.Email}`);
       setPasswordModal(null);
       setNewPassword("");
-      scrollToItem(passwordModal.UserId);
+      await load(true);
+      triggerScrollToItem(passwordModal.UserId);
     } catch (err) {
       setError(
-        err?.response?.data?.message || err?.message || "Đặt lại mật khẩu thất bại",
+        err?.response?.data?.message || err?.message || "Đổi mật khẩu thất bại",
       );
     } finally {
       setSaving(false);
@@ -1157,7 +1196,7 @@ export default function AdminUsers() {
                   )}
                 </div>
 
-                <div className="admin-user-card-footer">
+                <div className="admin-user-card-footer" style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                   <button className="card-btn primary" onClick={() => setSelected(item)}>
                     Hồ sơ
                   </button>
@@ -1167,8 +1206,22 @@ export default function AdminUsers() {
                   <button className="card-btn" onClick={() => setPasswordModal(item)}>
                     Pass 🔑
                   </button>
-                  <button className="card-btn danger" onClick={() => toggleStatus(item)}>
-                    Khóa/Mở
+                  {item.Status !== "ACTIVE" ? (
+                    <button className="card-btn" onClick={() => changeStatus(item, "ACTIVE")}>
+                      Mở khóa
+                    </button>
+                  ) : (
+                    <button className="card-btn" onClick={() => changeStatus(item, "INACTIVE")}>
+                      Tạm khóa
+                    </button>
+                  )}
+                  {item.Status !== "BANNED" && (
+                    <button className="card-btn danger" onClick={() => changeStatus(item, "BANNED")}>
+                      Ban
+                    </button>
+                  )}
+                  <button className="card-btn danger" onClick={() => removeUser(item)}>
+                    Xóa
                   </button>
                 </div>
               </div>
@@ -1374,13 +1427,98 @@ export default function AdminUsers() {
                     />
                   </label>
                 ) : null}
-                <label>
-                  Đường dẫn avatar
-                  <input
-                    value={form.AvatarUrl}
-                    onChange={(e) => setForm({ ...form, AvatarUrl: e.target.value })}
-                    placeholder="/uploads/avatars/user-1.png"
-                  />
+                <label style={{ gridColumn: "1 / -1" }}>
+                  Hình ảnh / Avatar *
+                  <div
+                    style={{
+                      border: '2px dashed #ebdcc5',
+                      borderRadius: '16px',
+                      padding: '14px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: '#faf8f5',
+                      transition: 'all 0.2s',
+                      position: 'relative',
+                      marginTop: '4px'
+                    }}
+                    onClick={() => document.getElementById('user-avatar-input')?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#d6b57e'; }}
+                    onDragLeave={(e) => { e.currentTarget.style.borderColor = '#ebdcc5'; }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = '#ebdcc5';
+                      const file = e.dataTransfer.files?.[0];
+                      if (file && file.type.startsWith('image/')) {
+                        setImageFile(file);
+                        setImagePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  >
+                    {(imagePreview || form.AvatarUrl) ? (
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <img
+                          src={imagePreview || resolveFileUrl(form.AvatarUrl)}
+                          alt="Preview"
+                          style={{
+                            maxHeight: '100px',
+                            maxWidth: '100%',
+                            borderRadius: '50%',
+                            width: '100px',
+                            height: '100px',
+                            objectFit: 'cover',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImageFile(null);
+                            setImagePreview('');
+                            setForm({ ...form, AvatarUrl: '' });
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '-4px',
+                            right: '-4px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: '#d83b01',
+                            color: '#fff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            display: 'grid',
+                            placeItems: 'center',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <span style={{ fontSize: '28px', display: 'block', marginBottom: '2px' }}>👤</span>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#5c4a3c', fontWeight: 600 }}>
+                          Kéo thả ảnh hoặc nhấn để chọn avatar
+                        </p>
+                      </div>
+                    )}
+                    <input
+                      id="user-avatar-input"
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setImageFile(file);
+                          setImagePreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </div>
                 </label>
 
                 {/* Sub-form fields */}

@@ -24,7 +24,7 @@ app.use("/api/appointments", require("./modules/appointments/appointments.routes
 app.use("/api/payments", require("./modules/payments/payments.routes"));
 app.use("/api/membership", require("./modules/membership/membership.routes"));
 app.use("/api/notifications", require("./modules/notifications/notifications.routes"));
-app.use("/api/ai", require("./modules/ai/ai.routes"));
+app.use("/api/ai", require("./modules/ai/general/ai.routes"));
 app.use("/api/reports", require("./modules/reports/reports.routes"));
 app.use("/api/admin", require("./modules/admin/admin.routes"));
 app.use("/api/admin/employees", require("./modules/admin/adminEmployees.routes"));

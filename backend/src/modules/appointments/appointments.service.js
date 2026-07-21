@@ -215,11 +215,27 @@ async function getRescheduleInfo(id, user = null) {
     );
   }
 
-  const isPendingFollowUp = currentStatus === "PENDING";
-
-  ensureNotTooClose(appointment.AppointmentDate, appointment.StartTime, "đổi");
+  if (currentStatus === "CONFIRMED") {
+    ensureNotTooClose(appointment.AppointmentDate, appointment.StartTime, "đổi");
+  }
 
   const pool = await connectDB();
+
+  const followUpCheck = await pool.request()
+    .input("AppointmentId", sql.Int, id)
+    .query(`
+      SELECT TOP 1 
+        tn.service_date_time, 
+        s.ServiceName, 
+        sc.CategoryName
+      FROM TreatmentNotesV2 tn
+      JOIN Services s ON tn.service_id = s.ServiceId
+      JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
+      WHERE tn.follow_up_appointment_id = @AppointmentId
+    `);
+
+  const parentNote = followUpCheck.recordset[0];
+  const isPendingFollowUp = !!parentNote;
 
   const servicesResult = await pool
     .request()
@@ -251,7 +267,7 @@ async function getRescheduleInfo(id, user = null) {
         u.FullName AS EmployeeName,
         e.Position,
         e.Specialization,
-        e.ImageUrl,
+        COALESCE(e.ImageUrl, u.AvatarUrl) AS ImageUrl,
         e.BranchId,
         b.BranchName,
         b.Address AS BranchAddress,
@@ -295,10 +311,24 @@ async function getRescheduleInfo(id, user = null) {
     Services: servicesResult.recordset,
     AvailableEmployees: availableEmployees,
     isPendingFollowUp,
-    suggestedDate: isPendingFollowUp && appointment.AppointmentDate ? (() => {
-      const d = new Date(appointment.AppointmentDate);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    })() : null,
+    suggestedDate: (() => {
+      if (!parentNote) return null;
+      const originalDate = new Date(parentNote.service_date_time);
+      const cat = (parentNote.CategoryName || "").toLowerCase();
+      const svc = (parentNote.ServiceName || "").toLowerCase();
+      
+      let days = 21;
+      if (cat.includes("nail") || svc.includes("nail") || svc.includes("móng")) {
+        days = 28;
+      } else if (cat.includes("massage") || svc.includes("massage") || svc.includes("thư giãn")) {
+        days = 7;
+      } else if (cat.includes("skincare") || cat.includes("facial") || svc.includes("da mặt") || svc.includes("chăm sóc da")) {
+        days = 14;
+      }
+      
+      originalDate.setDate(originalDate.getDate() + days);
+      return `${originalDate.getFullYear()}-${String(originalDate.getMonth() + 1).padStart(2, "0")}-${String(originalDate.getDate()).padStart(2, "0")}`;
+    })(),
     suggestedStartTime: isPendingFollowUp ? appointment.StartTime : null,
   };
 }
@@ -328,7 +358,9 @@ async function reschedule(id, data = {}, user = null) {
   const isPendingFollowUp = currentStatus === "PENDING";
   const targetStatus = isPendingFollowUp ? "CONFIRMED" : appointment.Status;
 
-  ensureNotTooClose(appointment.AppointmentDate, appointment.StartTime, "đổi");
+  if (currentStatus === "CONFIRMED") {
+    ensureNotTooClose(appointment.AppointmentDate, appointment.StartTime, "đổi");
+  }
 
   const appointmentDate = data.appointmentDate || data.AppointmentDate;
   const employeeId = Number(data.employeeId || data.EmployeeId || appointment.EmployeeId);
@@ -348,6 +380,43 @@ async function reschedule(id, data = {}, user = null) {
   ensureFutureAppointment(appointmentDate, startTime);
 
   const pool = await connectDB();
+
+  // For follow-up appointments, validate suggestedDate constraint
+  const followUpCheck = await pool.request()
+    .input("AppointmentId", sql.Int, id)
+    .query(`
+      SELECT TOP 1 
+        tn.service_date_time, 
+        s.ServiceName, 
+        sc.CategoryName
+      FROM TreatmentNotesV2 tn
+      JOIN Services s ON tn.service_id = s.ServiceId
+      JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
+      WHERE tn.follow_up_appointment_id = @AppointmentId
+    `);
+
+  const parentNote = followUpCheck.recordset[0];
+  if (parentNote) {
+    const originalDate = new Date(parentNote.service_date_time);
+    const cat = (parentNote.CategoryName || "").toLowerCase();
+    const svc = (parentNote.ServiceName || "").toLowerCase();
+    
+    let days = 21;
+    if (cat.includes("nail") || svc.includes("nail") || svc.includes("móng")) {
+      days = 28;
+    } else if (cat.includes("massage") || svc.includes("massage") || svc.includes("thư giãn")) {
+      days = 7;
+    } else if (cat.includes("skincare") || cat.includes("facial") || svc.includes("da mặt") || svc.includes("chăm sóc da")) {
+      days = 14;
+    }
+    
+    originalDate.setDate(originalDate.getDate() + days);
+    const minDateStr = `${originalDate.getFullYear()}-${String(originalDate.getMonth() + 1).padStart(2, "0")}-${String(originalDate.getDate()).padStart(2, "0")}`;
+    
+    if (appointmentDate < minDateStr) {
+      throw new Error(`Ngày đổi lịch không được trước ngày đề xuất tái khám (${originalDate.toLocaleDateString("vi-VN")})!`);
+    }
+  }
 
   const serviceResult = await pool.request().input("AppointmentId", sql.Int, id)
     .query(`
@@ -378,6 +447,13 @@ async function reschedule(id, data = {}, user = null) {
   });
 
   const endTime = addMinutesToTime(startTime, serviceInfo.DurationMinutes);
+
+  // Validate salon opening hours (08:00 - 20:00)
+  const startCheck = startTime.slice(0, 5);
+  const endCheck = endTime.slice(0, 5);
+  if (startCheck < "08:00" || endCheck > "20:00") {
+    throw new Error("Lịch hẹn mới nằm ngoài giờ làm việc của Salon (08:00 - 20:00)");
+  }
 
   await checkEmployeeBusy(
     employeeId,
@@ -427,7 +503,12 @@ async function reschedule(id, data = {}, user = null) {
 
   try {
     const { runAutoMatch } = require("../waiting-list/waiting-list.service");
-    runAutoMatch(appointment.AppointmentDate).catch(err => console.error("Auto match failed:", err.message));
+    runAutoMatch(appointment.AppointmentDate, {
+      startTime: appointment.StartTime,
+      endTime: appointment.EndTime,
+      employeeId: appointment.EmployeeId || (appointment.services && appointment.services[0]?.EmployeeId),
+      branchId: appointment.BranchId
+    }).catch(err => console.error("Auto match failed:", err.message));
   } catch (err) {
     console.error("Auto match trigger failed:", err.message);
   }
@@ -478,6 +559,13 @@ async function create(userId, data) {
   }
 
   const endTime = addMinutesToTime(startTime, selectedService.DurationMinutes);
+
+  // Validate salon opening hours (08:00 - 20:00)
+  const startCheck = startTime.slice(0, 5);
+  const endCheck = endTime.slice(0, 5);
+  if (startCheck < "08:00" || endCheck > "20:00") {
+    throw new Error("Lịch hẹn nằm ngoài giờ làm việc của Salon (08:00 - 20:00)");
+  }
 
   await checkEmployeeBusy(employeeId, appointmentDate, startTime, endTime);
 
@@ -775,6 +863,7 @@ async function getMyAppointments(userId) {
         u.FullName AS EmployeeName,
         e.ImageUrl AS EmployeeImageUrl,
         b.BranchName,
+        b.BranchId,
 
         svc.ServiceNames,
         svc.ServiceIds,
@@ -888,6 +977,14 @@ async function getAll() {
 }
 
 async function getById(id, user = null) {
+  // On-the-fly status check for PayOS pending payments (resolves localhost/webhook-not-received issues)
+  try {
+    const paymentsService = require("../payments/payments.service");
+    await paymentsService.checkAndUpdatePayosStatusByAppointment(id);
+  } catch (err) {
+    console.error("[Auto-Sync] Error during getById check:", err.message);
+  }
+
   const pool = await connectDB();
 
   const result = await pool.request().input("AppointmentId", sql.Int, id)
@@ -1049,14 +1146,20 @@ async function getById(id, user = null) {
                     AND r.ServiceId = s.ServiceId
                 )
                 THEN 1 ELSE 0
-              END AS HasReviewed
+              END AS HasReviewed,
+              aps.EmployeeId,
+              eu.FullName AS TechnicianName,
+              COALESCE(e.ImageUrl, eu.AvatarUrl) AS TechnicianAvatar
             FROM AppointmentServices aps
             JOIN Services s ON aps.ServiceId = s.ServiceId
+            LEFT JOIN Employees e ON aps.EmployeeId = e.EmployeeId
+            LEFT JOIN Users eu ON e.UserId = eu.UserId
             LEFT JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
             WHERE aps.AppointmentId = a.AppointmentId
             ORDER BY aps.AppointmentServiceId ASC
             FOR JSON PATH
           ) AS ServicesJson,
+
 
           (
             SELECT
@@ -1142,7 +1245,146 @@ async function getById(id, user = null) {
     }
   }
 
+  // Fetch linked treatment notes (either direct or parent note if this is a follow-up)
+  const notesResult = await pool.request()
+    .input("AppointmentId", sql.Int, id)
+    .query(`
+      SELECT 
+        tn.id,
+        tn.before_condition,
+        tn.after_result,
+        tn.technician_notes,
+        tn.recommendations,
+        tn.procedure_steps,
+        tn.products_used,
+        tn.before_images,
+        tn.after_images,
+        tn.detailed_images,
+        s.ServiceName,
+        u.FullName AS TechnicianName
+      FROM TreatmentNotesV2 tn
+      JOIN Services s ON tn.service_id = s.ServiceId
+      JOIN Employees e ON tn.technician_id = e.EmployeeId
+      JOIN Users u ON e.UserId = u.UserId
+      WHERE tn.appointment_id = @AppointmentId 
+         OR tn.follow_up_appointment_id = @AppointmentId
+    `);
+
+  const safeParseJson = (str, fallback) => {
+    if (!str) return fallback;
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(fallback) && !Array.isArray(parsed)) {
+        return [parsed];
+      }
+      return parsed;
+    } catch {
+      if (Array.isArray(fallback)) {
+        return [str];
+      }
+      return str;
+    }
+  };
+
+  appointment.TreatmentNotes = (notesResult.recordset || []).map(row => ({
+    ...row,
+    recommendations: safeParseJson(row.recommendations, []),
+    procedure_steps: safeParseJson(row.procedure_steps, []),
+    products_used: safeParseJson(row.products_used, []),
+    before_images: safeParseJson(row.before_images, []),
+    after_images: safeParseJson(row.after_images, []),
+    detailed_images: safeParseJson(row.detailed_images, [])
+  }));
+
   return appointment;
+}
+
+async function deductComboSession(transaction, appointmentId) {
+  // Lấy thông tin lịch hẹn
+  const currentRes = await new sql.Request(transaction)
+    .input("AppointmentId", sql.Int, Number(appointmentId))
+    .query(`
+      SELECT CustomerPackageId FROM Appointments WHERE AppointmentId = @AppointmentId
+    `);
+  const current = currentRes.recordset[0];
+  if (!current || !current.CustomerPackageId) return;
+
+  // Kiểm tra chưa từng trừ buổi cho appointment này
+  const usageCheck = await new sql.Request(transaction)
+    .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
+      SELECT UsageId FROM CustomerPackageUsages
+      WHERE AppointmentId = @AppointmentId AND Status = 'USED'
+    `);
+
+  if (usageCheck.recordset.length === 0) {
+    // Lấy ServiceId từ AppointmentServices
+    const svcResult = await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
+        SELECT TOP 1 ServiceId FROM AppointmentServices
+        WHERE AppointmentId = @AppointmentId
+      `);
+
+    const serviceId = svcResult.recordset[0]?.ServiceId;
+
+    if (serviceId) {
+      // Kiểm tra giới hạn số buổi của dịch vụ trong combo
+      const checkLimit = await new sql.Request(transaction)
+        .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
+        .input("ServiceId", sql.Int, serviceId).query(`
+          SELECT
+            ISNULL(ps.SessionCount, 1) AS MaxSessions,
+            (
+              SELECT ISNULL(SUM(SessionsUsed), 0)
+              FROM CustomerPackageUsages
+              WHERE CustomerPackageId = @CustomerPackageId
+                AND ServiceId = @ServiceId
+                AND Status <> 'CANCELLED'
+            ) AS UsedCount
+          FROM CustomerPackages cp
+          JOIN PackageServices ps ON cp.PackageId = ps.PackageId
+          WHERE cp.CustomerPackageId = @CustomerPackageId
+            AND ps.ServiceId = @ServiceId
+        `);
+
+      const limitInfo = checkLimit.recordset[0];
+      if (limitInfo && limitInfo.UsedCount >= limitInfo.MaxSessions) {
+        throw new Error(`Dịch vụ này đã dùng hết số buổi quy định trong combo (Tối đa ${limitInfo.MaxSessions} buổi)`);
+      }
+
+      // Tạo bản ghi sử dụng
+      await new sql.Request(transaction)
+        .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
+        .input("AppointmentId", sql.Int, Number(appointmentId))
+        .input("ServiceId", sql.Int, serviceId).query(`
+          INSERT INTO CustomerPackageUsages
+          (CustomerPackageId, AppointmentId, ServiceId, SessionsUsed, UsedBy, Status)
+          SELECT @CustomerPackageId, @AppointmentId, @ServiceId, 1, c.UserId, 'USED'
+          FROM Appointments a
+          JOIN Customers c ON a.CustomerId = c.CustomerId
+          WHERE a.AppointmentId = @AppointmentId
+        `);
+
+      // Trừ buổi: UsedSessions +1, RemainingSessions -1
+      await new sql.Request(transaction)
+        .input("CustomerPackageId", sql.Int, current.CustomerPackageId).query(`
+          UPDATE CustomerPackages
+          SET UsedSessions = UsedSessions + 1,
+              RemainingSessions = CASE WHEN RemainingSessions > 0 THEN RemainingSessions - 1 ELSE 0 END,
+              UpdatedAt = GETDATE()
+          WHERE CustomerPackageId = @CustomerPackageId
+        `);
+
+      // Kiểm tra nếu hết buổi -> chuyển gói sang USED_UP
+      await new sql.Request(transaction)
+        .input("CustomerPackageId", sql.Int, current.CustomerPackageId).query(`
+          UPDATE CustomerPackages
+          SET Status = 'USED_UP', UpdatedAt = GETDATE()
+          WHERE CustomerPackageId = @CustomerPackageId
+            AND RemainingSessions <= 0
+            AND Status = 'ACTIVE'
+        `);
+    }
+  }
 }
 
 async function update(id, data, user = null) {
@@ -1312,7 +1554,7 @@ async function update(id, data, user = null) {
     }
 
     /* ===========================================================
-       TỰ ĐỘNG TRỪ BUỔI COMBO KHI APPOINTMENT CHUYỂN SANG COMPLETED
+       TỰ ĐỘNG TRỪ BUỔI COMBO KHI APPOINTMENT CHUYỂN SANG COMPLETED HOẶC NO_SHOW
        - Chỉ trừ khi lịch hẹn có liên kết CustomerPackageId
        - Chống trừ trùng bằng Unique Index trên CustomerPackageUsages(AppointmentId)
        - Khi RemainingSessions về 0, chuyển gói sang USED_UP
@@ -1321,86 +1563,12 @@ async function update(id, data, user = null) {
     const newStatusUpper = String(status || "").toUpperCase();
 
     if (
-      newStatusUpper === "COMPLETED" &&
+      (newStatusUpper === "COMPLETED" || newStatusUpper === "NO_SHOW") &&
       oldStatusUpper !== "COMPLETED" &&
+      oldStatusUpper !== "NO_SHOW" &&
       current.CustomerPackageId
     ) {
-      // Kiểm tra chưa từng trừ buổi cho appointment này
-      const usageCheck = await new sql.Request(transaction)
-        .input("AppointmentId", sql.Int, Number(id)).query(`
-          SELECT UsageId FROM CustomerPackageUsages
-          WHERE AppointmentId = @AppointmentId AND Status = 'COMPLETED'
-        `);
-
-      if (usageCheck.recordset.length === 0) {
-        // Lấy ServiceId từ AppointmentServices
-        const svcResult = await new sql.Request(transaction)
-          .input("AppointmentId", sql.Int, Number(id)).query(`
-            SELECT TOP 1 ServiceId FROM AppointmentServices
-            WHERE AppointmentId = @AppointmentId
-          `);
-
-        const serviceId = svcResult.recordset[0]?.ServiceId;
-
-        if (serviceId) {
-          // Kiểm tra giới hạn số buổi của dịch vụ trong combo
-          const checkLimit = await new sql.Request(transaction)
-            .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
-            .input("ServiceId", sql.Int, serviceId).query(`
-              SELECT
-                ISNULL(ps.SessionCount, 1) AS MaxSessions,
-                (
-                  SELECT ISNULL(SUM(SessionsUsed), 0)
-                  FROM CustomerPackageUsages
-                  WHERE CustomerPackageId = @CustomerPackageId
-                    AND ServiceId = @ServiceId
-                    AND Status <> 'CANCELLED'
-                ) AS UsedCount
-              FROM CustomerPackages cp
-              JOIN PackageServices ps ON cp.PackageId = ps.PackageId
-              WHERE cp.CustomerPackageId = @CustomerPackageId
-                AND ps.ServiceId = @ServiceId
-            `);
-
-          const limitInfo = checkLimit.recordset[0];
-          if (limitInfo && limitInfo.UsedCount >= limitInfo.MaxSessions) {
-            throw new Error(`Dịch vụ này đã dùng hết số buổi quy định trong combo (Tối đa ${limitInfo.MaxSessions} buổi)`);
-          }
-
-          // Tạo bản ghi sử dụng
-          await new sql.Request(transaction)
-            .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
-            .input("AppointmentId", sql.Int, Number(id))
-            .input("ServiceId", sql.Int, serviceId).query(`
-              INSERT INTO CustomerPackageUsages
-              (CustomerPackageId, AppointmentId, ServiceId, SessionsUsed, UsedBy, Status)
-              SELECT @CustomerPackageId, @AppointmentId, @ServiceId, 1, c.UserId, 'COMPLETED'
-              FROM Appointments a
-              JOIN Customers c ON a.CustomerId = c.CustomerId
-              WHERE a.AppointmentId = @AppointmentId
-            `);
-
-          // Trừ buổi: UsedSessions +1, RemainingSessions -1
-          await new sql.Request(transaction)
-            .input("CustomerPackageId", sql.Int, current.CustomerPackageId).query(`
-              UPDATE CustomerPackages
-              SET UsedSessions = UsedSessions + 1,
-                  RemainingSessions = CASE WHEN RemainingSessions > 0 THEN RemainingSessions - 1 ELSE 0 END,
-                  UpdatedAt = GETDATE()
-              WHERE CustomerPackageId = @CustomerPackageId
-            `);
-
-          // Kiểm tra nếu hết buổi -> chuyển gói sang USED_UP
-          await new sql.Request(transaction)
-            .input("CustomerPackageId", sql.Int, current.CustomerPackageId).query(`
-              UPDATE CustomerPackages
-              SET Status = 'USED_UP', UpdatedAt = GETDATE()
-              WHERE CustomerPackageId = @CustomerPackageId
-                AND RemainingSessions <= 0
-                AND Status = 'ACTIVE'
-            `);
-        }
-      }
+      await deductComboSession(transaction, id);
     }
 
     await transaction.commit();
@@ -1454,6 +1622,11 @@ async function markNoShow(id, data = {}, user = null) {
       user?.userId,
       reason,
     );
+
+    // Tự động trừ buổi combo nếu có liên kết CustomerPackageId
+    if (current.CustomerPackageId) {
+      await deductComboSession(transaction, id);
+    }
 
     await transaction.commit();
   } catch (err) {
@@ -1676,9 +1849,22 @@ async function cancelAppointment(id, data = {}, user = null) {
     throw err;
   }
 
+  // Tự động finalize hồ sơ điều trị gốc liên kết với lịch tái khám này (nếu bị hủy)
+  try {
+    const treatmentNotesV2Service = require("../treatment-notes-v2/treatment-notes-v2.service");
+    await treatmentNotesV2Service.finalizeByFollowUpAppointment(Number(id));
+  } catch (finalizeErr) {
+    console.warn("[cancelAppointment] Auto-finalize treatment note failed:", finalizeErr.message);
+  }
+
   try {
     const { runAutoMatch } = require("../waiting-list/waiting-list.service");
-    runAutoMatch(current.AppointmentDate).catch(err => console.error("Auto match failed:", err.message));
+    runAutoMatch(current.AppointmentDate, {
+      startTime: current.StartTime,
+      endTime: current.EndTime,
+      employeeId: current.EmployeeId,
+      branchId: current.BranchId
+    }).catch(err => console.error("Auto match failed:", err.message));
   } catch (err) {
     console.error("Auto match trigger failed:", err.message);
   }
@@ -1787,6 +1973,14 @@ async function autoExpirePendingPayments() {
       );
 
       await transaction.commit();
+
+      // Tự động finalize hồ sơ điều trị gốc liên kết với lịch tái khám này (nếu bị hủy)
+      try {
+        const treatmentNotesV2Service = require("../treatment-notes-v2/treatment-notes-v2.service");
+        await treatmentNotesV2Service.finalizeByFollowUpAppointment(Number(row.AppointmentId));
+      } catch (finalizeErr) {
+        console.warn("[auto-expire] Auto-finalize treatment note failed:", finalizeErr.message);
+      }
 
       // Gửi thông báo cho khách hàng (ngoài transaction để không ảnh hưởng nếu lỗi)
       try {
@@ -1928,4 +2122,5 @@ module.exports = {
   autoExpirePendingPayments,
   startAutoExpireScheduler,
   confirmAppointment,
+  deductComboSession,
 };

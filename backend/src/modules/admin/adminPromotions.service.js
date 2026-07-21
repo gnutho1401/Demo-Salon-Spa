@@ -412,6 +412,23 @@ async function remove(id) {
   return getById(id);
 }
 
+async function updateImage(id, imageUrl) {
+  await getById(id);
+
+  const pool = await connectDB();
+
+  await pool.request()
+    .input("PromotionId", sql.Int, Number(id))
+    .input("ImageUrl", sql.NVarChar, imageUrl)
+    .query(`
+      UPDATE Promotions
+      SET ImageUrl = @ImageUrl
+      WHERE PromotionId = @PromotionId
+    `);
+
+  return getById(id);
+}
+
 module.exports = {
   getServices,
   list,
@@ -422,4 +439,5 @@ module.exports = {
   changeStatus,
   updateAssignedServices,
   remove,
+  updateImage,
 };

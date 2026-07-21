@@ -34,21 +34,30 @@ export default function VerifyEmail() {
     }
   };
 
-  return <div className="auth-page">
-    <form className="auth-card" onSubmit={verify}>
-      <div className="eyebrow">Email verification</div>
-      <h2>Xác thực email</h2>
-      {message && <p className={isError ? 'auth-error' : 'auth-success'}>{message}</p>}
+  return (
+    <div className="auth-page">
+      {/* Background dynamic animated mesh orbs */}
+      <div className="auth-bg-decor">
+        <div className="auth-orb auth-orb-1"></div>
+        <div className="auth-orb auth-orb-2"></div>
+        <div className="auth-orb auth-orb-3"></div>
+      </div>
 
-      <label>Email</label>
-      <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Nhập email" />
+      <form className="auth-card" onSubmit={verify}>
+        <div className="eyebrow">Email verification</div>
+        <h2>Xác thực email</h2>
+        {message && <p className={isError ? 'auth-error' : 'auth-success'}>{message}</p>}
 
-      <label>Mã xác thực</label>
-      <input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="Nhập mã 6 số" />
+        <label>Email</label>
+        <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Nhập email" />
 
-      <button className="btn" style={{width:'100%',marginTop:10}}>Xác thực</button>
-      <button type="button" className="btn outline" style={{width:'100%',marginTop:10}} onClick={resend}>Gửi lại mã</button>
-      <p className="muted"><Link className="see-all" to="/login">Quay lại đăng nhập</Link></p>
-    </form>
-  </div>;
+        <label>Mã xác thực</label>
+        <input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="Nhập mã 6 số" />
+
+        <button className="btn" style={{width:'100%',marginTop:10}}>Xác thực</button>
+        <button type="button" className="btn outline" style={{width:'100%',marginTop:10}} onClick={resend}>Gửi lại mã</button>
+        <p className="muted"><Link className="see-all" to="/login">Quay lại đăng nhập</Link></p>
+      </form>
+    </div>
+  );
 }

@@ -738,175 +738,7 @@ export default function ReceptionistInvoiceDetail() {
                 </div>
               </div>
 
-              {/* Action: Edit Invoice Details (for unpaid/pending bills) */}
-              {canMarkPaid && (
-                <div className="rx-detail-card" style={{ padding: "22px", marginBottom: "20px", border: "1px solid #cbd5e1" }}>
-                  <div className="rx-section-title" style={{ marginBottom: "16px" }}>
-                    <h2 style={{ fontSize: "16px", color: "#1e293b", margin: 0 }}>✏️ Điều chỉnh chi tiết hóa đơn</h2>
-                    <p style={{ fontSize: "12px", color: "#64748b", margin: "4px 0 0" }}>Thêm/bớt dịch vụ, áp voucher, giảm giá hoặc phụ phí</p>
-                  </div>
 
-                  {/* Service selection list */}
-                  <div style={{ marginBottom: "15px" }}>
-                    <label style={{ fontSize: "12px", fontWeight: "bold", color: "#475569", display: "block", marginBottom: "6px" }}>
-                      Danh sách dịch vụ:
-                    </label>
-                    
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
-                      {selectedServiceIds.map((sid) => {
-                        const s = availableServices.find((x) => x.ServiceId === sid);
-                        if (!s) return null;
-                        return (
-                          <div
-                            key={sid}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              background: "#f8fafc",
-                              border: "1px solid #e2e8f0",
-                              padding: "6px 10px",
-                              borderRadius: "8px",
-                              fontSize: "13px"
-                            }}
-                          >
-                            <span style={{ fontWeight: "600", color: "#334155" }}>{s.ServiceName}</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <span style={{ color: "#64748b" }}>{money(s.Price)}</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedServiceIds(selectedServiceIds.filter((id) => id !== sid));
-                                }}
-                                style={{
-                                  background: "none",
-                                  border: "none",
-                                  color: "#ef4444",
-                                  cursor: "pointer",
-                                  fontSize: "14px",
-                                  padding: "0 4px"
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <select
-                        id="add-service-select"
-                        defaultValue=""
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val) {
-                            const sid = Number(val);
-                            if (!selectedServiceIds.includes(sid)) {
-                              setSelectedServiceIds([...selectedServiceIds, sid]);
-                            }
-                            e.target.value = "";
-                          }
-                        }}
-                        style={{
-                          flex: 1,
-                          height: "38px",
-                          borderRadius: "8px",
-                          border: "1px solid #cbd5e1",
-                          padding: "0 8px",
-                          fontSize: "13px"
-                        }}
-                      >
-                        <option value="">-- Chọn dịch vụ để thêm --</option>
-                        {availableServices
-                          .filter((s) => !selectedServiceIds.includes(s.ServiceId))
-                          .map((s) => (
-                            <option key={s.ServiceId} value={s.ServiceId}>
-                              {s.ServiceName} ({money(s.Price)})
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Voucher input */}
-                  <div style={{ marginBottom: "12px" }}>
-                    <label style={{ fontSize: "12px", fontWeight: "bold", color: "#475569", display: "block", marginBottom: "4px" }}>
-                      Mã Voucher:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Nhập mã voucher..."
-                      value={voucherCodeInput}
-                      onChange={(e) => setVoucherCodeInput(e.target.value)}
-                      style={{
-                        width: "100%",
-                        height: "38px",
-                        borderRadius: "8px",
-                        border: "1px solid #cbd5e1",
-                        padding: "0 10px",
-                        fontSize: "13px",
-                        boxSizing: "border-box"
-                      }}
-                    />
-                  </div>
-
-                  {/* Manual discount & Surcharge */}
-                  <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: "12px", fontWeight: "bold", color: "#475569", display: "block", marginBottom: "4px" }}>
-                        Giảm thủ công:
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={manualDiscountInput}
-                        onChange={(e) => setManualDiscountInput(e.target.value)}
-                        style={{
-                          width: "100%",
-                          height: "38px",
-                          borderRadius: "8px",
-                          border: "1px solid #cbd5e1",
-                          padding: "0 10px",
-                          fontSize: "13px",
-                          boxSizing: "border-box"
-                        }}
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: "12px", fontWeight: "bold", color: "#475569", display: "block", marginBottom: "4px" }}>
-                        Phụ phí / Tip:
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={surchargeInput}
-                        onChange={(e) => setSurchargeInput(e.target.value)}
-                        style={{
-                          width: "100%",
-                          height: "38px",
-                          borderRadius: "8px",
-                          border: "1px solid #cbd5e1",
-                          padding: "0 10px",
-                          fontSize: "13px",
-                          boxSizing: "border-box"
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    className="rx-outline-pink-btn"
-                    type="button"
-                    disabled={saving}
-                    onClick={saveAdjustments}
-                    style={{ width: "100%", height: "42px", fontWeight: "bold", borderRadius: "10px", cursor: "pointer" }}
-                  >
-                    {saving ? "Đang lưu..." : "💾 Lưu điều chỉnh hóa đơn"}
-                  </button>
-                </div>
-              )}
 
                 {/* Action: Mark Paid Card (for unpaid/pending bills) */}
                 {canMarkPaid && (
@@ -996,12 +828,18 @@ export default function ReceptionistInvoiceDetail() {
                           <p style={{ color: "#a78248", fontSize: "12px", margin: "4px 0 0" }}>Khôi phục buổi sử dụng combo cho khách hàng</p>
                         </div>
 
-                        <div style={{ padding: "12px", borderRadius: "8px", background: "#fef3c7", border: "1px solid #f59e0b", color: "#b45309", fontSize: "0.85rem", marginBottom: "15px", fontWeight: "bold" }}>
-                          📦 HÓA ĐƠN SỬ DỤNG COMBO:<br />
-                          Khách hàng đã thanh toán hóa đơn này bằng cách trừ buổi trong Gói Combo. Khi xác nhận hoàn trả, hệ thống sẽ tự động cộng trả lại 1 buổi sử dụng vào Gói Combo của khách hàng.
-                        </div>
+                        {String(invoice?.AppointmentStatus || "").toUpperCase() === "COMPLETED" ? (
+                          <div style={{ padding: "14px 16px", borderRadius: "10px", background: "#fef3c7", border: "1.5px solid #f59e0b", color: "#92400e", fontSize: "0.88rem", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+                            🔒 <span>Dịch vụ đã ở trạng thái HOÀN THÀNH. Không thể hoàn trả buổi combo cho hóa đơn này.</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ padding: "12px", borderRadius: "8px", background: "#faf0e6", border: "1px solid #e6d7b8", color: "#85583f", fontSize: "0.85rem", marginBottom: "15px", fontWeight: "bold" }}>
+                              📦 HÓA ĐƠN SỬ DỤNG COMBO:<br />
+                              Khách hàng đã thanh toán hóa đơn này bằng cách trừ buổi trong Gói Combo. Khi xác nhận hoàn trả, hệ thống sẽ tự động cộng trả lại 1 buổi sử dụng vào Gói Combo của khách hàng.
+                            </div>
 
-                        <div className="rx-refund-form" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                            <div className="rx-refund-form" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                           <div>
                             <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Lý do hoàn trả combo</label>
                             <input
@@ -1039,8 +877,10 @@ export default function ReceptionistInvoiceDetail() {
                             {saving ? "Đang xử lý..." : "Xác nhận hoàn buổi combo"}
                           </button>
                         </div>
-                      </div>
+                      </>
                     )}
+                  </div>
+                )}
 
                     {/* CASE 3: PAID CASH/TRANSFER INVOICE */}
                     {paymentStatus === "PAID" && String(invoice?.PaymentInfo?.PaymentMethod || "").toUpperCase() !== "PACKAGE" && (
@@ -1050,91 +890,115 @@ export default function ReceptionistInvoiceDetail() {
                           <p style={{ color: "#a78248", fontSize: "12px", margin: "4px 0 0" }}>Hoàn tiền một phần hoặc toàn bộ số tiền hóa đơn</p>
                         </div>
 
-                        <div style={{ padding: "12px", borderRadius: "8px", background: "#fee2e2", border: "1px solid #ef4444", color: "#b91c1c", fontSize: "0.85rem", marginBottom: "15px", fontWeight: "bold" }}>
-                          💳 HÓA ĐƠN LẺ ĐÃ THANH TOÁN:<br />
-                          Khách hàng đã thanh toán hóa đơn này bằng tiền mặt hoặc chuyển khoản trực tuyến. Sau khi tạo yêu cầu hoàn tiền, hệ thống sẽ chờ quản trị viên duyệt chi tiền.
+                        {String(invoice?.AppointmentStatus || "").toUpperCase() === "COMPLETED" ? (
+                          <div style={{ padding: "14px 16px", borderRadius: "10px", background: "#fef3c7", border: "1.5px solid #f59e0b", color: "#92400e", fontSize: "0.88rem", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+                            🔒 <span>Dịch vụ đã ở trạng thái HOÀN THÀNH. Không thể khởi tạo yêu cầu hoàn tiền cho hóa đơn này.</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ padding: "12px", borderRadius: "8px", background: "#fee2e2", border: "1px solid #ef4444", color: "#b91c1c", fontSize: "0.85rem", marginBottom: "15px", fontWeight: "bold" }}>
+                              💳 HÓA ĐƠN LẺ ĐÃ THANH TOÁN:<br />
+                              Khách hàng đã thanh toán hóa đơn này bằng tiền mặt hoặc chuyển khoản trực tuyến. Sau khi tạo yêu cầu hoàn tiền, hệ thống sẽ chờ quản trị viên duyệt chi tiền.
+                            </div>
+
+                            <div className="rx-refund-form" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #e6d7b8", background: "#fff" }}>
+                                <span style={{ fontSize: "13px", fontWeight: "bold", color: "#85583f" }}>Số tiền hoàn (tự động cập nhật):</span>
+                                <span style={{ fontSize: "16px", fontWeight: "800", color: "#d91f68" }}>{money(invoice.FinalAmount || invoice.Total)}</span>
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Ngân hàng nhận hoàn</label>
+                                <select
+                                  value={bankCode}
+                                  onChange={(e) => setBankCode(e.target.value)}
+                                  style={{ width: "100%", border: "1px solid #e6d7b8", padding: "0 14px", borderRadius: "10px", outline: "none", height: "42px", boxSizing: "border-box", background: "#fff" }}
+                                >
+                                  <option value="">-- Chọn ngân hàng --</option>
+                                  {bankList.map((b) => (
+                                    <option key={b.bin} value={b.bin}>
+                                      {b.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Số tài khoản nhận hoàn</label>
+                                <input
+                                  type="text"
+                                  value={accountNumber}
+                                  onChange={(e) => setAccountNumber(e.target.value.replace(/\s/g, ""))}
+                                  placeholder="Số tài khoản ngân hàng..."
+                                  style={{ width: "100%", border: "1px solid #e6d7b8", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box", background: "#fff" }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Tên chủ tài khoản (VIẾT HOA KHÔNG DẤU)</label>
+                                <input
+                                  type="text"
+                                  value={accountName}
+                                  onChange={(e) => setAccountName(e.target.value.toUpperCase())}
+                                  placeholder="VD: NGUYEN VAN A..."
+                                  style={{ width: "100%", border: "1px solid #e6d7b8", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box", background: "#fff" }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Lý do hoàn tiền</label>
+                                <input
+                                  value={refundReason}
+                                  onChange={(e) => setRefundReason(e.target.value)}
+                                  placeholder="Nhập lý do (VD: Đổi dịch vụ, nhân viên nghỉ)..."
+                                  style={{ width: "100%", border: "1px solid #e6d7b8", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box", background: "#fff" }}
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={requestRefund}
+                                style={{
+                                  width: "100%",
+                                  height: "46px",
+                                  fontWeight: "bold",
+                                  border: "0",
+                                  color: "#fff",
+                                  background: "linear-gradient(135deg, #85583f, #66412c)",
+                                  borderRadius: "12px",
+                                  cursor: "pointer",
+                                  marginTop: "5px",
+                                  boxShadow: "0 8px 16px rgba(102, 65, 44, 0.15)",
+                                  transition: "all 0.2s ease"
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!saving) e.currentTarget.style.background = "linear-gradient(135deg, #754b34, #573623)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!saving) e.currentTarget.style.background = "linear-gradient(135deg, #85583f, #66412c)";
+                                }}
+                              >
+                                {saving ? "Đang gửi yêu cầu..." : "Gửi yêu cầu hoàn tiền"}
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {paymentStatus === "REFUND_PENDING" && (
+                      <div className="rx-detail-card" style={{ border: "1.5px solid #93c5fd", backgroundColor: "#eff6ff", padding: "20px" }}>
+                        <div style={{ color: "#1e40af", fontSize: "0.9rem", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+                          ⏳ <span>Hóa đơn này đang có yêu cầu hoàn tiền chờ Quản trị viên (Admin/Manager) duyệt chi tiền.</span>
                         </div>
+                      </div>
+                    )}
 
-                        <div className="rx-refund-form" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #e6d7b8", background: "#fff" }}>
-                            <span style={{ fontSize: "13px", fontWeight: "bold", color: "#85583f" }}>Số tiền hoàn (tự động cập nhật):</span>
-                            <span style={{ fontSize: "16px", fontWeight: "800", color: "#d91f68" }}>{money(invoice.FinalAmount || invoice.Total)}</span>
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Ngân hàng nhận hoàn</label>
-                            <select
-                              value={bankCode}
-                              onChange={(e) => setBankCode(e.target.value)}
-                              style={{ width: "100%", border: "1px solid #e6d7b8", padding: "0 14px", borderRadius: "10px", outline: "none", height: "42px", boxSizing: "border-box", background: "#fff" }}
-                            >
-                              <option value="">-- Chọn ngân hàng --</option>
-                              {bankList.map((b) => (
-                                <option key={b.bin} value={b.bin}>
-                                  {b.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Số tài khoản nhận hoàn</label>
-                            <input
-                              type="text"
-                              value={accountNumber}
-                              onChange={(e) => setAccountNumber(e.target.value.replace(/\s/g, ""))}
-                              placeholder="Số tài khoản ngân hàng..."
-                              style={{ width: "100%", border: "1px solid #e6d7b8", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box", background: "#fff" }}
-                            />
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Tên chủ tài khoản (VIẾT HOA KHÔNG DẤU)</label>
-                            <input
-                              type="text"
-                              value={accountName}
-                              onChange={(e) => setAccountName(e.target.value.toUpperCase())}
-                              placeholder="VD: NGUYEN VAN A..."
-                              style={{ width: "100%", border: "1px solid #e6d7b8", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box", background: "#fff" }}
-                            />
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: "12px", fontWeight: "bold", color: "#85583f", display: "block", marginBottom: "4px" }}>Lý do hoàn tiền</label>
-                            <input
-                              value={refundReason}
-                              onChange={(e) => setRefundReason(e.target.value)}
-                              placeholder="Nhập lý do (VD: Đổi dịch vụ, nhân viên nghỉ)..."
-                              style={{ width: "100%", border: "1px solid #e6d7b8", padding: "10px 14px", borderRadius: "10px", outline: "none", boxSizing: "border-box", background: "#fff" }}
-                            />
-                          </div>
-
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={requestRefund}
-                            style={{
-                              width: "100%",
-                              height: "46px",
-                              fontWeight: "bold",
-                              border: "0",
-                              color: "#fff",
-                              background: "linear-gradient(135deg, #85583f, #66412c)",
-                              borderRadius: "12px",
-                              cursor: "pointer",
-                              marginTop: "5px",
-                              boxShadow: "0 8px 16px rgba(102, 65, 44, 0.15)",
-                              transition: "all 0.2s ease"
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!saving) e.currentTarget.style.background = "linear-gradient(135deg, #754b34, #573623)";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!saving) e.currentTarget.style.background = "linear-gradient(135deg, #85583f, #66412c)";
-                            }}
-                          >
-                            {saving ? "Đang gửi yêu cầu..." : "Gửi yêu cầu hoàn tiền"}
-                          </button>
+                    {paymentStatus === "REFUNDED" && (
+                      <div className="rx-detail-card" style={{ border: "1.5px solid #86efac", backgroundColor: "#f0fdf4", padding: "20px" }}>
+                        <div style={{ color: "#166534", fontSize: "0.9rem", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+                          ✅ <span>Hóa đơn này đã được hoàn tiền thành công.</span>
                         </div>
                       </div>
                     )}

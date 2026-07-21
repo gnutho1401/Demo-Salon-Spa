@@ -22,6 +22,22 @@ router.get(
   authMiddleware,
   controller.getUsageHistoryPaginated,
 );
+router.post(
+  "/my/:customerPackageId/book",
+  authMiddleware,
+  controller.bookCustomerPackage,
+);
+router.post(
+  "/my/:customerPackageId/reschedule",
+  authMiddleware,
+  controller.rescheduleCustomerPackageAppointment,
+);
+
+router.get("/my/combo-history", authMiddleware, controller.getComboHistoryAndReviews);
+router.post("/my/combo-review", authMiddleware, controller.submitComboReview);
+
+
+
 
 // Enterprise: Gia hạn / Đóng băng / Hủy đóng băng (Đã bãi bỏ)
 /*
@@ -52,6 +68,11 @@ router.post(
   "/my/:customerPackageId/repay",
   authMiddleware,
   controller.repayCustomerPackage,
+);
+router.post(
+  "/my/:customerPackageId/repay-payos",
+  authMiddleware,
+  controller.repayPayosCustomerPackage,
 );
 router.delete(
   "/my/:customerPackageId/members/:memberId",
@@ -93,8 +114,10 @@ router.get(
 router.get("/find-member", authMiddleware, controller.findMember);
 router.get("/categories/list", controller.getCategories);
 router.get("/vnpay-return", controller.vnpayReturn);
+router.get("/payos-return", controller.payosReturn);
 router.post("/:id/buy", authMiddleware, controller.buyPackage);
 router.post("/:id/vnpay", authMiddleware, controller.createVnpayPackage);
+router.post("/:id/payos", authMiddleware, controller.createPayosPackage);
 router.get("/", controller.getAll);
 router.get("/:id", controller.getById);
 router.post(

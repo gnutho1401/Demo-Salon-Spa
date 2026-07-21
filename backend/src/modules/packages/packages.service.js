@@ -1,5 +1,7 @@
 const { sql, connectDB } = require("../../config/db");
 const crypto = require("crypto");
+const { getPayOS } = require("../../config/payos.config");
+const { findAvailableTechnician } = require("../appointments/availability.service");
 
 function formatVnpDate(date = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -146,7 +148,17 @@ async function getAll(filters = {}) {
     ORDER BY ${orderBy}
   `);
 
-  return result.recordset;
+  return result.recordset.map(pkg => {
+    const original = Number(pkg.OriginalPrice || 0);
+    const sale = Number(pkg.SalePrice || 0);
+    const discountPercent = original > 0 ? Math.round(((original - sale) / original) * 100) : 0;
+    return {
+      ...pkg,
+      Price: original,
+      FinalPrice: sale,
+      DiscountPercent: discountPercent
+    };
+  });
 }
 
 async function getCategories() {
@@ -218,6 +230,12 @@ async function getById(id) {
   item.Services = services.recordset;
   item.ServiceNames = services.recordset.map((x) => x.ServiceName).join(", ");
 
+  const original = Number(item.OriginalPrice || 0);
+  const sale = Number(item.SalePrice || 0);
+  item.Price = original;
+  item.FinalPrice = sale;
+  item.DiscountPercent = original > 0 ? Math.round(((original - sale) / original) * 100) : 0;
+
   return item;
 }
 
@@ -235,6 +253,18 @@ async function getMine(userId, customerId = null) {
   const result = await pool
     .request()
     .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      WITH LatestPayments AS (
+        SELECT 
+          PackagePaymentId,
+          CustomerPackageId,
+          Amount,
+          PaymentMethod,
+          Status AS PaymentStatus,
+          TransactionCode,
+          PaidAt,
+          ROW_NUMBER() OVER (PARTITION BY CustomerPackageId ORDER BY PackagePaymentId DESC) as rn
+        FROM PackagePayments
+      )
       SELECT
         cp.CustomerPackageId,
         cp.CustomerId,
@@ -258,7 +288,7 @@ async function getMine(userId, customerId = null) {
         pp.PackagePaymentId,
         pp.Amount,
         pp.PaymentMethod,
-        pp.Status AS PaymentStatus,
+        pp.PaymentStatus,
         pp.TransactionCode,
         pp.PaidAt,
 
@@ -268,8 +298,8 @@ async function getMine(userId, customerId = null) {
         ON cp.PackageId = p.PackageId
       LEFT JOIN PackageCategories pc
         ON p.PackageCategoryId = pc.PackageCategoryId
-      LEFT JOIN PackagePayments pp
-        ON cp.CustomerPackageId = pp.CustomerPackageId
+      LEFT JOIN LatestPayments pp
+        ON cp.CustomerPackageId = pp.CustomerPackageId AND pp.rn = 1
       LEFT JOIN PackageServices ps
         ON p.PackageId = ps.PackageId
       LEFT JOIN Services s
@@ -302,7 +332,7 @@ async function getMine(userId, customerId = null) {
         pp.PackagePaymentId,
         pp.Amount,
         pp.PaymentMethod,
-        pp.Status,
+        pp.PaymentStatus,
         pp.TransactionCode,
         pp.PaidAt
       ORDER BY cp.CustomerPackageId DESC
@@ -503,6 +533,22 @@ async function checkExistingPackage(pool, customerId, packageId) {
   }
 }
 
+async function checkPendingPackage(pool, customerId, packageId) {
+  const existingPkg = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
+    .input("PackageId", sql.Int, packageId)
+    .query(`
+      SELECT TOP 1 CustomerPackageId
+      FROM CustomerPackages
+      WHERE CustomerId = @CustomerId 
+        AND PackageId = @PackageId 
+        AND Status = 'PENDING_PAYMENT'
+    `);
+  if (existingPkg.recordset.length > 0) {
+    throw new Error("Bạn đã đăng ký combo này và đang chờ thanh toán. Vui lòng thanh toán gói hiện tại hoặc hủy giao dịch cũ trong mục 'Liệu trình của tôi'.");
+  }
+}
+
 async function buyPackage(userId, packageId, payload = {}) {
   const pool = await connectDB();
 
@@ -513,11 +559,10 @@ async function buyPackage(userId, packageId, payload = {}) {
   if (!pkg)
     throw new Error("Combo / liệu trình không tồn tại hoặc đã ngừng bán");
 
-  // Cho phép mua một combo nhiều lần, không chặn khi đang sở hữu gói hoạt động/tạm khóa nữa
-  // await checkExistingPackage(pool, customer.CustomerId, packageId);
+  await checkPendingPackage(pool, customer.CustomerId, packageId);
 
   const transaction = new sql.Transaction(pool);
-
+  
   try {
     await transaction.begin();
 
@@ -564,8 +609,7 @@ async function createVnpayPackageUrl(
   if (!pkg)
     throw new Error("Combo / liệu trình không tồn tại hoặc đã ngừng bán");
 
-  // Cho phép mua một combo nhiều lần qua VNPAY, không chặn khi đang sở hữu gói hoạt động/tạm khóa nữa
-  // await checkExistingPackage(pool, customer.CustomerId, packageId);
+  await checkPendingPackage(pool, customer.CustomerId, packageId);
 
   const prices = calcDiscount(pkg.OriginalPrice, pkg.SalePrice);
   const txnRef = `PKG${packageId}_${Date.now()}`;
@@ -709,6 +753,96 @@ async function createVnpayRepayUrl(
     paymentUrl: `${vnpUrl}?${buildQuery(sorted)}`,
     amount: prices.finalPrice,
     transactionCode: txnRef,
+  };
+}
+
+async function createPayosRepayUrl(userId, customerPackageId) {
+  const pool = await connectDB();
+
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
+
+  // Get customer package details and check ownership
+  const pkgResult = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, customerPackageId)
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
+      SELECT cp.*, p.PackageName, p.OriginalPrice, p.SalePrice
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE cp.CustomerPackageId = @CustomerPackageId AND cp.CustomerId = @CustomerId
+    `);
+
+  const cp = pkgResult.recordset[0];
+  if (!cp) {
+    throw new Error("Không tìm thấy liệu trình này hoặc bạn không có quyền sở hữu");
+  }
+
+  if (cp.Status !== "PENDING_PAYMENT") {
+    throw new Error("Liệu trình này không ở trạng thái chờ thanh toán");
+  }
+
+  const prices = calcDiscount(cp.OriginalPrice, cp.SalePrice);
+  const orderCode = Number(`${customerPackageId}${Date.now() % 1000000}`);
+
+  // Create a new PENDING PackagePayments record
+  await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, customerPackageId)
+    .input("Amount", sql.Decimal(18, 2), prices.finalPrice)
+    .input("PaymentMethod", sql.NVarChar, "PAYOS")
+    .input("Status", sql.NVarChar, "PENDING")
+    .input("TransactionCode", sql.NVarChar, String(orderCode)).query(`
+      INSERT INTO PackagePayments
+      (
+        CustomerPackageId,
+        Amount,
+        PaymentMethod,
+        Status,
+        TransactionCode,
+        PaidAt
+      )
+      VALUES
+      (
+        @CustomerPackageId,
+        @Amount,
+        @PaymentMethod,
+        @Status,
+        @TransactionCode,
+        NULL
+      )
+    `);
+
+  const payos = getPayOS();
+
+  const returnUrl =
+    process.env.PAYOS_PACKAGE_RETURN_URL ||
+    `${process.env.BACKEND_URL || "http://localhost:5000"}/api/packages/payos-return`;
+
+  const cancelUrl =
+    `${process.env.FRONTEND_URL || "http://localhost:5173"}/customer/packages?cancel=1`;
+
+  const paymentData = {
+    orderCode: orderCode,
+    amount: Math.round(Number(prices.finalPrice || 0)),
+    description: `Tra combo #${customerPackageId}`.slice(0, 25),
+    returnUrl: returnUrl,
+    cancelUrl: cancelUrl,
+    items: [
+      {
+        name: cp.PackageName.slice(0, 50),
+        quantity: 1,
+        price: Math.round(Number(prices.finalPrice || 0)),
+      },
+    ],
+  };
+
+  const paymentLink = await payos.paymentRequests.create(paymentData);
+
+  return {
+    paymentUrl: paymentLink.checkoutUrl,
+    amount: prices.finalPrice,
+    transactionCode: String(orderCode),
   };
 }
 
@@ -1429,9 +1563,58 @@ async function getMyPackageDetail(userId, customerPackageId, customerId = null) 
       WHERE ps.PackageId = @PackageId
     `);
 
+  const activeApptResult = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, customerPackageId).query(`
+      SELECT TOP 1
+        a.AppointmentId,
+        CONVERT(VARCHAR(10), a.AppointmentDate, 120) AS AppointmentDate,
+        CAST(a.StartTime AS VARCHAR(8)) AS StartTime,
+        CAST(a.EndTime AS VARCHAR(8)) AS EndTime,
+        a.Status,
+        a.Notes,
+        u.FullName AS PrimaryTechName,
+        u.AvatarUrl AS PrimaryTechAvatar
+      FROM Appointments a
+      LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
+      LEFT JOIN Users u ON e.UserId = u.UserId
+      WHERE a.CustomerPackageId = @CustomerPackageId
+        AND a.Status IN ('CONFIRMED', 'PENDING', 'CHECKED_IN')
+      ORDER BY a.CreatedAt DESC
+    `);
+
+
+  let activeAppointment = activeApptResult.recordset[0] || null;
+  if (activeAppointment) {
+    const apptServicesRes = await pool
+      .request()
+      .input("AppointmentId", sql.Int, activeAppointment.AppointmentId)
+      .query(`
+        SELECT 
+          aps.AppointmentServiceId,
+          aps.ServiceId,
+          s.ServiceName,
+          s.DurationMinutes,
+          s.ImageUrl,
+          aps.EmployeeId,
+          u.FullName AS TechnicianName,
+          u.Phone AS TechnicianPhone,
+          ISNULL(u.AvatarUrl, e.ImageUrl) AS TechnicianAvatar
+        FROM AppointmentServices aps
+        JOIN Services s ON aps.ServiceId = s.ServiceId
+        LEFT JOIN Employees e ON aps.EmployeeId = e.EmployeeId
+        LEFT JOIN Users u ON e.UserId = u.UserId
+        WHERE aps.AppointmentId = @AppointmentId
+        ORDER BY aps.AppointmentServiceId ASC
+      `);
+    activeAppointment.Services = apptServicesRes.recordset || [];
+  }
+
   return {
     ...pkg,
+    ActiveAppointment: activeAppointment,
     Members: membersResult.recordset,
+
     FreezeHistory: freezeResult.recordset,
     ExtensionHistory: extensionResult.recordset,
     Benefits: benefitsResult.recordset,
@@ -1439,6 +1622,7 @@ async function getMyPackageDetail(userId, customerPackageId, customerId = null) 
     Services: servicesResult.recordset,
   };
 }
+
 
 /**
  * [Staff] Lấy danh sách yêu cầu chờ duyệt (gia hạn + đóng băng)
@@ -1550,8 +1734,8 @@ async function approveRequest(staffUserId, requestType, requestId, action) {
 async function getPackageReport(filters = {}) {
   const pool = await connectDB();
 
-  const startDate = filters.startDate || null;
-  const endDate = filters.endDate || null;
+  const startDate = filters.startDate && filters.startDate !== "" ? filters.startDate : null;
+  const endDate = filters.endDate && filters.endDate !== "" ? filters.endDate : null;
 
   const result = await pool
     .request()
@@ -1566,7 +1750,7 @@ async function getPackageReport(filters = {}) {
         SUM(CASE WHEN cp.Status = 'EXPIRED' THEN 1 ELSE 0 END) AS ExpiredPackages,
         SUM(CASE WHEN cp.Status = 'CANCELLED' THEN 1 ELSE 0 END) AS CancelledPackages,
         SUM(CASE WHEN cp.EndDate >= CAST(GETDATE() AS DATE) 
-                  AND cp.EndDate <= CAST(GETDATE() AS DATE) + 7
+                  AND cp.EndDate <= DATEADD(day, 7, CAST(GETDATE() AS DATE))
                   AND cp.Status = 'ACTIVE' THEN 1 ELSE 0 END) AS ExpiringSoonPackages,
         ISNULL(SUM(pp.Amount), 0) AS TotalRevenue,
         CASE WHEN COUNT(*) > 0
@@ -1579,8 +1763,8 @@ async function getPackageReport(filters = {}) {
         END AS UsageRate
       FROM CustomerPackages cp
       LEFT JOIN PackagePayments pp ON cp.CustomerPackageId = pp.CustomerPackageId AND pp.Status = 'PAID'
-      WHERE (CAST(@StartDate AS DATE) IS NULL OR cp.CreatedAt >= @StartDate)
-        AND (CAST(@EndDate AS DATE) IS NULL OR cp.CreatedAt <= CAST(@EndDate AS DATE) + 1)
+      WHERE (@StartDate IS NULL OR cp.CreatedAt >= @StartDate)
+        AND (@EndDate IS NULL OR cp.CreatedAt < DATEADD(day, 1, @EndDate))
     `);
 
   // Top packages by revenue
@@ -1598,8 +1782,8 @@ async function getPackageReport(filters = {}) {
       FROM Packages p
       LEFT JOIN CustomerPackages cp ON p.PackageId = cp.PackageId
       LEFT JOIN PackagePayments pp ON cp.CustomerPackageId = pp.CustomerPackageId AND pp.Status = 'PAID'
-      WHERE (CAST(@StartDate AS DATE) IS NULL OR cp.CreatedAt >= @StartDate)
-        AND (CAST(@EndDate AS DATE) IS NULL OR cp.CreatedAt <= CAST(@EndDate AS DATE) + 1)
+      WHERE (@StartDate IS NULL OR cp.CreatedAt >= @StartDate)
+        AND (@EndDate IS NULL OR cp.CreatedAt < DATEADD(day, 1, @EndDate))
       GROUP BY p.PackageId, p.PackageName
       ORDER BY Revenue DESC
     `);
@@ -1625,6 +1809,213 @@ async function getPackageReport(filters = {}) {
   };
 }
 
+async function createPayosPackageUrl(userId, packageId, payload = {}) {
+  const pool = await connectDB();
+
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
+
+  const pkg = await getActivePackage(pool, packageId);
+  if (!pkg)
+    throw new Error("Combo / liệu trình không tồn tại hoặc đã ngừng bán");
+
+  await checkPendingPackage(pool, customer.CustomerId, packageId);
+
+  const prices = calcDiscount(pkg.OriginalPrice, pkg.SalePrice);
+
+  // orderCode must be a unique positive integer
+  const orderCode = Number(`${packageId}${Date.now() % 1000000}`);
+
+  const transaction = new sql.Transaction(pool);
+
+  try {
+    await transaction.begin();
+
+    await createCustomerPackageTransaction(
+      transaction,
+      customer.CustomerId,
+      pkg,
+      "PAYOS",
+      "PENDING",
+      String(orderCode),
+    );
+
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
+
+  const payos = getPayOS();
+
+  const returnUrl =
+    process.env.PAYOS_PACKAGE_RETURN_URL ||
+    `${process.env.BACKEND_URL || "http://localhost:5000"}/api/packages/payos-return`;
+
+  const cancelUrl =
+    `${process.env.FRONTEND_URL || "http://localhost:5173"}/packages/${packageId}?cancel=1`;
+
+  const paymentData = {
+    orderCode: orderCode,
+    amount: Math.round(Number(prices.finalPrice || 0)),
+    description: `Mua combo #${packageId}`.slice(0, 25),
+    returnUrl: returnUrl,
+    cancelUrl: cancelUrl,
+    items: [
+      {
+        name: pkg.PackageName.slice(0, 50),
+        quantity: 1,
+        price: Math.round(Number(prices.finalPrice || 0)),
+      },
+    ],
+  };
+
+  const paymentLink = await payos.paymentRequests.create(paymentData);
+
+  return {
+    paymentUrl: paymentLink.checkoutUrl,
+    amount: prices.finalPrice,
+    transactionCode: String(orderCode),
+  };
+}
+
+async function handlePayosReturn(query = {}) {
+  const orderCode = query.orderCode || query.code;
+  const status = query.status; // PAID, CANCELLED
+  const cancel = query.cancel === "true" || status === "CANCELLED";
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+  if (!orderCode) {
+    return `${frontendUrl}/customer/packages?error=missing_order_code`;
+  }
+
+  const pool = await connectDB();
+
+  // Search package payment by orderCode
+  const found = await pool
+    .request()
+    .input("TransactionCode", sql.NVarChar, String(orderCode)).query(`
+      SELECT TOP 1
+        pp.PackagePaymentId,
+        pp.Amount,
+        pp.Status,
+        cp.CustomerPackageId,
+        cp.CustomerId,
+        cp.PackageId,
+        p.ValidityDays,
+        p.TotalSessions
+      FROM PackagePayments pp
+      JOIN CustomerPackages cp
+        ON pp.CustomerPackageId = cp.CustomerPackageId
+      JOIN Packages p
+        ON cp.PackageId = p.PackageId
+      WHERE pp.TransactionCode = @TransactionCode
+        AND pp.PaymentMethod = 'PAYOS'
+    `);
+
+  const payment = found.recordset[0];
+
+  if (!payment) {
+    return `${frontendUrl}/customer/packages?error=payment_not_found`;
+  }
+
+  const failUrl = `${frontendUrl}/customer/packages?error=payos_failed`;
+
+  if (cancel) {
+    await pool
+      .request()
+      .input("PackagePaymentId", sql.Int, payment.PackagePaymentId).query(`
+        UPDATE PackagePayments
+        SET Status = 'FAILED'
+        WHERE PackagePaymentId = @PackagePaymentId
+          AND Status = 'PENDING';
+
+        UPDATE CustomerPackages
+        SET Status = 'CANCELLED'
+        WHERE CustomerPackageId = (
+          SELECT CustomerPackageId
+          FROM PackagePayments
+          WHERE PackagePaymentId = @PackagePaymentId
+        )
+        AND Status = 'PENDING_PAYMENT';
+      `);
+
+    return failUrl;
+  }
+
+  // Verify actual status from PayOS
+  try {
+    const payos = getPayOS();
+    const info = await payos.paymentRequests.get(String(orderCode));
+
+    if (info && info.status === "PAID") {
+      if (String(payment.Status).toUpperCase() !== "PAID") {
+        const transaction = new sql.Transaction(pool);
+
+        try {
+          await transaction.begin();
+
+          await new sql.Request(transaction)
+            .input("PackagePaymentId", sql.Int, payment.PackagePaymentId)
+            .input("VnpTransactionNo", sql.NVarChar, String(info.id || info.paymentLinkId || "")).query(`
+              UPDATE PackagePayments
+              SET
+                Status = 'PAID',
+                PaidAt = GETDATE(),
+                VnpTransactionNo = @VnpTransactionNo
+              WHERE PackagePaymentId = @PackagePaymentId
+            `);
+
+          await new sql.Request(transaction)
+            .input("CustomerPackageId", sql.Int, payment.CustomerPackageId)
+            .input("ValidityDays", sql.Int, payment.ValidityDays || 30)
+            .input(
+              "TotalSessions",
+              sql.Int,
+              Math.max(Number(payment.TotalSessions || 1), 1),
+            ).query(`
+              UPDATE CustomerPackages
+              SET
+                Status = 'ACTIVE',
+                StartDate = CAST(GETDATE() AS DATE),
+                EndDate = CAST(GETDATE() AS DATE) + CAST(@ValidityDays AS INT),
+                TotalSessions = @TotalSessions,
+                RemainingSessions = @TotalSessions,
+                UpdatedAt = GETDATE()
+              WHERE CustomerPackageId = @CustomerPackageId
+            `);
+
+          await new sql.Request(transaction)
+            .input("CustomerId", sql.Int, payment.CustomerId)
+            .input(
+              "Points",
+              sql.Int,
+              Math.floor(Number(payment.Amount || 0) / 10000),
+            ).query(`
+              UPDATE Customers
+              SET LoyaltyPoints = LoyaltyPoints + @Points
+              WHERE CustomerId = @CustomerId
+            `);
+
+          await transaction.commit();
+        } catch (err) {
+          try {
+            await transaction.rollback();
+          } catch (_) {}
+          throw err;
+        }
+      }
+      return `${frontendUrl}/customer/packages?paid=1`;
+    }
+  } catch (err) {
+    console.error("PayOS package verify error:", err.message);
+  }
+
+  return failUrl;
+}
+
 module.exports = {
   getAll,
   getCategories,
@@ -1635,6 +2026,9 @@ module.exports = {
   createVnpayPackageUrl,
   createVnpayRepayUrl,
   handleVnpayReturn,
+  createPayosPackageUrl,
+  createPayosRepayUrl,
+  handlePayosReturn,
   create,
   update,
   remove,
@@ -1650,6 +2044,7 @@ module.exports = {
   approveRequest,
   getPackageReport,
   findMember,
+  bookCustomerPackage,
 };
 
 async function findMember(keyword, currentUserId) {
@@ -1678,3 +2073,515 @@ async function findMember(keyword, currentUserId) {
 
   return result.recordset || [];
 }
+
+async function bookCustomerPackage(userId, customerPackageId, bookingData = {}) {
+  const pool = await connectDB();
+  const { appointmentDate, startTime, notes } = bookingData;
+
+  if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn");
+  if (!startTime) throw new Error("Vui lòng chọn giờ bắt đầu");
+
+  // 1. Get Customer profile
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy thông tin hồ sơ khách hàng");
+
+  // 2. Fetch CustomerPackage details
+  const pkgRes = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .query(`
+      SELECT cp.*, p.PackageName, p.Description
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE cp.CustomerPackageId = @CustomerPackageId
+        AND (
+          cp.CustomerId = @CustomerId
+          OR EXISTS (
+            SELECT 1 FROM PackageMembers pm
+            WHERE pm.CustomerPackageId = cp.CustomerPackageId
+              AND pm.FamilyCustomerId = @CustomerId
+          )
+        )
+    `);
+
+  const cp = pkgRes.recordset[0];
+  if (!cp) throw new Error("Gói Combo không tồn tại hoặc bạn không có quyền dùng gói này");
+
+  if (cp.Status === "CANCELLED" || cp.Status === "EXPIRED") {
+    throw new Error("Gói Combo này đã hết hạn hoặc bị hủy");
+  }
+  if (cp.RemainingSessions <= 0 && cp.TotalSessions > 0) {
+    throw new Error("Gói Combo này đã được sử dụng hết số lượt");
+  }
+
+  // Check end date expiry
+  if (cp.EndDate) {
+    const today = new Date().toISOString().slice(0, 10);
+    const endDateStr = new Date(cp.EndDate).toISOString().slice(0, 10);
+    if (today > endDateStr) {
+      throw new Error("Gói Combo này đã quá hạn sử dụng!");
+    }
+  }
+
+  // 3. Lifetime Single-Use Limit Check (1 time total per purchased combo package)
+  const lifetimeCheck = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .query(`
+      SELECT COUNT(*) AS BookedCount
+      FROM Appointments
+      WHERE CustomerPackageId = @CustomerPackageId
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED')
+    `);
+
+  if (lifetimeCheck.recordset[0]?.BookedCount >= 1) {
+    throw new Error("Gói Combo này chỉ được áp dụng 1 lần duy nhất trong suốt thời hạn sử dụng. Bạn đã có lịch hẹn hoặc đã sử dụng gói Combo này!");
+  }
+
+  // 4. Fetch Services in Combo & Calculate total duration
+  const svcsRes = await pool
+    .request()
+    .input("PackageId", sql.Int, cp.PackageId)
+    .query(`
+      SELECT s.ServiceId, s.ServiceName, s.DurationMinutes, s.Price
+      FROM PackageServices ps
+      JOIN Services s ON ps.ServiceId = s.ServiceId
+      WHERE ps.PackageId = @PackageId
+    `);
+
+  const services = svcsRes.recordset || [];
+  if (services.length === 0) throw new Error("Không có dịch vụ nào trong gói Combo này");
+
+  const totalDurationMinutes = services.reduce((acc, s) => acc + (Number(s.DurationMinutes) || 30), 0);
+
+  // Calculate endTime
+  const pad = (n) => String(n).padStart(2, "0");
+  const [h, m] = startTime.split(":").map(Number);
+  const startD = new Date();
+  startD.setHours(h, m, 0, 0);
+  const endD = new Date(startD.getTime() + totalDurationMinutes * 60 * 1000);
+  const endTime = `${pad(endD.getHours())}:${pad(endD.getMinutes())}:00`;
+
+  // 5. Calculate step-by-step times and auto-assign dedicated technician for EACH service step in combo
+  let currentStepStart = startD;
+  const serviceAssignments = [];
+
+  for (const svc of services) {
+    const durMins = Number(svc.DurationMinutes) || 30;
+    const stepEnd = new Date(currentStepStart.getTime() + durMins * 60 * 1000);
+
+    const stepStartStr = `${pad(currentStepStart.getHours())}:${pad(currentStepStart.getMinutes())}:00`;
+    const stepEndStr = `${pad(stepEnd.getHours())}:${pad(stepEnd.getMinutes())}:00`;
+
+    let stepTech;
+    try {
+      stepTech = await findAvailableTechnician(appointmentDate, stepStartStr, stepEndStr);
+    } catch {
+      stepTech = await findAvailableTechnician(appointmentDate, startTime, endTime);
+    }
+
+    serviceAssignments.push({
+      serviceId: svc.ServiceId,
+      serviceName: svc.ServiceName,
+      durationMinutes: durMins,
+      startTime: stepStartStr,
+      endTime: stepEndStr,
+      technician: stepTech
+    });
+
+    currentStepStart = stepEnd;
+  }
+
+  const primaryTechnician = serviceAssignments[0]?.technician || await findAvailableTechnician(appointmentDate, startTime, endTime);
+
+  // 6. DB Transaction for appointment creation & package usage update
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    // Insert Appointment
+    const apptReq = new sql.Request(transaction);
+    apptReq.input("CustomerId", sql.Int, customer.CustomerId);
+    apptReq.input("EmployeeId", sql.Int, primaryTechnician.EmployeeId);
+    apptReq.input("AppointmentDate", sql.Date, appointmentDate);
+    apptReq.input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime);
+    apptReq.input("EndTime", sql.VarChar, endTime);
+    apptReq.input("Status", sql.NVarChar, "CONFIRMED");
+    apptReq.input("Notes", sql.NVarChar, notes ? `[Gói Combo: ${cp.PackageName}] ${notes}` : `[Gói Combo: ${cp.PackageName}]`);
+    apptReq.input("CustomerPackageId", sql.Int, cp.CustomerPackageId);
+
+    const apptResult = await apptReq.query(`
+      INSERT INTO Appointments (
+        CustomerId, EmployeeId, AppointmentDate, StartTime, EndTime,
+        Status, Notes, CustomerPackageId, CreatedAt
+      )
+      OUTPUT INSERTED.AppointmentId
+      VALUES (
+        @CustomerId, @EmployeeId, @AppointmentDate, @StartTime, @EndTime,
+        @Status, @Notes, @CustomerPackageId, GETDATE()
+      )
+    `);
+
+    const appointmentId = apptResult.recordset[0].AppointmentId;
+
+    // Insert AppointmentServices with dedicated EmployeeId for each service step, status = PENDING
+    for (const step of serviceAssignments) {
+      const svcReq = new sql.Request(transaction);
+      svcReq.input("AppointmentId", sql.Int, appointmentId);
+      svcReq.input("ServiceId", sql.Int, step.serviceId);
+      svcReq.input("Price", sql.Decimal(18, 2), 0);
+      svcReq.input("EmployeeId", sql.Int, step.technician.EmployeeId);
+      await svcReq.query(`
+        INSERT INTO AppointmentServices (AppointmentId, ServiceId, Price, EmployeeId, Status)
+        VALUES (@AppointmentId, @ServiceId, @Price, @EmployeeId, 'PENDING')
+      `);
+    }
+
+    await transaction.commit();
+
+    return {
+      appointmentId,
+      packageName: cp.PackageName,
+      appointmentDate,
+      startTime,
+      endTime,
+      totalDurationMinutes,
+      technician: {
+        employeeId: primaryTechnician.EmployeeId,
+        fullName: primaryTechnician.FullName,
+        phone: primaryTechnician.Phone,
+        avatarUrl: primaryTechnician.AvatarUrl
+      },
+      serviceAssignments: serviceAssignments.map(s => ({
+        serviceId: s.serviceId,
+        serviceName: s.serviceName,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        durationMinutes: s.durationMinutes,
+        technician: {
+          employeeId: s.technician.EmployeeId,
+          fullName: s.technician.FullName,
+          phone: s.technician.Phone,
+          avatarUrl: s.technician.AvatarUrl
+        }
+      })),
+      services: services.map(s => s.ServiceName)
+    };
+
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
+}
+
+async function rescheduleCustomerPackageAppointment(userId, customerPackageId, bookingData = {}) {
+  const pool = await connectDB();
+  const { appointmentDate, startTime, notes } = bookingData;
+
+  if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn mới");
+  if (!startTime) throw new Error("Vui lòng chọn giờ bắt đầu mới");
+
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy thông tin hồ sơ khách hàng");
+
+  const apptRes = await pool.request()
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .query(`
+      SELECT TOP 1 *
+      FROM Appointments
+      WHERE CustomerPackageId = @CustomerPackageId
+        AND CustomerId = @CustomerId
+        AND Status IN ('CONFIRMED', 'PENDING', 'CHECKED_IN')
+      ORDER BY CreatedAt DESC
+    `);
+
+  const currentAppt = apptRes.recordset[0];
+  if (!currentAppt) {
+    throw new Error("Không tìm thấy lịch hẹn Combo đang chờ để đổi lịch!");
+  }
+
+  const pkgRes = await pool.request()
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .query(`
+      SELECT cp.*, p.PackageName
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE cp.CustomerPackageId = @CustomerPackageId
+    `);
+  const cp = pkgRes.recordset[0];
+
+  const svcsRes = await pool.request()
+    .input("PackageId", sql.Int, cp.PackageId)
+    .query(`
+      SELECT s.ServiceId, s.ServiceName, s.DurationMinutes, s.Price
+      FROM PackageServices ps
+      JOIN Services s ON ps.ServiceId = s.ServiceId
+      WHERE ps.PackageId = @PackageId
+    `);
+  const services = svcsRes.recordset || [];
+  const totalDurationMinutes = services.reduce((acc, s) => acc + (Number(s.DurationMinutes) || 30), 0);
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const [h, m] = startTime.split(":").map(Number);
+  const startD = new Date();
+  startD.setHours(h, m, 0, 0);
+  const endD = new Date(startD.getTime() + totalDurationMinutes * 60 * 1000);
+  const endTime = `${pad(endD.getHours())}:${pad(endD.getMinutes())}:00`;
+
+  let currentStepStart = startD;
+  const serviceAssignments = [];
+
+  for (const svc of services) {
+    const durMins = Number(svc.DurationMinutes) || 30;
+    const stepEnd = new Date(currentStepStart.getTime() + durMins * 60 * 1000);
+
+    const stepStartStr = `${pad(currentStepStart.getHours())}:${pad(currentStepStart.getMinutes())}:00`;
+    const stepEndStr = `${pad(stepEnd.getHours())}:${pad(stepEnd.getMinutes())}:00`;
+
+    let stepTech;
+    try {
+      stepTech = await findAvailableTechnician(appointmentDate, stepStartStr, stepEndStr);
+    } catch {
+      stepTech = await findAvailableTechnician(appointmentDate, startTime, endTime);
+    }
+
+    serviceAssignments.push({
+      serviceId: svc.ServiceId,
+      serviceName: svc.ServiceName,
+      durationMinutes: durMins,
+      startTime: stepStartStr,
+      endTime: stepEndStr,
+      technician: stepTech
+    });
+
+    currentStepStart = stepEnd;
+  }
+
+  const primaryTechnician = serviceAssignments[0]?.technician;
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const apptReq = new sql.Request(transaction);
+    apptReq.input("AppointmentId", sql.Int, currentAppt.AppointmentId);
+    apptReq.input("EmployeeId", sql.Int, primaryTechnician.EmployeeId);
+    apptReq.input("AppointmentDate", sql.Date, appointmentDate);
+    apptReq.input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime);
+    apptReq.input("EndTime", sql.VarChar, endTime);
+    apptReq.input("Notes", sql.NVarChar, notes ? `[Đổi lịch Combo: ${cp.PackageName}] ${notes}` : `[Đổi lịch Combo: ${cp.PackageName}]`);
+
+    await apptReq.query(`
+      UPDATE Appointments
+      SET EmployeeId = @EmployeeId,
+          AppointmentDate = @AppointmentDate,
+          StartTime = @StartTime,
+          EndTime = @EndTime,
+          Notes = @Notes,
+          UpdatedAt = GETDATE()
+      WHERE AppointmentId = @AppointmentId
+    `);
+
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, currentAppt.AppointmentId)
+      .query(`DELETE FROM AppointmentServices WHERE AppointmentId = @AppointmentId`);
+
+    for (const step of serviceAssignments) {
+      const svcReq = new sql.Request(transaction);
+      svcReq.input("AppointmentId", sql.Int, currentAppt.AppointmentId);
+      svcReq.input("ServiceId", sql.Int, step.serviceId);
+      svcReq.input("Price", sql.Decimal(18, 2), 0);
+      svcReq.input("EmployeeId", sql.Int, step.technician.EmployeeId);
+      await svcReq.query(`
+        INSERT INTO AppointmentServices (AppointmentId, ServiceId, Price, EmployeeId)
+        VALUES (@AppointmentId, @ServiceId, @Price, @EmployeeId)
+      `);
+    }
+
+    await transaction.commit();
+
+    return {
+      appointmentId: currentAppt.AppointmentId,
+      packageName: cp.PackageName,
+      appointmentDate,
+      startTime,
+      endTime,
+      totalDurationMinutes,
+      technician: {
+        employeeId: primaryTechnician.EmployeeId,
+        fullName: primaryTechnician.FullName,
+        phone: primaryTechnician.Phone,
+        avatarUrl: primaryTechnician.AvatarUrl
+      },
+      serviceAssignments: serviceAssignments.map(s => ({
+        serviceId: s.serviceId,
+        serviceName: s.serviceName,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        durationMinutes: s.durationMinutes,
+        technician: {
+          employeeId: s.technician.EmployeeId,
+          fullName: s.technician.FullName,
+          phone: s.technician.Phone,
+          avatarUrl: s.technician.AvatarUrl
+        }
+      }))
+    };
+  } catch (err) {
+    try { await transaction.rollback(); } catch {}
+    throw err;
+  }
+}
+
+async function getComboHistoryAndReviews(customerId) {
+  const pool = await connectDB();
+
+  // 1. Fetch completed combo appointments for this customer
+  const apptsRes = await pool
+    .request()
+    .input("CustomerId", sql.Int, customerId)
+    .query(`
+      SELECT 
+        a.AppointmentId,
+        a.CustomerPackageId,
+        p.PackageName,
+        CONVERT(VARCHAR(10), a.AppointmentDate, 120) AS AppointmentDate,
+        CAST(a.StartTime AS VARCHAR(5)) AS StartTime,
+        CAST(a.EndTime AS VARCHAR(5)) AS EndTime,
+        a.Status,
+        a.Notes
+      FROM Appointments a
+      JOIN CustomerPackages cp ON a.CustomerPackageId = cp.CustomerPackageId
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE a.CustomerId = @CustomerId
+        AND a.Status = 'COMPLETED'
+      ORDER BY a.AppointmentDate DESC, a.StartTime DESC
+    `);
+
+  const appts = apptsRes.recordset || [];
+
+  for (const appt of appts) {
+    // 2. Fetch service steps + technicians for each combo appointment
+    const servicesRes = await pool
+      .request()
+      .input("AppointmentId", sql.Int, appt.AppointmentId)
+      .query(`
+        SELECT 
+          aps.AppointmentServiceId,
+          aps.ServiceId,
+          s.ServiceName,
+          s.DurationMinutes,
+          aps.EmployeeId,
+          u.FullName AS TechnicianName,
+          u.Phone AS TechnicianPhone,
+          COALESCE(e.ImageUrl, u.AvatarUrl) AS TechnicianAvatar,
+          r.Rating AS ServiceRating,
+          r.TechnicianRating,
+          r.Comment AS ServiceComment
+        FROM AppointmentServices aps
+        JOIN Services s ON aps.ServiceId = s.ServiceId
+        LEFT JOIN Employees e ON aps.EmployeeId = e.EmployeeId
+        LEFT JOIN Users u ON e.UserId = u.UserId
+        LEFT JOIN Reviews r ON r.AppointmentId = aps.AppointmentId AND r.ServiceId = aps.ServiceId
+        WHERE aps.AppointmentId = @AppointmentId
+        ORDER BY aps.AppointmentServiceId ASC
+      `);
+
+    appt.Services = servicesRes.recordset || [];
+
+    // 3. Fetch Treatment Notes for this appointment
+    const notesRes = await pool
+      .request()
+      .input("AppointmentId", sql.Int, appt.AppointmentId)
+      .query(`
+        SELECT TOP 1 NoteText, SkinCondition, CustomerFeedback
+        FROM TreatmentNotes
+        WHERE AppointmentId = @AppointmentId
+        ORDER BY CreatedAt DESC
+      `);
+
+    appt.TreatmentNote = notesRes.recordset[0] || null;
+
+    // Check if appointment is reviewed
+    appt.IsReviewed = appt.Services.some(s => s.ServiceRating > 0);
+  }
+
+  return appts;
+}
+
+async function submitComboReview({ customerId, appointmentId, overallRating, overallComment, stepReviews = [] }) {
+  const pool = await connectDB();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    for (const step of stepReviews) {
+      const serviceId = step.serviceId;
+      const employeeId = step.employeeId;
+      const rating = step.rating || overallRating || 5;
+      const comment = step.comment || overallComment || "";
+
+      // Check if review already exists
+      const checkRes = await new sql.Request(transaction)
+        .input("CustomerId", sql.Int, customerId)
+        .input("AppointmentId", sql.Int, appointmentId)
+        .input("ServiceId", sql.Int, serviceId)
+        .query(`
+          SELECT ReviewId FROM Reviews 
+          WHERE CustomerId = @CustomerId 
+            AND AppointmentId = @AppointmentId 
+            AND ServiceId = @ServiceId
+        `);
+
+      if (checkRes.recordset.length > 0) {
+        await new sql.Request(transaction)
+          .input("ReviewId", sql.Int, checkRes.recordset[0].ReviewId)
+          .input("Rating", sql.Int, overallRating || rating)
+          .input("TechnicianRating", sql.Int, rating)
+          .input("Comment", sql.NVarChar, comment)
+          .query(`
+            UPDATE Reviews
+            SET Rating = @Rating,
+                TechnicianRating = @TechnicianRating,
+                Comment = @Comment,
+                UpdatedAt = CURRENT_TIMESTAMP
+            WHERE ReviewId = @ReviewId
+          `);
+      } else {
+        await new sql.Request(transaction)
+          .input("CustomerId", sql.Int, customerId)
+          .input("AppointmentId", sql.Int, appointmentId)
+          .input("ServiceId", sql.Int, serviceId)
+          .input("EmployeeId", sql.Int, employeeId || null)
+          .input("Rating", sql.Int, overallRating || rating)
+          .input("TechnicianRating", sql.Int, rating)
+          .input("Comment", sql.NVarChar, comment)
+          .input("Status", sql.NVarChar, "APPROVED")
+          .query(`
+            INSERT INTO Reviews (CustomerId, AppointmentId, ServiceId, EmployeeId, Rating, TechnicianRating, Comment, Status, CreatedAt)
+            VALUES (@CustomerId, @AppointmentId, @ServiceId, @EmployeeId, @Rating, @TechnicianRating, @Comment, @Status, CURRENT_TIMESTAMP)
+          `);
+      }
+    }
+
+    await transaction.commit();
+    return { success: true, message: "Cảm ơn bạn đã đánh giá Combo & Kỹ thuật viên!" };
+  } catch (err) {
+    try { await transaction.rollback(); } catch {}
+    throw err;
+  }
+}
+
+module.exports = {
+  ...module.exports,
+  rescheduleCustomerPackageAppointment,
+  getComboHistoryAndReviews,
+  submitComboReview
+};
+
+
+

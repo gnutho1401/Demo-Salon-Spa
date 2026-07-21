@@ -483,6 +483,44 @@ async function updateAssignedServices(employeeId, serviceIds = []) {
   }
 }
 
+async function updateImage(id, imageUrl) {
+  const pool = await connectDB();
+  const emp = await getById(id);
+
+  await pool.request()
+    .input("EmployeeId", sql.Int, Number(id))
+    .input("UserId", sql.Int, emp.UserId)
+    .input("ImageUrl", sql.NVarChar, imageUrl)
+    .query(`
+      UPDATE Employees SET ImageUrl = @ImageUrl WHERE EmployeeId = @EmployeeId;
+      UPDATE Users SET AvatarUrl = @ImageUrl WHERE UserId = @UserId;
+    `);
+
+  return await getById(id);
+}
+
+async function remove(id) {
+  const pool = await connectDB();
+  const emp = await getById(id);
+
+  try {
+    await pool.request().input("EmployeeId", sql.Int, Number(id)).query("DELETE FROM EmployeeServices WHERE EmployeeId = @EmployeeId");
+    await pool.request().input("EmployeeId", sql.Int, Number(id)).query("DELETE FROM ShiftRegistrations WHERE TechnicianId = @EmployeeId");
+    await pool.request().input("EmployeeId", sql.Int, Number(id)).query("DELETE FROM Employees WHERE EmployeeId = @EmployeeId");
+    await pool.request().input("UserId", sql.Int, emp.UserId).query("DELETE FROM Users WHERE UserId = @UserId");
+    return { EmployeeId: Number(id), deleted: true };
+  } catch (err) {
+    await pool.request()
+      .input("EmployeeId", sql.Int, Number(id))
+      .input("UserId", sql.Int, emp.UserId)
+      .query(`
+        UPDATE Employees SET Status = 'INACTIVE' WHERE EmployeeId = @EmployeeId;
+        UPDATE Users SET Status = 'INACTIVE' WHERE UserId = @UserId;
+      `);
+    return { EmployeeId: Number(id), Status: "INACTIVE", softDeleted: true };
+  }
+}
+
 module.exports = {
   getRoles,
   getBranches,
@@ -494,4 +532,7 @@ module.exports = {
   changeStatus,
   getAssignedServices,
   updateAssignedServices,
+  updateImage,
+  remove,
 };
+

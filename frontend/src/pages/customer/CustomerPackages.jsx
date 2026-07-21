@@ -6,28 +6,29 @@ import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 
 const STATUS_LABELS = {
-  ACTIVE: { text: "Đang hoạt động", color: "#22c55e", bg: "#f0fdf4" },
-  FROZEN: { text: "Đang đóng băng", color: "#3b82f6", bg: "#eff6ff" },
-  EXPIRED: { text: "Đã hết hạn", color: "#ef4444", bg: "#fef2f2" },
-  USED_UP: { text: "Đã hoàn thành", color: "#8b5cf6", bg: "#f5f3ff" },
-  COMPLETED: { text: "Đã hoàn thành", color: "#8b5cf6", bg: "#f5f3ff" },
-  PENDING_PAYMENT: { text: "Chờ thanh toán", color: "#f59e0b", bg: "#fffbeb" },
-  CANCELLED: { text: "Đã hủy", color: "#6b7280", bg: "#f9fafb" },
+  ACTIVE: { text: "Đang hoạt động", color: "#059669", bg: "#ecfdf5" },
+  FROZEN: { text: "Đang tạm dừng", color: "#2563eb", bg: "#eff6ff" },
+  EXPIRED: { text: "Đã hết hạn", color: "#dc2626", bg: "#fef2f2" },
+  USED_UP: { text: "Đã hoàn thành", color: "#7c3aed", bg: "#f5f3ff" },
+  COMPLETED: { text: "Đã hoàn thành", color: "#7c3aed", bg: "#f5f3ff" },
+  PENDING_PAYMENT: { text: "Chờ thanh toán", color: "#d97706", bg: "#fffbeb" },
+  CANCELLED: { text: "Đã hủy", color: "#4b5563", bg: "#f9fafb" },
 };
 
 function StatusBadge({ status }) {
-  const info = STATUS_LABELS[status] || { text: status, color: "#6b7280", bg: "#f3f4f6" };
+  const info = STATUS_LABELS[status] || { text: status, color: "#4b5563", bg: "#f3f4f6" };
   return (
     <span
       style={{
         display: "inline-block",
         padding: "4px 12px",
         borderRadius: 20,
-        fontSize: 12,
-        fontWeight: 600,
+        fontSize: 11,
+        fontWeight: 700,
         color: info.color,
         backgroundColor: info.bg,
-        border: `1px solid ${info.color}20`,
+        border: `1px solid ${info.color}30`,
+        letterSpacing: 0.3
       }}
     >
       {info.text}
@@ -37,14 +38,18 @@ function StatusBadge({ status }) {
 
 function formatDate(dateValue) {
   if (!dateValue) return "—";
+  if (typeof dateValue === "string" && dateValue.includes("T")) {
+    dateValue = dateValue.split("T")[0];
+  }
+  if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    const [y, m, d] = dateValue.split("-");
+    return `${d}/${m}/${y}`;
+  }
   return new Date(dateValue).toLocaleDateString("vi-VN");
 }
 
 function formatDateTime(dateValue, timeValue) {
-  const dateText = dateValue
-    ? new Date(dateValue).toLocaleDateString("vi-VN")
-    : "Không rõ ngày";
-  
+  const dateText = formatDate(dateValue);
   let timeText = "";
   if (timeValue) {
     if (timeValue instanceof Date || (typeof timeValue === "object" && typeof timeValue.getHours === "function")) {
@@ -91,10 +96,8 @@ function Modal({ open, onClose, title, children }) {
     <div className="pkg-modal-overlay" onClick={onClose}>
       <div className="pkg-modal" onClick={(e) => e.stopPropagation()}>
         <div className="pkg-modal-header">
-          <h3>{title}</h3>
-          <button onClick={onClose} className="pkg-modal-close">
-            ✕
-          </button>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#831843" }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#64748b" }}>✕</button>
         </div>
         <div className="pkg-modal-body">{children}</div>
       </div>
@@ -104,7 +107,6 @@ function Modal({ open, onClose, title, children }) {
 
 /* ===== PACKAGE DETAIL PANEL ===== */
 function PackageDetailPanel({ pkg, onClose, onRefresh }) {
-  const navigate = useNavigate();
   const [detail, setDetail] = useState(null);
   const [usages, setUsages] = useState({ data: [], pagination: {} });
   const [usagePage, setUsagePage] = useState(1);
@@ -112,13 +114,41 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Modal states
-  const [showMemberModal, setShowMemberModal] = useState(false);
-  const [memberForm, setMemberForm] = useState({ phoneOrEmail: "", relationship: "" });
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
+  // Combo Booking Modal states
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [isRescheduleMode, setIsRescheduleMode] = useState(false);
+  const [bookingForm, setBookingForm] = useState({
+    appointmentDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    startTime: "09:00",
+    notes: ""
+  });
+  const [bookingSuccess, setBookingSuccess] = useState(null);
+  const [bookingError, setBookingError] = useState("");
+
+  const handleBookCombo = async () => {
+    if (!bookingForm.appointmentDate || !bookingForm.startTime) {
+      setBookingError("Vui lòng chọn ngày và giờ hẹn");
+      return;
+    }
+    setActionLoading(true);
+    setBookingError("");
+    try {
+      const endpoint = isRescheduleMode
+        ? `/packages/my/${pkg.CustomerPackageId}/reschedule`
+        : `/packages/my/${pkg.CustomerPackageId}/book`;
+
+      const res = await axiosClient.post(endpoint, bookingForm);
+      const data = res.data.data || res.data;
+      setBookingSuccess(data);
+      setMessage(isRescheduleMode ? "✅ Đổi lịch hẹn Combo thành công!" : "✅ Đặt lịch sử dụng Combo thành công!");
+      onRefresh();
+      loadDetail();
+    } catch (err) {
+      setBookingError(err.response?.data?.message || (isRescheduleMode ? "Lỗi đổi lịch hẹn Combo" : "Lỗi đặt lịch hẹn Combo"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const loadDetail = async () => {
     setLoading(true);
@@ -139,640 +169,425 @@ function PackageDetailPanel({ pkg, onClose, onRefresh }) {
     loadDetail();
   }, [pkg.CustomerPackageId, usagePage]);
 
+  const d = detail || pkg;
+  const total = Number(d.TotalSessions || 0) || 1;
+  const left = Number(d.RemainingSessions || 0);
+  const used = Number(d.UsedSessions || 0);
+  const percent = Math.max(0, Math.min(100, (used / total) * 100));
+  const services = d.Services || [];
 
-
-  const selectMember = (m) => {
-    setSelectedMember(m);
-    setSearchResults([]);
-    setSearchError("");
-    setMemberForm((f) => ({ ...f, phoneOrEmail: "" }));
-  };
-
-  useEffect(() => {
-    if (selectedMember) {
-      setSearchResults([]);
-      return;
-    }
-
-    const query = memberForm.phoneOrEmail ? memberForm.phoneOrEmail.trim() : "";
-    if (query.length < 2) {
-      setSearchResults([]);
-      setSearchError("");
-      return;
-    }
-
-    const delayDebounceFn = setTimeout(async () => {
-      setSearching(true);
-      setSearchError("");
-      try {
-        const res = await axiosClient.get(`/packages/find-member?q=${encodeURIComponent(query)}`);
-        const data = res.data.data || res.data || [];
-        setSearchResults(Array.isArray(data) ? data : (data ? [data] : []));
-        if (Array.isArray(data) && data.length === 0) {
-          setSearchError("Không tìm thấy tài khoản khách hàng phù hợp");
-        }
-      } catch (err) {
-        setSearchError(err.response?.data?.message || "Lỗi tìm kiếm tài khoản");
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 450);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [memberForm.phoneOrEmail, selectedMember]);
-
-  const handleAddMember = async () => {
-    if (!selectedMember) return;
-    setActionLoading(true);
-    try {
-      await axiosClient.post(`/packages/my/${pkg.CustomerPackageId}/members`, {
-        phoneOrEmail: selectedMember.Email || selectedMember.Phone,
-        relationship: memberForm.relationship
-      });
-      setMessage("✅ Thêm thành viên gia đình thành công!");
-      setShowMemberModal(false);
-      setMemberForm({ phoneOrEmail: "", relationship: "" });
-      setSelectedMember(null);
-      setSearchResults([]);
-      setSearchError("");
-      loadDetail();
-    } catch (err) {
-      setMessage("❌ " + (err.response?.data?.message || "Lỗi thêm thành viên"));
-    }
-    setActionLoading(false);
-  };
-
-  const handleRemoveMember = async (memberId) => {
-    if (!window.confirm("Hủy thêm thành viên này khỏi liệu trình?")) return;
-    try {
-      await axiosClient.delete(`/packages/my/${pkg.CustomerPackageId}/members/${memberId}`);
-      setMessage("✅ Đã hủy thêm thành viên");
-      loadDetail();
-    } catch (err) {
-      setMessage("❌ " + (err.response?.data?.message || "Lỗi hủy thêm thành viên"));
-    }
-  };
-
-  const handleRepay = async (customerPackageId) => {
-    setActionLoading(true);
-    try {
-      setMessage("");
-      const res = await axiosClient.post(`/packages/my/${customerPackageId}/repay`);
-      const data = res.data.data || res.data;
-      if (data && data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      } else {
-        throw new Error("Không nhận được URL thanh toán");
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || "Lỗi tạo link thanh toán");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  if (loading && !detail) {
+  if (loading) {
     return (
-      <div className="pkg-detail-panel">
-        <div className="pkg-detail-header">
-          <h2>Chi tiết liệu trình</h2>
-          <button onClick={onClose} className="btn-close">✕</button>
-        </div>
-        <p className="muted" style={{ textAlign: "center", padding: 40 }}>Đang tải...</p>
+      <div style={{ textAlign: "center", padding: 60, color: "#be185d" }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>🌸</div>
+        <p style={{ fontWeight: 700 }}>Đang tải chi tiết liệu trình...</p>
       </div>
     );
   }
 
-  const d = detail || pkg;
-  const total = Number(d.TotalSessions || 0) || 1;
-  const used = Number(d.UsedSessions || 0);
-  const left = Number(d.RemainingSessions || 0);
-  const percent = Math.max(0, Math.min(100, (used / total) * 100));
-  const remaining = daysLeft(d.EndDate);
-
   return (
-    <div className="pkg-detail-panel">
-      <div className="pkg-detail-header">
-        <div className="pkg-detail-header-info">
-          <h2>Chi tiết Combo & Liệu trình</h2>
-          <p className="muted">Theo dõi tiến trình sử dụng dịch vụ và quản lý chia sẻ người thân</p>
+    <div className="pkg-detail-panel" style={{ background: "#fff", borderRadius: 24, padding: 28, border: "1.5px solid #fbcfe8", boxShadow: "0 10px 30px rgba(236,72,153,0.08)" }}>
+      {/* PANEL HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, paddingBottom: 16, borderBottom: "1px dashed #fbcfe8" }}>
+        <div>
+          <span style={{ background: "#ec4899", color: "#fff", fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 10 }}>CHI TIẾT LIỆU TRÌNH COMBO</span>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: "#831843", margin: "6px 0 4px 0" }}>{d.PackageName}</h2>
+          {d.CategoryName && <span style={{ fontSize: 12, color: "#be185d", fontWeight: 600 }}>📂 {d.CategoryName}</span>}
         </div>
-        <button onClick={onClose} className="pkg-back-btn">
+        <button onClick={onClose} style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", color: "#db2777", fontWeight: 700, borderRadius: 12, padding: "8px 16px", cursor: "pointer", whiteSpace: "nowrap" }}>
           ← Quay lại danh sách
         </button>
       </div>
 
       {message && (
-        <div className={message.includes("✅") ? "alert success" : "alert error"} style={{ margin: "12px 0" }}>
+        <div className={message.includes("✅") ? "alert success" : "alert error"} style={{ margin: "12px 0", borderRadius: 12 }}>
           {message}
           <button onClick={() => setMessage("")} style={{ float: "right", background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>✕</button>
         </div>
       )}
 
-      <div className="pkg-detail-grid">
-        {/* === COLUMN LEFT: MAIN CONTENT === */}
-        <div className="pkg-detail-left">
-          
-          {/* OVERVIEW CARD */}
-          <div className="pkg-overview-card">
-            <div className="pkg-overview-banner">
-              <img src={resolveFileUrl(d.ImageUrl) || "/vite.svg"} alt={d.PackageName} />
-              <div className="pkg-overview-banner-overlay">
-                <span className="pkg-overview-category">{d.CategoryName}</span>
-                <h3 className="pkg-overview-title">{d.PackageName}</h3>
-              </div>
-            </div>
-            <div className="pkg-overview-content">
-              <p className="pkg-overview-desc">{d.Description || "Không có mô tả chi tiết cho liệu trình này."}</p>
-              <div className="pkg-overview-meta-list">
-                <div className="pkg-overview-meta-item">
-                  <span className="pkg-overview-meta-icon">📅</span>
-                  <div className="pkg-overview-meta-text">
-                    <small>Thời hạn sử dụng</small>
-                    <span>{formatDate(d.StartDate)} - {formatDate(d.EndDate)}</span>
-                  </div>
-                </div>
-                <div className="pkg-overview-meta-item">
-                  <span className="pkg-overview-meta-icon">💳</span>
-                  <div className="pkg-overview-meta-text">
-                    <small>Giá mua gói</small>
-                    <span>{money(d.PurchasePrice || d.SalePrice)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* THÔNG TIN TỔNG QUAN */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Trạng thái", value: <StatusBadge status={d.Status} /> },
+          { label: "Ngày bắt đầu", value: formatDate(d.StartDate) },
+          { label: "Hạn sử dụng", value: d.EndDate ? formatDate(d.EndDate) : "Chưa xác định" },
+          { 
+            label: "Giá mua", 
+            value: (d.Amount || d.PurchasePrice || d.SalePrice || d.OriginalPrice || d.Price) 
+              ? `${Number(d.Amount || d.PurchasePrice || d.SalePrice || d.OriginalPrice || d.Price).toLocaleString("vi-VN")}đ` 
+              : "—" 
+          },
+        ].map((item, i) => (
+          <div key={i} style={{ background: "#fdf2f8", padding: "12px 14px", borderRadius: 12, border: "1px solid #fbcfe8" }}>
+            <div style={{ fontSize: 11, color: "#be185d", fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>{item.label}</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: item.highlight ? "#059669" : "#1e293b" }}>{item.value}</div>
           </div>
+        ))}
+      </div>
 
-          {/* SERVICES LIST */}
-          <div className="pkg-section">
-            <h3>📋 Dịch vụ & Hạn mức chi tiết</h3>
-            {detail?.Services && detail.Services.length > 0 ? (
-              <div className="pkg-services-list">
-                {detail.Services.map((s) => {
-                  const sUsed = Number(s.UsedSessions || 0);
-                  const sMax = Number(s.MaxSessions || 0);
-                  const sLeft = Math.max(0, sMax - sUsed);
-                  const sPercent = sMax > 0 ? (sUsed / sMax) * 100 : 0;
-                  const isExhausted = sLeft === 0;
-
-                  return (
-                    <div
-                      key={s.ServiceId}
-                      className="pkg-service-card"
-                      style={{
-                        opacity: isExhausted ? 0.55 : 1,
-                        filter: isExhausted ? "grayscale(100%)" : "none",
-                      }}
-                    >
-                      <div className="pkg-service-img-wrap">
-                        <img
-                          className="pkg-service-img"
-                          src={resolveFileUrl(s.ImageUrl) || "/vite.svg"}
-                          alt={s.ServiceName}
-                        />
-                      </div>
-                      <div className="pkg-service-info">
-                        <div className="pkg-service-header">
-                          <h4 className="pkg-service-name">{s.ServiceName}</h4>
-                          <span className="pkg-service-badge">
-                            Còn {sLeft} / {sMax} buổi
-                          </span>
-                        </div>
-                        <p className="pkg-service-desc">{s.Description || "Chưa có mô tả dịch vụ."}</p>
-                        
-                        <div className="pkg-service-meta">
-                          <span className="pkg-service-duration">
-                            🕘 {s.DurationMinutes || 60} phút
-                          </span>
-                          <span>• Đã dùng {sUsed} buổi</span>
-                        </div>
-
-                        <div className="pkg-service-progress-container">
-                          <div className="pkg-service-progress-bar">
-                            <div
-                              className="pkg-service-progress-fill"
-                              style={{ width: `${sPercent}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {s.ActiveBookings > 0 && (
-                          <div style={{
-                            margin: '8px 0',
-                            padding: '6px 10px',
-                            backgroundColor: '#fffbeb',
-                            border: '1px solid #fef3c7',
-                            borderRadius: '6px',
-                            fontSize: '11.5px',
-                            color: '#b45309',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontWeight: '500',
-                            lineHeight: '1.4',
-                            textAlign: 'left'
-                          }}>
-                            <span>📅</span>
-                            <span>{s.ActiveBookingDetails}</span>
-                          </div>
-                        )}
-
-                        {d.Status !== "ACTIVE" ? (
-                          <div
-                            style={{
-                              padding: "8px",
-                              textAlign: "center",
-                              background: "#f1f5f9",
-                              color: "#64748b",
-                              borderRadius: 8,
-                              fontSize: 12,
-                              fontWeight: 600
-                            }}
-                          >
-                            🔒 {d.Status === "PENDING_PAYMENT" ? "Chờ thanh toán để sử dụng" : "Không thể sử dụng"}
-                          </div>
-                        ) : isExhausted ? (
-                          <div
-                            style={{
-                              padding: "8px",
-                              textAlign: "center",
-                              background: "#fee2e2",
-                              color: "#dc2626",
-                              borderRadius: 8,
-                              fontSize: 12,
-                              fontWeight: 700
-                            }}
-                          >
-                            🚫 Hết hạn mức buổi sử dụng
-                          </div>
-                        ) : (
-                          <button
-                            className="btn primary"
-                            style={{
-                              width: "100%",
-                              padding: "8px",
-                              fontSize: "12px",
-                              borderRadius: "8px",
-                              justifyContent: "center"
-                            }}
-                            onClick={() => navigate(`/customer/booking?customerPackageId=${d.CustomerPackageId}&serviceId=${s.ServiceId}`)}
-                          >
-                            📅 Đặt lịch nhanh dịch vụ này
-                          </button>
-                        )}
-                      </div>
+      {/* DANH SÁCH DỊCH VỤ TRONG COMBO */}
+      {services.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 800, color: "#831843", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            ✂️ Các Dịch Vụ Trong Combo ({services.length} dịch vụ)
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", gap: 12 }}>
+            {services.map((svc, idx) => {
+              return (
+                <div key={svc.ServiceId || idx} style={{ background: "#fff", border: "1.5px solid #fbcfe8", borderRadius: 14, padding: "14px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {svc.ImageUrl ? (
+                      <img src={resolveFileUrl(svc.ImageUrl)} alt={svc.ServiceName} style={{ width: 42, height: 42, borderRadius: 10, objectFit: "cover", border: "1.5px solid #fbcfe8" }} />
+                    ) : (
+                      <div style={{ width: 42, height: 42, borderRadius: 10, background: "linear-gradient(135deg, #fce7f3, #fbcfe8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>✨</div>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <b style={{ fontSize: 13, color: "#831843", display: "block" }}>Bước {idx + 1}. {svc.ServiceName}</b>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>⏱ {svc.DurationMinutes || 30} phút</span>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="muted">{d.ServiceNames}</p>
-            )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </div>
+      )}
 
-          {/* TIMELINE USAGE HISTORY */}
-          <div className="pkg-section">
-            <h3>📜 Lịch sử trị liệu</h3>
-            {(usages.data || []).length > 0 ? (
-              <>
-                <div className="pkg-timeline">
-                  {usages.data.map((u) => (
-                    <div className="pkg-timeline-item" key={u.UsageId}>
-                      <div className="pkg-timeline-badge" />
-                      <div className="pkg-timeline-card">
-                        <div className="pkg-timeline-details">
-                          <h4 className="pkg-timeline-title">{u.ServiceName}</h4>
-                          <span className="pkg-timeline-time">{formatDateTime(u.AppointmentDate, u.StartTime)}</span>
-                          <div className="pkg-timeline-metadata">
-                            <span className="pkg-timeline-ktv">KTV: {u.TechnicianName || "Chưa có"}</span>
-                            {u.UsedByName && (
-                              <span className="pkg-timeline-user">
-                                Người thực hiện: {u.UsedByName}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="pkg-timeline-sessions">
-                          -{u.SessionsUsed || 1} buổi
-                        </div>
+      {/* ACTIVE APPOINTMENT & RESCHEDULE BAR */}
+      {d.ActiveAppointment && (
+        <div style={{
+          background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+          border: "1.5px solid #93c5fd",
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 24,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 12
+        }}>
+          <div>
+            <span style={{ background: "#2563eb", color: "#fff", fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 10 }}>
+              📅 ĐÃ CÓ LỊCH HẸN COMBO SẮP TỚI
+            </span>
+            <h4 style={{ margin: "6px 0 2px 0", fontSize: 15, fontWeight: 800, color: "#1e3a8a" }}>
+              Khung giờ: {d.ActiveAppointment.StartTime?.slice(0,5)} - {d.ActiveAppointment.EndTime?.slice(0,5)} ngày {formatDate(d.ActiveAppointment.AppointmentDate)}
+            </h4>
+            <span style={{ fontSize: 12, color: "#1d4ed8" }}>
+              Trạng thái: <b>{d.ActiveAppointment.Status}</b> • Trưởng nhóm KTV: <b>{d.ActiveAppointment.PrimaryTechName || "Tự động phân công"}</b>
+            </span>
+
+            {/* STEP-BY-STEP SERVICE & TECHNICIAN BREAKDOWN */}
+            {d.ActiveAppointment.Services && d.ActiveAppointment.Services.length > 0 && (
+              <div style={{ marginTop: 12, borderTop: "1px dashed #bfdbfe", paddingTop: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#1e40af", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                  ✂️ PHÂN CÔNG KỸ THUẬT VIÊN TƯƠNG ỨNG TỪNG DỊCH VỤ:
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
+                  {d.ActiveAppointment.Services.map((svcStep, idx) => (
+                    <div key={svcStep.AppointmentServiceId || idx} style={{
+                      background: "#ffffff",
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      border: "1px solid #bfdbfe",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between"
+                    }}>
+                      <div>
+                        <b style={{ color: "#1e3a8a", fontSize: 12, display: "block" }}>{idx + 1}. {svcStep.ServiceName}</b>
+                        <span style={{ fontSize: 11, color: "#64748b" }}>⏱ {svcStep.DurationMinutes || 30} phút</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <img
+                          src={resolveFileUrl(svcStep.TechnicianAvatar) || "/images/avatars/default-avatar.png"}
+                          alt={svcStep.TechnicianName}
+                          style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #2563eb" }}
+                        />
+                        <b style={{ fontSize: 12, color: "#1d4ed8" }}>{svcStep.TechnicianName || "KTV Rảnh"}</b>
                       </div>
                     </div>
                   ))}
                 </div>
-                {usages.pagination?.totalPages > 1 && (
-                  <div className="pkg-pagination">
-                    <button disabled={usagePage <= 1} onClick={() => setUsagePage((p) => p - 1)}>
-                      ← Trước
-                    </button>
-                    <span>
-                      Trang {usagePage} / {usages.pagination.totalPages}
-                    </span>
-                    <button
-                      disabled={usagePage >= usages.pagination.totalPages}
-                      onClick={() => setUsagePage((p) => p + 1)}
-                    >
-                      Sau →
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="muted">
-                Chưa có buổi nào hoàn thành. Gói dịch vụ chỉ bị trừ buổi sau khi lịch hẹn hoàn thành.
-              </p>
+              </div>
             )}
           </div>
 
-        </div>
-
-        {/* === COLUMN RIGHT: SIDEBAR === */}
-        <div className="pkg-detail-right">
-          
-          {/* GENERAL PROGRESS */}
-          <div className="pkg-progress-card">
-            <h3>📊 Tiến độ sử dụng chung</h3>
-            <div className="pkg-progress-stats" style={{ margin: "20px 0" }}>
-              <div>
-                <span className="pkg-stat-number">{used}</span>
-                <span className="pkg-stat-label">Đã dùng</span>
-              </div>
-              <div className="pkg-progress-circle">
-                <svg viewBox="0 0 100 100" width="90" height="90">
-                  <circle cx="50" cy="50" r="44" fill="none" stroke="#eeded4" strokeWidth="8" />
-                  <circle
-                    cx="50" cy="50" r="44" fill="none" stroke="var(--primary, #8b5cf6)"
-                    strokeWidth="8" strokeLinecap="round"
-                    strokeDasharray={`${percent * 2.76} ${276 - percent * 2.76}`}
-                    transform="rotate(-90 50 50)"
-                    style={{ transition: "stroke-dasharray 0.5s ease-in-out" }}
-                  />
-                </svg>
-                <span className="pkg-progress-text">{Math.round(percent)}%</span>
-              </div>
-              <div>
-                <span className="pkg-stat-number">{left}</span>
-                <span className="pkg-stat-label">Còn lại</span>
-              </div>
-            </div>
-            <div className="pkg-info-row">
-              <StatusBadge status={d.Status} />
-              <span style={{ fontWeight: 600, color: remaining >= 0 ? "#16a34a" : "#dc2626" }}>
-                {remaining !== null && remaining >= 0
-                  ? `Còn ${remaining} ngày (${formatDate(d.EndDate)})`
-                  : remaining !== null
-                    ? `Đã quá hạn ${Math.abs(remaining)} ngày`
-                    : "Không giới hạn"}
-              </span>
-            </div>
-            {d.Status === "PENDING_PAYMENT" && !!d.IsOwner && (
-              <button
-                className="btn primary"
-                style={{ width: "100%", marginTop: "16px", justifyContent: "center" }}
-                onClick={() => handleRepay(d.CustomerPackageId)}
-                disabled={actionLoading}
-              >
-                💳 {actionLoading ? "Đang xử lý..." : "Thanh toán ngay qua VNPay"}
-              </button>
-            )}
-          </div>
-
-          {/* QUICK BOOK BUTTON */}
-          <div className="pkg-actions-bar" style={{ marginBottom: "24px" }}>
-            {d.Status === "ACTIVE" && left > 0 && (
-              <button
-                className="btn primary"
-                style={{ width: "100%", justifyContent: "center" }}
-                onClick={() => navigate(`/customer/booking?customerPackageId=${d.CustomerPackageId}`)}
-              >
-                📅 Đặt lịch nhanh toàn gói
-              </button>
-            )}
-          </div>
-
-          {/* FAMILY SHARING DETAILS & SLOTS */}
-          <div className="pkg-section">
-            <h3>👨‍👩‍👦 Chia sẻ gia đình ({detail?.Members?.length || 0}/2)</h3>
-            <p className="muted" style={{ fontSize: "12px", margin: "-6px 0 12px 0", lineHeight: "1.4" }}>
-              Chia sẻ quyền sử dụng gói dịch vụ này cho tối đa 2 thành viên trong gia đình bạn.
-            </p>
-            <div className="pkg-member-grid">
-              {Array.from({ length: 2 }).map((_, idx) => {
-                const m = detail?.Members?.[idx];
-                if (m) {
-                  return (
-                    <div key={m.PackageMemberId} className="pkg-member-card-premium">
-                      <img
-                        className="pkg-member-avatar"
-                        src={resolveFileUrl(m.AvatarUrl) || "/images/default-avatar.png"}
-                        alt={m.FullName}
-                      />
-                      <div className="pkg-member-info">
-                        <h5 className="pkg-member-name">{m.FullName}</h5>
-                        <span className="pkg-member-rel">{m.Relationship}</span>
-                        <small className="pkg-member-contact">{m.Phone || m.Email}</small>
-                      </div>
-                      {!!d.IsOwner && (
-                        <button
-                          className="pkg-member-remove-btn"
-                          onClick={() => handleRemoveMember(m.PackageMemberId)}
-                          title="Hủy thêm thành viên"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  );
-                } else {
-                  const canAddMember = !!d.IsOwner && d.Status === "ACTIVE";
-                  return canAddMember ? (
-                    <div
-                      key={`empty-${idx}`}
-                      className="pkg-member-slot-empty"
-                      onClick={() => setShowMemberModal(true)}
-                    >
-                      <span className="pkg-member-slot-icon">➕</span>
-                      <span className="pkg-member-slot-text">Thêm người thân</span>
-                    </div>
-                  ) : (
-                    <div key={`empty-${idx}`} className="pkg-member-slot-empty" style={{ cursor: "default" }}>
-                      <span className="pkg-member-slot-icon" style={{ opacity: 0.4 }}>👤</span>
-                      <span className="pkg-member-slot-text" style={{ opacity: 0.5, fontWeight: "normal" }}>
-                        {d.Status === "PENDING_PAYMENT" ? "Chờ thanh toán" : "Trống"}
-                      </span>
-                    </div>
-                  );
-                }
-              })}
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* === MODALS === */}
-      <Modal
-        open={showMemberModal}
-        onClose={() => {
-          setShowMemberModal(false);
-          setSelectedMember(null);
-          setSearchResults([]);
-          setSearchError("");
-          setMemberForm((f) => ({ ...f, phoneOrEmail: "" }));
-        }}
-        title="Thêm thành viên gia đình"
-      >
-        <div className="pkg-form">
-          <p className="muted">
-            Thành viên gia đình có thể đặt lịch sử dụng liệu trình này (tối đa 2 người). 
-            Nhập Họ tên, Số điện thoại hoặc Email để chọn tài khoản gợi ý bên dưới.
-          </p>
-          <label style={{ position: "relative", display: "block" }}>
-            Tìm kiếm người thân:
-            <input
-              type="text"
-              value={memberForm.phoneOrEmail}
-              onChange={(e) => {
-                setMemberForm((f) => ({ ...f, phoneOrEmail: e.target.value }));
-                if (selectedMember) {
-                  setSelectedMember(null);
-                }
-              }}
-              placeholder="Nhập tên, số điện thoại hoặc email..."
-              style={{ marginTop: 4, width: "100%" }}
-            />
-            
-            {searching && (
-              <p className="muted" style={{ fontSize: 12, margin: "4px 0" }}>
-                Đang tìm kiếm...
-              </p>
-            )}
-            
-            {/* Search Results Dropdown List */}
-            {searchResults.length > 0 && (
-              <div className="search-results-list">
-                {searchResults.map((m) => (
-                  <div
-                    key={m.CustomerId}
-                    onClick={() => selectMember(m)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "8px 12px",
-                      cursor: "pointer",
-                      borderBottom: "1px solid #f1f5f9"
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#f8fafc"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "#fff"}
-                  >
-                    <img
-                      src={resolveFileUrl(m.AvatarUrl) || "/images/default-avatar.png"}
-                      alt={m.FullName}
-                      style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }}
-                    />
-                    <div>
-                      <b style={{ fontSize: 13, color: "#1e293b", display: "block" }}>{m.FullName}</b>
-                      <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>{m.Email} | {m.Phone}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </label>
-          
-          {searchError && (
-            <p className="error-text" style={{ color: "#ef4444", fontSize: 12, margin: "8px 0 0 0", fontWeight: 600 }}>
-              {searchError}
-            </p>
-          )}
-          
-          {/* Selected Member Card */}
-          {selectedMember && (
-            <div
-              className="selected-member-card"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                padding: 12,
-                background: "#f0fdf4",
-                borderRadius: 8,
-                border: "1px solid #bbf7d0",
-                margin: "16px 0 12px"
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <img
-                  src={resolveFileUrl(selectedMember.AvatarUrl) || "/images/default-avatar.png"}
-                  alt={selectedMember.FullName}
-                  style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }}
-                />
-                <div>
-                  <b style={{ color: "#166534", fontSize: 14 }}>{selectedMember.FullName}</b>
-                  <p style={{ fontSize: 12, color: "#15803d", margin: 0 }}>{selectedMember.Email} | {selectedMember.Phone}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedMember(null);
-                  setMemberForm((f) => ({ ...f, phoneOrEmail: "" }));
-                }}
-                style={{ background: "none", border: "none", color: "#ef4444", fontSize: 18, cursor: "pointer", fontWeight: 700 }}
-                title="Bỏ chọn"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          <label style={{ display: "block", marginTop: 12 }}>
-            Mối quan hệ:
-            <select
-              value={memberForm.relationship}
-              onChange={(e) => setMemberForm((f) => ({ ...f, relationship: e.target.value }))}
-            >
-              <option value="">Chọn mối quan hệ</option>
-              <option value="Vợ/Chồng">Vợ/Chồng</option>
-              <option value="Con">Con</option>
-              <option value="Bố/Mẹ">Bố/Mẹ</option>
-              <option value="Anh/Chị/Em">Anh/Chị/Em</option>
-              <option value="Bạn bè">Bạn bè</option>
-              <option value="Khác">Khác</option>
-            </select>
-          </label>
-          
           <button
-            className="btn primary"
-            onClick={handleAddMember}
-            disabled={actionLoading || !selectedMember || !memberForm.relationship}
-            style={{ width: "100%", marginTop: 16 }}
+            style={{
+              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 12,
+              padding: "10px 18px",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }}
+            onClick={() => {
+              setIsRescheduleMode(true);
+              setBookingForm({
+                appointmentDate: d.ActiveAppointment.AppointmentDate || new Date().toISOString().slice(0, 10),
+                startTime: d.ActiveAppointment.StartTime?.slice(0,5) || "09:00",
+                notes: d.ActiveAppointment.Notes || ""
+              });
+              setShowBookModal(true);
+              setBookingSuccess(null);
+              setBookingError("");
+            }}
           >
-            {actionLoading ? "Đang thêm..." : "Thêm thành viên"}
+            🔄 Đổi Lịch Hẹn Combo Ngay
           </button>
         </div>
+      )}
+
+      {/* BOOK BUTTON BANNER IF NO ACTIVE APPOINTMENT & HAS SESSIONS */}
+      {!d.ActiveAppointment && d.Status === "ACTIVE" && left > 0 && (
+        <div style={{
+          background: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)",
+          border: "1.5px solid #fbcfe8",
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 24,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <div>
+            <h4 style={{ margin: "0 0 2px 0", fontSize: 15, fontWeight: 800, color: "#831843" }}>Gói của bạn còn {left} lượt sử dụng</h4>
+            <span style={{ fontSize: 12, color: "#be185d" }}>Bấm Đặt lịch ngay để hệ thống phân công KTV rảnh nhất phục vụ bạn!</span>
+          </div>
+
+          <button
+            style={{
+              background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 12,
+              padding: "10px 20px",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(236,72,153,0.3)"
+            }}
+            onClick={() => {
+              setIsRescheduleMode(false);
+              setShowBookModal(true);
+              setBookingSuccess(null);
+              setBookingError("");
+            }}
+          >
+            ✨ 📅 Đặt Lịch Hẹn Combo
+          </button>
+        </div>
+      )}
+
+      {/* LỊCH SỬ SỬ DỤNG */}
+      {usages.data && usages.data.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 800, color: "#831843", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            📋 Lịch Sử Sử Dụng ({usages.pagination?.total || usages.data.length} buổi)
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {usages.data.map((u, idx) => (
+              <div key={u.UsageId || idx} style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: 12, border: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <b style={{ fontSize: 13, color: "#1e293b", display: "block" }}>{formatDateTime(u.UsedDate, u.StartTime)}</b>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>{u.ServiceName || "Dịch vụ combo"} · KTV: {u.EmployeeName || "—"}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>×{u.SessionsUsed || 1} buổi</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: u.Status === "COMPLETED" ? "#059669" : "#94a3b8", background: u.Status === "COMPLETED" ? "#f0fdf4" : "#f8fafc", padding: "2px 8px", borderRadius: 8, border: `1px solid ${u.Status === "COMPLETED" ? "#86efac" : "#e2e8f0"}` }}>
+                    {u.Status === "COMPLETED" ? "✓ Hoàn thành" : u.Status || "—"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {usages.pagination && usages.pagination.totalPages > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+              <button disabled={usagePage <= 1} onClick={() => setUsagePage(p => p - 1)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: usagePage <= 1 ? "not-allowed" : "pointer", opacity: usagePage <= 1 ? 0.5 : 1 }}>← Trước</button>
+              <span style={{ padding: "6px 14px", fontSize: 12, color: "#64748b" }}>Trang {usagePage}/{usages.pagination.totalPages}</span>
+              <button disabled={usagePage >= usages.pagination.totalPages} onClick={() => setUsagePage(p => p + 1)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: usagePage >= usages.pagination.totalPages ? "not-allowed" : "pointer", opacity: usagePage >= usages.pagination.totalPages ? 0.5 : 1 }}>Sau →</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* BOOKING MODAL */}
+      <Modal open={showBookModal} onClose={() => setShowBookModal(false)} title={isRescheduleMode ? "🔄 Đổi Lịch Hẹn Combo" : "✨ Đặt Lịch Hẹn Sử Dụng Combo"}>
+        {bookingSuccess ? (
+          <div style={{ textAlign: "center", padding: "10px 0" }}>
+            <div style={{ fontSize: 44, marginBottom: 8 }}>🎉</div>
+            <h3 style={{ color: "#db2777", margin: "0 0 6px 0", fontSize: 20 }}>
+              {isRescheduleMode ? "ĐỔI LỊCH THÀNH CÔNG!" : "ĐẶT LỊCH THÀNH CÔNG!"}
+            </h3>
+            <p style={{ fontSize: 13, color: "#475569", margin: "0 0 16px 0" }}>
+              Hệ thống đã cập nhật lịch hẹn và tự động gán KTV rảnh cho từng dịch vụ trong Combo của bạn!
+            </p>
+
+            <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", padding: 14, borderRadius: 12, textAlign: "left", marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <small style={{ color: "#be185d", fontWeight: 700, fontSize: 11 }}>NGÀY HẸN</small>
+                  <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 13 }}>{formatDate(bookingSuccess.appointmentDate)}</div>
+                </div>
+                <div>
+                  <small style={{ color: "#be185d", fontWeight: 700, fontSize: 11 }}>KHUNG GIỜ</small>
+                  <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
+                    {bookingSuccess.startTime?.slice(0,5)} - {bookingSuccess.endTime?.slice(0,5)} ({bookingSuccess.totalDurationMinutes}p)
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px dashed #f472b6", paddingTop: 10, marginTop: 10 }}>
+                <small style={{ color: "#be185d", fontWeight: 700, fontSize: 11 }}>DANH SÁCH DỊCH VỤ & KTV ĐƯỢC PHÂN CÔNG TƯƠNG ỨNG</small>
+                {bookingSuccess.serviceAssignments && bookingSuccess.serviceAssignments.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                    {bookingSuccess.serviceAssignments.map((step, idx) => (
+                      <div key={idx} style={{ background: "#ffffff", padding: "8px 12px", borderRadius: 10, border: "1px solid #fbcfe8", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div>
+                          <b style={{ color: "#831843", fontSize: 12, display: "block" }}>{idx + 1}. {step.serviceName}</b>
+                          <span style={{ fontSize: 11, color: "#64748b" }}>⏱ {step.startTime?.slice(0,5)} - {step.endTime?.slice(0,5)} ({step.durationMinutes}p)</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <img
+                            src={resolveFileUrl(step.technician?.avatarUrl) || "/images/avatars/default-avatar.png"}
+                            alt={step.technician?.fullName}
+                            style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "1px solid #ec4899" }}
+                          />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#be185d" }}>{step.technician?.fullName}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              className="btn primary"
+              style={{
+                width: "100%",
+                background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+                borderColor: "#db2777",
+                fontWeight: 700,
+                padding: 12
+              }}
+              onClick={() => {
+                setShowBookModal(false);
+                setBookingSuccess(null);
+              }}
+            >
+              Hoàn tất & Đóng
+            </button>
+          </div>
+        ) : (
+          <div className="pkg-form">
+            <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
+              <b style={{ color: "#be185d", fontSize: 13, display: "block", marginBottom: 4 }}>
+                📦 Gói Combo: {d.PackageName}
+              </b>
+              <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>
+                Gồm có: <strong>{d.ServiceNames || "Các dịch vụ spa chuyên sâu"}</strong>
+              </p>
+            </div>
+
+            {bookingError && <div className="alert error" style={{ marginBottom: 12 }}>{bookingError}</div>}
+
+            <label style={{ display: "block", marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>📅 Chọn Ngày Hẹn:</span>
+              <input
+                type="date"
+                min={new Date().toISOString().slice(0, 10)}
+                value={bookingForm.appointmentDate}
+                onChange={(e) => setBookingForm(f => ({ ...f, appointmentDate: e.target.value }))}
+                style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 6, border: "1px solid #cbd5e1" }}
+              />
+            </label>
+
+            <label style={{ display: "block", marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>⏰ Chọn Giờ Bắt Đầu:</span>
+              <select
+                value={bookingForm.startTime}
+                onChange={(e) => setBookingForm(f => ({ ...f, startTime: e.target.value }))}
+                style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 6, border: "1px solid #cbd5e1" }}
+              >
+                <option value="08:30">08:30 sáng</option>
+                <option value="09:00">09:00 sáng</option>
+                <option value="09:30">09:30 sáng</option>
+                <option value="10:00">10:00 sáng</option>
+                <option value="10:30">10:30 sáng</option>
+                <option value="11:00">11:00 sáng</option>
+                <option value="13:30">13:30 chiều</option>
+                <option value="14:00">14:00 chiều</option>
+                <option value="14:30">14:30 chiều</option>
+                <option value="15:00">15:00 chiều</option>
+                <option value="15:30">15:30 chiều</option>
+                <option value="16:00">16:00 chiều</option>
+                <option value="16:30">16:30 chiều</option>
+                <option value="17:00">17:00 chiều</option>
+              </select>
+            </label>
+
+            <div style={{ background: "#f8fafc", padding: 10, borderRadius: 8, fontSize: 12, color: "#64748b", marginBottom: 16 }}>
+              ℹ️ Gói Combo áp dụng 1 lần duy nhất trong suốt thời hạn. Toàn bộ các dịch vụ trong Combo sẽ được thực hiện liên tiếp trong cùng 1 ca.
+            </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setShowBookModal(false)}
+                style={{ flex: 1, padding: 12, borderRadius: 8, border: "1px solid #cbd5e1", background: "#f8fafc", cursor: "pointer", fontWeight: 600 }}
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                onClick={handleBookCombo}
+                disabled={actionLoading}
+                style={{ flex: 1, padding: 12, borderRadius: 8, border: "none", background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)", color: "#fff", cursor: "pointer", fontWeight: 700 }}
+              >
+                {actionLoading ? "Đang xử lý..." : isRescheduleMode ? "Xác Nhận Đổi Lịch" : "Xác Nhận Đặt Lịch"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
+
     </div>
   );
 }
 
-/* ===== MAIN PAGE ===== */
+/* ===== MAIN CUSTOMER PACKAGES PAGE ===== */
 export default function CustomerPackages() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [customerActiveTab, setCustomerActiveTab] = useState("packages"); // 'packages' | 'history' | 'reviews'
+
   const [packages, setPackages] = useState([]);
   const [mine, setMine] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedPkg, setSelectedPkg] = useState(null);
-  const [filters, setFilters] = useState({
-    search: "",
-    category: "",
-    sort: "newest",
+  const [message, setMessage] = useState("");
+  const [filters, setFilters] = useState({ search: "", category: "" });
+
+  // Dedicated History & Review States
+  const [comboHistory, setComboHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [reviewModalAppt, setReviewModalAppt] = useState(null);
+  const [reviewForm, setReviewForm] = useState({
+    overallRating: 5,
+    overallComment: "",
+    stepRatings: {} // { serviceId: { rating, comment, employeeId } }
   });
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -795,237 +610,723 @@ export default function CustomerPackages() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get("paid") === "1")
-      setMessage("✅ Thanh toán combo / liệu trình thành công!");
-    if (params.get("error")) setMessage("❌ Thanh toán thất bại hoặc đã bị hủy");
-  }, [location.search]);
+  const loadComboHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await axiosClient.get("/packages/my/combo-history");
+      setComboHistory(res.data.data || res.data || []);
+    } catch (_) {
+      setComboHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   useEffect(() => {
-    load().catch(() => {
-      setLoading(false);
-      setMessage("❌ Không tải được combo / liệu trình");
-    });
+    load();
+    loadComboHistory();
   }, [queryString]);
 
-  const buyVnpay = async (id) => {
+  const buyVnpay = async (packageId) => {
+    const confirmPayment = window.confirm(
+      "⚠️ LƯU Ý QUAN TRỌNG:\nGói combo / liệu trình sau khi đã thanh toán thành công sẽ KHÔNG ĐƯỢC HỦY HOẶC HOÀN TIỀN dưới bất kỳ hình thức nào.\n\nBạn có chắc chắn muốn mua gói này?"
+    );
+    if (!confirmPayment) return;
+
     try {
       setMessage("");
-      const res = await axiosClient.post(`/packages/${id}/vnpay`);
+      const res = await axiosClient.post(`/packages/${packageId}/vnpay`);
       const data = res.data.data || res.data;
-      window.location.href = data.paymentUrl;
+      if (data && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        setMessage("❌ Không tạo được link thanh toán VNPay");
+      }
     } catch (err) {
-      alert(err.response?.data?.message || "Không tạo được thanh toán VNPay");
+      setMessage("❌ " + (err.response?.data?.message || "Lỗi tạo link thanh toán VNPay"));
+    }
+  };
+
+  const buyPayos = async (packageId) => {
+    const confirmPayment = window.confirm(
+      "⚠️ LƯU Ý QUAN TRỌNG:\nGói combo / liệu trình sau khi đã thanh toán thành công sẽ KHÔNG ĐƯỢC HỦY HOẶC HOÀN TIỀN dưới bất kỳ hình thức nào.\n\nBạn có chắc chắn muốn mua gói này?"
+    );
+    if (!confirmPayment) return;
+
+    try {
+      setMessage("");
+      const res = await axiosClient.post(`/packages/${packageId}/payos`);
+      const data = res.data.data || res.data;
+      if (data && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        setMessage("❌ Không tạo được link thanh toán PayOS");
+      }
+    } catch (err) {
+      setMessage("❌ " + (err.response?.data?.message || "Lỗi tạo link thanh toán PayOS"));
+    }
+  };
+
+  const openReviewModal = (appt) => {
+    const initialStepRatings = {};
+    (appt.Services || []).forEach(s => {
+      initialStepRatings[s.ServiceId] = {
+        serviceId: s.ServiceId,
+        employeeId: s.EmployeeId,
+        serviceName: s.ServiceName,
+        technicianName: s.TechnicianName,
+        technicianAvatar: s.TechnicianAvatar,
+        rating: s.TechnicianRating || 5,
+        comment: s.ServiceComment || ""
+      };
+    });
+
+    setReviewForm({
+      overallRating: 5,
+      overallComment: "",
+      stepRatings: initialStepRatings
+    });
+    setReviewModalAppt(appt);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewModalAppt) return;
+    setSubmittingReview(true);
+    try {
+      const stepReviews = Object.values(reviewForm.stepRatings);
+      await axiosClient.post("/packages/my/combo-review", {
+        appointmentId: reviewModalAppt.AppointmentId,
+        overallRating: reviewForm.overallRating,
+        overallComment: reviewForm.overallComment,
+        stepReviews
+      });
+      setMessage("🎉 Cảm ơn bạn đã gửi đánh giá dịch vụ Combo & Kỹ thuật viên!");
+      setReviewModalAppt(null);
+      loadComboHistory();
+    } catch (err) {
+      alert(err.response?.data?.message || "Lỗi gửi đánh giá Combo");
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
   return (
-    <CustomerLayout>
-      <section className="customer-combo-page">
-        <div className="section-head">
+    <CustomerLayout activeTab="packages">
+      <section className="pkg-container" style={{ maxWidth: 1200, margin: "0 auto", padding: "10px 20px 60px 20px" }}>
+        
+        {/* HEADER HERO BANNER */}
+        <div style={{
+          background: "linear-gradient(135deg, #fff0f6 0%, #fce7f3 50%, #fbcfe8 100%)",
+          borderRadius: 24,
+          padding: "32px 36px",
+          marginBottom: 24,
+          border: "1.5px solid #fbcfe8",
+          boxShadow: "0 10px 30px rgba(236, 72, 153, 0.08)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 20
+        }}>
           <div>
-            <div className="eyebrow">Combo / Liệu trình</div>
-            <h2 className="section-title">Quản lý liệu trình của bạn</h2>
-            <p className="muted">
-              Theo dõi tiến độ, chia sẻ gia đình và đặt lịch
-              từ combo.
+            <span style={{ background: "#db2777", color: "#fff", fontSize: 11, fontWeight: 800, padding: "4px 12px", borderRadius: 20, letterSpacing: 0.5 }}>
+              COMBO TRỌN GÓI SPA 1 LƯỢT
+            </span>
+            <h1 style={{ fontSize: 28, fontWeight: 800, color: "#831843", margin: "10px 0 6px 0" }}>
+              Quản Lý Combo & Liệu Trình Làm Đẹp
+            </h1>
+            <p style={{ margin: 0, color: "#475569", fontSize: 14, maxWidth: 600, lineHeight: 1.5 }}>
+              Làm toàn bộ dịch vụ trong 1 buổi ghé Spa duy nhất. Hệ thống tự động xếp Kỹ thuật viên tốt nhất đang rảnh ca phục vụ quý khách.
             </p>
           </div>
-          <Link className="btn" to="/packages">
-            Xem trang guest
-          </Link>
+
+          {/* MAIN TABS NAVIGATION */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={() => { setCustomerActiveTab("packages"); setSelectedPkg(null); }}
+              style={{
+                padding: "10px 20px",
+                borderRadius: 14,
+                border: "1.5px solid #fbcfe8",
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: "pointer",
+                background: customerActiveTab === "packages" ? "#db2777" : "#ffffff",
+                color: customerActiveTab === "packages" ? "#ffffff" : "#be185d",
+                boxShadow: customerActiveTab === "packages" ? "0 4px 14px rgba(219,39,119,0.3)" : "none",
+                transition: "all 0.2s"
+              }}
+            >
+              📦 Gói Combo Của Tôi ({mine.length})
+            </button>
+
+            <button
+              onClick={() => { setCustomerActiveTab("history"); setSelectedPkg(null); }}
+              style={{
+                padding: "10px 20px",
+                borderRadius: 14,
+                border: "1.5px solid #fbcfe8",
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: "pointer",
+                background: customerActiveTab === "history" ? "#db2777" : "#ffffff",
+                color: customerActiveTab === "history" ? "#ffffff" : "#be185d",
+                boxShadow: customerActiveTab === "history" ? "0 4px 14px rgba(219,39,119,0.3)" : "none",
+                transition: "all 0.2s"
+              }}
+            >
+              📜 Lịch Sử Liệu Trình ({comboHistory.length})
+            </button>
+
+            <button
+              onClick={() => { setCustomerActiveTab("reviews"); setSelectedPkg(null); }}
+              style={{
+                padding: "10px 20px",
+                borderRadius: 14,
+                border: "1.5px solid #fbcfe8",
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: "pointer",
+                background: customerActiveTab === "reviews" ? "#db2777" : "#ffffff",
+                color: customerActiveTab === "reviews" ? "#ffffff" : "#be185d",
+                boxShadow: customerActiveTab === "reviews" ? "0 4px 14px rgba(219,39,119,0.3)" : "none",
+                transition: "all 0.2s"
+              }}
+            >
+              ⭐ Đánh Giá Combo & KTV
+            </button>
+          </div>
         </div>
 
         {message && (
-          <div
-            className={
-              message.includes("✅") ? "alert success" : "alert error"
-            }
-          >
+          <div className="alert success" style={{ marginBottom: 20, borderRadius: 12 }}>
             {message}
-            <button
-              onClick={() => setMessage("")}
-              style={{
-                float: "right",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: 700,
-              }}
-            >
-              ✕
-            </button>
           </div>
         )}
 
-        {/* === MY PACKAGES === */}
-        <h3>Liệu trình của tôi</h3>
+        {/* TAB 1: MY PACKAGES & SHOP */}
+        {customerActiveTab === "packages" && (
+          <div>
+            {/* BREADCRUMB NAVIGATION khi đang xem detail */}
+            {selectedPkg && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 20,
+                padding: "10px 16px",
+                background: "#fdf2f8",
+                borderRadius: 12,
+                border: "1px solid #fbcfe8",
+                fontSize: 13
+              }}>
+                <button
+                  onClick={() => setSelectedPkg(null)}
+                  style={{ background: "none", border: "none", color: "#db2777", fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0 }}
+                >
+                  📦 Gói Combo Của Tôi
+                </button>
+                <span style={{ color: "#94a3b8" }}>›</span>
+                <span style={{ color: "#831843", fontWeight: 700 }}>{selectedPkg.PackageName}</span>
+              </div>
+            )}
 
-        {selectedPkg ? (
-          <PackageDetailPanel
-            pkg={selectedPkg}
-            onClose={() => setSelectedPkg(null)}
-            onRefresh={load}
-          />
-        ) : (
-          <div className="my-combo-grid">
-            {mine.length ? (
-              mine.map((p) => {
-                const total =
-                  Number(p.TotalSessions || 0) ||
-                  Number(p.RemainingSessions || 0) ||
-                  1;
-                const left = Number(p.RemainingSessions || 0);
-                const used = Number(p.UsedSessions || 0);
-                const percent = Math.max(
-                  0,
-                  Math.min(100, (used / total) * 100),
-                );
-                const remaining = daysLeft(p.EndDate);
-                return (
-                  <article
-                    className="my-combo-card"
-                    key={p.CustomerPackageId}
-                    onClick={() => setSelectedPkg(p)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <img
-                      src={resolveFileUrl(p.ImageUrl) || "/vite.svg"}
-                      alt={p.PackageName}
+            {/* DETAIL PANEL khi chọn 1 combo */}
+            {selectedPkg ? (
+              <PackageDetailPanel
+                pkg={selectedPkg}
+                onClose={() => setSelectedPkg(null)}
+                onRefresh={load}
+              />
+            ) : (
+              /* GRID CÁC COMBO ĐÃ MUA */
+              <div style={{ marginBottom: 40 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 800, color: "#831843", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>🌸</span> Liệu Trình Combo Của Tôi ({mine.length})
+                </h2>
+                <div className="my-combo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 20 }}>
+                  {mine.length ? (
+                    mine.map((p) => {
+                      const total = Number(p.TotalSessions || 0) || 1;
+                      const left = Number(p.RemainingSessions || 0);
+                      const used = Number(p.UsedSessions || 0);
+                      const percent = Math.max(0, Math.min(100, (used / total) * 100));
+                      const remaining = daysLeft(p.EndDate);
+
+                      return (
+                        <article
+                          className="my-combo-card"
+                          key={p.CustomerPackageId}
+                          onClick={() => setSelectedPkg(p)}
+                          style={{
+                            background: "#fff",
+                            borderRadius: 20,
+                            border: "1.5px solid #fbcfe8",
+                            overflow: "hidden",
+                            boxShadow: "0 8px 24px rgba(236,72,153,0.06)",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            display: "flex",
+                            flexDirection: "column"
+                          }}
+                        >
+                          <div className="my-combo-card-img-wrap" style={{ position: "relative", height: 160 }}>
+                            <img
+                              src={resolveFileUrl(p.ImageUrl) || "/images/services/default-service.png"}
+                              alt={p.PackageName}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                            {p.CategoryName && (
+                              <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,255,255,0.9)", color: "#be185d", fontSize: 10, fontWeight: 800, padding: "3px 10px", borderRadius: 12 }}>
+                                {p.CategoryName}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="my-combo-card-body" style={{ padding: 18, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                            <div>
+                              <h3 style={{ margin: "0 0 6px 0", fontSize: 16, fontWeight: 800, color: "#831843" }}>{p.PackageName}</h3>
+                              <p style={{ margin: "0 0 14px 0", fontSize: 12, color: "#64748b", lineHeight: 1.4 }}>{p.ServiceNames || "Dịch vụ chăm sóc spa chuyên sâu"}</p>
+                            </div>
+
+                            <div>
+                              <div style={{ background: "#fdf2f8", padding: "10px 12px", borderRadius: 12, marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#9d174d", fontWeight: 700 }}>
+                                <span>Giá gói: <b style={{ color: "#db2777" }}>{(p.Amount || p.PurchasePrice || p.SalePrice || p.OriginalPrice || p.Price) ? `${Number(p.Amount || p.PurchasePrice || p.SalePrice || p.OriginalPrice || p.Price).toLocaleString("vi-VN")}đ` : "—"}</b></span>
+                                <span>{remaining !== null && remaining >= 0 ? `⏳ Còn ${remaining} ngày` : "❌ Hết hạn"}</span>
+                              </div>
+
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <StatusBadge status={p.Status} />
+                                {p.Status === "ACTIVE" && left > 0 ? (
+                                  <span
+                                    style={{
+                                      background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+                                      color: "#ffffff",
+                                      padding: "6px 14px",
+                                      borderRadius: 12,
+                                      fontSize: 12,
+                                      fontWeight: 800,
+                                      boxShadow: "0 4px 12px rgba(236,72,153,0.3)"
+                                    }}
+                                  >
+                                    ✨ Đặt Lịch 1 Lượt →
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: "#db2777" }}>
+                                    Xem chi tiết →
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })
+                  ) : (
+                    <div style={{ background: "#fff", border: "1px dashed #fbcfe8", borderRadius: 16, padding: 30, textAlign: "center", gridColumn: "1 / -1", color: "#64748b", fontSize: 14 }}>
+                      Bạn chưa sở hữu Combo nào. Hãy xem danh sách các gói ưu đãi bên dưới để mua ngay!
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SHOP STORE SECTION - chỉ hiện khi không xem detail */}
+            {!selectedPkg && (
+              <div style={{ marginTop: 50 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+                  <h2 style={{ fontSize: 20, fontWeight: 800, color: "#831843", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>🛒</span> Các Gói Combo Trọn Gói Khuyến Mãi
+                  </h2>
+
+                  <div className="combo-toolbar" style={{ display: "flex", gap: 10 }}>
+                    <input
+                      value={filters.search}
+                      onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
+                      placeholder="Tìm gói combo..."
+                      style={{ padding: "8px 14px", borderRadius: 12, border: "1px solid #cbd5e1", fontSize: 13 }}
                     />
-                    <div>
-                      <div className="combo-category">
-                        {p.CategoryName}
-                        {!p.IsOwner && (
-                          <span style={{ marginLeft: 8, background: "#dbeafe", color: "#1e40af", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
-                            Được chia sẻ
+                    <select
+                      value={filters.category}
+                      onChange={(e) => setFilters((p) => ({ ...p, category: e.target.value }))}
+                      style={{ padding: "8px 14px", borderRadius: 12, border: "1px solid #cbd5e1", fontSize: 13 }}
+                    >
+                      <option value="">Tất cả danh mục</option>
+                      {categories.map((c) => (
+                        <option key={c.CategoryName} value={c.CategoryName}>
+                          {c.CategoryName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {loading && <p className="muted" style={{ textAlign: "center" }}>Đang tải danh sách combo...</p>}
+
+                <div className="combo-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 24 }}>
+                  {packages.map((p) => (
+                    <article className="combo-card" key={p.PackageId} style={{ background: "#fff", borderRadius: 20, border: "1px solid #fbcfe8", overflow: "hidden", boxShadow: "0 6px 20px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column" }}>
+                      <div className="combo-img-wrap" style={{ position: "relative", height: 170 }}>
+                        {Number(p.DiscountPercent || 0) > 0 && (
+                          <span style={{ position: "absolute", top: 12, left: 12, background: "#dc2626", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 12 }}>
+                            -{p.DiscountPercent}% GIẢM
                           </span>
                         )}
+                        <img src={resolveFileUrl(p.ImageUrl) || "/images/services/default-service.png"} alt={p.PackageName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       </div>
-                      <h3>{p.PackageName}</h3>
-                      <p className="muted">{p.ServiceNames}</p>
-                      <div className="combo-progress">
-                        <span style={{ width: `${percent}%` }} />
+
+                      <div className="combo-card-body" style={{ padding: 18, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                        <div>
+                          <span style={{ color: "#be185d", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>{p.CategoryName}</span>
+                          <h3 style={{ margin: "4px 0 6px 0", fontSize: 16, fontWeight: 800, color: "#1e293b" }}>{p.PackageName}</h3>
+                          <p style={{ margin: "0 0 10px 0", fontSize: 12, color: "#64748b", lineHeight: 1.4 }}>{p.Description}</p>
+                          <p style={{ fontSize: 11, fontWeight: 700, color: "#be185d", background: "#fdf2f8", padding: "6px 10px", borderRadius: 8, margin: "0 0 14px 0" }}>
+                            ✨ {p.ServiceNames}
+                          </p>
+                        </div>
+
+                        <div>
+                          <div className="combo-price-row" style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14 }}>
+                            <b style={{ fontSize: 18, color: "#db2777", fontWeight: 800 }}>{money(p.FinalPrice || p.Price)}</b>
+                            {Number(p.DiscountPercent || 0) > 0 && (
+                              <del style={{ fontSize: 12, color: "#94a3b8" }}>{money(p.Price)}</del>
+                            )}
+                          </div>
+
+                          <div className="combo-actions" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                            <button
+                              className="card-btn"
+                              style={{ margin: 0, padding: "8px 4px", fontSize: 11, borderRadius: 10, border: "1px solid #cbd5e1", fontWeight: 700 }}
+                              onClick={() => navigate(`/packages/${p.PackageId}`)}
+                            >
+                              Chi tiết
+                            </button>
+                            <button
+                              className="card-btn primary"
+                              style={{ margin: 0, padding: "8px 4px", fontSize: 11, borderRadius: 10, background: "#0284c7", borderColor: "#0284c7", fontWeight: 700 }}
+                              onClick={() => buyVnpay(p.PackageId)}
+                            >
+                              💳 VNPay
+                            </button>
+                            <button
+                              className="card-btn primary"
+                              style={{ margin: 0, padding: "8px 4px", fontSize: 11, borderRadius: 10, background: "#db2777", borderColor: "#db2777", fontWeight: 700 }}
+                              onClick={() => buyPayos(p.PackageId)}
+                            >
+                              📲 PayOS
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="combo-meta">
-                        <span>
-                          {used}/{total} buổi đã dùng
-                        </span>
-                        <span>
-                          {remaining !== null && remaining >= 0
-                            ? `Còn ${remaining} ngày`
-                            : remaining !== null
-                              ? "Đã hết hạn"
-                              : "Chưa kích hoạt"}
-                        </span>
-                      </div>
-                      <div
-                        className="combo-meta"
-                        style={{ justifyContent: "space-between" }}
-                      >
-                        <StatusBadge status={p.Status} />
-                        <span className="muted" style={{ fontSize: 12 }}>
-                          Nhấn để xem chi tiết →
-                        </span>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="empty-card">Bạn chưa mua combo nào.</div>
+                    </article>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {/* === SHOP === */}
-        {!selectedPkg && (
-          <>
-            <div className="combo-toolbar customer-toolbar">
-              <input
-                value={filters.search}
-                onChange={(e) =>
-                  setFilters((p) => ({ ...p, search: e.target.value }))
-                }
-                placeholder="Tìm combo / liệu trình..."
-              />
-              <select
-                value={filters.category}
-                onChange={(e) =>
-                  setFilters((p) => ({ ...p, category: e.target.value }))
-                }
-              >
-                <option value="">Tất cả danh mục</option>
-                {categories.map((c) => (
-                  <option key={c.CategoryName} value={c.CategoryName}>
-                    {c.CategoryName}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={filters.sort}
-                onChange={(e) =>
-                  setFilters((p) => ({ ...p, sort: e.target.value }))
-                }
-              >
-                <option value="newest">Mới nhất</option>
-                <option value="priceAsc">Giá thấp đến cao</option>
-                <option value="priceDesc">Giá cao đến thấp</option>
-                <option value="sessionsDesc">Nhiều buổi nhất</option>
-              </select>
-            </div>
+        {/* TAB 2: DEDICATED COMBO TREATMENT HISTORY */}
+        {customerActiveTab === "history" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#831843", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>📜</span> Lịch Sử Nhật Ký Trị Liệu Combo ({comboHistory.length})
+            </h2>
 
-            {loading && <p className="muted">Đang tải...</p>}
-            <div className="combo-grid">
-              {packages.map((p) => (
-                <article className="combo-card" key={p.PackageId}>
-                  <div className="combo-img-wrap">
-                    {Number(p.DiscountPercent || 0) > 0 && (
-                      <span className="sale-badge">-{p.DiscountPercent}%</span>
-                    )}
-                    <img
-                      src={resolveFileUrl(p.ImageUrl) || "/vite.svg"}
-                      alt={p.PackageName}
-                    />
-                  </div>
-                  <div className="combo-card-body">
-                    <div className="combo-category">{p.CategoryName}</div>
-                    <h3>{p.PackageName}</h3>
-                    <p>{p.Description}</p>
-                    <div className="combo-meta">
-                      <span>
-                        🕘 {p.TotalSessions || p.ServiceCount || 1} buổi
-                      </span>
-                      <span>📅 {p.ValidityDays || 30} ngày</span>
+            {loadingHistory ? (
+              <p style={{ color: "#64748b", textAlign: "center", padding: 30 }}>Đang tải lịch sử trị liệu...</p>
+            ) : comboHistory.length === 0 ? (
+              <div style={{ background: "#fff", borderRadius: 16, padding: 40, textAlign: "center", border: "1px dashed #fbcfe8", color: "#64748b" }}>
+                Chưa có nhật ký sử dụng Combo nào. Sau khi hoàn thành buổi làm tại Spa, lịch sử chi tiết sẽ hiển thị ở đây!
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {comboHistory.map(item => (
+                  <div key={item.AppointmentId} style={{
+                    background: "#fff",
+                    borderRadius: 20,
+                    border: "1.5px solid #fbcfe8",
+                    padding: 24,
+                    boxShadow: "0 6px 18px rgba(236,72,153,0.05)"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+                      <div>
+                        <span style={{ background: "#ec4899", color: "#fff", fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 10 }}>
+                          #HẸN {item.AppointmentId} • {formatDate(item.AppointmentDate)}
+                        </span>
+                        <h3 style={{ margin: "6px 0 0 0", fontSize: 17, fontWeight: 800, color: "#831843" }}>{item.PackageName}</h3>
+                      </div>
+
+                      <StatusBadge status={item.Status} />
                     </div>
-                    <p className="muted service-names">{p.ServiceNames}</p>
-                    <div className="combo-price-row">
-                      <b>{money(p.FinalPrice || p.Price)}</b>
-                      {Number(p.DiscountPercent || 0) > 0 && (
-                        <del>{money(p.Price)}</del>
+
+                    {/* SERVICES & TECHNICIANS BREAKDOWN */}
+                    <div style={{ background: "#fdf2f8", padding: 14, borderRadius: 14, border: "1px solid #fbcfe8", marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#be185d", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                        ✂️ CÁC BƯỚC DỊCH VỤ & KTV ĐÃ PHỤC VỤ:
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
+                        {(item.Services || []).map((s, idx) => (
+                          <div key={idx} style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 10, border: "1px solid #fbcfe8", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div>
+                              <b style={{ color: "#831843", fontSize: 13, display: "block" }}>{idx + 1}. {s.ServiceName}</b>
+                              <span style={{ fontSize: 11, color: "#64748b" }}>⏱ {s.DurationMinutes || 30} phút</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <img
+                                src={resolveFileUrl(s.TechnicianAvatar) || "/images/avatars/default-avatar.png"}
+                                alt={s.TechnicianName}
+                                style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #ec4899" }}
+                              />
+                              <b style={{ fontSize: 12, color: "#be185d" }}>{s.TechnicianName || "KTV Salon"}</b>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* TREATMENT NOTES IF ANY */}
+                    {item.TreatmentNote && (
+                      <div style={{ background: "#f8fafc", padding: 12, borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12, color: "#334155" }}>
+                        <b style={{ color: "#0f766e", display: "block", marginBottom: 4 }}>📋 Ghi chú chỉ định từ KTV:</b>
+                        <div>{item.TreatmentNote.NoteText || item.TreatmentNote.SkinCondition}</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: DEDICATED COMBO REVIEWS */}
+        {customerActiveTab === "reviews" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#831843", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>⭐</span> Đánh Giá Combo & Kỹ Thuật Viên Phụ Trách ({comboHistory.length})
+            </h2>
+
+            {loadingHistory ? (
+              <p style={{ color: "#64748b", textAlign: "center", padding: 30 }}>Đang tải lịch sử đánh giá...</p>
+            ) : comboHistory.length === 0 ? (
+              <div style={{ background: "#fff", borderRadius: 16, padding: 40, textAlign: "center", border: "1px dashed #fbcfe8", color: "#64748b" }}>
+                Chưa có buổi làm Combo nào hoàn thành để gửi đánh giá.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {comboHistory.map(item => (
+                  <div key={item.AppointmentId} style={{
+                    background: "#fff",
+                    borderRadius: 20,
+                    border: "1.5px solid #fbcfe8",
+                    padding: 24,
+                    boxShadow: "0 6px 18px rgba(236,72,153,0.05)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                    gap: 16
+                  }}>
+                    <div style={{ flex: 1, minWidth: 300 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <span style={{ background: "#ec4899", color: "#fff", fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 8 }}>
+                          #HẸN {item.AppointmentId}
+                        </span>
+                        <span style={{ fontSize: 12, color: "#64748b" }}>📅 {formatDate(item.AppointmentDate)}</span>
+                      </div>
+
+                      <h3 style={{ margin: "0 0 8px 0", fontSize: 17, fontWeight: 800, color: "#831843" }}>{item.PackageName}</h3>
+
+                      {/* STEP-BY-STEP REVIEWS IF ALREADY REVIEWED */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+                        {(item.Services || []).map((s, idx) => (
+                          <div key={idx} style={{ background: "#fdf2f8", padding: "8px 12px", borderRadius: 10, border: "1px solid #fbcfe8", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div>
+                              <b style={{ color: "#831843", fontSize: 12 }}>{idx + 1}. {s.ServiceName}</b>
+                              <span style={{ fontSize: 11, color: "#64748b", marginLeft: 8 }}>KTV: {s.TechnicianName}</span>
+                            </div>
+                            <div>
+                              {s.TechnicianRating > 0 ? (
+                                <span style={{ color: "#f59e0b", fontWeight: 800, fontSize: 13 }}>
+                                  {"★".repeat(s.TechnicianRating)} <small style={{ color: "#475569" }}>({s.TechnicianRating}/5)</small>
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 11, color: "#94a3b8" }}>Chưa gửi số sao</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ACTION BUTTON */}
+                    <div>
+                      {item.IsReviewed ? (
+                        <div style={{ background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", padding: "8px 14px", borderRadius: 12, fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                          <span>✅ Đã gửi đánh giá</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => openReviewModal(item)}
+                          style={{
+                            background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 12,
+                            padding: "10px 18px",
+                            fontWeight: 800,
+                            fontSize: 13,
+                            cursor: "pointer",
+                            boxShadow: "0 4px 14px rgba(236,72,153,0.3)"
+                          }}
+                        >
+                          ⭐ Đánh Giá Combo & KTV Ngay
+                        </button>
                       )}
                     </div>
-                    <div className="combo-actions">
-                      <button
-                        className="card-btn"
-                        onClick={() => navigate(`/packages/${p.PackageId}`)}
-                      >
-                        Chi tiết
-                      </button>
-                      <button
-                        className="card-btn primary"
-                        onClick={() => buyVnpay(p.PackageId)}
-                      >
-                        Thanh toán VNPay
-                      </button>
-                    </div>
                   </div>
-                </article>
-              ))}
-            </div>
-          </>
+                ))}
+              </div>
+            )}
+          </div>
         )}
+
+        {/* MODAL: DEDICATED COMBO & STEP-BY-STEP KTV REVIEW */}
+        {reviewModalAppt && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 999
+          }}>
+            <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 540, padding: 24, boxShadow: "0 20px 50px rgba(0,0,0,0.2)", maxHeight: "90vh", overflowY: "auto" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, borderBottom: "1px solid #e2e8f0", pb: 12 }}>
+                <h3 style={{ margin: 0, color: "#831843", fontSize: 18, fontWeight: 800 }}>⭐ Đánh Giá Combo & Kỹ Thuật Viên</h3>
+                <button onClick={() => setReviewModalAppt(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>✕</button>
+              </div>
+
+              <div style={{ background: "#fdf2f8", padding: 12, borderRadius: 12, border: "1px solid #fbcfe8", marginBottom: 16 }}>
+                <b style={{ color: "#be185d", fontSize: 14, display: "block" }}>{reviewModalAppt.PackageName}</b>
+                <span style={{ fontSize: 11, color: "#64748b" }}>Ngày thực hiện: {formatDate(reviewModalAppt.AppointmentDate)} (#HẸN {reviewModalAppt.AppointmentId})</span>
+              </div>
+
+              {/* 1. OVERALL COMBO RATING */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 700, fontSize: 13, color: "#1e293b", display: "block", marginBottom: 6 }}>
+                  1. Đánh giá chất lượng tổng quan của Gói Combo:
+                </label>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <span
+                      key={star}
+                      onClick={() => setReviewForm(f => ({ ...f, overallRating: star }))}
+                      style={{ fontSize: 28, cursor: "pointer", color: star <= reviewForm.overallRating ? "#f59e0b" : "#cbd5e1" }}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="Nhập cảm nhận của bạn về gói Combo..."
+                  value={reviewForm.overallComment}
+                  onChange={(e) => setReviewForm(f => ({ ...f, overallComment: e.target.value }))}
+                  style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+                />
+              </div>
+
+              {/* 2. PER-STEP TECHNICIAN RATING */}
+              <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: 16, marginBottom: 20 }}>
+                <label style={{ fontWeight: 700, fontSize: 13, color: "#1e293b", display: "block", marginBottom: 10 }}>
+                  2. Chấm sao riêng cho tay nghề từng Kỹ Thuật Viên:
+                </label>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {(reviewModalAppt.Services || []).map((step, idx) => {
+                    const currentRating = reviewForm.stepRatings[step.ServiceId]?.rating || 5;
+                    const currentComment = reviewForm.stepRatings[step.ServiceId]?.comment || "";
+
+                    return (
+                      <div key={idx} style={{ background: "#f8fafc", padding: 12, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <b style={{ color: "#0f766e", fontSize: 13 }}>{idx + 1}. {step.ServiceName}</b>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <img
+                              src={resolveFileUrl(step.TechnicianAvatar) || "/images/avatars/default-avatar.png"}
+                              alt={step.TechnicianName}
+                              style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover" }}
+                            />
+                            <b style={{ fontSize: 12, color: "#1e293b" }}>{step.TechnicianName}</b>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, color: "#64748b" }}>Chấm sao:</span>
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <span
+                              key={star}
+                              onClick={() => {
+                                setReviewForm(f => ({
+                                  ...f,
+                                  stepRatings: {
+                                    ...f.stepRatings,
+                                    [step.ServiceId]: {
+                                      ...f.stepRatings[step.ServiceId],
+                                      rating: star
+                                    }
+                                  }
+                                }));
+                              }}
+                              style={{ fontSize: 20, cursor: "pointer", color: star <= currentRating ? "#f59e0b" : "#cbd5e1" }}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+
+                        <input
+                          type="text"
+                          placeholder={`Ghi chú nhận xét riêng cho KTV ${step.TechnicianName}...`}
+                          value={currentComment}
+                          onChange={(e) => {
+                            setReviewForm(f => ({
+                              ...f,
+                              stepRatings: {
+                                ...f.stepRatings,
+                                [step.ServiceId]: {
+                                  ...f.stepRatings[step.ServiceId],
+                                  comment: e.target.value
+                                }
+                              }
+                            }));
+                          }}
+                          style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 12 }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ACTIONS */}
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  onClick={() => setReviewModalAppt(null)}
+                  style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid #cbd5e1", background: "#f8fafc", fontWeight: 700, cursor: "pointer" }}
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  onClick={handleSubmitReview}
+                  disabled={submittingReview}
+                  style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)", color: "#fff", fontWeight: 800, cursor: "pointer" }}
+                >
+                  {submittingReview ? "Đang gửi..." : "Xác Nhận Gửi Đánh Giá"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </section>
     </CustomerLayout>
   );

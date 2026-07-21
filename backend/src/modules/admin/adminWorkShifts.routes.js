@@ -13,4 +13,10 @@ router.post("/", controller.create);
 router.put("/:id", controller.update);
 router.delete("/:id", controller.remove);
 
+router.get("/:id/registrations", controller.getRegistrations);
+router.post("/:id/assign", controller.assignTechnician);
+router.patch("/registrations/:registrationId/status", controller.updateRegistrationStatus);
+router.delete("/registrations/:registrationId", controller.removeRegistration);
+
 module.exports = router;
+

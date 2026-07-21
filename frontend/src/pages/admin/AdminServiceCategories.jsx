@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
 const DEFAULT_IMAGE = "/images/services/skincare.png";
@@ -30,10 +30,13 @@ export default function AdminServiceCategories() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [scrollTargetId, setScrollTargetId] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   const gridRef = useRef(null);
   const shouldScrollRef = useRef(false);
@@ -41,42 +44,42 @@ export default function AdminServiceCategories() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 180;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+      gridRef.current.scrollIntoView({ block: "start", behavior: "instant" });
     }
   };
 
-  const scrollToItem = (id) => {
-    setTimeout(() => {
-      const element = document.getElementById(`category-card-${id}`);
-      if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - 180;
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth"
-        });
-        element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
-        element.style.borderColor = "#d6b57e";
-        element.style.boxShadow = "0 0 25px 6px rgba(214, 181, 126, 0.6)";
-        setTimeout(() => {
-          element.style.borderColor = "";
-          element.style.boxShadow = "";
-        }, 3000);
-      } else {
-        scrollToGrid();
-      }
-    }, 150);
+  const triggerScrollToItem = (id) => {
+    if (!id) return;
+    setScrollTargetId(id);
   };
 
-  async function load() {
+  useLayoutEffect(() => {
+    if (!scrollTargetId) return;
+
+    const el = document.getElementById(`category-card-${scrollTargetId}`);
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+
+      el.style.transition = "all 0.3s ease";
+      el.style.borderColor = "#d6b57e";
+      el.style.boxShadow = "0 0 30px 8px rgba(214, 181, 126, 0.8)";
+      el.style.transform = "scale(1.02)";
+
+      const timer = setTimeout(() => {
+        el.style.borderColor = "";
+        el.style.boxShadow = "";
+        el.style.transform = "";
+        setScrollTargetId(null);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [items, scrollTargetId]);
+
+  async function load(isSilent = false) {
     try {
       setError("");
-      setLoading(true);
+      if (!isSilent && items.length === 0) setLoading(true);
 
       const res = await axiosClient.get("/admin/service-categories", {
         params: {
@@ -167,6 +170,8 @@ export default function AdminServiceCategories() {
   function openCreate() {
     setEditingId(null);
     setForm(emptyForm);
+    setImageFile(null);
+    setImagePreview("");
     setShowModal(true);
     setError("");
   }
@@ -180,6 +185,8 @@ export default function AdminServiceCategories() {
       ImageUrl: item.ImageUrl || "",
       Status: item.Status || "ACTIVE",
     });
+    setImageFile(null);
+    setImagePreview(item.ImageUrl ? resolveFileUrl(item.ImageUrl) : "");
     setShowModal(true);
   }
 
@@ -216,10 +223,20 @@ export default function AdminServiceCategories() {
         catId = created?.CategoryId || created?.id;
       }
 
+      if (imageFile && catId) {
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        await axiosClient.post(`/admin/service-categories/${catId}/image`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
       setShowModal(false);
-      await load();
+      setImageFile(null);
+      setImagePreview("");
+      await load(true);
       if (catId) {
-        scrollToItem(catId);
+        triggerScrollToItem(catId);
       } else {
         scrollToGrid();
       }
@@ -236,8 +253,8 @@ export default function AdminServiceCategories() {
     try {
       setError("");
       await axiosClient.patch(`/admin/service-categories/${item.CategoryId}/toggle-active`);
-      await load();
-      scrollToItem(item.CategoryId);
+      await load(true);
+      triggerScrollToItem(item.CategoryId);
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -258,8 +275,7 @@ export default function AdminServiceCategories() {
     try {
       setError("");
       await axiosClient.delete(`/admin/service-categories/${item.CategoryId}`);
-      await load();
-      scrollToGrid();
+      await load(true);
     } catch (err) {
       setError(
         err?.response?.data?.message || err?.message || "Xóa danh mục thất bại",
@@ -958,12 +974,100 @@ export default function AdminServiceCategories() {
                   />
                 </label>
                 <label>
-                  Đường dẫn ảnh (ImageUrl)
-                  <input
-                    value={form.ImageUrl}
-                    onChange={(e) => setForm({ ...form, ImageUrl: e.target.value })}
-                    placeholder="/images/services/facial.png"
-                  />
+                  Hình ảnh danh mục *
+                  <div
+                    style={{
+                      border: '2px dashed #ebdcc5',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: '#faf8f5',
+                      transition: 'all 0.2s',
+                      position: 'relative',
+                    }}
+                    onClick={() => document.getElementById('cat-image-input')?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#d6b57e'; }}
+                    onDragLeave={(e) => { e.currentTarget.style.borderColor = '#ebdcc5'; }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = '#ebdcc5';
+                      const file = e.dataTransfer.files?.[0];
+                      if (file && file.type.startsWith('image/')) {
+                        setImageFile(file);
+                        setImagePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  >
+                    {(imagePreview || form.ImageUrl) ? (
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <img
+                          src={imagePreview || resolveFileUrl(form.ImageUrl)}
+                          alt="Preview"
+                          style={{
+                            maxHeight: '120px',
+                            maxWidth: '100%',
+                            borderRadius: '10px',
+                            objectFit: 'cover',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImageFile(null);
+                            setImagePreview('');
+                            setForm({ ...form, ImageUrl: '' });
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: '#d83b01',
+                            color: '#fff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            display: 'grid',
+                            placeItems: 'center',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                          }}
+                        >
+                          ×
+                        </button>
+                        <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#8c7e74' }}>
+                          {imageFile ? imageFile.name : 'Nhấn để đổi ảnh mới'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <span style={{ fontSize: '32px', display: 'block', marginBottom: '4px' }}>🖼️</span>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#5c4a3c', fontWeight: 600 }}>
+                          Kéo thả ảnh hoặc nhấn để chọn file
+                        </p>
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#8c7e74' }}>
+                          JPG, PNG, WEBP • Tối đa 5MB
+                        </p>
+                      </div>
+                    )}
+                    <input
+                      id="cat-image-input"
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setImageFile(file);
+                          setImagePreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </div>
                 </label>
                 <label>
                   Trạng thái hoạt động
@@ -996,7 +1100,7 @@ export default function AdminServiceCategories() {
                   <div className="admin-category-img-container">
                     <img
                       className="admin-category-img"
-                      src={image(form.ImageUrl)}
+                      src={imagePreview || image(form.ImageUrl)}
                       alt="Preview"
                     />
                     <span className="admin-category-badge">

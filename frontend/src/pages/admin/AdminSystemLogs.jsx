@@ -81,7 +81,7 @@ export default function AdminSystemLogs() {
     }
     const logsCard = document.getElementById("logs-card-section");
     if (logsCard) {
-      logsCard.scrollIntoView({ behavior: "smooth" });
+      logsCard.scrollIntoView({ behavior: "instant" });
     }
   };
 

@@ -29,6 +29,7 @@ import MembershipPage from "../pages/customer/MembershipPage";
 import NotificationsPage from "../pages/customer/NotificationsPage";
 import AiAssistantPage from "../pages/customer/AiAssistantPage";
 import AiStylistAdvisor from "../pages/customer/AiStylistAdvisor";
+import SkinAnalyzerPage from "../pages/customer/SkinAnalyzerPage";
 import FeedbackPage from "../pages/customer/FeedbackPage";
 import VouchersPage from "../pages/customer/VouchersPage";
 import WaitingListPage from "../pages/customer/WaitingListPage";
@@ -68,6 +69,7 @@ import ReceptionistReviews from "../pages/receptionist/ReceptionistReviews";
 import ReceptionistNotifications from "../pages/receptionist/ReceptionistNotifications";
 import TechnicianDispatcher from "../pages/receptionist/TechnicianDispatcher";
 import ReceptionistRescheduleRequests from "../pages/receptionist/ReceptionistRescheduleRequests";
+import ReceptionistPackages from "../pages/receptionist/ReceptionistPackages";
 import TechnicianDashboard from "../pages/technician/TechnicianDashboard";
 import TechnicianSchedule from "../pages/technician/TechnicianSchedule";
 import ProtectedRoute from "./ProtectedRoute";
@@ -355,6 +357,14 @@ export default function AppRoutes() {
         }
       />
       <Route
+        path="/customer/skin-analyzer"
+        element={
+          <CustomerProtectedPage>
+            <SkinAnalyzerPage />
+          </CustomerProtectedPage>
+        }
+      />
+      <Route
         path="/customer/feedback"
         element={
           <CustomerProtectedPage>
@@ -517,6 +527,15 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/receptionist/packages"
+        element={
+          <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
+            <ReceptionistPackages />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Commented out as freeze/extension features are deprecated
       <Route
         path="/receptionist/approvals"

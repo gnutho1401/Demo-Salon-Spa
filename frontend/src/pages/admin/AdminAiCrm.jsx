@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axiosClient from "../../api/axiosClient";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 export default function AdminAiCrm() {
   const [loading, setLoading] = useState(true);
@@ -67,7 +67,7 @@ export default function AdminAiCrm() {
 
       let msg = "";
       if (risk === "HIGH_RISK") {
-        msg = `Kính gửi Anh/Chị ${selectedCust.name},\n\nĐã lâu rồi Beauty Salon chưa có cơ hội được đón tiếp và chăm sóc sắc đẹp cho Anh/Chị. Chúng em luôn trân quý sự đồng hành của Anh/Chị và rất mong muốn được cải thiện chất lượng dịch vụ tốt hơn.\n\nĐể bày tỏ lòng tri ân sâu sắc, Beauty Salon xin gửi tặng riêng Anh/Chị:\n💝 01 Voucher ưu đãi giảm giá 20% áp dụng cho toàn bộ dịch vụ.\n🎁 Đặc biệt: Tặng kèm 01 suất Gội đầu thảo dược dưỡng sinh hoặc Massage cổ vai gáy hoàn toàn miễn phí cho lần hẹn tới.\n\nChúng em rất mong được gặp lại Anh/Chị. Anh/Chị có thể đặt lịch hẹn trực tiếp qua website hoặc liên hệ hotline của salon nhé ạ!\n\nTrân trọng,\nBeauty Salon`;
+        msg = `Kính gửi Anh/Chị ${selectedCust.name},\n\nĐã lâu rồi Beauty Salon chưa có cơ hội được đón tiếp và chăm sóc sắc đẹp cho Anh/Chị. Chúng em luôn trân quý sự đồng hành của Anh/Chị và rất mong muốn được cải thiện chất lượng dịch vụ tốt hơn.\n\nĐể bày tỏ lòng tri ân sâu sắc, Beauty Salon xin gửi tặng riêng Anh/Chị:\n💝 01 Voucher ưu đãi giảm giá 20% áp dụng cho toàn bộ dịch vụ.\n🎁 Đặc biệt: Tặng kèm 01 suất Phục hồi tóc hư tổn hoặc Massage cổ vai gáy hoàn toàn miễn phí cho lần hẹn tới.\n\nChúng em rất mong được gặp lại Anh/Chị. Anh/Chị có thể đặt lịch hẹn trực tiếp qua website hoặc liên hệ hotline của salon nhé ạ!\n\nTrân trọng,\nBeauty Salon`;
       } else if (risk === "MEDIUM_RISK") {
         const serviceIntro = favService ? ` dịch vụ ${favService} cũng như các` : "";
         msg = `Kính chào Anh/Chị ${selectedCust.name},\n\nĐã một khoảng thời gian kể từ lần cuối Beauty Salon có cơ hội được phục vụ Anh/Chị. Salon rất nhớ bạn và hy vọng bạn vẫn đang có những trải nghiệm tuyệt vời.\n\nĐể hỗ trợ bạn tiếp tục duy trì vẻ đẹp và sự tự tin, chúng em xin gửi tặng ưu đãi đặc biệt:\n🎫 01 Voucher giảm giá 15% cho${serviceIntro} dịch vụ yêu thích tại Salon.\n\nAnh/Chị đặt lịch hẹn ngay hôm nay để nhận thêm nhiều ưu đãi làm đẹp tốt nhất nhé. Rất mong được đón tiếp bạn trở lại!\n\nThân ái,\nBeauty Salon`;
@@ -148,7 +148,7 @@ export default function AdminAiCrm() {
   async function handleExecuteRecommendedAction(actionStr) {
     if (!selectedCust) return;
     const isVoucher = actionStr.includes("Voucher") || actionStr.includes("voucher");
-    const isGift = actionStr.includes("Gội đầu") || actionStr.includes("Massage") || actionStr.includes("Tặng kèm") || actionStr.includes("suất");
+    const isGift = actionStr.includes("Phục hồi") || actionStr.includes("Massage") || actionStr.includes("Tặng kèm") || actionStr.includes("suất");
     const isUpgrade = actionStr.includes("nâng cấp") || actionStr.includes("VIP");
     const isPoints = actionStr.includes("điểm tích lũy") || actionStr.includes("điểm thưởng") || actionStr.includes("Nhân đôi");
     const isMessage = actionStr.includes("tin nhắn") || actionStr.includes("Zalo/SMS") || actionStr.includes("Gửi tin nhắn");
@@ -170,7 +170,7 @@ export default function AdminAiCrm() {
         const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/upgrade-vip`);
         showToast(res.data?.message || "Đã đặc cách nâng cấp VIP thành công!", "success");
       } else if (isGift) {
-        const giftName = actionStr.includes("Gội đầu") ? "Gội đầu thảo dược dưỡng sinh" : "Massage cổ vai gáy miễn phí";
+        const giftName = actionStr.includes("Phục hồi") ? "Phục hồi tóc hư tổn" : "Massage cổ vai gáy miễn phí";
         const res = await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/gift-free-service`, {
           serviceName: giftName
         });
@@ -210,7 +210,7 @@ export default function AdminAiCrm() {
       if (executedActions[`${selectedCust.customer_id}-${action}`]) continue;
 
       const isVoucher = action.includes("Voucher") || action.includes("voucher");
-      const isGift = action.includes("Gội đầu") || action.includes("Massage") || action.includes("Tặng kèm") || action.includes("suất");
+      const isGift = action.includes("Phục hồi") || action.includes("Massage") || action.includes("Tặng kèm") || action.includes("suất");
       const isUpgrade = action.includes("nâng cấp") || action.includes("VIP");
       const isPoints = action.includes("điểm tích lũy") || action.includes("điểm thưởng") || action.includes("Nhân đôi");
       const isMessage = action.includes("tin nhắn") || action.includes("Zalo/SMS") || action.includes("Gửi tin nhắn");
@@ -230,7 +230,7 @@ export default function AdminAiCrm() {
           } else if (isUpgrade) {
             await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/upgrade-vip`);
           } else if (isGift) {
-            const giftName = action.includes("Gội đầu") ? "Gội đầu thảo dược dưỡng sinh" : "Massage cổ vai gáy miễn phí";
+            const giftName = action.includes("Phục hồi") ? "Phục hồi tóc hư tổn" : "Massage cổ vai gáy miễn phí";
             await axiosClient.post(`/ai/customers/${selectedCust.customer_id}/gift-free-service`, {
               serviceName: giftName
             });
@@ -347,8 +347,27 @@ export default function AdminAiCrm() {
           >
             Hệ thống CRM thông minh kết hợp Trí tuệ Nhân tạo
           </span>
-          <h1 style={{ margin: "4px 0", fontSize: "2rem", fontFamily: "Georgia, serif" }}>
+          <h1 style={{ margin: "4px 0", fontSize: "2rem", fontFamily: "Georgia, serif", display: "flex", alignItems: "center", gap: "12px" }}>
             🔮 AI CRM & Churn Predictor
+            {crmData && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: "bold",
+                  padding: "4px 10px",
+                  borderRadius: "20px",
+                  border: crmData.isFallback ? "1px solid #d97706" : "1px solid #16a34a",
+                  color: crmData.isFallback ? "#b45309" : "#15803d",
+                  backgroundColor: crmData.isFallback ? "#fef3c7" : "#dcfce7",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  fontFamily: "sans-serif"
+                }}
+              >
+                {crmData.isFallback ? "⚠️ Chế độ: Dự phòng (Rule-based)" : "🟢 Chế độ: AI Real-time (Gemini-2.5-Flash)"}
+              </span>
+            )}
           </h1>
           <p style={{ margin: 0, color: "#666", fontSize: "0.95rem" }}>
             Tự động phân nhóm khách hàng, cảnh báo rủi ro rời dịch vụ và đề xuất chính sách giữ chân phù hợp.
@@ -1096,7 +1115,7 @@ export default function AdminAiCrm() {
                           helperText = "Gửi ngay lời nhắc và hỏi thăm theo mẫu soạn sẵn qua Email/Thông báo.";
                           handleExecute = () => handleExecuteRecommendedAction(action);
                         } else if (isGift) {
-                          const giftName = action.includes("Gội đầu") ? "Gội đầu thảo dược dưỡng sinh" : "Massage cổ vai gáy miễn phí";
+                          const giftName = action.includes("Phục hồi") ? "Phục hồi tóc hư tổn" : "Massage cổ vai gáy miễn phí";
                           btnText = `Tặng suất ${giftName}`;
                           btnIcon = "💆";
                           helperText = "Gửi tặng dịch vụ miễn phí vào tài khoản khách hàng để họ trải nghiệm.";

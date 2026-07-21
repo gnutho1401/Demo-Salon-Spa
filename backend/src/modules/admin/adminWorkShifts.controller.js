@@ -99,6 +99,44 @@ async function remove(req, res) {
   }
 }
 
+async function getRegistrations(req, res) {
+  try {
+    return success(res, await service.getRegistrations(req.params.id));
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
+
+async function assignTechnician(req, res) {
+  try {
+    const { technicianId } = req.body;
+    if (!technicianId) return error(res, "Vui lòng chọn kỹ thuật viên", 400);
+    const result = await service.assignTechnician(req.params.id, technicianId);
+    return success(res, result, "Assigned");
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
+
+async function removeRegistration(req, res) {
+  try {
+    const result = await service.removeRegistration(req.params.registrationId);
+    return success(res, result, "Removed");
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
+
+async function updateRegistrationStatus(req, res) {
+  try {
+    const { status } = req.body;
+    const result = await service.updateRegistrationStatus(req.params.registrationId, status);
+    return success(res, result, "Updated");
+  } catch (err) {
+    return error(res, err.message);
+  }
+}
+
 module.exports = {
   getTechnicians,
   list,
@@ -106,4 +144,9 @@ module.exports = {
   create,
   update,
   remove,
+  getRegistrations,
+  assignTechnician,
+  removeRegistration,
+  updateRegistrationStatus,
 };
+

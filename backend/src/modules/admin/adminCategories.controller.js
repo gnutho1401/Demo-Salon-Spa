@@ -113,5 +113,28 @@ async function toggleActive(req, res) {
   }
 }
 
-module.exports = { list, getById, create, update, remove, toggleActive };
+async function uploadImage(req, res) {
+  try {
+    if (!req.file) return error(res, "Vui lòng chọn file ảnh", 400);
+    const imageUrl = `/uploads/categories/${req.file.filename}`;
+    const result = await service.updateImage(req.params.id, imageUrl);
+
+    await logs.writeLog({
+      userId: userId(req),
+      roleName: roleName(req),
+      actionName: "Admin upload category image",
+      actionType: "UPDATE",
+      description: `Uploaded image for category #${req.params.id}`,
+      ipAddress: req.ip,
+      oldValue: null,
+      newValue: JSON.stringify({ imageUrl }),
+    });
+
+    return success(res, result, "Image uploaded");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+module.exports = { list, getById, create, update, remove, toggleActive, uploadImage };
 

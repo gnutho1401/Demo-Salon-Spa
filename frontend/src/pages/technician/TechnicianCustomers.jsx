@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import TechnicianLayout from "../../layouts/TechnicianLayout";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const MEMBERSHIP_MAP = {
   Normal: "Thành viên Thường",

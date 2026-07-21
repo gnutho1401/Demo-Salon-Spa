@@ -16,7 +16,7 @@ import {
   Bar,
 } from "recharts";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("vi-VN", {

@@ -137,6 +137,13 @@ export default function MyAppointments() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
+  const [branches, setBranches] = useState([]);
+  const [branchFilter, setBranchFilter] = useState("ALL");
+  const [technicians, setTechnicians] = useState([]);
+  const [technicianFilter, setTechnicianFilter] = useState("ALL");
+  const [services, setServices] = useState([]);
+  const [serviceFilter, setServiceFilter] = useState("ALL");
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -164,6 +171,24 @@ export default function MyAppointments() {
       .catch(() => {
         setBankList(POPULAR_BANKS);
       });
+  }, []);
+
+  useEffect(() => {
+    async function loadFilterOptions() {
+      try {
+        const [branchRes, techRes, serviceRes] = await Promise.all([
+          axiosClient.get("/employees/branches").catch(() => ({ data: { data: [] } })),
+          axiosClient.get("/employees").catch(() => ({ data: [] })),
+          axiosClient.get("/services").catch(() => ({ data: { data: [] } })),
+        ]);
+        setBranches(branchRes.data.data || branchRes.data || []);
+        setTechnicians(techRes.data.data || techRes.data || []);
+        setServices(serviceRes.data.data || serviceRes.data || []);
+      } catch (err) {
+        console.error("Lỗi khi tải danh mục lọc:", err);
+      }
+    }
+    loadFilterOptions();
   }, []);
 
   async function loadAppointments() {
@@ -231,6 +256,12 @@ export default function MyAppointments() {
         const fromOk = !fromDate || date >= fromDate;
         const toOk = !toDate || date <= toDate;
 
+        const branchOk = branchFilter === "ALL" || Number(r.BranchId) === Number(branchFilter);
+        const technicianOk = technicianFilter === "ALL" || Number(r.EmployeeId) === Number(technicianFilter);
+        const serviceOk = serviceFilter === "ALL" || 
+          (r.ServiceIds && r.ServiceIds.split(",").map(Number).includes(Number(serviceFilter))) ||
+          Number(r.ServiceId) === Number(serviceFilter);
+
         const keywordOk =
           !text ||
           getAppointmentCode(r.AppointmentId).toLowerCase().includes(text) ||
@@ -247,9 +278,9 @@ export default function MyAppointments() {
             .toLowerCase()
             .includes(text);
 
-        return statusOk && paymentOk && fromOk && toOk && keywordOk;
+        return statusOk && paymentOk && fromOk && toOk && branchOk && technicianOk && serviceOk && keywordOk;
       });
-  }, [rows, keyword, statusFilter, paymentFilter, fromDate, toDate]);
+  }, [rows, keyword, statusFilter, paymentFilter, fromDate, toDate, branchFilter, technicianFilter, serviceFilter]);
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -361,6 +392,9 @@ export default function MyAppointments() {
     setKeyword("");
     setStatusFilter("ALL");
     setPaymentFilter("ALL");
+    setBranchFilter("ALL");
+    setTechnicianFilter("ALL");
+    setServiceFilter("ALL");
     setFromDate("");
     setToDate("");
   }
@@ -643,6 +677,45 @@ export default function MyAppointments() {
             {PAYMENT_OPTIONS.map(([value, label]) => (
               <option value={value} key={value}>
                 {label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="filter-select"
+            value={branchFilter}
+            onChange={(e) => setBranchFilter(e.target.value)}
+          >
+            <option value="ALL">Tất cả chi nhánh</option>
+            {branches.map((b) => (
+              <option key={b.BranchId} value={b.BranchId}>
+                {b.BranchName}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="filter-select"
+            value={technicianFilter}
+            onChange={(e) => setTechnicianFilter(e.target.value)}
+          >
+            <option value="ALL">Tất cả KTV</option>
+            {technicians.map((t) => (
+              <option key={t.EmployeeId} value={t.EmployeeId}>
+                {t.FullName}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="filter-select"
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value)}
+          >
+            <option value="ALL">Tất cả dịch vụ</option>
+            {services.map((s) => (
+              <option key={s.ServiceId} value={s.ServiceId}>
+                {s.ServiceName}
               </option>
             ))}
           </select>

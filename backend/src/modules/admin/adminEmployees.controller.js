@@ -143,6 +143,51 @@ async function updateAssignedServices(req, res) {
   }
 }
 
+async function uploadImage(req, res) {
+  try {
+    if (!req.file) return error(res, "Vui lòng chọn file ảnh", 400);
+    const imageUrl = `/uploads/employees/${req.file.filename}`;
+    const result = await service.updateImage(req.params.id, imageUrl);
+
+    await logs.writeLog({
+      userId: currentUser(req),
+      roleName: currentRole(req),
+      actionName: "Admin upload employee image",
+      actionType: "UPDATE",
+      description: `Uploaded image for employee ID ${req.params.id}`,
+      ipAddress: req.ip,
+      oldValue: null,
+      newValue: JSON.stringify({ imageUrl }),
+    });
+
+    return success(res, result, "Image uploaded");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function remove(req, res) {
+  try {
+    const before = await service.getById(req.params.id);
+    const result = await service.remove(req.params.id);
+
+    await logs.writeLog({
+      userId: currentUser(req),
+      roleName: currentRole(req),
+      actionName: "Admin delete employee",
+      actionType: "DELETE",
+      description: `Deleted employee ${before?.FullName || ""}`,
+      ipAddress: req.ip,
+      oldValue: JSON.stringify(before),
+      newValue: JSON.stringify(result),
+    });
+
+    return success(res, result);
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
   getRoles,
   getBranches,
@@ -153,4 +198,7 @@ module.exports = {
   changeStatus,
   getAssignedServices,
   updateAssignedServices,
+  uploadImage,
+  remove,
 };
+

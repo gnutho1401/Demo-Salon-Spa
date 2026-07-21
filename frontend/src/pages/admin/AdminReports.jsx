@@ -51,7 +51,7 @@ export default function AdminReports() {
   const scrollToAppointments = () => {
     const section = document.getElementById("reports-appointments-section");
     if (section) {
-      section.scrollIntoView({ behavior: "smooth" });
+      section.scrollIntoView({ behavior: "instant" });
     }
   };
 

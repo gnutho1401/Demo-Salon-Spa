@@ -44,7 +44,7 @@ CREATE TABLE Users (
     Phone NVARCHAR(20) NULL,
     PasswordHash NVARCHAR(255) NOT NULL,
     RoleId INT NOT NULL,
-    AvatarUrl NVARCHAR(255) NULL,
+    AvatarUrl NVARCHAR(1000) NULL,
     Status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     IsVerified BIT NOT NULL DEFAULT 0,
     VerifyCode NVARCHAR(10) NULL,

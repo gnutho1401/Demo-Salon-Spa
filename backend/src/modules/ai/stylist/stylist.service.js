@@ -3,6 +3,29 @@ const { generateContent } = require('../../../config/gemini');
 const { analyzeImage } = require('../vision/face_analysis.service');
 const { SYSTEM_PROMPT } = require('./stylist.prompt');
 
+function sanitizeText(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/выглядеть/gi, 'trông')
+    .replace(/блон\s*/gi, 'vàng ')
+    .replace(/elongated/gi, 'thon dài')
+    .replace(/[\u0400-\u04FF]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function sanitizeObject(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  for (const key of Object.keys(obj)) {
+    if (typeof obj[key] === 'string') {
+      obj[key] = sanitizeText(obj[key]);
+    } else if (typeof obj[key] === 'object') {
+      sanitizeObject(obj[key]);
+    }
+  }
+  return obj;
+}
+
 async function getCustomerContext(pool, customerId) {
   // 1. Get customer details
   const custResult = await pool.request()
@@ -174,10 +197,18 @@ async function getStylistRecommendations(customerId, imageUrl) {
   const servicesText = salonCtx.services.map(s => `- ID [${s.ServiceId}]: ${s.ServiceName} - Giá: ${s.Price?.toLocaleString('vi-VN')}đ (${s.CategoryName || 'Khác'})`).join('\n');
   const stylistsText = salonCtx.technicians.map(t => `- ID [${t.EmployeeId}]: Stylist ${t.FullName} - Chuyên môn: ${t.Specialization || 'Làm tóc chung'} (Đánh giá: ${t.AverageRating}/5)`).join('\n');
 
-  const userMessage = `[KẾT QUẢ PHÂN TÍCH VISION AI]:
-- Face Shape: ${visionResult.face_shape}
-- Hair Type: ${visionResult.hair_type}
-- Skin Tone: ${visionResult.skin_tone}
+  const userMessage = `[KẾT QUẢ PHÂN TÍCH NHÂN TRẮC HỌC & VISION AI]:
+- Dáng mặt chính (Face Shape): ${visionResult.face_shape || 'Trái xoan'}
+- Đường viền hàm (Jawline): ${visionResult.jawline || 'V-line thon gọn'}
+- Đặc điểm trán (Forehead): ${visionResult.forehead || 'Trán cao rộng'}
+- Gò má (Cheekbones): ${visionResult.cheekbones || 'Đầy đặn cân đối'}
+- Độ dài tóc hiện tại (Hair Length): ${visionResult.hair_length || 'Tóc lửng ngang vai'}
+- Mật độ/Độ dày tóc (Hair Density): ${visionResult.hair_density || 'Mật độ trung bình'}
+- Kết cấu chất tóc (Hair Texture): ${visionResult.hair_texture || 'Tóc thẳng tự nhiên'}
+- Màu tóc hiện tại (Current Hair Color): ${visionResult.current_hair_color || 'Nâu hạt dẻ'}
+- Tông màu da (Skin Tone): ${visionResult.skin_tone || 'Trắng hồng'}
+- Sắc thái da (Undertone): ${visionResult.undertone || 'Tone ấm'}
+- Mùa màu sắc cá nhân (Personal Color): ${visionResult.personal_color_season || 'Xuân ấm áp'}
 
 [HỒ SƠ KHÁCH HÀNG]:
 - Tên khách hàng: ${profile.FullName}
@@ -191,7 +222,7 @@ ${servicesText}
 [DANH SÁCH STYLIST CỦA SALON]:
 ${stylistsText}
 
-Hãy phân tích và đưa ra đề xuất kiểu tóc, màu nhuộm, combo upsell dịch vụ giá trị cao và stylist phù hợp nhất cho khách hàng này. Đảm bảo trả về JSON cấu trúc chuẩn.`;
+Hãy phân tích kỹ lưỡng các đặc điểm nhân trắc học và đưa ra đề xuất kiểu tóc, màu nhuộm tôn dáng mặt & tông da, combo upsell dịch vụ giá trị cao và stylist phù hợp nhất cho khách hàng này. Đảm bảo trả về JSON cấu trúc chuẩn.`;
 
   let finalPayload;
   let isFallback = false;
@@ -199,16 +230,50 @@ Hãy phân tích và đưa ra đề xuất kiểu tóc, màu nhuộm, combo upse
   try {
     const aiResponse = await generateContent(SYSTEM_PROMPT, userMessage, { jsonMode: true, maxTokens: 4096 });
     let cleanAnswer = aiResponse.trim();
-    // Strip markdown code fence if present (fallback for non-jsonMode responses)
-    if (cleanAnswer.startsWith('```')) {
-      cleanAnswer = cleanAnswer.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    const firstBrace = cleanAnswer.indexOf('{');
+    const lastBrace = cleanAnswer.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      cleanAnswer = cleanAnswer.substring(firstBrace, lastBrace + 1);
     }
-    finalPayload = JSON.parse(cleanAnswer);
+    try {
+      finalPayload = JSON.parse(cleanAnswer);
+    } catch (parseErr) {
+      // Fix common JSON issues like trailing commas or unescaped controls
+      console.warn('[AI Stylist] Retrying parse with repaired JSON...');
+      let repaired = cleanAnswer
+        .replace(/,\s*([\]}])/g, '$1')
+        .replace(/[\u0000-\u001F]+/g, ' ');
+      try {
+        finalPayload = JSON.parse(repaired);
+      } catch (err2) {
+        console.error('[AI Stylist JSON Raw Answer]:', cleanAnswer);
+        throw parseErr;
+      }
+    }
+
+    // Ensure detailed analysis payload contains vision attributes
+    const rawAnalysis = finalPayload.analysis || {};
+    finalPayload.analysis = {
+      face_shape: visionResult.face_shape || (typeof rawAnalysis === 'object' ? rawAnalysis.face_shape : null) || 'Trái xoan',
+      face_shape_reason: visionResult.face_shape_reason || 'Tỉ lệ chiều dài và chiều rộng cân đối hài hòa theo chuẩn nhân trắc học',
+      jawline: visionResult.jawline || 'V-line thon gọn',
+      forehead: visionResult.forehead || 'Trán cao rộng',
+      cheekbones: visionResult.cheekbones || 'Đầy đặn cân đối',
+      chin: visionResult.chin || 'Cằm nhọn thon gọn',
+      hair_length: visionResult.hair_length || 'Tóc lửng ngang vai',
+      hair_density: visionResult.hair_density || 'Mật độ trung bình',
+      hair_texture: visionResult.hair_texture || 'Tóc thẳng tự nhiên',
+      current_hair_color: visionResult.current_hair_color || 'Nâu hạt dẻ',
+      skin_tone: visionResult.skin_tone || (typeof rawAnalysis === 'object' ? rawAnalysis.skin_tone : null) || 'Trắng hồng',
+      undertone: visionResult.undertone || 'Tone ấm',
+      personal_color_season: visionResult.personal_color_season || 'Xuân ấm áp',
+      hair_type: `${visionResult.hair_length || 'Tóc lửng'}, ${visionResult.hair_texture || 'Thẳng tự nhiên'} (${visionResult.hair_density || 'Mật độ trung bình'})`,
+      summary: typeof rawAnalysis === 'string' ? rawAnalysis : (rawAnalysis.summary || `Khuôn mặt ${visionResult.face_shape || 'cân đối'} (${visionResult.face_shape_reason || ''}). Tóc ${visionResult.hair_length || 'lửng'}, ${visionResult.hair_texture || 'tự nhiên'}. Tông da ${visionResult.skin_tone || 'sáng'} (${visionResult.undertone || 'Tone ấm'}).`)
+    };
 
     // --- Sanitize: ensure array fields are always arrays ---
     if (finalPayload.trending) {
       if (typeof finalPayload.trending.styles === 'string') {
-        // Split comma-separated string or wrap single value in array
         finalPayload.trending.styles = finalPayload.trending.styles
           .split(/,\s*/)
           .map(s => s.trim())
@@ -230,11 +295,11 @@ Hãy phân tích và đưa ra đề xuất kiểu tóc, màu nhuộm, combo upse
     }
   } catch (err) {
     console.error('[AI Stylist] LLM generation failed with details:', err.message);
-    finalPayload = getRuleBasedFallback(visionResult, salonCtx.services, salonCtx.technicians, profile);
-    isFallback = true;
+    throw new Error(`Dịch vụ AI Stylist không thể kết nối tới mô hình AI: ${err.message}. Vui lòng bấm thử lại sau ít phút!`);
   }
 
   finalPayload.image_url = imageUrl;
+  sanitizeObject(finalPayload);
 
   // 5. Log to AIPredictions and AIAuditLogs
   try {

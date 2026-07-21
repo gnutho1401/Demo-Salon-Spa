@@ -86,6 +86,29 @@ async function vnpayReturn(req, res) {
     );
   }
 }
+async function createPayosPackage(req, res) {
+  try {
+    return success(
+      res,
+      await service.createPayosPackageUrl(
+        req.user.userId,
+        req.params.id,
+        req.body,
+      ),
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+async function payosReturn(req, res) {
+  try {
+    return res.redirect(await service.handlePayosReturn(req.query));
+  } catch (err) {
+    return res.redirect(
+      `${process.env.FRONTEND_URL || "http://localhost:5173"}/customer/packages?error=${encodeURIComponent(err.message)}`,
+    );
+  }
+}
 async function create(req, res) {
   try {
     return success(res, await service.create(req.body), "Created", 201);
@@ -306,7 +329,107 @@ async function findMember(req, res) {
   }
 }
 
+async function repayCustomerPackage(req, res) {
+  try {
+    const ipAddr =
+      req.headers["x-forwarded-for"] ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      req.connection.socket.remoteAddress;
+
+    return success(
+      res,
+      await service.createVnpayRepayUrl(
+        req.user.userId,
+        req.params.customerPackageId,
+        ipAddr,
+      ),
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function repayPayosCustomerPackage(req, res) {
+  try {
+    return success(
+      res,
+      await service.createPayosRepayUrl(
+        req.user.userId,
+        req.params.customerPackageId,
+      ),
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function getComboHistoryAndReviews(req, res) {
+  try {
+    const { connectDB, sql } = require("../../config/db");
+    const pool = await connectDB();
+    const custRes = await pool.request()
+      .input("UserId", sql.Int, req.user.userId)
+      .query(`SELECT CustomerId FROM Customers WHERE UserId = @UserId`);
+    const customerId = custRes.recordset[0]?.CustomerId;
+    if (!customerId) throw new Error("Không tìm thấy thông tin khách hàng");
+
+    const data = await service.getComboHistoryAndReviews(customerId);
+    return success(res, data);
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function bookCustomerPackage(req, res) {
+  try {
+    const data = await service.bookCustomerPackage(
+      req.user.userId,
+      req.params.customerPackageId,
+      req.body
+    );
+    return success(res, data, "Đặt lịch hẹn sử dụng Combo thành công", 201);
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function rescheduleCustomerPackageAppointment(req, res) {
+  try {
+    const data = await service.rescheduleCustomerPackageAppointment(
+      req.user.userId,
+      req.params.customerPackageId,
+      req.body
+    );
+    return success(res, data, "Đổi lịch hẹn Combo thành công", 200);
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function submitComboReview(req, res) {
+
+  try {
+    const { connectDB, sql } = require("../../config/db");
+    const pool = await connectDB();
+    const custRes = await pool.request()
+      .input("UserId", sql.Int, req.user.userId)
+      .query(`SELECT CustomerId FROM Customers WHERE UserId = @UserId`);
+    const customerId = custRes.recordset[0]?.CustomerId;
+    if (!customerId) throw new Error("Không tìm thấy thông tin khách hàng");
+
+    const data = await service.submitComboReview({
+      customerId,
+      ...req.body
+    });
+    return success(res, data, "Gửi đánh giá Combo thành công", 201);
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
+
   getAll,
   getCategories,
   getMine,
@@ -315,10 +438,11 @@ module.exports = {
   buyPackage,
   createVnpayPackage,
   vnpayReturn,
+  createPayosPackage,
+  payosReturn,
   create,
   update,
   remove,
-  // Enterprise
   requestExtension,
   requestFreeze,
   unfreezePackage,
@@ -331,4 +455,14 @@ module.exports = {
   getPackageReport,
   findMember,
   repayCustomerPackage,
+  repayPayosCustomerPackage,
+  bookCustomerPackage,
+  rescheduleCustomerPackageAppointment,
+  getComboHistoryAndReviews,
+  submitComboReview
 };
+
+
+
+
+

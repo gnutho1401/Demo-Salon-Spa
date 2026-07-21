@@ -650,6 +650,37 @@ async function resetPassword(id, data = {}) {
   return getById(id);
 }
 
+async function updateAvatar(id, avatarUrl) {
+  const pool = await connectDB();
+  await pool.request()
+    .input("UserId", sql.Int, Number(id))
+    .input("AvatarUrl", sql.NVarChar, avatarUrl)
+    .query(`
+      UPDATE Users SET AvatarUrl = @AvatarUrl, UpdatedAt = GETDATE() WHERE UserId = @UserId;
+      UPDATE Employees SET ImageUrl = @AvatarUrl WHERE UserId = @UserId;
+    `);
+  return getById(id);
+}
+
+async function remove(id) {
+  const pool = await connectDB();
+  try {
+    await pool.request().input("UserId", sql.Int, Number(id)).query("DELETE FROM CustomerVouchers WHERE CustomerId IN (SELECT CustomerId FROM Customers WHERE UserId = @UserId)");
+    await pool.request().input("UserId", sql.Int, Number(id)).query("DELETE FROM CustomerPackages WHERE CustomerId IN (SELECT CustomerId FROM Customers WHERE UserId = @UserId)");
+    await pool.request().input("UserId", sql.Int, Number(id)).query("DELETE FROM Customers WHERE UserId = @UserId");
+    await pool.request().input("UserId", sql.Int, Number(id)).query("DELETE FROM ShiftRegistrations WHERE TechnicianId IN (SELECT EmployeeId FROM Employees WHERE UserId = @UserId)");
+    await pool.request().input("UserId", sql.Int, Number(id)).query("DELETE FROM EmployeeServices WHERE EmployeeId IN (SELECT EmployeeId FROM Employees WHERE UserId = @UserId)");
+    await pool.request().input("UserId", sql.Int, Number(id)).query("DELETE FROM Employees WHERE UserId = @UserId");
+    await pool.request().input("UserId", sql.Int, Number(id)).query("DELETE FROM Users WHERE UserId = @UserId");
+    return { UserId: Number(id), deleted: true };
+  } catch (err) {
+    await pool.request()
+      .input("UserId", sql.Int, Number(id))
+      .query("UPDATE Users SET Status = 'INACTIVE', UpdatedAt = GETDATE() WHERE UserId = @UserId");
+    return { UserId: Number(id), Status: "INACTIVE", softDeleted: true };
+  }
+}
+
 module.exports = {
   getRoles,
   list,
@@ -659,4 +690,7 @@ module.exports = {
   updateRole,
   changeStatus,
   resetPassword,
+  updateAvatar,
+  remove,
 };
+

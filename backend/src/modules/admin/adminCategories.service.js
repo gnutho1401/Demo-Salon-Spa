@@ -176,5 +176,21 @@ async function toggleActive(id) {
   return await getById(id);
 }
 
-module.exports = { list, getById, create, update, remove, toggleActive };
+async function updateImage(id, imageUrl) {
+  const pool = await connectDB();
+  await getById(id);
+
+  await pool.request()
+    .input("CategoryId", sql.Int, id)
+    .input("ImageUrl", sql.NVarChar, imageUrl)
+    .query(`
+      UPDATE ServiceCategories
+      SET ImageUrl = @ImageUrl
+      WHERE CategoryId = @CategoryId
+    `);
+
+  return await getById(id);
+}
+
+module.exports = { list, getById, create, update, remove, toggleActive, updateImage };
 

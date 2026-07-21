@@ -406,10 +406,10 @@ async function createAppointment(req, res) {
   try {
     const data = await service.createAppointment(req.user.userId, req.body);
 
-    // Nếu đặt tái khám PENDING từ một Treatment Note, lưu liên kết để sau khi khách xác nhận sẽ auto-finalize
+    // Nếu đặt tái khám PENDING/PENDING_PAYMENT từ một Treatment Note, lưu liên kết để sau khi khách xác nhận/thanh toán sẽ auto-finalize
     const appointmentId = data?.appointmentId || data?.AppointmentId;
     const { treatmentNoteId, status } = req.body;
-    if (appointmentId && treatmentNoteId && status === "PENDING") {
+    if (appointmentId && treatmentNoteId && (status === "PENDING" || status === "PENDING_PAYMENT")) {
       try {
         await treatmentNotesV2Service.linkFollowUpAppointment(treatmentNoteId, appointmentId);
       } catch (linkErr) {
@@ -514,6 +514,19 @@ async function getMonthlyTimesheet(req, res) {
   }
 }
 
+async function updateAppointmentDuration(req, res) {
+  try {
+    const data = await service.updateAppointmentDuration(
+      req.user.userId,
+      req.params.id,
+      req.body.durationMinutes
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+}
+
 module.exports = {
   getDashboard,
   getSchedule,
@@ -523,10 +536,10 @@ module.exports = {
   getAppointmentDetail,
   markNoShow,
   addTreatmentNote,
-  getAppointments,
-  getAppointmentsSummary,
   getCustomers,
   getCustomersSummary,
+  getAppointments,
+  getAppointmentsSummary,
   getCustomerDetail,
   getCustomerInsights,
   getTreatmentNotesPage,
@@ -563,4 +576,5 @@ module.exports = {
   getAttendanceByShift,
   getWeeklyTimesheet,
   getMonthlyTimesheet,
+  updateAppointmentDuration,
 };

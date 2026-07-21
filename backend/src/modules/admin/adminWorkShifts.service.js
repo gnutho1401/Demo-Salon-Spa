@@ -177,6 +177,81 @@ async function remove(id) {
   return { ShiftId: Number(id) };
 }
 
+async function getRegistrations(shiftId) {
+  const pool = await connectDB();
+  const result = await pool.request()
+    .input("ShiftId", sql.Int, Number(shiftId))
+    .query(`
+      SELECT 
+        sr.RegistrationId,
+        sr.ShiftId,
+        sr.TechnicianId,
+        sr.Status,
+        sr.CreatedAt,
+        u.FullName,
+        u.Email,
+        u.Phone,
+        u.AvatarUrl,
+        e.ImageUrl,
+        e.Position,
+        e.Specialization
+      FROM ShiftRegistrations sr
+      JOIN Employees e ON sr.TechnicianId = e.EmployeeId
+      JOIN Users u ON e.UserId = u.UserId
+      WHERE sr.ShiftId = @ShiftId
+      ORDER BY sr.CreatedAt ASC
+    `);
+  return result.recordset;
+}
+
+async function assignTechnician(shiftId, technicianId) {
+  const pool = await connectDB();
+
+  // Check if already registered
+  const check = await pool.request()
+    .input("ShiftId", sql.Int, Number(shiftId))
+    .input("TechnicianId", sql.Int, Number(technicianId))
+    .query(`
+      SELECT RegistrationId FROM ShiftRegistrations 
+      WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId
+    `);
+
+  if (check.recordset.length > 0) {
+    // Update to APPROVED if existing
+    await pool.request()
+      .input("RegistrationId", sql.Int, check.recordset[0].RegistrationId)
+      .query(`UPDATE ShiftRegistrations SET Status = 'APPROVED' WHERE RegistrationId = @RegistrationId`);
+  } else {
+    // Insert new approved registration
+    await pool.request()
+      .input("ShiftId", sql.Int, Number(shiftId))
+      .input("TechnicianId", sql.Int, Number(technicianId))
+      .query(`
+        INSERT INTO ShiftRegistrations (ShiftId, TechnicianId, Status, CreatedAt)
+        VALUES (@ShiftId, @TechnicianId, 'APPROVED', GETDATE())
+      `);
+  }
+
+  return getRegistrations(shiftId);
+}
+
+async function removeRegistration(registrationId) {
+  const pool = await connectDB();
+  await pool.request()
+    .input("RegistrationId", sql.Int, Number(registrationId))
+    .query(`DELETE FROM ShiftRegistrations WHERE RegistrationId = @RegistrationId`);
+  return { RegistrationId: Number(registrationId) };
+}
+
+async function updateRegistrationStatus(registrationId, status) {
+  const pool = await connectDB();
+  await pool.request()
+    .input("RegistrationId", sql.Int, Number(registrationId))
+    .input("Status", sql.NVarChar(20), status)
+    .query(`UPDATE ShiftRegistrations SET Status = @Status WHERE RegistrationId = @RegistrationId`);
+  return { RegistrationId: Number(registrationId), Status: status };
+}
+
 module.exports = {
   getTechnicians,
   list,
@@ -184,4 +259,9 @@ module.exports = {
   create,
   update,
   remove,
+  getRegistrations,
+  assignTechnician,
+  removeRegistration,
+  updateRegistrationStatus,
 };
+

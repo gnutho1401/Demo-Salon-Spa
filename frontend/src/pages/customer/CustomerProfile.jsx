@@ -217,7 +217,7 @@ export default function CustomerProfile() {
                   <label className="prof-vip-avatar-container" style={{ margin: 0, position: 'relative', zIndex: 3 }}>
                     <div className="prof-vip-avatar">
                       {avatarSrc ? (
-                        <img src={avatarSrc} alt="Avatar" />
+                        <img src={avatarSrc} alt="Avatar" referrerPolicy="no-referrer" />
                       ) : (
                         form.fullName ? form.fullName.charAt(0).toUpperCase() : 'K'
                       )}

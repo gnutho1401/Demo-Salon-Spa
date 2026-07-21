@@ -18,6 +18,13 @@ router.get(
   controller.getTechnicianRequests
 );
 
+router.put(
+  "/technician/reschedule-requests/:id/cancel",
+  authMiddleware,
+  allowRoles("TECHNICIAN"),
+  controller.technicianCancelRequest
+);
+
 // Receptionist routes
 router.get(
   "/receptionist/reschedule-requests",
@@ -38,6 +45,28 @@ router.put(
   authMiddleware,
   allowRoles("RECEPTIONIST", "ADMIN", "MANAGER"),
   controller.rejectRequest
+);
+
+// Customer routes
+router.get(
+  "/customer/appointments/:appointmentId/pending-reschedule",
+  authMiddleware,
+  allowRoles("CUSTOMER"),
+  controller.getCustomerPendingRequest
+);
+
+router.put(
+  "/customer/reschedule-requests/:id/confirm",
+  authMiddleware,
+  allowRoles("CUSTOMER"),
+  controller.customerConfirm
+);
+
+router.put(
+  "/customer/reschedule-requests/:id/reject",
+  authMiddleware,
+  allowRoles("CUSTOMER"),
+  controller.customerReject
 );
 
 module.exports = router;

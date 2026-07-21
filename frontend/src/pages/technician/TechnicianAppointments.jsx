@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import TechnicianLayout from "../../layouts/TechnicianLayout";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function avatar(url) {
   if (!url) return DEFAULT_AVATAR;
@@ -164,7 +164,7 @@ export default function TechnicianAppointments() {
   const completeAppointment = async (id) => {
     try {
       await axiosClient.patch(`/technician/appointments/${id}/complete`);
-      await refreshPage();
+      navigate(`/technician/treatment-notes?appointmentId=${id}`);
     } catch (err) {
       alert(err.response?.data?.message || "Không thể hoàn thành lịch hẹn");
     }
@@ -858,6 +858,22 @@ export default function TechnicianAppointments() {
                           </td>
 
                           <td>
+                            {(a.CustomerPackageId || (a.Notes && a.Notes.includes("Combo"))) && (
+                              <div style={{ marginBottom: 4 }}>
+                                <span style={{
+                                  background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                                  color: "#ffffff",
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  padding: "2px 8px",
+                                  borderRadius: 12,
+                                  display: "inline-block",
+                                  letterSpacing: 0.5
+                                }}>
+                                  🎁 COMBO TRỌN GÓI
+                                </span>
+                              </div>
+                            )}
                             <b style={{ color: "#102616" }}>{service.main}</b>
                             {service.more && <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#8b651e" }}>{service.more}</p>}
                           </td>
@@ -896,6 +912,18 @@ export default function TechnicianAppointments() {
                                 style={{ border: "1px solid #eadfca", background: "white", cursor: "pointer" }}
                               >
                                 👁
+                              </button>
+
+                              <button
+                                title="Ghi Treatment Note (Nhật ký trị liệu)"
+                                onClick={() =>
+                                  navigate(
+                                    `/technician/treatment-notes?appointmentId=${a.AppointmentId}`,
+                                  )
+                                }
+                                style={{ border: "1px solid #c7d2fe", background: "#e0e7ff", color: "#4338ca", cursor: "pointer" }}
+                              >
+                                ✍️
                               </button>
 
                               {["CONFIRMED", "PAID", "CHECKED_IN"].includes(
@@ -937,6 +965,7 @@ export default function TechnicianAppointments() {
                               )}
                             </div>
                           </td>
+
                         </tr>
                       );
                     })

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../api/axiosClient";
 import { useAuth } from "../context/AuthContext";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function avatarUrl(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
@@ -78,11 +78,13 @@ export default function ReceptionistLayout({ children }) {
             <p className="rx-menu-group-title">Nghiệp vụ Salon</p>
             <NavLink to="/receptionist/dashboard">📊 Tổng quan</NavLink>
             <NavLink to="/receptionist/appointments">📅 Lịch hẹn</NavLink>
-            <NavLink to="/receptionist/dispatch">⚡ Điều phối KTV</NavLink>
+            <NavLink to="/receptionist/packages">📦 Quản lý Combo</NavLink>
+
+            {/* <NavLink to="/receptionist/dispatch">⚡ Điều phối KTV</NavLink> */}
             <NavLink to="/receptionist/appointments/create">
               ➕ Tạo lịch hẹn mới
             </NavLink>
-            <NavLink to="/receptionist/waiting-list">⏳ Hàng chờ</NavLink>
+            {/* <NavLink to="/receptionist/waiting-list">⏳ Hàng chờ</NavLink> */}
             <NavLink to="/receptionist/reschedule-requests">📅 Duyệt đổi lịch</NavLink>
           </div>
 

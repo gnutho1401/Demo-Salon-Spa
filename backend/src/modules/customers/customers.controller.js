@@ -102,4 +102,8 @@ async function remove(req, res) {
   try { return success(res, await service.remove(req.params.id), 'Deleted'); } catch (err) { return error(res, err.message, 400); }
 }
 
-module.exports = { getAll, getById, getMyProfile, getMyDashboard, createMyFeedback, getMyFeedbacks, createMyReview, getMyReviews, getMyReviewableServices, getMyFavoriteServices, getMyFavoriteEmployees, toggleFavoriteService, toggleFavoriteEmployee, updateMyProfile, updateMyAvatar, createGuestContact, create, update, remove };
+async function getPublicReviews(req, res) {
+  try { return success(res, await service.getPublicReviews()); } catch (err) { return error(res, err.message, 400); }
+}
+
+module.exports = { getPublicReviews, getAll, getById, getMyProfile, getMyDashboard, createMyFeedback, getMyFeedbacks, createMyReview, getMyReviews, getMyReviewableServices, getMyFavoriteServices, getMyFavoriteEmployees, toggleFavoriteService, toggleFavoriteEmployee, updateMyProfile, updateMyAvatar, createGuestContact, create, update, remove };

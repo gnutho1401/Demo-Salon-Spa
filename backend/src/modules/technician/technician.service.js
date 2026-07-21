@@ -2,6 +2,7 @@ const { sql, connectDB } = require("../../config/db");
 const appointmentStateService = require("../appointments/appointment-state.service");
 const receptionistService = require("../receptionist/receptionist.service");
 const eventBusService = require("../event-bus/eventBus.service");
+const { deductComboSession } = require("../appointments/appointments.service");
 
 async function getTechnicianByUserId(userId) {
   const pool = await connectDB();
@@ -193,10 +194,19 @@ async function getDashboard(userId) {
         CONVERT(VARCHAR(5), ws.StartTime, 108) AS StartTime,
         CONVERT(VARCHAR(5), ws.EndTime, 108) AS EndTime,
         ws.ShiftName AS ShiftType
-      FROM ShiftRegistrations sr
-      JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
-      WHERE sr.TechnicianId = @EmployeeId
-        AND sr.Status = 'APPROVED'
+      FROM WorkShifts ws
+      LEFT JOIN ShiftRegistrations sr ON ws.ShiftId = sr.ShiftId AND sr.TechnicianId = @EmployeeId
+      WHERE (
+        (sr.TechnicianId = @EmployeeId AND sr.Status = 'APPROVED')
+        OR (ws.ShiftName <> N'Cả Ngày' AND EXISTS (
+          SELECT 1 FROM Appointments app
+          WHERE app.EmployeeId = @EmployeeId
+            AND app.AppointmentDate = ws.ShiftDate
+            AND app.Status NOT IN ('CANCELLED', 'NO_SHOW')
+            AND CONVERT(VARCHAR(5), app.StartTime, 108) >= CONVERT(VARCHAR(5), ws.StartTime, 108)
+            AND CONVERT(VARCHAR(5), app.StartTime, 108) < CONVERT(VARCHAR(5), ws.EndTime, 108)
+        ))
+      )
         AND ws.ShiftDate BETWEEN @StartOfWeek AND @EndOfWeek
       ORDER BY ws.ShiftDate ASC
     `);
@@ -455,7 +465,7 @@ async function getAvailableSlotsForTechnician(userId, query = {}) {
     `);
 
   let shiftStart = "08:00:00";
-  let shiftEnd = "22:00:00"; // Default to full salon hours
+  let shiftEnd = "20:00:00"; // Default to full salon hours
 
   if (shiftResult.recordset[0] && !shiftResult.recordset[0].IsDayOff) {
     shiftStart = shiftResult.recordset[0].StartTime;
@@ -554,18 +564,6 @@ async function startAppointment(userId, appointmentId) {
   // Validate state transition
   appointmentStateService.validateTransition(current.Status, "IN_PROGRESS");
 
-  // Kiểm tra thời gian: chỉ được bắt đầu trong ngày và đã đến giờ làm dịch vụ
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const apptDate = current.AppointmentDate instanceof Date
-    ? current.AppointmentDate.toISOString().slice(0, 10)
-    : String(current.AppointmentDate).slice(0, 10);
-  const nowTimeStr = now.toTimeString().slice(0, 8);
-  const startTimeStr = String(current.StartTime).slice(0, 8);
-  if (apptDate !== todayStr || nowTimeStr < startTimeStr) {
-    throw new Error("Chỉ được bắt đầu lịch trong ngày và đã đến giờ làm dịch vụ");
-  }
-
   const result = await pool
     .request()
     .input("AppointmentId", sql.Int, Number(appointmentId))
@@ -590,6 +588,126 @@ async function startAppointment(userId, appointmentId) {
     `);
 
   return result.recordset[0];
+}
+
+async function getAppointmentByIdInternal(pool, id) {
+  const result = await pool.request().input("AppointmentId", sql.Int, id)
+    .query(`
+    SELECT
+      a.AppointmentId,
+      a.CustomerId,
+      a.EmployeeId AS TechnicianId,
+      a.AppointmentDate,
+      a.Status,
+      cu.FullName AS CustomerName,
+      cu.Email AS CustomerEmail,
+      cu.Phone AS CustomerPhone,
+      eu.FullName AS TechnicianName,
+      COALESCE(i.InvoiceId, NULL) AS InvoiceId,
+      COALESCE(i.FinalAmount, 0) AS FinalAmount,
+      a.CustomerPackageId
+    FROM Appointments a
+    JOIN Customers c ON a.CustomerId = c.CustomerId
+    JOIN Users cu ON c.UserId = cu.UserId
+    JOIN Employees e ON a.EmployeeId = e.EmployeeId
+    JOIN Users eu ON e.UserId = eu.UserId
+    LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+    WHERE a.AppointmentId = @AppointmentId
+    `);
+  return result.recordset[0];
+}
+
+async function finalizeCheckoutInternal(pool, id, userId = null) {
+  const current = await getAppointmentByIdInternal(pool, id);
+  if (!current) return;
+  if (current.CheckedOutAt) return; // Already checked out, skip sending email again
+
+  await pool.request()
+    .input("AppointmentId", sql.Int, id)
+    .query(`
+      UPDATE Appointments
+      SET CheckedOutAt = COALESCE(CheckedOutAt, CURRENT_TIMESTAMP),
+          CompletedAt = COALESCE(CompletedAt, CURRENT_TIMESTAMP),
+          Status = 'COMPLETED',
+          UpdatedAt = CURRENT_TIMESTAMP
+      WHERE AppointmentId = @AppointmentId
+    `);
+
+  const servicesResult = await pool.request()
+    .input("AppointmentId", sql.Int, id)
+    .query(`SELECT ServiceId, Price FROM AppointmentServices WHERE AppointmentId = @AppointmentId`);
+  const apptServices = servicesResult.recordset || [];
+
+  if (current.CustomerEmail) {
+    try {
+      const { sendMail } = require("../../utils/sendMail");
+      
+      let servicesListHtml = "";
+      if (apptServices.length > 0) {
+        servicesListHtml = apptServices.map(s => `<li>Dịch vụ giá: ${Number(s.Price).toLocaleString('vi-VN')}đ</li>`).join("");
+      }
+
+      const emailHtml = `
+        <div style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333;">
+          <h2 style="color: #d91f68; border-bottom: 2px solid #fce7f3; padding-bottom: 8px;">Cảm ơn quý khách đã đồng hành cùng BeautyMS!</h2>
+          <p>Chào <strong>${current.CustomerName}</strong>,</p>
+          <p>Chúng tôi xin gửi lời cảm ơn chân thành nhất vì quý khách đã tin tưởng và sử dụng dịch vụ tại salon của chúng tôi vào ngày <strong>${new Date(current.AppointmentDate).toLocaleDateString('vi-VN')}</strong>.</p>
+          
+          <div style="background: #fafafa; border: 1px solid #eaeaea; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #555;">Tóm tắt dịch vụ đã thực hiện:</h3>
+            <ul>
+              ${servicesListHtml || '<li>Dịch vụ chăm sóc sắc đẹp</li>'}
+            </ul>
+            <p style="margin-bottom: 0;">Tổng số tiền thanh toán: <strong>${Number(current.FinalAmount).toLocaleString('vi-VN')}đ</strong></p>
+          </div>
+          
+          <p>Mọi góp ý hoặc phản hồi của quý khách về dịch vụ và tay nghề Kỹ thuật viên <strong>${current.TechnicianName || 'Chuyên viên'}</strong> sẽ giúp chúng tôi hoàn thiện chất lượng phục vụ ngày một tốt hơn.</p>
+          <p>Quý khách có thể đánh giá dịch vụ trực tuyến tại đây: 
+            <a href="http://localhost:3000/customer/reviews" style="display: inline-block; background: #d91f68; color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; margin-top: 5px;">Viết Đánh Giá Ngay</a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
+          <p style="font-size: 12px; color: #999;">Đây là email tự động gửi từ hệ thống chăm sóc khách hàng của BeautyMS. Vui lòng không trả lời trực tiếp email này.</p>
+        </div>
+      `;
+
+      await sendMail({
+        to: current.CustomerEmail,
+        subject: "[BeautyMS] Cảm ơn quý khách đã sử dụng dịch vụ",
+        html: emailHtml
+      });
+      console.log(`[Checkout] Thank-you email sent successfully to ${current.CustomerEmail}`);
+    } catch (mailErr) {
+      console.error(`[Checkout] Failed to send check-out email to ${current.CustomerEmail}:`, mailErr.message);
+    }
+  }
+
+  if (current.CustomerId) {
+    try {
+      const { create: createNotification } = require("../notifications/notifications.service");
+      const custUserRes = await pool.request()
+        .input("CustomerId", sql.Int, current.CustomerId)
+        .query(`SELECT UserId FROM Customers WHERE CustomerId = @CustomerId`);
+      const custUserId = custUserRes.recordset[0]?.UserId;
+
+      if (custUserId) {
+        await createNotification({
+          userId: custUserId,
+          title: `🧾 Hóa đơn thanh toán dịch vụ #${current.InvoiceId || id}`,
+          content: `Dịch vụ làm đẹp cho lịch hẹn #${id} đã hoàn tất check-out. Tổng tiền thanh toán: ${Number(current.FinalAmount || 0).toLocaleString('vi-VN')}đ. Hóa đơn chi tiết đã được gửi tới email ${current.CustomerEmail || ''}. Cảm ơn quý khách!`,
+          type: "INVOICE"
+        });
+        console.log(`[Checkout] In-app invoice notification created for UserId ${custUserId}`);
+      }
+    } catch (notifErr) {
+      console.error(`[Checkout] Failed to create in-app invoice notification:`, notifErr.message);
+    }
+  }
+
+  eventBusService.publish("APPOINTMENT_CHECKED_OUT", {
+    appointmentId: Number(id),
+    userId
+  });
 }
 
 async function completeAppointment(userId, appointmentId) {
@@ -620,6 +738,34 @@ async function completeAppointment(userId, appointmentId) {
 
     if (!current) {
       throw new Error("Không tìm thấy lịch hẹn của kỹ thuật viên này");
+    }
+
+    // Kiểm tra tất cả dịch vụ trong lịch hẹn đã hoàn thành chưa
+    const servicesCheckResult = await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .query(`
+        SELECT 
+          aps.AppointmentServiceId,
+          s.ServiceName,
+          ISNULL(aps.Status, 'PENDING') AS ServiceStatus
+        FROM AppointmentServices aps
+        JOIN Services s ON aps.ServiceId = s.ServiceId
+        WHERE aps.AppointmentId = @AppointmentId
+      `);
+
+    const totalServices = servicesCheckResult.recordset.length;
+    const incompleteServices = servicesCheckResult.recordset.filter(
+      (s) => (s.ServiceStatus || 'PENDING') !== 'COMPLETED'
+    );
+
+    // Bắt buộc tất cả dịch vụ trong combo (hoặc lịch hẹn có nhiều dịch vụ) phải hoàn thành trước
+    if ((current.CustomerPackageId || totalServices > 1) && incompleteServices.length > 0) {
+      const incompleteNames = incompleteServices
+        .map((s, i) => `${i + 1}. ${s.ServiceName}`)
+        .join(", ");
+      throw new Error(
+        `Chưa thể hoàn thành lịch hẹn. Bạn phải hoàn thành tất cả các dịch vụ trong combo trước! Các dịch vụ chưa hoàn thành: ${incompleteNames}`
+      );
     }
 
     // Validate state transition using state machine service
@@ -840,6 +986,9 @@ async function completeAppointment(userId, appointmentId) {
       userId
     });
 
+    // Always finalize checkout and send email upon completion of service
+    await finalizeCheckoutInternal(pool, appointmentId, userId);
+
     return finalResult.recordset[0];
   } catch (err) {
     try {
@@ -1019,7 +1168,7 @@ async function markNoShow(userId, appointmentId) {
     .input("AppointmentId", sql.Int, Number(appointmentId))
     .input("EmployeeId", sql.Int, employeeId)
     .query(`
-      SELECT Status, AppointmentDate, EndTime
+      SELECT Status, AppointmentDate, EndTime, CustomerPackageId
       FROM Appointments
       WHERE AppointmentId = @AppointmentId
         AND EmployeeId = @EmployeeId
@@ -1047,46 +1196,60 @@ async function markNoShow(userId, appointmentId) {
     throw new Error("Chỉ được đánh dấu No-show khi lịch đã quá giờ kết thúc");
   }
 
-  const result = await pool
-    .request()
-    .input("AppointmentId", sql.Int, Number(appointmentId))
-    .input("EmployeeId", sql.Int, employeeId)
-    .input("UserId", sql.Int, userId)
-    .input("OldStatus", sql.NVarChar, current.Status)
-    .query(`
-      UPDATE Appointments
-      SET Status = 'NO_SHOW',
-          UpdatedAt = GETDATE()
-      WHERE AppointmentId = @AppointmentId
-        AND EmployeeId = @EmployeeId
-        AND Status IN ('CONFIRMED', 'PAID', 'CHECKED_IN');
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
 
-      INSERT INTO AppointmentStatusHistory
-      (
-        AppointmentId,
-        OldStatus,
-        NewStatus,
-        ChangedBy,
-        Reason,
-        ChangedAt
-      )
-      VALUES
-      (
-        @AppointmentId,
-        @OldStatus,
-        'NO_SHOW',
-        @UserId,
-        N'Technician đánh dấu khách không đến',
-        GETDATE()
-      );
+    const result = await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .input("EmployeeId", sql.Int, employeeId)
+      .input("UserId", sql.Int, userId)
+      .input("OldStatus", sql.NVarChar, current.Status)
+      .query(`
+        UPDATE Appointments
+        SET Status = 'NO_SHOW',
+            UpdatedAt = GETDATE()
+        WHERE AppointmentId = @AppointmentId
+          AND EmployeeId = @EmployeeId
+          AND Status IN ('CONFIRMED', 'PAID', 'CHECKED_IN');
 
-      SELECT *
-      FROM Appointments
-      WHERE AppointmentId = @AppointmentId
-        AND EmployeeId = @EmployeeId;
-    `);
+        INSERT INTO AppointmentStatusHistory
+        (
+          AppointmentId,
+          OldStatus,
+          NewStatus,
+          ChangedBy,
+          Reason,
+          ChangedAt
+        )
+        VALUES
+        (
+          @AppointmentId,
+          @OldStatus,
+          'NO_SHOW',
+          @UserId,
+          N'Technician đánh dấu khách không đến',
+          GETDATE()
+        );
 
-  return result.recordset[0];
+        SELECT *
+        FROM Appointments
+        WHERE AppointmentId = @AppointmentId
+          AND EmployeeId = @EmployeeId;
+      `);
+
+    if (current.CustomerPackageId) {
+      await deductComboSession(transaction, appointmentId);
+    }
+
+    await transaction.commit();
+    return result.recordset[0];
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
 }
 
 async function upsertTreatmentNote(userId, appointmentId, body) {
@@ -3129,10 +3292,10 @@ async function getAvailableShifts(userId) {
 
   // --- Auto-create default shifts for dates with no shifts in next 30 days ---
   const DEFAULT_SHIFTS = [
-    { name: "Cả Ngày",  start: "08:00:00", end: "22:00:00", max: 10 },
+    { name: "Cả Ngày",  start: "08:00:00", end: "20:00:00", max: 10 },
     { name: "Ca Sáng",  start: "08:00:00", end: "12:00:00", max: 5  },
     { name: "Ca Chiều", start: "12:00:00", end: "18:00:00", max: 5  },
-    { name: "Ca Tối",   start: "18:00:00", end: "22:00:00", max: 5  },
+    { name: "Ca Tối",   start: "18:00:00", end: "20:00:00", max: 5  },
   ];
 
   // Get all dates in the next 30 days that already have at least 1 WorkShift
@@ -3201,7 +3364,14 @@ async function getAvailableShifts(userId) {
         CAST(CASE WHEN EXISTS (
           SELECT 1 FROM ShiftRegistrations sr 
           WHERE sr.ShiftId = ws.ShiftId AND sr.TechnicianId = @TechnicianId AND sr.Status = 'APPROVED'
-        ) THEN 1 ELSE 0 END AS BIT) AS IsRegistered
+        ) OR (ws.ShiftName <> N'Cả Ngày' AND EXISTS (
+          SELECT 1 FROM Appointments a
+          WHERE a.EmployeeId = @TechnicianId
+            AND a.AppointmentDate = ws.ShiftDate
+            AND a.Status NOT IN ('CANCELLED', 'NO_SHOW')
+            AND CONVERT(VARCHAR(5), a.StartTime, 108) >= CONVERT(VARCHAR(5), ws.StartTime, 108)
+            AND CONVERT(VARCHAR(5), a.StartTime, 108) < CONVERT(VARCHAR(5), ws.EndTime, 108)
+        )) THEN 1 ELSE 0 END AS BIT) AS IsRegistered
       FROM WorkShifts ws
       WHERE ws.ShiftDate >= CAST(GETDATE() AS DATE)
       ORDER BY ws.ShiftDate ASC, ws.StartTime ASC
@@ -3246,14 +3416,7 @@ async function registerShift(userId, shiftId, serviceIds = []) {
     throw new Error("Không thể đăng ký ca làm trong quá khứ");
   }
 
-  // 3. Check current registered count
-  const countRes = await pool.request()
-    .input("ShiftId", sql.Int, shiftId)
-    .query("SELECT COUNT(*) AS RegisteredCount FROM ShiftRegistrations WHERE ShiftId = @ShiftId AND Status = 'APPROVED'");
-  
-  if (countRes.recordset[0].RegisteredCount >= shift.MaxTechnicians) {
-    throw new Error("Ca làm đã đủ số lượng kỹ thuật viên đăng ký");
-  }
+  // 3. Check current registered count (Bypassed per request)
 
   // 4. Check overlapping shift registrations
   const overlapRes = await pool.request()
@@ -3312,14 +3475,6 @@ async function registerShift(userId, shiftId, serviceIds = []) {
         .input("ServiceId", sql.Int, Number(sId))
         .query("INSERT INTO ShiftRegistrationServices (RegistrationId, ServiceId) VALUES (@RegistrationId, @ServiceId)");
     }
-  }
-
-  // 6. Automatically set status to FULL if max techs reached
-  const newCount = countRes.recordset[0].RegisteredCount + 1;
-  if (newCount >= shift.MaxTechnicians) {
-    await pool.request()
-      .input("ShiftId", sql.Int, shiftId)
-      .query("UPDATE WorkShifts SET Status = 'FULL' WHERE ShiftId = @ShiftId");
   }
 
   return { message: "Đăng ký ca trực thành công" };
@@ -3401,69 +3556,98 @@ async function getMyShifts(userId) {
         CONVERT(VARCHAR(5), ws.EndTime, 108) AS EndTime,
         ws.MaxTechnicians,
         ws.Status AS ShiftStatus,
-        sr.Status AS RegistrationStatus,
+        COALESCE(sr.Status, 'APPROVED') AS RegistrationStatus,
         sr.RegistrationId,
         a.AttendanceId,
         CONVERT(VARCHAR(5), a.CheckInTime, 108) AS CheckInTime,
         CONVERT(VARCHAR(5), a.CheckOutTime, 108) AS CheckOutTime,
-        a.Status AS AttendanceStatus,
-        (
-          SELECT STRING_AGG(s.ServiceName, ', ')
-          FROM ShiftRegistrationServices srs
-          JOIN Services s ON srs.ServiceId = s.ServiceId
-          WHERE srs.RegistrationId = sr.RegistrationId
-        ) AS ServiceNames
-      FROM ShiftRegistrations sr
-      JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
-      LEFT JOIN Attendance a ON ws.ShiftId = a.ShiftId AND a.TechnicianId = sr.TechnicianId
-      WHERE sr.TechnicianId = @TechnicianId AND sr.Status = 'APPROVED'
+        a.Status AS AttendanceStatus
+      FROM WorkShifts ws
+      LEFT JOIN ShiftRegistrations sr ON ws.ShiftId = sr.ShiftId AND sr.TechnicianId = @TechnicianId
+      LEFT JOIN Attendance a ON ws.ShiftId = a.ShiftId AND a.TechnicianId = @TechnicianId
+      WHERE (sr.TechnicianId = @TechnicianId AND sr.Status = 'APPROVED')
+         OR (ws.ShiftName <> N'Cả Ngày' AND EXISTS (
+          SELECT 1 FROM Appointments app
+          WHERE app.EmployeeId = @TechnicianId
+            AND app.AppointmentDate = ws.ShiftDate
+            AND app.Status NOT IN ('CANCELLED', 'NO_SHOW')
+            AND CONVERT(VARCHAR(5), app.StartTime, 108) >= CONVERT(VARCHAR(5), ws.StartTime, 108)
+            AND CONVERT(VARCHAR(5), app.StartTime, 108) < CONVERT(VARCHAR(5), ws.EndTime, 108)
+        ))
       ORDER BY ws.ShiftDate DESC, ws.StartTime ASC
     `);
   return result.recordset;
+}
+
+async function getOrCreateTodayShiftForTechnician(pool, technicianId) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  
+  // Find or create default today shift in WorkShifts
+  let shiftRes = await pool.request()
+    .input("ShiftDate", sql.Date, todayStr)
+    .query("SELECT TOP 1 ShiftId FROM WorkShifts WHERE ShiftDate = @ShiftDate AND Status = 'OPEN'");
+
+  let shiftId;
+  if (shiftRes.recordset.length > 0) {
+    shiftId = shiftRes.recordset[0].ShiftId;
+  } else {
+    const newShiftRes = await pool.request()
+      .input("ShiftName", sql.NVarChar, "Ca Ngày (08:00 - 20:00)")
+      .input("ShiftDate", sql.Date, todayStr)
+      .input("StartTime", sql.NVarChar, "08:00:00")
+      .input("EndTime", sql.NVarChar, "20:00:00")
+      .query(`
+        INSERT INTO WorkShifts (ShiftName, ShiftDate, StartTime, EndTime, MaxTechnicians, Status, CreatedAt)
+        OUTPUT INSERTED.ShiftId
+        VALUES (@ShiftName, @ShiftDate, @StartTime, @EndTime, 50, 'OPEN', GETDATE())
+      `);
+    shiftId = newShiftRes.recordset[0].ShiftId;
+  }
+
+  // Ensure technician is registered for this shift
+  await pool.request()
+    .input("ShiftId", sql.Int, shiftId)
+    .input("TechnicianId", sql.Int, technicianId)
+    .query(`
+      IF NOT EXISTS (SELECT 1 FROM ShiftRegistrations WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId)
+      BEGIN
+        INSERT INTO ShiftRegistrations (ShiftId, TechnicianId, Status, CreatedAt)
+        VALUES (@ShiftId, @TechnicianId, 'APPROVED', GETDATE())
+      END
+    `);
+
+  return shiftId;
 }
 
 async function checkIn(userId, shiftId) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
 
-  // 1. Verify shift registration exists and is approved
-  const regRes = await pool.request()
-    .input("ShiftId", sql.Int, shiftId)
-    .input("TechnicianId", sql.Int, technicianId)
-    .query("SELECT * FROM ShiftRegistrations WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId AND Status = 'APPROVED'");
-  if (!regRes.recordset[0]) {
-    throw new Error("Bạn chưa đăng ký hoặc không được phân công ca làm việc này");
+  if (!shiftId) {
+    shiftId = await getOrCreateTodayShiftForTechnician(pool, technicianId);
+  } else {
+    await pool.request()
+      .input("ShiftId", sql.Int, shiftId)
+      .input("TechnicianId", sql.Int, technicianId)
+      .query(`
+        IF NOT EXISTS (SELECT 1 FROM ShiftRegistrations WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId)
+        BEGIN
+          INSERT INTO ShiftRegistrations (ShiftId, TechnicianId, Status, CreatedAt)
+          VALUES (@ShiftId, @TechnicianId, 'APPROVED', GETDATE())
+        END
+      `);
   }
 
-  // 2. Verify shift date and early-check-in constraint (max 10 minutes)
-  const shiftRes = await pool.request()
-    .input("ShiftId", sql.Int, shiftId)
-    .query("SELECT * FROM WorkShifts WHERE ShiftId = @ShiftId");
-  
-  const shift = shiftRes.recordset[0];
-  const now = new Date();
-  
-  const shiftDateStr = shift.ShiftDate.toISOString().slice(0, 10);
-  const startStr = shift.StartTime.toISOString ? shift.StartTime.toISOString().slice(11, 19) : String(shift.StartTime);
-  const shiftStartDateTime = new Date(`${shiftDateStr}T${startStr}`);
-
-  // Early check-in margin: 10 minutes early
-  const maxEarlyCheckIn = new Date(shiftStartDateTime.getTime() - 10 * 60 * 1000);
-  if (now < maxEarlyCheckIn) {
-    throw new Error("Không thể check-in quá sớm! Bạn chỉ có thể check-in tối đa 10 phút trước giờ ca làm bắt đầu");
-  }
-
-  // 3. Prevent duplicate attendance checkin
+  // Prevent duplicate active checkin
   const attRes = await pool.request()
-    .input("ShiftId", sql.Int, shiftId)
     .input("TechnicianId", sql.Int, technicianId)
-    .query("SELECT * FROM Attendance WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId");
+    .query("SELECT TOP 1 * FROM Attendance WHERE TechnicianId = @TechnicianId AND Status = 'ACTIVE' ORDER BY AttendanceId DESC");
 
   if (attRes.recordset[0]) {
-    throw new Error("Bạn đã check-in cho ca trực này rồi");
+    throw new Error("Bạn đang trong ca trực rồi. Vui lòng check-out trước khi check-in ca mới!");
   }
 
-  // 4. Perform checkin
+  // Perform checkin
   const insertRes = await pool.request()
     .input("TechnicianId", sql.Int, technicianId)
     .input("ShiftId", sql.Int, shiftId)
@@ -3477,7 +3661,7 @@ async function checkIn(userId, shiftId) {
     `);
 
   return {
-    message: "Check-in thành công",
+    message: "Check-in ca trực thành công!",
     attendance: insertRes.recordset[0]
   };
 }
@@ -3486,21 +3670,22 @@ async function checkOut(userId, shiftId) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
 
-  // 1. Get attendance record
-  const attRes = await pool.request()
-    .input("ShiftId", sql.Int, shiftId)
-    .input("TechnicianId", sql.Int, technicianId)
-    .query("SELECT * FROM Attendance WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId");
-  
-  const att = attRes.recordset[0];
-  if (!att) {
-    throw new Error("Bạn chưa check-in cho ca trực này");
+  let query = "SELECT TOP 1 * FROM Attendance WHERE TechnicianId = @TechnicianId AND Status = 'ACTIVE'";
+  const req = pool.request().input("TechnicianId", sql.Int, technicianId);
+  if (shiftId) {
+    query += " AND ShiftId = @ShiftId";
+    req.input("ShiftId", sql.Int, shiftId);
   }
-  if (att.Status === 'COMPLETED') {
-    throw new Error("Bạn đã check-out ca trực này trước đó rồi");
+  query += " ORDER BY AttendanceId DESC";
+
+  const attRes = await req.query(query);
+  const att = attRes.recordset[0];
+
+  if (!att) {
+    throw new Error("Bạn chưa check-in hoặc ca trực hôm nay đã kết thúc.");
   }
 
-  // 2. Perform checkout & calculate hours
+  // Perform checkout & calculate hours
   const checkOutTime = new Date();
   const checkInTime = new Date(att.CheckInTime);
   const diffMs = checkOutTime - checkInTime;
@@ -3515,7 +3700,7 @@ async function checkOut(userId, shiftId) {
       SET CheckOutTime = GETDATE(),
           TotalHours = @TotalHours,
           Status = 'COMPLETED'
-      OUTPUT
+      OUTPUT 
         INSERTED.AttendanceId,
         CONVERT(VARCHAR(5), INSERTED.CheckInTime, 108) AS CheckInTime,
         CONVERT(VARCHAR(5), INSERTED.CheckOutTime, 108) AS CheckOutTime,
@@ -3525,7 +3710,7 @@ async function checkOut(userId, shiftId) {
     `);
 
   return {
-    message: "Check-out thành công",
+    message: "Check-out ca trực thành công!",
     attendance: updateRes.recordset[0]
   };
 }
@@ -3827,35 +4012,74 @@ async function getReviews(userId, query = {}) {
   };
 }
 
+async function updateAppointmentDuration(userId, appointmentId, durationMinutes) {
+  const pool = await connectDB();
+  const employeeId = await getEmployeeIdByUserId(userId);
+
+  const duration = Number(durationMinutes);
+  if (isNaN(duration) || duration <= 0) {
+    throw new Error("Thời lượng dịch vụ phải là số lớn hơn 0");
+  }
+
+  const apptRes = await pool.request()
+    .input("AppointmentId", sql.Int, Number(appointmentId))
+    .input("EmployeeId", sql.Int, employeeId)
+    .query(`
+      SELECT StartTime, Status
+      FROM Appointments
+      WHERE AppointmentId = @AppointmentId AND EmployeeId = @EmployeeId
+    `);
+
+  const current = apptRes.recordset[0];
+  if (!current) throw new Error("Không tìm thấy lịch hẹn của kỹ thuật viên này");
+
+  const startTimeStr = String(current.StartTime).slice(0, 8);
+  const [h, m] = startTimeStr.split(":").map(Number);
+  const startDate = new Date(2000, 0, 1, h, m, 0);
+  startDate.setMinutes(startDate.getMinutes() + duration);
+  const pad = n => String(n).padStart(2, "0");
+  const newEndTimeStr = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}:00`;
+
+  await pool.request()
+    .input("AppointmentId", sql.Int, Number(appointmentId))
+    .input("EmployeeId", sql.Int, employeeId)
+    .input("EndTime", sql.VarChar, newEndTimeStr)
+    .query(`
+      UPDATE Appointments
+      SET EndTime = @EndTime, UpdatedAt = GETDATE()
+      WHERE AppointmentId = @AppointmentId AND EmployeeId = @EmployeeId
+    `);
+
+  return { message: "Đã cập nhật thời lượng dịch vụ thành công!", durationMinutes: duration, endTime: newEndTimeStr };
+}
+
 module.exports = {
   getDashboard,
   getSchedule,
   getAvailableSlotsForTechnician,
   getReviews,
+  getCustomersSummary,
+  getCustomers,
+  getAppointmentsSummary,
+  getCustomerDetail,
+  getCustomerInsights,
   startAppointment,
   completeAppointment,
   getAppointmentDetail,
   markNoShow,
   upsertTreatmentNote,
   getAppointments,
-  getAppointmentsSummary,
-  getCustomers,
-  getCustomersSummary,
-  getCustomerDetail,
-  getCustomerInsights,
   getTreatmentNotesPage,
   getCustomerNoteHistory,
   deleteTreatmentNote,
   getEarnings,
   getEarningPayoutHistory,
-  updateEarningGoal,
   createPayoutRequest,
   getProfile,
   updateProfile,
   updateAvatar,
   uploadTreatmentAttachments,
   updateTreatmentProgress,
-  
   createShift,
   getAvailableShifts,
   registerShift,
@@ -3870,4 +4094,5 @@ module.exports = {
   createAppointment,
   getShiftQuotas,
   getAttendanceWeeklyStats,
+  updateAppointmentDuration,
 };

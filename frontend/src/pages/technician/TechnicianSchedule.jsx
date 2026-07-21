@@ -16,7 +16,7 @@ const STATUS = [
   "NO_SHOW",
 ];
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 function money(v) {
   return Number(v || 0).toLocaleString("vi-VN") + " VND";
@@ -298,7 +298,7 @@ export default function TechnicianSchedule() {
         `/technician/appointments/${selected.AppointmentId}/complete`,
       );
 
-      await loadSchedule();
+      navigate(`/technician/treatment-notes?appointmentId=${selected.AppointmentId}`);
     } catch (err) {
       setError(err.response?.data?.message || "Không thể hoàn thành dịch vụ");
     } finally {
@@ -1249,11 +1249,16 @@ export default function TechnicianSchedule() {
 
                   <button
                     className="note"
-                    onClick={() =>
-                      navigate(
-                        `/technician/treatment-notes?appointmentId=${selected.AppointmentId}`,
-                      )
-                    }
+                    disabled={!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase())}
+                    onClick={() => {
+                      if (!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase())) {
+                        alert("Chỉ được viết và xem ghi chú điều trị khi dịch vụ ở trạng thái Đang thực hiện hoặc Hoàn thành.");
+                        return;
+                      }
+                      navigate(`/technician/treatment-notes?appointmentId=${selected.AppointmentId}`);
+                    }}
+                    style={!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase()) ? { opacity: 0.5, cursor: "not-allowed" } : {}}
+                    title={!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
                   >
                     📝 Ghi chú điều trị
                   </button>
@@ -1264,7 +1269,9 @@ export default function TechnicianSchedule() {
                       className="complete"
                       disabled={actionLoading}
                     >
-                      ✓ Hoàn thành ca
+                      {selected.PaymentStatus === "PAID" || selected.CustomerPackageId
+                        ? "✓ Hoàn thành & Checkout"
+                        : "✓ Hoàn thành ca"}
                     </button>
                   )}
                 </div>

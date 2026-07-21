@@ -142,6 +142,51 @@ async function resetPassword(req, res) {
   }
 }
 
+async function uploadAvatar(req, res) {
+  try {
+    if (!req.file) return error(res, "Vui lòng chọn file ảnh", 400);
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const result = await service.updateAvatar(req.params.id, avatarUrl);
+
+    await logs.writeLog({
+      userId: userId(req),
+      roleName: roleName(req),
+      actionName: "Admin upload user avatar",
+      actionType: "UPDATE",
+      description: `Uploaded avatar for user ID ${req.params.id}`,
+      ipAddress: req.ip,
+      oldValue: null,
+      newValue: JSON.stringify({ avatarUrl }),
+    });
+
+    return success(res, result, "Avatar uploaded");
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function remove(req, res) {
+  try {
+    const before = await service.getById(req.params.id);
+    const result = await service.remove(req.params.id);
+
+    await logs.writeLog({
+      userId: userId(req),
+      roleName: roleName(req),
+      actionName: "Admin delete user",
+      actionType: "DELETE",
+      description: `Deleted user ${before?.Email || ""}`,
+      ipAddress: req.ip,
+      oldValue: JSON.stringify(before),
+      newValue: JSON.stringify(result),
+    });
+
+    return success(res, result);
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
   getRoles,
   list,
@@ -151,4 +196,7 @@ module.exports = {
   updateRole,
   changeStatus,
   resetPassword,
+  uploadAvatar,
+  remove,
 };
+

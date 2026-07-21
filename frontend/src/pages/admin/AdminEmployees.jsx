@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 
-const DEFAULT_AVATAR = "/images/default-avatar.png";
+const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 
 const emptyForm = {
   fullName: "",
@@ -53,9 +53,16 @@ export default function AdminEmployees() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   // Tabs inside detail modal
   const [activeDetailTab, setActiveDetailTab] = useState("general");
+  const [scrollTargetId, setScrollTargetId] = useState(null);
+
+  const gridRef = useRef(null);
+  const shouldScrollRef = useRef(false);
+  const isInitialMount = useRef(true);
 
   // Service assignment states
   const [assigningEmployee, setAssigningEmployee] = useState(null);
@@ -64,10 +71,10 @@ export default function AdminEmployees() {
   const [loadingServices, setLoadingServices] = useState(false);
   const [savingServices, setSavingServices] = useState(false);
 
-  async function load() {
+  async function load(isSilent = false) {
     try {
       setError("");
-      setLoading(true);
+      if (!isSilent && items.length === 0) setLoading(true);
 
       const [empRes, roleRes, branchRes] = await Promise.all([
         axiosClient.get("/admin/employees", {
@@ -96,43 +103,39 @@ export default function AdminEmployees() {
     }
   }
 
-  const gridRef = useRef(null);
-  const shouldScrollRef = useRef(false);
-  const isInitialMount = useRef(true);
-
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - 180;
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+      gridRef.current.scrollIntoView({ block: "start", behavior: "instant" });
     }
   };
 
-  const scrollToItem = (id, type = "employee") => {
-    setTimeout(() => {
-      const element = document.getElementById(`${type}-card-${id}`);
-      if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - 180;
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth"
-        });
-        element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
-        element.style.borderColor = "#d6b57e";
-        element.style.boxShadow = "0 0 20px 5px rgba(214, 181, 126, 0.5)";
-        setTimeout(() => {
-          element.style.borderColor = "";
-          element.style.boxShadow = "";
-        }, 3000);
-      } else {
-        scrollToGrid();
-      }
-    }, 150);
+  const triggerScrollToItem = (id) => {
+    if (!id) return;
+    setScrollTargetId(id);
   };
+
+  useLayoutEffect(() => {
+    if (!scrollTargetId) return;
+
+    const el = document.getElementById(`employee-card-${scrollTargetId}`);
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+
+      el.style.transition = "all 0.3s ease";
+      el.style.borderColor = "#d6b57e";
+      el.style.boxShadow = "0 0 30px 8px rgba(214, 181, 126, 0.8)";
+      el.style.transform = "scale(1.02)";
+
+      const timer = setTimeout(() => {
+        el.style.borderColor = "";
+        el.style.boxShadow = "";
+        el.style.transform = "";
+        setScrollTargetId(null);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [items, scrollTargetId]);
 
   const handleFilter = async () => {
     shouldScrollRef.current = true;
@@ -164,10 +167,18 @@ export default function AdminEmployees() {
     return { total, active, inactive, banned, technician };
   }, [items]);
 
+  function openDetail(item) {
+    setSelected(item);
+    setActiveDetailTab("general");
+    triggerScrollToItem(item.EmployeeId);
+  }
+
   function openCreate() {
     setEditingId(null);
     setForm(emptyForm);
     setError("");
+    setImageFile(null);
+    setImagePreview("");
     setShowModal(true);
   }
 
@@ -192,7 +203,10 @@ export default function AdminEmployees() {
       imageUrl: item.ImageUrl || item.AvatarUrl || "",
       password: "",
     });
+    setImageFile(null);
+    setImagePreview(item.ImageUrl || item.AvatarUrl ? resolveFileUrl(item.ImageUrl || item.AvatarUrl) : "");
     setShowModal(true);
+    triggerScrollToItem(item.EmployeeId);
   }
 
   async function submit(e) {
@@ -240,10 +254,20 @@ export default function AdminEmployees() {
         empId = created?.EmployeeId || created?.id;
       }
 
+      if (imageFile && empId) {
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        await axiosClient.post(`/admin/employees/${empId}/image`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
       setShowModal(false);
-      await load();
+      setImageFile(null);
+      setImagePreview("");
+      await load(true);
       if (empId) {
-        scrollToItem(empId, "employee");
+        triggerScrollToItem(empId);
       } else {
         scrollToGrid();
       }
@@ -269,8 +293,8 @@ export default function AdminEmployees() {
       await axiosClient.patch(`/admin/employees/${item.EmployeeId}/status`, {
         status: nextStatus,
       });
-      await load();
-      scrollToItem(item.EmployeeId, "employee");
+      await load(true);
+      triggerScrollToItem(item.EmployeeId);
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -280,9 +304,27 @@ export default function AdminEmployees() {
     }
   }
 
+  async function removeEmployee(item) {
+    const ok = window.confirm(
+      `Bạn chắc chắn muốn xóa nhân viên "${item.FullName}" (${item.Email})?`,
+    );
+    if (!ok) return;
+
+    try {
+      setError("");
+      await axiosClient.delete(`/admin/employees/${item.EmployeeId}`);
+      await load(true);
+    } catch (err) {
+      setError(
+        err?.response?.data?.message || err?.message || "Xóa nhân viên thất bại",
+      );
+    }
+  }
+
   // Open Service Assignment Modal
   const openServiceAssign = async (employee) => {
     setAssigningEmployee(employee);
+    triggerScrollToItem(employee.EmployeeId);
     setLoadingServices(true);
     try {
       const res = await axiosClient.get(`/admin/employees/${employee.EmployeeId}/services`);
@@ -314,8 +356,8 @@ export default function AdminEmployees() {
       });
       const empId = assigningEmployee.EmployeeId;
       setAssigningEmployee(null);
-      await load();
-      scrollToItem(empId, "employee");
+      await load(true);
+      triggerScrollToItem(empId);
     } catch (err) {
       console.error("Error saving services", err);
       alert("Lưu phân bổ dịch vụ thất bại");
@@ -1018,27 +1060,25 @@ export default function AdminEmployees() {
 
                 <div style={{ flexGrow: 1 }} />
 
-                <div style={{ display: "flex", gap: "8px", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
-                  <button className="card-btn-action btn-secondary" style={{ flexGrow: 1 }} onClick={() => setSelected(item)}>
+                <div style={{ display: "flex", gap: "6px", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "12px", flexWrap: "wrap" }}>
+                  <button className="card-btn-action btn-secondary" style={{ flex: "1 1 30%" }} onClick={() => openDetail(item)}>
                     Chi tiết
                   </button>
-                  <button className="card-btn-action btn-primary" style={{ flexGrow: 1 }} onClick={() => openEdit(item)}>
+                  <button className="card-btn-action btn-primary" style={{ flex: "1 1 30%" }} onClick={() => openEdit(item)}>
                     Sửa
                   </button>
                   {item.Status !== "ACTIVE" ? (
                     <button className="card-btn-action btn-secondary" onClick={() => changeStatus(item, "ACTIVE")}>
-                      Kích hoạt
+                      Mở khóa
                     </button>
                   ) : (
                     <button className="card-btn-action btn-secondary" onClick={() => changeStatus(item, "INACTIVE")}>
-                      Khóa tạm
+                      Tạm khóa
                     </button>
                   )}
-                  {item.Status !== "BANNED" && (
-                    <button className="card-btn-action btn-danger" onClick={() => changeStatus(item, "BANNED")}>
-                      Ban
-                    </button>
-                  )}
+                  <button className="card-btn-action btn-danger" onClick={() => removeEmployee(item)}>
+                    Xóa
+                  </button>
                 </div>
               </div>
             </article>
@@ -1286,22 +1326,101 @@ export default function AdminEmployees() {
                   />
                 </label>
 
-                <label className="form-label">
-                  Đường dẫn ảnh đại diện (Avatar URL)
-                  <input
-                    className="form-input"
-                    value={form.avatarUrl}
-                    onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
-                  />
-                </label>
-
-                <label className="form-label">
-                  Ảnh đại diện hồ sơ (Profile Image URL)
-                  <input
-                    className="form-input"
-                    value={form.imageUrl}
-                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                  />
+                <label className="form-label form-wide">
+                  Hình ảnh / Avatar nhân viên *
+                  <div
+                    style={{
+                      border: '2px dashed #ebdcc5',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: '#faf8f5',
+                      transition: 'all 0.2s',
+                      position: 'relative',
+                    }}
+                    onClick={() => document.getElementById('emp-image-input')?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#d6b57e'; }}
+                    onDragLeave={(e) => { e.currentTarget.style.borderColor = '#ebdcc5'; }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = '#ebdcc5';
+                      const file = e.dataTransfer.files?.[0];
+                      if (file && file.type.startsWith('image/')) {
+                        setImageFile(file);
+                        setImagePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  >
+                    {(imagePreview || form.imageUrl || form.avatarUrl) ? (
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <img
+                          src={imagePreview || resolveFileUrl(form.imageUrl || form.avatarUrl)}
+                          alt="Preview"
+                          style={{
+                            maxHeight: '120px',
+                            maxWidth: '100%',
+                            borderRadius: '10px',
+                            objectFit: 'cover',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImageFile(null);
+                            setImagePreview('');
+                            setForm({ ...form, imageUrl: '', avatarUrl: '' });
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: '#d83b01',
+                            color: '#fff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            display: 'grid',
+                            placeItems: 'center',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                          }}
+                        >
+                          ×
+                        </button>
+                        <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#8c7e74' }}>
+                          {imageFile ? imageFile.name : 'Nhấn để đổi ảnh mới'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <span style={{ fontSize: '32px', display: 'block', marginBottom: '4px' }}>👤</span>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#5c4a3c', fontWeight: 600 }}>
+                          Kéo thả ảnh hoặc nhấn để chọn ảnh nhân viên
+                        </p>
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#8c7e74' }}>
+                          JPG, PNG, WEBP • Tối đa 5MB
+                        </p>
+                      </div>
+                    )}
+                    <input
+                      id="emp-image-input"
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setImageFile(file);
+                          setImagePreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </div>
                 </label>
 
                 {!editingId && (
