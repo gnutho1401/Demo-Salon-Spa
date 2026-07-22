@@ -167,8 +167,12 @@ function canPay(item) {
   if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(status)) return false;
   if (payment === "PAID" || isBilledUnderPackage) return false;
 
-  return ["UNPAID", "PENDING", "FAILED"].includes(payment);
+  return (
+    ["UNPAID", "PENDING", "PENDING_PAYMENT", "FAILED"].includes(payment) ||
+    status === "PENDING_PAYMENT"
+  );
 }
+
 
 function canCancel(item) {
   const status = String(item?.Status || "").toUpperCase();
@@ -1035,7 +1039,12 @@ export default function AppointmentDetail() {
               </div>
 
 
-              <div className="ap-v2-tech-profile">
+              <div
+                className="ap-v2-tech-profile"
+                style={{ cursor: canChangeTech(appointment) ? "pointer" : "default" }}
+                onClick={() => canChangeTech(appointment) && openChangeTechModal(null)}
+                title={canChangeTech(appointment) ? "Nhấn vào đây để xem và chọn Kỹ thuật viên rảnh khác" : ""}
+              >
                 <div className="ap-v2-tech-avatar-container">
                   <img
                     className="ap-v2-tech-avatar"
@@ -1044,10 +1053,18 @@ export default function AppointmentDetail() {
                   />
                 </div>
                 <div>
-                  <h4 className="ap-v2-tech-name">{appointment.EmployeeName || "Chưa phân công"}</h4>
+                  <h4 className="ap-v2-tech-name">
+                    {appointment.EmployeeName || "Chưa phân công"}
+                    {canChangeTech(appointment) && <span style={{ fontSize: "0.85rem", marginLeft: 6, color: "#d97706" }}>✎</span>}
+                  </h4>
                   <p className="ap-v2-tech-title">
                     {appointment.Specialization || appointment.Position || "Chuyên gia làm đẹp"}
                   </p>
+                  {canChangeTech(appointment) && (
+                    <span style={{ fontSize: "0.78rem", color: "#b45309", backgroundColor: "#fef3c7", padding: "2px 8px", borderRadius: "10px", marginTop: "4px", display: "inline-block", fontWeight: 600 }}>
+                      ✎ Nhấp vào để xem KTV rảnh trong giờ
+                    </span>
+                  )}
                   <div className="ap-v2-tech-contacts">
                     {appointment.EmployeePhone && (
                       <span className="ap-v2-tech-contact-item">
@@ -1062,6 +1079,7 @@ export default function AppointmentDetail() {
                   </div>
                 </div>
               </div>
+
             </div>
 
 

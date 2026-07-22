@@ -681,11 +681,28 @@ async function checkPendingPackage(pool, customerId, packageId) {
   }
 }
 
+async function resolveCustomer(pool, userId, payload = {}) {
+  const custId = payload?.customerId || payload?.CustomerId;
+  if (custId) {
+    const custRes = await pool
+      .request()
+      .input("CustomerId", sql.Int, Number(custId))
+      .query(`
+        SELECT CustomerId, UserId
+        FROM Customers
+        WHERE CustomerId = @CustomerId
+      `);
+    if (custRes.recordset[0]) return custRes.recordset[0];
+  }
+  return await getCustomerByUserId(pool, userId);
+}
+
 async function buyPackage(userId, packageId, payload = {}) {
   const pool = await connectDB();
 
-  const customer = await getCustomerByUserId(pool, userId);
+  const customer = await resolveCustomer(pool, userId, payload);
   if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
+
 
   const pkg = await getActivePackage(pool, packageId);
   if (!pkg)
@@ -1100,8 +1117,9 @@ async function handleVnpayReturn(query) {
     }
   }
 
-  return `${frontendUrl}/customer/packages?paid=1`;
+  return `${frontendUrl}/customer/packages?paid=1&packageId=${payment.CustomerPackageId}`;
 }
+
 
 async function create(data) {
   const pool = await connectDB();
@@ -1711,7 +1729,7 @@ async function getMyPackageDetail(userId, customerPackageId, customerId = null) 
       LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
       LEFT JOIN Users u ON e.UserId = u.UserId
       WHERE a.CustomerPackageId = @CustomerPackageId
-        AND a.Status IN ('CONFIRMED', 'PENDING', 'CHECKED_IN')
+        AND a.Status IN ('CONFIRMED', 'PENDING', 'CHECKED_IN', 'IN_PROGRESS')
       ORDER BY a.CreatedAt DESC
     `);
 
@@ -1729,6 +1747,9 @@ async function getMyPackageDetail(userId, customerPackageId, customerId = null) 
           s.DurationMinutes,
           s.ImageUrl,
           aps.EmployeeId,
+          aps.Status AS StepStatus,
+          CONVERT(VARCHAR(5), aps.StartTime, 108) AS StepStartTime,
+          CONVERT(VARCHAR(5), aps.EndTime, 108) AS StepEndTime,
           u.FullName AS TechnicianName,
           u.Phone AS TechnicianPhone,
           ISNULL(u.AvatarUrl, e.ImageUrl) AS TechnicianAvatar
@@ -2139,8 +2160,9 @@ async function handlePayosReturn(query = {}) {
           throw err;
         }
       }
-      return `${frontendUrl}/customer/packages?paid=1`;
+      return `${frontendUrl}/customer/packages?paid=1&packageId=${payment.CustomerPackageId}`;
     }
+
   } catch (err) {
     console.error("PayOS package verify error:", err.message);
   }
@@ -2214,8 +2236,9 @@ async function bookCustomerPackage(userId, customerPackageId, bookingData = {}) 
   if (!startTime) throw new Error("Vui lòng chọn giờ bắt đầu");
 
   // 1. Get Customer profile
-  const customer = await getCustomerByUserId(pool, userId);
+  const customer = await resolveCustomer(pool, userId, bookingData);
   if (!customer) throw new Error("Không tìm thấy thông tin hồ sơ khách hàng");
+
 
   // 2. Fetch CustomerPackage details
   const pkgRes = await pool
@@ -2298,6 +2321,28 @@ async function bookCustomerPackage(userId, customerPackageId, bookingData = {}) 
   const endD = new Date(startD.getTime() + totalDurationMinutes * 60 * 1000);
   const endTime = `${pad(endD.getHours())}:${pad(endD.getMinutes())}:00`;
 
+  // Check customer availability (prevent double-booking customer across combos / single appts)
+  const customerOverlap = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .input("AppointmentDate", sql.Date, appointmentDate)
+    .input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime)
+    .input("EndTime", sql.VarChar, endTime)
+    .query(`
+      SELECT TOP 1 AppointmentId
+      FROM Appointments
+      WHERE CustomerId = @CustomerId
+        AND AppointmentDate = @AppointmentDate
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'EXPIRED', 'REJECTED')
+        AND (@StartTime < EndTime AND @EndTime > StartTime)
+
+    `);
+
+  if (customerOverlap.recordset.length > 0) {
+    throw new Error("Bạn đã có một lịch hẹn khác (dịch vụ lẻ hoặc gói Combo khác) trùng trong khoảng thời gian này rồi. Vui lòng chọn khung giờ khác!");
+  }
+
+
   // 5. Calculate step-by-step times and auto-assign dedicated technician for EACH service step in combo
   let currentStepStart = startD;
   const serviceAssignments = [];
@@ -2348,7 +2393,11 @@ async function bookCustomerPackage(userId, customerPackageId, bookingData = {}) 
     apptReq.input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime);
     apptReq.input("EndTime", sql.VarChar, endTime);
     apptReq.input("Status", sql.NVarChar, "CONFIRMED");
-    apptReq.input("Notes", sql.NVarChar, notes ? `[Gói Combo: ${cp.PackageName}] ${notes}` : `[Gói Combo: ${cp.PackageName}]`);
+    const cleanNoteInsert = String(notes || "")
+      .replace(/\[(?:Gói Combo|Đổi lịch Combo|Tái khám từ lịch #[0-9]+):\s*[^\]]+\]/gi, "")
+      .trim();
+    apptReq.input("Notes", sql.NVarChar, cleanNoteInsert ? `[Gói Combo: ${cp.PackageName}] ${cleanNoteInsert}` : `[Gói Combo: ${cp.PackageName}]`);
+
     apptReq.input("CustomerPackageId", sql.Int, cp.CustomerPackageId);
 
     const apptResult = await apptReq.query(`
@@ -2426,8 +2475,9 @@ async function rescheduleCustomerPackageAppointment(userId, customerPackageId, b
   if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn mới");
   if (!startTime) throw new Error("Vui lòng chọn giờ bắt đầu mới");
 
-  const customer = await getCustomerByUserId(pool, userId);
+  const customer = await resolveCustomer(pool, userId, bookingData);
   if (!customer) throw new Error("Không tìm thấy thông tin hồ sơ khách hàng");
+
 
   const apptRes = await pool.request()
     .input("CustomerPackageId", sql.Int, Number(customerPackageId))
@@ -2473,6 +2523,29 @@ async function rescheduleCustomerPackageAppointment(userId, customerPackageId, b
   startD.setHours(h, m, 0, 0);
   const endD = new Date(startD.getTime() + totalDurationMinutes * 60 * 1000);
   const endTime = `${pad(endD.getHours())}:${pad(endD.getMinutes())}:00`;
+
+  // Check customer availability (excluding current combo appointment)
+  const customerOverlap = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .input("AppointmentDate", sql.Date, appointmentDate)
+    .input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime)
+    .input("EndTime", sql.VarChar, endTime)
+    .input("CurrentApptId", sql.Int, currentAppt.AppointmentId)
+    .query(`
+      SELECT TOP 1 AppointmentId
+      FROM Appointments
+      WHERE CustomerId = @CustomerId
+        AND AppointmentDate = @AppointmentDate
+        AND AppointmentId <> @CurrentApptId
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'EXPIRED', 'REJECTED')
+        AND (@StartTime < EndTime AND @EndTime > StartTime)
+    `);
+
+  if (customerOverlap.recordset.length > 0) {
+    throw new Error("Bạn đã có một lịch hẹn khác (dịch vụ lẻ hoặc gói Combo khác) trùng trong khoảng thời gian này rồi. Vui lòng chọn khung giờ khác!");
+  }
+
 
   let currentStepStart = startD;
   const serviceAssignments = [];
@@ -2520,7 +2593,11 @@ async function rescheduleCustomerPackageAppointment(userId, customerPackageId, b
     apptReq.input("AppointmentDate", sql.Date, appointmentDate);
     apptReq.input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime);
     apptReq.input("EndTime", sql.VarChar, endTime);
-    apptReq.input("Notes", sql.NVarChar, notes ? `[Đổi lịch Combo: ${cp.PackageName}] ${notes}` : `[Đổi lịch Combo: ${cp.PackageName}]`);
+    const cleanRescheduleNote = String(notes || "")
+      .replace(/\[(?:Gói Combo|Đổi lịch Combo|Tái khám từ lịch #[0-9]+):\s*[^\]]+\]/gi, "")
+      .trim();
+    apptReq.input("Notes", sql.NVarChar, cleanRescheduleNote ? `[Đổi lịch Combo: ${cp.PackageName}] ${cleanRescheduleNote}` : `[Đổi lịch Combo: ${cp.PackageName}]`);
+
 
     await apptReq.query(`
       UPDATE Appointments
@@ -2765,22 +2842,37 @@ async function cancelCustomerPackageAppointment(userId, customerPackageId, reaso
   }
 }
 
-async function submitComboReview({ customerId, appointmentId, overallRating, overallComment, stepReviews = [] }) {
+async function submitComboReview({ customerId, appointmentId, overallRating, overallComment, stepReviews = [], imageUrls = [] }) {
   const pool = await connectDB();
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
 
   try {
+    const validAppointmentId = Number(appointmentId);
+    if (!validAppointmentId) {
+      throw new Error("Mã ca hẹn không hợp lệ");
+    }
+
     for (const step of stepReviews) {
-      const serviceId = step.serviceId;
-      const employeeId = step.employeeId;
-      const rating = step.rating || overallRating || 5;
-      const comment = step.comment || overallComment || "";
+      const serviceId = Number(step.serviceId || step.ServiceId);
+      if (!serviceId) continue;
+
+      let employeeId = Number(step.employeeId || step.EmployeeId || step.StepEmployeeId || 0) || null;
+      const rating = Number(step.rating || step.TechnicianRating || overallRating || 5);
+      const comment = String(step.comment || step.Comment || overallComment || "").trim();
+
+      if (!employeeId) {
+        const empRes = await new sql.Request(transaction)
+          .input("AppointmentId", sql.Int, validAppointmentId)
+          .input("ServiceId", sql.Int, serviceId)
+          .query(`SELECT TOP 1 EmployeeId FROM AppointmentServices WHERE AppointmentId = @AppointmentId AND ServiceId = @ServiceId`);
+        employeeId = empRes.recordset[0]?.EmployeeId || null;
+      }
 
       // Check if review already exists
       const checkRes = await new sql.Request(transaction)
         .input("CustomerId", sql.Int, customerId)
-        .input("AppointmentId", sql.Int, appointmentId)
+        .input("AppointmentId", sql.Int, validAppointmentId)
         .input("ServiceId", sql.Int, serviceId)
         .query(`
           SELECT ReviewId FROM Reviews 
@@ -2789,34 +2881,49 @@ async function submitComboReview({ customerId, appointmentId, overallRating, ove
             AND ServiceId = @ServiceId
         `);
 
+      let reviewId;
       if (checkRes.recordset.length > 0) {
+        reviewId = checkRes.recordset[0].ReviewId;
         await new sql.Request(transaction)
-          .input("ReviewId", sql.Int, checkRes.recordset[0].ReviewId)
-          .input("Rating", sql.Int, overallRating || rating)
+          .input("ReviewId", sql.Int, reviewId)
+          .input("EmployeeId", sql.Int, employeeId)
+          .input("Rating", sql.Int, Number(overallRating || rating))
           .input("TechnicianRating", sql.Int, rating)
-          .input("Comment", sql.NVarChar, comment)
+          .input("Comment", sql.NVarChar(sql.MAX), comment)
           .query(`
             UPDATE Reviews
-            SET Rating = @Rating,
+            SET EmployeeId = ISNULL(@EmployeeId, EmployeeId),
+                Rating = @Rating,
                 TechnicianRating = @TechnicianRating,
                 Comment = @Comment,
                 UpdatedAt = CURRENT_TIMESTAMP
             WHERE ReviewId = @ReviewId
           `);
       } else {
-        await new sql.Request(transaction)
+        const insRes = await new sql.Request(transaction)
           .input("CustomerId", sql.Int, customerId)
-          .input("AppointmentId", sql.Int, appointmentId)
+          .input("AppointmentId", sql.Int, validAppointmentId)
           .input("ServiceId", sql.Int, serviceId)
-          .input("EmployeeId", sql.Int, employeeId || null)
-          .input("Rating", sql.Int, overallRating || rating)
+          .input("EmployeeId", sql.Int, employeeId)
+          .input("Rating", sql.Int, Number(overallRating || rating))
           .input("TechnicianRating", sql.Int, rating)
-          .input("Comment", sql.NVarChar, comment)
+          .input("Comment", sql.NVarChar(sql.MAX), comment)
           .input("Status", sql.NVarChar, "APPROVED")
           .query(`
             INSERT INTO Reviews (CustomerId, AppointmentId, ServiceId, EmployeeId, Rating, TechnicianRating, Comment, Status, CreatedAt)
+            OUTPUT INSERTED.ReviewId
             VALUES (@CustomerId, @AppointmentId, @ServiceId, @EmployeeId, @Rating, @TechnicianRating, @Comment, @Status, CURRENT_TIMESTAMP)
           `);
+        reviewId = insRes.recordset[0]?.ReviewId;
+      }
+
+      if (reviewId && imageUrls && imageUrls.length > 0) {
+        for (const url of imageUrls) {
+          await new sql.Request(transaction)
+            .input("ReviewId", sql.Int, reviewId)
+            .input("ImageUrl", sql.NVarChar(500), url)
+            .query(`INSERT INTO ReviewImages (ReviewId, ImageUrl) VALUES (@ReviewId, @ImageUrl)`);
+        }
       }
     }
 

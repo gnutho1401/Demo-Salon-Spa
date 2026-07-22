@@ -35,12 +35,16 @@ class TreatmentNotesV2Service {
       throw new Error("Either appointment_id or package_session_id must be specified.");
     }
 
-    // Check if a treatment note for this appointment already exists to prevent duplicate insertion
+    // Check if a treatment note for this appointment and service already exists to prevent duplicate insertion
     if (appointmentId) {
       const checkReq = transaction ? new sql.Request(transaction) : pool.request();
-      const existing = await checkReq
-        .input("ApptId", sql.Int, appointmentId)
-        .query("SELECT id FROM TreatmentNotesV2 WHERE appointment_id = @ApptId");
+      checkReq.input("ApptId", sql.Int, appointmentId);
+      let query = "SELECT id FROM TreatmentNotesV2 WHERE appointment_id = @ApptId";
+      if (serviceId) {
+        query += " AND service_id = @SvcId";
+        checkReq.input("SvcId", sql.Int, serviceId);
+      }
+      const existing = await checkReq.query(query);
       if (existing.recordset.length > 0) {
         return existing.recordset[0].id;
       }
@@ -104,33 +108,18 @@ class TreatmentNotesV2Service {
 
     let query = `
       SELECT 
-        tn.id,
-        tn.customer_id,
-        tn.appointment_id,
-        tn.package_session_id,
-        tn.service_id,
-        tn.technician_id,
-        tn.status,
-        tn.service_date_time,
-        tn.duration_minutes,
-        tn.before_images,
-        tn.after_images,
-        tn.detailed_images,
-        tn.before_condition,
-        tn.after_result,
-        tn.procedure_steps,
-        tn.products_used,
-        tn.technician_notes,
-        tn.recommendations,
-        ${isAdmin ? "tn.internal_notes," : ""}
-        tn.follow_up_appointment_id,
-        tn.created_at,
+        tn.*,
+        a.Status AS AppointmentStatus,
+        a.Notes AS AppointmentNotes,
+        aps.Status AS StepStatus,
         s.ServiceName,
         s.Price AS ServicePrice,
         sc.CategoryName,
         u.FullName AS TechnicianName,
         u.AvatarUrl AS TechnicianAvatar
       FROM TreatmentNotesV2 tn
+      LEFT JOIN Appointments a ON tn.appointment_id = a.AppointmentId
+      LEFT JOIN AppointmentServices aps ON tn.appointment_id = aps.AppointmentId AND tn.service_id = aps.ServiceId
       JOIN Services s ON tn.service_id = s.ServiceId
       JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
       JOIN Employees e ON tn.technician_id = e.EmployeeId
@@ -180,6 +169,9 @@ class TreatmentNotesV2Service {
       .query(`
         SELECT
           tn.*,
+          a.Status AS AppointmentStatus,
+          a.Notes AS AppointmentNotes,
+          aps.Status AS StepStatus,
           c.FullName AS CustomerName,
           s.ServiceName,
           s.Price AS ServicePrice,
@@ -188,6 +180,8 @@ class TreatmentNotesV2Service {
           u.FullName AS TechnicianName,
           u.AvatarUrl AS TechnicianAvatar
         FROM TreatmentNotesV2 tn
+        LEFT JOIN Appointments a ON tn.appointment_id = a.AppointmentId
+        LEFT JOIN AppointmentServices aps ON tn.appointment_id = aps.AppointmentId AND tn.service_id = aps.ServiceId
         JOIN Customers cust ON tn.customer_id = cust.CustomerId
         JOIN Users c ON cust.UserId = c.UserId
         JOIN Services s ON tn.service_id = s.ServiceId
@@ -195,6 +189,7 @@ class TreatmentNotesV2Service {
         JOIN Employees e ON tn.technician_id = e.EmployeeId
         JOIN Users u ON e.UserId = u.UserId
         WHERE tn.id = @NoteId
+
       `);
 
     if (result.recordset.length === 0) return null;
@@ -211,6 +206,9 @@ class TreatmentNotesV2Service {
       let query = `
         SELECT 
           tn.*,
+          a.Status AS AppointmentStatus,
+          a.Notes AS AppointmentNotes,
+          aps.Status AS StepStatus,
           s.ServiceName,
           s.Price AS ServicePrice,
           s.ImageUrl,
@@ -218,7 +216,9 @@ class TreatmentNotesV2Service {
           u.FullName AS TechnicianName,
           u.AvatarUrl AS TechnicianAvatar
         FROM TreatmentNotesV2 tn
-        JOIN Services s ON tn.service_id = s.ServiceId
+        LEFT JOIN Appointments a ON tn.appointment_id = a.AppointmentId
+        LEFT JOIN AppointmentServices aps ON tn.appointment_id = aps.AppointmentId AND (tn.service_id = aps.ServiceId OR tn.service_id = aps.AppointmentServiceId)
+        JOIN Services s ON (tn.service_id = s.ServiceId OR aps.ServiceId = s.ServiceId)
         JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
         JOIN Employees e ON tn.technician_id = e.EmployeeId
         JOIN Users u ON e.UserId = u.UserId
@@ -226,7 +226,7 @@ class TreatmentNotesV2Service {
       `;
       const req = pool.request().input("AppointmentId", sql.Int, appointmentId);
       if (serviceId) {
-        query += ` AND tn.service_id = @ServiceId`;
+        query += ` AND (tn.service_id = @ServiceId OR aps.AppointmentServiceId = @ServiceId OR aps.ServiceId = @ServiceId)`;
         req.input("ServiceId", sql.Int, serviceId);
       }
       return await req.query(query);
@@ -243,7 +243,7 @@ class TreatmentNotesV2Service {
       const appt = apptCheck.recordset[0];
       if (appt && appt.Status === 'COMPLETED') {
         try {
-          await this.createNoteOnCompletion(appointmentId);
+          await this.createNoteOnCompletion(appointmentId, serviceId);
           // Query again
           result = await runQuery();
         } catch (e) {
@@ -273,11 +273,17 @@ class TreatmentNotesV2Service {
       throw new Error("Không tìm thấy ghi chú trị liệu.");
     }
 
-    const currentStatus = statusCheck.recordset[0].Status || statusCheck.recordset[0].status;
-    const isOnlyFollowUp = Object.keys(updateFields).every(k => k === "follow_up_appointment_id");
+    const currentStatus = String(statusCheck.recordset[0].Status || statusCheck.recordset[0].status || "").toLowerCase();
+    const isLockedNote = currentStatus === "finalized" || currentStatus === "final";
 
-    if (currentStatus !== "draft" && !updateFields.follow_up_appointment_id) {
-      throw new Error("Cannot edit a finalized treatment note.");
+    // If note is finalized/locked, reject editing any treatment details
+    if (isLockedNote) {
+      const nonFollowUpKeys = Object.keys(updateFields).filter(
+        k => k !== "follow_up_appointment_id" && updateFields[k] !== undefined
+      );
+      if (nonFollowUpKeys.length > 0) {
+        throw new Error("Hồ sơ điều trị này đã được khóa chính thức, không thể sửa đổi!");
+      }
     }
 
     const setClauses = [];
@@ -299,8 +305,7 @@ class TreatmentNotesV2Service {
 
     allowedFields.forEach(field => {
       if (updateFields[field] !== undefined) {
-        // If note is finalized, only allow updating follow_up_appointment_id
-        if (currentStatus !== "draft" && field !== "follow_up_appointment_id") {
+        if (isLockedNote && field !== "follow_up_appointment_id") {
           return;
         }
         setClauses.push(`${field} = @${field}`);
@@ -312,25 +317,27 @@ class TreatmentNotesV2Service {
       }
     });
 
-    if (updateFields.before_images !== undefined) {
-      setClauses.push(`before_images = @before_images`);
-      request.input("before_images", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.before_images));
-    }
-    if (updateFields.after_images !== undefined) {
-      setClauses.push(`after_images = @after_images`);
-      request.input("after_images", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.after_images));
-    }
-    if (updateFields.detailed_images !== undefined) {
-      setClauses.push(`detailed_images = @detailed_images`);
-      request.input("detailed_images", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.detailed_images));
-    }
-    if (updateFields.procedure_steps !== undefined) {
-      setClauses.push(`procedure_steps = @procedure_steps`);
-      request.input("procedure_steps", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.procedure_steps));
-    }
-    if (updateFields.products_used !== undefined) {
-      setClauses.push(`products_used = @products_used`);
-      request.input("products_used", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.products_used));
+    if (!isLockedNote) {
+      if (updateFields.before_images !== undefined) {
+        setClauses.push(`before_images = @before_images`);
+        request.input("before_images", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.before_images));
+      }
+      if (updateFields.after_images !== undefined) {
+        setClauses.push(`after_images = @after_images`);
+        request.input("after_images", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.after_images));
+      }
+      if (updateFields.detailed_images !== undefined) {
+        setClauses.push(`detailed_images = @detailed_images`);
+        request.input("detailed_images", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.detailed_images));
+      }
+      if (updateFields.procedure_steps !== undefined) {
+        setClauses.push(`procedure_steps = @procedure_steps`);
+        request.input("procedure_steps", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.procedure_steps));
+      }
+      if (updateFields.products_used !== undefined) {
+        setClauses.push(`products_used = @products_used`);
+        request.input("products_used", sql.NVarChar(sql.MAX), JSON.stringify(updateFields.products_used));
+      }
     }
 
     if (setClauses.length === 0) return false;
@@ -403,9 +410,11 @@ class TreatmentNotesV2Service {
         u.FullName AS TechnicianName,
         u.AvatarUrl AS TechnicianAvatar,
         a.Status AS AppointmentStatus,
-        a.Notes AS AppointmentNotes
+        a.Notes AS AppointmentNotes,
+        aps.Status AS StepStatus
       FROM TreatmentNotesV2 tn
       LEFT JOIN Appointments a ON tn.appointment_id = a.AppointmentId
+      LEFT JOIN AppointmentServices aps ON tn.appointment_id = aps.AppointmentId AND tn.service_id = aps.ServiceId
       JOIN Customers cust ON tn.customer_id = cust.CustomerId
       JOIN Users c ON cust.UserId = c.UserId
       JOIN Services s ON tn.service_id = s.ServiceId
@@ -488,6 +497,7 @@ class TreatmentNotesV2Service {
     if (!row) return null;
     return {
       ...row,
+      StepStatus: row.StepStatus || row.step_status || null,
       before_images: this.safeParseJson(row.before_images, []),
       after_images: this.safeParseJson(row.after_images, []),
       detailed_images: this.safeParseJson(row.detailed_images, []),
@@ -506,12 +516,16 @@ class TreatmentNotesV2Service {
   }
 
   // Auto create Treatment Note when appointment status transitions to COMPLETED
-  async createNoteOnCompletion(appointmentId) {
+  async createNoteOnCompletion(appointmentId, targetServiceId = null) {
     // 1. Check if note already exists
     const pool = await this.getPool();
-    const noteCheck = await pool.request()
-      .input("AppointmentId", sql.Int, appointmentId)
-      .query(`SELECT id FROM TreatmentNotesV2 WHERE appointment_id = @AppointmentId`);
+    const checkReq = pool.request().input("AppointmentId", sql.Int, appointmentId);
+    let checkQuery = `SELECT id FROM TreatmentNotesV2 WHERE appointment_id = @AppointmentId`;
+    if (targetServiceId) {
+      checkQuery += ` AND service_id = @TargetServiceId`;
+      checkReq.input("TargetServiceId", sql.Int, targetServiceId);
+    }
+    const noteCheck = await checkReq.query(checkQuery);
       
     if (noteCheck.recordset.length > 0) {
       console.log(`[EventBus] TreatmentNote V2 already exists for appointment ${appointmentId}`);
@@ -538,15 +552,17 @@ class TreatmentNotesV2Service {
     }
 
     // 3. Query primary service ID
-    const svcResult = await pool.request()
-      .input("AppointmentId", sql.Int, appointmentId)
-      .query(`
-        SELECT TOP 1 ServiceId 
-        FROM AppointmentServices 
-        WHERE AppointmentId = @AppointmentId
-      `);
-      
-    const serviceId = svcResult.recordset[0]?.ServiceId;
+    let serviceId = targetServiceId;
+    if (!serviceId) {
+      const svcResult = await pool.request()
+        .input("AppointmentId", sql.Int, appointmentId)
+        .query(`
+          SELECT TOP 1 ServiceId 
+          FROM AppointmentServices 
+          WHERE AppointmentId = @AppointmentId
+        `);
+      serviceId = svcResult.recordset[0]?.ServiceId;
+    }
     if (!serviceId) {
       throw new Error(`No services found for appointment ${appointmentId}`);
     }

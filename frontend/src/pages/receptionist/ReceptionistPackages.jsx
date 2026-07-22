@@ -560,6 +560,10 @@ export default function ReceptionistPackages() {
                               <span style={{ fontSize: 11, color: "#be123c", fontWeight: 700, background: "#fff1f2", padding: "3px 10px", borderRadius: 8, border: "1px solid #fecdd3" }}>
                                 🚨 Khách vắng mặt (No-Show) - Đã khóa toàn bộ dịch vụ
                               </span>
+                            ) : a.Status === "CANCELLED" ? (
+                              <span style={{ fontSize: 11, color: "#e11d48", fontWeight: 700, background: "#fff1f2", padding: "3px 10px", borderRadius: 8, border: "1px solid #fecdd3" }}>
+                                🚫 Lịch hẹn đã bị hủy - Đã khóa toàn bộ dịch vụ
+                              </span>
                             ) : !isCheckInDone && (
                               <span style={{ fontSize: 11, color: "#d97706", fontWeight: 700, background: "#fef3c7", padding: "3px 10px", borderRadius: 8 }}>
                                 🔒 Cần bấm "Check-in (Đón Khách)" để mở khóa làm dịch vụ
@@ -570,7 +574,9 @@ export default function ReceptionistPackages() {
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
                             {servicesList.map((svcStep, idx) => {
                               const prevStepsCompleted = servicesList.slice(0, idx).every(prev => prev.Status === 'COMPLETED');
-                              const isNoShowOrCancelled = ["NO_SHOW", "CANCELLED"].includes(a.Status);
+                              const isCancelled = a.Status === "CANCELLED";
+                              const isNoShow = a.Status === "NO_SHOW";
+                              const isNoShowOrCancelled = isCancelled || isNoShow;
                               const isUnlocked = isCheckInDone && prevStepsCompleted && !isNoShowOrCancelled;
                               const isCompleted = svcStep.Status === 'COMPLETED';
                               const isInProgress = svcStep.Status === 'IN_PROGRESS';
@@ -601,10 +607,10 @@ export default function ReceptionistPackages() {
                                         fontWeight: 800,
                                         padding: "2px 6px",
                                         borderRadius: 6,
-                                        background: isCompleted ? "#dcfce7" : isNoShowOrCancelled ? "#ffe4e6" : isInProgress ? "#e0f2fe" : isUnlocked ? "#fef3c7" : "#e2e8f0",
-                                        color: isCompleted ? "#15803d" : isNoShowOrCancelled ? "#e11d48" : isInProgress ? "#0369a1" : isUnlocked ? "#b45309" : "#64748b"
+                                        background: isCompleted ? "#dcfce7" : isCancelled ? "#f1f5f9" : isNoShow ? "#ffe4e6" : isInProgress ? "#e0f2fe" : isUnlocked ? "#fef3c7" : "#e2e8f0",
+                                        color: isCompleted ? "#15803d" : isCancelled ? "#64748b" : isNoShow ? "#e11d48" : isInProgress ? "#0369a1" : isUnlocked ? "#b45309" : "#64748b"
                                       }}>
-                                        {isCompleted ? "✓ ĐÃ XONG" : isNoShowOrCancelled ? "🚨 VẮNG MẶT" : isInProgress ? "▶️ ĐANG LÀM" : isUnlocked ? "⏳ CHỜ LÀM" : "🔒 KHÓA"}
+                                        {isCompleted ? "✓ ĐÃ XONG" : isCancelled ? "🚫 ĐÃ HỦY" : isNoShow ? "🚨 VẮNG MẶT" : isInProgress ? "▶️ ĐANG LÀM" : isUnlocked ? "⏳ CHỜ LÀM" : "🔒 KHÓA"}
                                       </span>
                                     </div>
 
@@ -647,10 +653,11 @@ export default function ReceptionistPackages() {
                                           cursor: isUnlocked ? "pointer" : "not-allowed"
                                         }}
                                       >
-                                        {isNoShowOrCancelled ? "🚨 Khách Vắng Mặt" : !isCheckInDone ? "🔒 Cần Check-in trước" : !prevStepsCompleted ? `🔒 Chờ xong bước ${idx}` : "✓ Xác Nhận Xong Bước Này"}
+                                        {isCancelled ? "🚫 Lịch Hẹn Đã Hủy" : isNoShow ? "🚨 Khách Vắng Mặt" : !isCheckInDone ? "🔒 Cần Check-in trước" : !prevStepsCompleted ? `🔒 Chờ xong bước ${idx}` : "✓ Xác Nhận Xong Bước Này"}
                                       </button>
                                     )}
                                   </div>
+
 
                                 </div>
                               );
@@ -1074,7 +1081,19 @@ export default function ReceptionistPackages() {
                     </select>
                   </label>
 
+                  <label style={{ display: "block", marginBottom: 12 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>📝 Ghi Chú Hẹn (Không bắt buộc):</span>
+                    <textarea
+                      value={bookingForm.notes || ""}
+                      onChange={(e) => setBookingForm(f => ({ ...f, notes: e.target.value }))}
+                      placeholder="Ví dụ: Khách dặn làm nhẹ tay, dị ứng tinh dầu..."
+                      rows={3}
+                      style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
+                    />
+                  </label>
+
                   <div style={{ background: "#f8fafc", padding: 10, borderRadius: 8, fontSize: 12, color: "#64748b", marginBottom: 16 }}>
+
                     ℹ️ Hệ thống sẽ tự động xếp KTV rảnh nhất trong ca làm việc để phục vụ cuộc hẹn Combo này.
                   </div>
 

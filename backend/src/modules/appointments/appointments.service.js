@@ -2183,14 +2183,16 @@ async function getAvailableTechniciansForAppointmentStep(appointmentId, appointm
   if (!serviceId) {
     const firstSvcRes = await pool.request()
       .input("AppointmentId", sql.Int, Number(appointmentId))
-      .query(`SELECT TOP 1 ServiceId FROM AppointmentServices WHERE AppointmentId = @AppointmentId`);
+      .query(`SELECT TOP 1 ServiceId FROM AppointmentServices WHERE AppointmentId = @AppointmentId ORDER BY AppointmentServiceId ASC`);
     serviceId = firstSvcRes.recordset[0]?.ServiceId;
   }
 
   if (!serviceId) throw new Error("Không tìm thấy dịch vụ tương ứng trong lịch hẹn");
 
-  const startTimeSql = startTime.length === 5 ? `${startTime}:00` : startTime;
-  const endTimeSql = endTime.length === 5 ? `${endTime}:00` : endTime;
+
+
+  const startTimeSql = String(startTime || "08:00").slice(0, 5) + ":00";
+  const endTimeSql = String(endTime || "20:00").slice(0, 5) + ":00";
 
   const result = await pool.request()
     .input("ServiceId", sql.Int, serviceId)
@@ -2239,8 +2241,8 @@ async function getAvailableTechniciansForAppointmentStep(appointmentId, appointm
     appointmentServiceId: appointmentServiceId ? Number(appointmentServiceId) : null,
     serviceId,
     appointmentDate: appt.AppointmentDate,
-    startTime,
-    endTime,
+    startTime: startTimeSql,
+    endTime: endTimeSql,
     currentEmployeeId,
     availableTechnicians: result.recordset || []
   };
@@ -2271,20 +2273,20 @@ async function changeTechnician(userId, appointmentId, { newEmployeeId, appointm
       throw new Error("Bạn không có quyền thay đổi lịch hẹn này");
     }
 
-    if (['IN_PROGRESS', 'COMPLETED'].includes(apptStatus)) {
-      throw new Error("Không thể đổi Kỹ thuật viên khi ca hẹn đang được thực hiện");
+    if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(apptStatus)) {
+      throw new Error("Không thể đổi Kỹ thuật viên khi ca hẹn đang được thực hiện hoặc đã kết thúc");
     }
 
-    const dateStr = new Date(appt.AppointmentDate).toISOString().slice(0, 10);
-    const startStr = String(appt.StartTime).length === 5 ? appt.StartTime + ":00" : String(appt.StartTime);
-    const apptDateTime = new Date(`${dateStr}T${startStr}`);
+    const dateStr = normalizeDateOnly(appt.AppointmentDate);
     const now = new Date();
-    const diffHours = (apptDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const todayStr = normalizeDateOnly(now);
 
-    if (diffHours < 2) {
-      throw new Error("Chỉ được đổi Kỹ thuật viên trước giờ hẹn tối thiểu 2 tiếng. Vui lòng liên hệ Lễ tân tại salon nếu muốn hỗ trợ thêm.");
+    if (dateStr < todayStr) {
+      throw new Error("Không thể đổi Kỹ thuật viên cho lịch hẹn thuộc các ngày trong quá khứ");
     }
   }
+
+
 
   const availInfo = await getAvailableTechniciansForAppointmentStep(appointmentId, appointmentServiceId);
   const isValidTech = availInfo.availableTechnicians.some(t => Number(t.EmployeeId) === newEmpId);

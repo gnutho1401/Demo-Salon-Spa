@@ -203,9 +203,12 @@ export default function TechnicianSchedule() {
       setSelected((current) => {
         if (!current) return nextData.appointments?.[0] || null;
 
-        const updated = nextData.appointments?.find(
-          (a) => a.AppointmentId === current.AppointmentId,
-        );
+        const updated = nextData.appointments?.find((a) => {
+          if (current.AppointmentServiceId && a.AppointmentServiceId) {
+            return Number(a.AppointmentServiceId) === Number(current.AppointmentServiceId);
+          }
+          return Number(a.AppointmentId) === Number(current.AppointmentId);
+        });
 
         return updated || nextData.appointments?.[0] || null;
       });
@@ -277,6 +280,7 @@ export default function TechnicianSchedule() {
 
       await axiosClient.patch(
         `/technician/appointments/${selected.AppointmentId}/start`,
+        { appointmentServiceId: selected.AppointmentServiceId, serviceId: selected.ServiceId }
       );
 
       await loadSchedule();
@@ -295,18 +299,17 @@ export default function TechnicianSchedule() {
       setError("");
 
       if (selected.CustomerPackageId) {
-        // Combo: hoàn thành bước của KTV này
         await axiosClient.patch(
           `/technician/appointments/${selected.AppointmentId}/complete-step`,
+          { appointmentServiceId: selected.AppointmentServiceId }
         );
-        await loadSchedule();
       } else {
         await axiosClient.patch(
           `/technician/appointments/${selected.AppointmentId}/complete`,
         );
-        const svcId = selected.ServiceId || "";
-        navigate(`/technician/treatment-notes?appointmentId=${selected.AppointmentId}${svcId ? `&serviceId=${svcId}` : ""}`);
       }
+      await loadSchedule();
+      alert(`✅ Đã hoàn thành dịch vụ "${selected.ServiceName || ""}"!`);
     } catch (err) {
       setError(err.response?.data?.message || "Không thể hoàn thành dịch vụ");
     } finally {
@@ -1092,7 +1095,7 @@ export default function TechnicianSchedule() {
                             onDoubleClick={(e) => {
                               e.stopPropagation();
                               navigate(
-                                `/technician/appointments/${a.AppointmentId}`,
+                                `/technician/appointments/${a.AppointmentId}?serviceId=${a.ServiceId || a.AppointmentServiceId || ""}`,
                               );
                             }}
                           >
@@ -1135,7 +1138,7 @@ export default function TechnicianSchedule() {
                             onDoubleClick={(e) => {
                               e.stopPropagation();
                               navigate(
-                                `/technician/appointments/${a.AppointmentId}`,
+                                `/technician/appointments/${a.AppointmentId}?serviceId=${a.ServiceId || a.AppointmentServiceId || ""}`,
                               );
                             }}
                           >

@@ -83,15 +83,19 @@ function refundText(status) {
 
 // ... helper methods for checking state transitions ...
 function canPay(row) {
-  const s = String(row.Status || "").toUpperCase();
-  const p = String(row.PaymentStatus || "UNPAID").toUpperCase();
-  const isBilledUnderPackage = row.CustomerPackageId != null;
+  const s = String(row?.Status || "").toUpperCase();
+  const p = String(row?.PaymentStatus || "UNPAID").toUpperCase();
+  const isBilledUnderPackage = row?.CustomerPackageId != null;
 
   if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(s)) return false;
   if (p === "PAID" || isBilledUnderPackage) return false;
 
-  return ["UNPAID", "PENDING", "FAILED"].includes(p);
+  return (
+    ["UNPAID", "PENDING", "PENDING_PAYMENT", "FAILED"].includes(p) ||
+    s === "PENDING_PAYMENT"
+  );
 }
+
 
 function canCancel(row) {
   const s = String(row.Status || "").toUpperCase();
@@ -784,7 +788,7 @@ export default function MyAppointments() {
                   ).toUpperCase();
 
                   return (
-                    <tr key={r.AppointmentId}>
+                    <tr key={r.AppointmentId} style={r.CustomerPackageId ? { background: "linear-gradient(135deg, #fdf2f8 0%, #ffffff 100%)" } : {}}>
                       <td>
                         <span className="code">
                           {getAppointmentCode(r.AppointmentId)}
@@ -793,41 +797,56 @@ export default function MyAppointments() {
 
                       <td>
                         <div className="service-cell">
-                          <div className="service-icon">🌸</div>
+                          <div className="service-icon" style={r.CustomerPackageId ? { background: "#fbcfe8", color: "#831843" } : {}}>
+                            {r.CustomerPackageId ? "📦" : "🌸"}
+                          </div>
                           <div>
-                            <div className="service-name">
-                              {r.ServiceNames || r.ServiceName || "Dịch vụ"}
-                            </div>
-                            {r.CustomerPackageId && r.CustomerPackageName && (
-                              <div style={{
-                                marginTop: '4px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '2px 6px',
-                                backgroundColor: '#f3e8ff',
-                                color: '#6b21a8',
-                                border: '1px solid #e9d5ff',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: '500'
-                              }}>
-                                📦 Combo: {r.CustomerPackageName}
+                            {r.CustomerPackageId ? (
+                              <div>
+                                <span style={{
+                                  background: "#db2777",
+                                  color: "#ffffff",
+                                  fontSize: "10px",
+                                  fontWeight: 800,
+                                  padding: "2px 8px",
+                                  borderRadius: "10px",
+                                  letterSpacing: "0.5px"
+                                }}>
+                                  GÓI COMBO TRỌN GÓI
+                                </span>
+                                <div className="service-name" style={{ color: "#831843", fontWeight: 800, marginTop: "2px" }}>
+                                  {r.CustomerPackageName || r.ServiceName || "Gói Combo Spa"}
+                                </div>
+                                {r.ServiceNames && (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                                    {r.ServiceNames.split(",").map((sName, sIdx) => (
+                                      <span key={sIdx} style={{ background: "#fce7f3", color: "#9d174d", border: "1px solid #fbcfe8", padding: "1px 6px", borderRadius: "6px", fontSize: "11px", fontWeight: "600" }}>
+                                        ✓ {sName.trim()}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="service-name">
+                                  {r.ServiceNames || r.ServiceName || "Dịch vụ"}
+                                </div>
+                                <div className="muted">
+                                  {r.ServiceCount > 1
+                                    ? `${r.ServiceCount} dịch vụ trong lịch hẹn`
+                                    : r.Notes
+                                      ? `Ghi chú: ${r.Notes}`
+                                      : "Dịch vụ chăm sóc sắc đẹp"}
+                                </div>
                               </div>
                             )}
-                            <div className="muted">
-                              {r.ServiceCount > 1
-                                ? `${r.ServiceCount} dịch vụ trong lịch hẹn`
-                                : r.Notes
-                                  ? `Ghi chú: ${r.Notes}`
-                                  : "Dịch vụ chăm sóc sắc đẹp"}
-                            </div>
                           </div>
                         </div>
                       </td>
 
                       <td>
-                        <b>{r.EmployeeName || "Chưa phân công"}</b>
+                        <b>{r.EmployeeName || (r.CustomerPackageId ? "Hệ thống tự động xếp KTV" : "Chưa phân công")}</b>
                         {r.BranchName && (
                           <div className="muted">{r.BranchName}</div>
                         )}
@@ -843,8 +862,8 @@ export default function MyAppointments() {
 
                       <td>
                         {r.CustomerPackageId ? (
-                          <span style={{ color: "#6b21a8", fontWeight: 700, fontSize: "0.88rem" }}>
-                            📦 Trọn gói
+                          <span style={{ color: "#059669", fontWeight: 800, fontSize: "0.88rem" }}>
+                            📦 Trọn gói Combo
                           </span>
                         ) : (
                           <>
@@ -872,8 +891,8 @@ export default function MyAppointments() {
 
                       <td>
                         {r.CustomerPackageId ? (
-                          <span className="payment-badge" style={{ backgroundColor: "#f3e8ff", color: "#6b21a8", border: "1px solid #e9d5ff" }}>
-                            📦 Trọn gói Combo
+                          <span className="payment-badge" style={{ backgroundColor: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", padding: "4px 10px", borderRadius: "12px", fontSize: "0.78rem", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            💳 Đã thanh toán thành công (Combo)
                           </span>
                         ) : (
                           <span
@@ -902,20 +921,33 @@ export default function MyAppointments() {
                         )}
                       </td>
 
-
                       <td>
                         <div className="action-row">
                           {r.CustomerPackageId ? (
-                            <button
-                              type="button"
-                              className="btn-detail"
-                              style={{ backgroundColor: "#831843", color: "#ffffff", borderColor: "#831843", fontWeight: 700 }}
-                              onClick={() => navigate("/customer/packages")}
-                              title="Bấm để chuyển đến chi tiết gói Combo của bạn"
-                            >
-                              📦 Chi tiết Combo
-                            </button>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                              <button
+                                type="button"
+                                className="btn-detail"
+                                style={{ background: "linear-gradient(135deg, #db2777, #be185d)", color: "#ffffff", border: "none", fontWeight: 700, borderRadius: "8px", padding: "6px 12px", boxShadow: "0 2px 8px rgba(219,39,119,0.25)", cursor: "pointer" }}
+                                onClick={() => navigate(`/customer/packages?packageId=${r.CustomerPackageId}`)}
+                                title="Bấm để chuyển đến chi tiết gói Combo này"
+                              >
+                                📦 Chi tiết Combo →
+                              </button>
+                              {status === "COMPLETED" && (
+                                <button
+                                  type="button"
+                                  style={{ background: "#ec4899", color: "#ffffff", border: "none", fontWeight: 700, borderRadius: "8px", padding: "6px 12px", cursor: "pointer", boxShadow: "0 2px 8px rgba(236,72,153,0.3)" }}
+                                  onClick={() => navigate(`/customer/packages?tab=reviews`)}
+                                  title="Đánh giá Gói Combo & KTV"
+                                >
+                                  ⭐ Đánh giá Combo
+                                </button>
+                              )}
+                            </div>
                           ) : (
+
+
                             <>
                               <Link
                                 className="btn-detail"

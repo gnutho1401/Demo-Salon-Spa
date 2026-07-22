@@ -37,12 +37,14 @@ async function getAvailableSlots(req, res) {
 
 async function startAppointment(req, res) {
   try {
-    const data = await service.startAppointment(req.user.userId, req.params.id);
+    const targetStepId = req.body?.appointmentServiceId || req.body?.serviceId || req.query?.serviceId || null;
+    const data = await service.startAppointment(req.user.userId, req.params.id, targetStepId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 }
+
 
 async function completeAppointment(req, res) {
   try {
@@ -58,12 +60,14 @@ async function completeAppointment(req, res) {
 
 async function completeMyStep(req, res) {
   try {
-    const data = await service.completeMyStep(req.user.userId, req.params.id);
+    const targetStepId = req.body?.appointmentServiceId || req.body?.serviceId || req.query?.serviceId || null;
+    const data = await service.completeMyStep(req.user.userId, req.params.id, targetStepId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 }
+
 
 async function getAppointmentDetail(req, res) {
   try {

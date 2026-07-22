@@ -4364,7 +4364,12 @@ async function finalizeCheckout(pool, id, userId = null) {
 
   const servicesResult = await pool.request()
     .input("AppointmentId", sql.Int, id)
-    .query(`SELECT ServiceId, Price FROM AppointmentServices WHERE AppointmentId = @AppointmentId`);
+    .query(`
+      SELECT aps.ServiceId, aps.Price, s.ServiceName, s.DurationMinutes 
+      FROM AppointmentServices aps
+      JOIN Services s ON aps.ServiceId = s.ServiceId
+      WHERE aps.AppointmentId = @AppointmentId
+    `);
   const apptServices = servicesResult.recordset || [];
 
   if (current.CustomerEmail) {
@@ -4373,36 +4378,43 @@ async function finalizeCheckout(pool, id, userId = null) {
       
       let servicesListHtml = "";
       if (apptServices.length > 0) {
-        servicesListHtml = apptServices.map(s => `<li>Dịch vụ giá: ${Number(s.Price).toLocaleString('vi-VN')}đ</li>`).join("");
+        servicesListHtml = apptServices.map(s => 
+          `<li style="margin-bottom: 6px;"><strong>${s.ServiceName}</strong> (${s.DurationMinutes || 30} phút) - ${current.CustomerPackageId ? "Trọn gói Combo" : `${Number(s.Price || 0).toLocaleString('vi-VN')}đ`}</li>`
+        ).join("");
       }
 
+      const isCombo = !!current.CustomerPackageId;
+      const paymentInfoHtml = isCombo
+        ? `<p style="margin-bottom: 0; font-size: 0.95rem;">Hình thức thanh toán: <strong style="color: #059669;">📦 Trọn gói Combo (${current.CustomerPackageName || 'Gói Combo'})</strong></p>`
+        : `<p style="margin-bottom: 0; font-size: 0.95rem;">Tổng số tiền thanh toán: <strong>${Number(current.FinalAmount || 0).toLocaleString('vi-VN')}đ</strong></p>`;
+
       const emailHtml = `
-        <div style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333;">
-          <h2 style="color: #d91f68; border-bottom: 2px solid #fce7f3; padding-bottom: 8px;">Cảm ơn quý khách đã đồng hành cùng BeautyMS!</h2>
+        <div style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h2 style="color: #2f593a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: 0;">Cảm ơn quý khách đã trải nghiệm dịch vụ!</h2>
           <p>Chào <strong>${current.CustomerName}</strong>,</p>
-          <p>Chúng tôi xin gửi lời cảm ơn chân thành nhất vì quý khách đã tin tưởng và sử dụng dịch vụ tại salon của chúng tôi vào ngày <strong>${new Date(current.AppointmentDate).toLocaleDateString('vi-VN')}</strong>.</p>
+          <p>Chúng tôi xin gửi lời cảm ơn chân thành vì quý khách đã tin tưởng và sử dụng dịch vụ tại salon của chúng tôi vào ngày <strong>${new Date(current.AppointmentDate).toLocaleDateString('vi-VN')}</strong>.</p>
           
-          <div style="background: #fafafa; border: 1px solid #eaeaea; border-radius: 8px; padding: 15px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #555;">Tóm tắt dịch vụ đã thực hiện:</h3>
-            <ul>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #2f593a; font-size: 1rem;">Tóm tắt dịch vụ đã thực hiện:</h3>
+            <ul style="padding-left: 20px; margin-bottom: 12px;">
               ${servicesListHtml || '<li>Dịch vụ chăm sóc sắc đẹp</li>'}
             </ul>
-            <p style="margin-bottom: 0;">Tổng số tiền thanh toán: <strong>${Number(current.FinalAmount).toLocaleString('vi-VN')}đ</strong></p>
+            ${paymentInfoHtml}
           </div>
           
-          <p>Mọi góp ý hoặc phản hồi của quý khách về dịch vụ và tay nghề Kỹ thuật viên <strong>${current.TechnicianName || 'Chuyên viên'}</strong> sẽ giúp chúng tôi hoàn thiện chất lượng phục vụ ngày một tốt hơn.</p>
-          <p>Quý khách có thể đánh giá dịch vụ trực tuyến tại đây: 
-            <a href="http://localhost:3000/customer/reviews" style="display: inline-block; background: #d91f68; color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; margin-top: 5px;">Viết Đánh Giá Ngay</a>
-          </p>
+          <p>Mọi góp ý hoặc phản hồi của quý khách về dịch vụ và tay nghề Kỹ thuật viên <strong>${current.TechnicianName || 'Chuyên viên'}</strong> sẽ giúp salon không ngừng nâng cao chất lượng phục vụ.</p>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="http://localhost:3000/customer/reviews" style="display: inline-block; background: #2f593a; color: #ffffff; text-decoration: none; padding: 10px 22px; border-radius: 8px; font-weight: bold; font-size: 0.9rem;">Viết Đánh Giá Ngay</a>
+          </div>
           
-          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
-          <p style="font-size: 12px; color: #999;">Đây là email tự động gửi từ hệ thống chăm sóc khách hàng của BeautyMS. Vui lòng không trả lời trực tiếp email này.</p>
+          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 25px 0;" />
+          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">Đây là email tự động gửi từ hệ thống chăm sóc khách hàng. Vui lòng không trả lời trực tiếp email này.</p>
         </div>
       `;
 
       await sendMail({
         to: current.CustomerEmail,
-        subject: "[BeautyMS] Cảm ơn quý khách đã sử dụng dịch vụ",
+        subject: `[Salon & Spa] Cảm ơn quý khách đã hoàn thành ${isCombo ? `buổi hẹn Combo '${current.CustomerPackageName || 'Combo'}'` : 'dịch vụ'}`,
         html: emailHtml
       });
       console.log(`[Checkout] Thank-you email sent successfully to ${current.CustomerEmail}`);
@@ -4410,6 +4422,7 @@ async function finalizeCheckout(pool, id, userId = null) {
       console.error(`[Checkout] Failed to send check-out email to ${current.CustomerEmail}:`, mailErr.message);
     }
   }
+
 
   if (current.CustomerId) {
     try {

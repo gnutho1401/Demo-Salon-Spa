@@ -38,8 +38,10 @@ router.post(
   controller.cancelCustomerPackageAppointment,
 );
 
+const upload = require("../../middlewares/upload.middleware");
+
 router.get("/my/combo-history", authMiddleware, controller.getComboHistoryAndReviews);
-router.post("/my/combo-review", authMiddleware, controller.submitComboReview);
+router.post("/my/combo-review", authMiddleware, upload.array("images", 6), controller.submitComboReview);
 
 
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import TechnicianLayout from "../../layouts/TechnicianLayout";
 
@@ -128,10 +129,18 @@ function statusClass(status) {
     .replaceAll("_", "-");
 }
 
-function statusLabel(status) {
+function statusLabel(status, isCombo = false, allCompleted = false) {
   const key = String(status || "").toUpperCase();
+  if (isCombo) {
+    if (key === "CONFIRMED") return "Đã đặt (Gói Combo)";
+    if (key === "CHECKED_IN") return "Đã check-in (Gói Combo)";
+    if (key === "IN_PROGRESS") return "Đang thực hiện Combo";
+    if (key === "COMPLETED") return allCompleted ? "Hoàn thành Combo" : "Hoàn thành dịch vụ";
+    if (key === "CANCELLED") return "Đã hủy lịch Combo";
+  }
   return STATUS_LABELS[key] || key.replaceAll("_", " ") || "—";
 }
+
 
 function progressLabel(status) {
   const key = String(status || "").toUpperCase();
@@ -153,9 +162,22 @@ export default function TechnicianAppointmentDetail() {
     requestedEndTime: "",
     reason: ""
   });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paramServiceId = searchParams.get("serviceId") || searchParams.get("appointmentServiceId");
+  const [selectedServiceId, setSelectedServiceId] = useState(paramServiceId ? Number(paramServiceId) : null);
+
   const [slots, setSlots] = useState([]);
   const [slotLoading, setSlotLoading] = useState(false);
   const [slotError, setSlotError] = useState("");
+  const [myProfile, setMyProfile] = useState(null);
+
+  useEffect(() => {
+    axiosClient.get("/technician/profile").then(res => {
+      setMyProfile(res.data?.data || null);
+    }).catch(() => {});
+  }, []);
+
+
 
 
   async function load() {
@@ -163,8 +185,50 @@ export default function TechnicianAppointmentDetail() {
       setLoading(true);
       setError("");
 
+      let profile = myProfile;
+      if (!profile) {
+        try {
+          const profRes = await axiosClient.get("/technician/profile");
+          profile = profRes.data?.data || null;
+          setMyProfile(profile);
+        } catch (pErr) {
+          console.warn("Failed to load technician profile:", pErr);
+        }
+      }
+
       const res = await axiosClient.get(`/technician/appointments/${id}`);
-      setAppointment(res.data.data || null);
+      const data = res.data.data || null;
+      setAppointment(data);
+
+      const svcs = data?.services || [];
+      if (svcs.length > 0) {
+        setSelectedServiceId((prevSelected) => {
+          if (prevSelected && prevSelected !== "ALL") {
+            const exists = svcs.find(
+              (s) => Number(s.ServiceId) === Number(prevSelected) || Number(s.AppointmentServiceId) === Number(prevSelected)
+            );
+            if (exists) return prevSelected;
+          }
+          if (paramServiceId) {
+            const paramMatch = svcs.find(
+              (s) => Number(s.ServiceId) === Number(paramServiceId) || Number(s.AppointmentServiceId) === Number(paramServiceId)
+            );
+            if (paramMatch) return paramMatch.AppointmentServiceId || paramMatch.ServiceId;
+          }
+          const myEmpId = profile?.EmployeeId;
+          const myStep = myEmpId ? svcs.find((s) => Number(s.EmployeeId) === Number(myEmpId)) : null;
+          if (myStep) {
+            return myStep.AppointmentServiceId || myStep.ServiceId;
+          }
+          const inProg = svcs.find((s) => s.StepStatus === "IN_PROGRESS");
+          const pend = svcs.find((s) => s.StepStatus === "PENDING");
+          return (inProg || pend || svcs[0])?.AppointmentServiceId || (inProg || pend || svcs[0])?.ServiceId;
+        });
+      }
+
+
+
+
 
       try {
         const resReq = await axiosClient.get("/reschedule/technician/reschedule-requests");
@@ -273,17 +337,144 @@ export default function TechnicianAppointmentDetail() {
     return history.find((item) => item.NewStatus === statusKey)?.ChangedAt;
   }
 
-  const status = String(detail.Status || "PENDING_PAYMENT").toUpperCase();
+  const filteredServices = useMemo(() => {
+    if (!services || services.length === 0) return [];
+    if (selectedServiceId && selectedServiceId !== "ALL") {
+      const found = services.find(
+        (s) => Number(s.ServiceId) === Number(selectedServiceId) || Number(s.AppointmentServiceId) === Number(selectedServiceId)
+      );
+      if (found) return [found];
+    }
+    // Default to step assigned to logged in technician
+    const myEmpId = myProfile?.EmployeeId;
+    if (myEmpId) {
+      const myStep = services.find((s) => Number(s.EmployeeId) === Number(myEmpId));
+      if (myStep) return [myStep];
+    }
+
+    return [services[0]];
+  }, [services, selectedServiceId, myProfile]);
+
+  const currentService = filteredServices[0] || services[0] || null;
+
+  const getServiceTimeRange = useMemo(() => {
+    return (targetSvc) => {
+      if (!targetSvc) return `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`;
+
+      if (targetSvc.StepStartTime && targetSvc.StepEndTime) {
+        return `${targetSvc.StepStartTime.slice(0, 5)} - ${targetSvc.StepEndTime.slice(0, 5)}`;
+      }
+
+      const defaultStartTime = detail.StartTime;
+      if (!defaultStartTime || !defaultStartTime.includes(":")) {
+        return `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`;
+      }
+
+      const targetIdx = services.findIndex(
+        s => (targetSvc.AppointmentServiceId && s.AppointmentServiceId === targetSvc.AppointmentServiceId) ||
+             (targetSvc.ServiceId && s.ServiceId === targetSvc.ServiceId)
+      );
+
+      let startMinutes = 0;
+      const [h, m] = defaultStartTime.split(":").map(Number);
+      const baseMinutes = (h || 0) * 60 + (m || 0);
+
+      for (let i = 0; i < (targetIdx >= 0 ? targetIdx : 0); i++) {
+        startMinutes += Number(services[i].DurationMinutes) || 0;
+      }
+
+      const stepStartTotal = baseMinutes + startMinutes;
+      const stepEndTotal = stepStartTotal + (Number(targetSvc.DurationMinutes) || 0);
+
+      const formatMins = (totalMins) => {
+        const hrs = Math.floor(totalMins / 60) % 24;
+        const mins = totalMins % 60;
+        return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+      };
+
+      return `${formatMins(stepStartTotal)} - ${formatMins(stepEndTotal)}`;
+    };
+  }, [detail.StartTime, detail.EndTime, services]);
+
+  const uncompletedSteps = useMemo(() => {
+    return services.filter((s) => s.StepStatus !== "COMPLETED");
+  }, [services]);
+
+  const allServicesCompleted = useMemo(() => {
+    return services.length > 0 && uncompletedSteps.length === 0;
+  }, [services, uncompletedSteps]);
+
+  const status = useMemo(() => {
+    if (allServicesCompleted) {
+      return "COMPLETED";
+    }
+    if (detail.CustomerPackageId && currentService) {
+      const stepStat = String(currentService.StepStatus || currentService.Status || "").toUpperCase();
+      if (stepStat === "COMPLETED") return "COMPLETED";
+      if (stepStat === "IN_PROGRESS") return "IN_PROGRESS";
+      if (stepStat === "PENDING" || stepStat === "CONFIRMED" || stepStat === "CHECKED_IN") {
+        const apptStat = String(detail.Status || "").toUpperCase();
+        return ["CHECKED_IN", "IN_PROGRESS"].includes(apptStat) ? "CHECKED_IN" : "CONFIRMED";
+      }
+    }
+    return String(detail.Status || "PENDING_PAYMENT").toUpperCase();
+  }, [allServicesCompleted, detail.CustomerPackageId, currentService, detail.Status]);
+
   const paymentStatus = String(detail.PaymentStatus || "UNPAID").toUpperCase();
 
-  const activeStepIndex = useMemo(() => {
-    const index = STATUS_STEPS.findIndex((step) => step.key === status);
-    return index < 0 ? 0 : index;
-  }, [status]);
 
-  const canStart = ["CHECKED_IN", "CONFIRMED", "PAID"].includes(status);
+  const displaySteps = useMemo(() => {
+    if (detail.CustomerPackageId) {
+      const steps = [
+        { key: "CONFIRMED", label: "Đã đặt (Gói Combo)", icon: "📦" },
+        { key: "CHECKED_IN", label: "Đã check-in", icon: "◇" },
+        { key: "IN_PROGRESS", label: "Đang thực hiện", icon: "▶" },
+        { key: "COMPLETED", label: "Hoàn thành", icon: "✓" },
+      ];
+      if (status === "NO_SHOW") steps.push({ key: "NO_SHOW", label: "Khách không đến", icon: "⊗" });
+      if (status === "CANCELLED") steps.push({ key: "CANCELLED", label: "Đã hủy lịch", icon: "🚫" });
+      return steps;
+    } else {
+      const steps = [];
+      if (status === "PENDING_PAYMENT" || paymentStatus === "UNPAID") {
+        steps.push({ key: "PENDING_PAYMENT", label: "Chờ thanh toán", icon: "▣" });
+      } else {
+        steps.push({ key: "PAID", label: "Đã thanh toán", icon: "💳" });
+      }
+      steps.push(
+        { key: "CONFIRMED", label: "Đã xác nhận", icon: "✓" },
+        { key: "CHECKED_IN", label: "Đã check-in", icon: "◇" },
+        { key: "IN_PROGRESS", label: "Đang thực hiện", icon: "▶" },
+        { key: "COMPLETED", label: "Hoàn thành", icon: "✓" }
+      );
+      if (status === "NO_SHOW") steps.push({ key: "NO_SHOW", label: "Khách không đến", icon: "⊗" });
+      if (status === "CANCELLED") steps.push({ key: "CANCELLED", label: "Đã hủy", icon: "🚫" });
+      return steps;
+    }
+  }, [detail.CustomerPackageId, status, paymentStatus]);
+
+  const activeStepIndex = useMemo(() => {
+    const index = displaySteps.findIndex((step) => step.key === status);
+    return index < 0 ? 0 : index;
+  }, [displaySteps, status]);
+
+
+
+
+
+
+  const canStart = ["CHECKED_IN", "CONFIRMED", "PAID", "IN_PROGRESS"].includes(status);
   const canComplete = status === "IN_PROGRESS";
   const canNoShow = ["CONFIRMED", "CHECKED_IN", "PAID"].includes(status);
+
+  const inProgressStep = useMemo(() => {
+    return services.find((s) => s.StepStatus === "IN_PROGRESS");
+  }, [services]);
+
+  const nextPendingStep = useMemo(() => {
+    return services.find((s) => s.StepStatus === "PENDING" || (!s.StepStatus && status !== "COMPLETED"));
+  }, [services, status]);
+
 
 
 
@@ -295,9 +486,7 @@ export default function TechnicianAppointmentDetail() {
       setActionLoading(type);
       await axiosClient.patch(url);
       if (type === "complete") {
-        const firstSvcId = services[0]?.ServiceId;
-        navigate(`/technician/treatment-notes?appointmentId=${id}${firstSvcId ? `&serviceId=${firstSvcId}` : ""}`);
-        return;
+        alert("✅ Đã hoàn thành dịch vụ!");
       }
       await load();
     } catch (err) {
@@ -366,19 +555,21 @@ export default function TechnicianAppointmentDetail() {
               <div>
                 <span>Trạng thái</span>
                 <b className={`tech-apd-badge ${statusClass(status)}`}>
-                  {statusLabel(status)}
+                  {statusLabel(status, !!detail.CustomerPackageId, allServicesCompleted)}
                 </b>
               </div>
+
 
               <div>
                 <span>Ngày &amp; giờ</span>
                 <strong>{safeDate(detail.AppointmentDate)}</strong>
                 <small>
                   {detail.CustomerPackageId
-                    ? /* Combo: dùng thời gian bước của KTV */
-                      `${services[0]?.StepStartTime || detail.StartTime || "—"} - ${services[services.length - 1]?.StepEndTime || detail.EndTime || "—"}`
-                    : /* Lịch thường */
-                      `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`
+                    ? (selectedServiceId && selectedServiceId !== "ALL" && currentService
+                        ? getServiceTimeRange(currentService)
+                        : `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`
+                      )
+                    : `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`
                   }
                 </small>
               </div>
@@ -387,23 +578,23 @@ export default function TechnicianAppointmentDetail() {
                 <span>Thời lượng</span>
                 <strong>
                   {detail.CustomerPackageId
-                    ? /* Combo: tổng thời gian các bước của KTV */
-                      services.reduce((sum, s) => {
-                        if (s.StepStartTime && s.StepEndTime) {
-                          const [sh, sm] = s.StepStartTime.split(':').map(Number);
-                          const [eh, em] = s.StepEndTime.split(':').map(Number);
-                          return sum + (eh * 60 + em) - (sh * 60 + sm);
-                        }
-                        return sum + (Number(s.DurationMinutes) || 0);
-                      }, 0)
-                    : services.reduce((sum, s) => sum + (Number(s.DurationMinutes) || 0), 0) || (detail.DurationMinutes || 0)
+                    ? (selectedServiceId && selectedServiceId !== "ALL" && currentService
+                        ? (Number(currentService.DurationMinutes) || 0)
+                        : services.reduce((sum, s) => sum + (Number(s.DurationMinutes) || 0), 0)
+                      )
+                    : (services.reduce((sum, s) => sum + (Number(s.DurationMinutes) || 0), 0) || (detail.DurationMinutes || 0))
                   } phút
                 </strong>
               </div>
 
               <div>
                 <span>Kỹ thuật viên</span>
-                <strong>{detail.TechnicianName || "—"}</strong>
+                <strong>
+                  {selectedServiceId === "ALL"
+                    ? (detail.TechnicianName || "—")
+                    : (currentService?.AssignedTechnicianName || currentService?.TechnicianName || detail.TechnicianName || "—")
+                  }
+                </strong>
                 <small>Chuyên viên làm đẹp</small>
               </div>
             </section>
@@ -411,12 +602,60 @@ export default function TechnicianAppointmentDetail() {
             <section className="tech-apd-layout">
               <main className="tech-apd-main">
                 <div className="tech-apd-card">
-                  <div className="tech-apd-card-title">♙ Thông tin dịch vụ</div>
+                  <div className="tech-apd-card-title">
+                    {detail.CustomerPackageId ? (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", flexWrap: "wrap", gap: 6 }}>
+                        <span>📦 Dịch vụ thuộc Gói Combo: <strong style={{ color: "#be185d" }}>{detail.PackageName || "Gói Combo"}</strong></span>
+                        <span style={{ fontSize: 11, background: "#fdf2f8", color: "#be185d", padding: "2px 8px", borderRadius: 12, border: "1px solid #fbcfe8", fontWeight: 700 }}>
+                          Gói Combo #{detail.CustomerPackageId}
+                        </span>
+                      </div>
+                    ) : (
+                      "♙ Thông tin dịch vụ"
+                    )}
+                  </div>
 
-                  {services.length === 0 ? (
+
+
+
+                  {services.length > 1 && (
+                    <div style={{ display: "flex", gap: "8px", marginBottom: "16px", marginTop: "12px", flexWrap: "wrap" }}>
+                      {services.map((srv) => {
+                        const isSelected = Number(srv.ServiceId) === Number(selectedServiceId) || Number(srv.AppointmentServiceId) === Number(selectedServiceId);
+                        const isMine = myProfile?.EmployeeId && Number(srv.EmployeeId) === Number(myProfile.EmployeeId);
+                        return (
+                          <button
+                            key={srv.AppointmentServiceId || srv.ServiceId}
+                            type="button"
+                            onClick={() => setSelectedServiceId(srv.AppointmentServiceId || srv.ServiceId)}
+                            style={{
+                              padding: "8px 14px",
+                              borderRadius: "8px",
+                              border: isSelected ? "2px solid #059669" : "1px solid #e2e8f0",
+                              background: isSelected ? "#ecfdf5" : "#f8fafc",
+                              color: isSelected ? "#047857" : "#475569",
+                              fontWeight: isSelected ? "700" : "500",
+                              fontSize: "0.85rem",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px"
+                            }}
+                          >
+                            {srv.ServiceName}
+                            {isMine && <span style={{ background: "#d1fae5", color: "#065f46", fontSize: "0.7rem", padding: "1px 5px", borderRadius: "4px", fontWeight: "700" }}>Dịch vụ của bạn</span>}
+                            {srv.StepStatus === "COMPLETED" && <span style={{ color: "#059669", fontWeight: "700" }}>✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {filteredServices.length === 0 ? (
                     <div className="tech-apd-empty">Chưa có dịch vụ</div>
                   ) : (
-                    services.map((srv, index) => (
+                    filteredServices.map((srv, index) => (
+
                       <article
                         className="tech-apd-service"
                         key={`${srv.ServiceId}-${srv.AppointmentServiceId || index}`}
@@ -432,12 +671,17 @@ export default function TechnicianAppointmentDetail() {
                         <div>
                           <h3>{srv.ServiceName}</h3>
 
-                          {/* Với Combo: hiển thị thời gian bước riêng */}
-                          {detail.CustomerPackageId && (srv.StepStartTime || srv.StepEndTime) && (
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                              <span style={{ background: "#dbeafe", color: "#1e40af", borderRadius: "6px", padding: "2px 8px", fontSize: "0.78rem", fontWeight: "700" }}>
-                                ⏱ {srv.StepStartTime} – {srv.StepEndTime}
+                          {/* Với Combo: hiển thị KTV phân công và thời gian bước riêng */}
+                          {detail.CustomerPackageId && (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px", flexWrap: "wrap" }}>
+                              <span style={{ background: "#eff6ff", color: "#1d4ed8", borderRadius: "6px", padding: "2px 8px", fontSize: "0.78rem", fontWeight: "700", border: "1px solid #bfdbfe" }}>
+                                👤 KTV: {srv.AssignedTechnicianName || srv.TechnicianName || detail.TechnicianName || "Tự động phân công"}
                               </span>
+                              {(srv.StepStartTime || srv.StepEndTime) && (
+                                <span style={{ background: "#dbeafe", color: "#1e40af", borderRadius: "6px", padding: "2px 8px", fontSize: "0.78rem", fontWeight: "700" }}>
+                                  ⏱ {srv.StepStartTime} – {srv.StepEndTime}
+                                </span>
+                              )}
                               {srv.StepStatus && (
                                 <span style={{
                                   background: srv.StepStatus === 'COMPLETED' ? '#dcfce7' : srv.StepStatus === 'IN_PROGRESS' ? '#fef9c3' : '#f1f5f9',
@@ -502,7 +746,12 @@ export default function TechnicianAppointmentDetail() {
                                 ✏️ Đổi thời gian
                               </button>
                             )}
-                            <span>◉ {money(srv.Price)}</span>
+                             {detail.CustomerPackageId ? (
+                              <span style={{ color: "#059669", fontWeight: "700", fontSize: "0.82rem" }}>📦 Trọn gói Combo</span>
+                            ) : (
+                              <span>◉ {money(srv.Price)}</span>
+                            )}
+
                           </div>
 
                           <div className="tech-apd-tags" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
@@ -559,7 +808,8 @@ export default function TechnicianAppointmentDetail() {
                   <div className="tech-apd-card-title">Tiến trình lịch hẹn</div>
 
                   <div className="tech-apd-vertical-timeline">
-                    {STATUS_STEPS.map((step, index) => (
+                    {displaySteps.map((step, index) => (
+
                       <div
                         className={index <= activeStepIndex ? "done" : ""}
                         key={step.key}
@@ -646,96 +896,305 @@ export default function TechnicianAppointmentDetail() {
                     ♙ Trạng thái lịch hẹn
                   </div>
 
-                  <div className="tech-apd-steps">
-                    {STATUS_STEPS.map((step, index) => (
-                      <div
-                        className={`${index <= activeStepIndex ? "active" : ""} ${
-                          step.key === status ? "current" : ""
-                        }`}
-                        key={step.key}
-                      >
-                        <i>{step.icon}</i>
-                        <span>{step.label}</span>
-                      </div>
-                    ))}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    position: "relative",
+                    padding: "16px 8px 8px 8px",
+                    margin: "8px 0 16px 0"
+                  }}>
+                    {/* Progress track background line */}
+                    <div style={{
+                      position: "absolute",
+                      top: "35px",
+                      left: "35px",
+                      right: "35px",
+                      height: "4px",
+                      background: "#e2e8f0",
+                      borderRadius: "4px",
+                      zIndex: 1
+                    }} />
+                    
+                    {/* Active progress fill line */}
+                    <div style={{
+                      position: "absolute",
+                      top: "35px",
+                      left: "35px",
+                      width: displaySteps.length > 1 
+                        ? `calc(${(activeStepIndex / (displaySteps.length - 1)) * 100}% - ${activeStepIndex === displaySteps.length - 1 ? 0 : 20}px)`
+                        : "0%",
+                      maxWidth: "calc(100% - 70px)",
+                      height: "4px",
+                      background: "linear-gradient(90deg, #10b981, #059669)",
+                      borderRadius: "4px",
+                      zIndex: 2,
+                      transition: "width 0.4s ease"
+                    }} />
+
+                    {displaySteps.map((step, index) => {
+                      const isPast = index < activeStepIndex;
+                      const isCurrent = step.key === status;
+
+                      return (
+                        <div
+                          key={step.key}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            position: "relative",
+                            zIndex: 3,
+                            flex: 1
+                          }}
+                        >
+                          {/* Step Circle / Icon */}
+                          <div style={{
+                            width: isCurrent ? "42px" : "34px",
+                            height: isCurrent ? "42px" : "34px",
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: "700",
+                            fontSize: isCurrent ? "1.05rem" : "0.85rem",
+                            transition: "all 0.3s ease",
+                            background: isCurrent
+                              ? "linear-gradient(135deg, #059669, #10b981)"
+                              : isPast
+                                ? "#dcfce7"
+                                : "#f1f5f9",
+                            color: isCurrent
+                              ? "#ffffff"
+                              : isPast
+                                ? "#15803d"
+                                : "#94a3b8",
+                            border: isCurrent
+                              ? "3px solid #a7f3d0"
+                              : isPast
+                                ? "2px solid #86efac"
+                                : "2px solid #cbd5e1",
+                            boxShadow: isCurrent
+                              ? "0 0 14px rgba(16, 185, 129, 0.45)"
+                              : "none"
+                          }}>
+                            {isPast ? "✓" : step.icon}
+                          </div>
+
+                          {/* Step Label */}
+                          <span style={{
+                            marginTop: "8px",
+                            fontSize: isCurrent ? "0.82rem" : "0.76rem",
+                            fontWeight: isCurrent ? "700" : isPast ? "600" : "500",
+                            color: isCurrent ? "#047857" : isPast ? "#166534" : "#64748b",
+                            textAlign: "center",
+                            lineHeight: "1.25",
+                            padding: "0 2px"
+                          }}>
+                            {step.label}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
+
 
                   <div className="tech-apd-update-box">
                     <h3>Cập nhật trạng thái</h3>
                     <p>Cập nhật trạng thái hiện tại của lịch hẹn này</p>
 
-                    {canStart && (
-                      <button
-                        className="tech-apd-action primary"
-                        type="button"
-                        disabled={!!actionLoading}
-                        onClick={() =>
-                          runAction(
-                            "start",
-                            `/technician/appointments/${id}/start`,
-                            "Bạn có chắc muốn bắt đầu thực hiện dịch vụ này?",
-                          )
-                        }
-                      >
-                        ▶{" "}
-                        {actionLoading === "start"
-                          ? "Đang xử lý..."
-                          : "Bắt đầu dịch vụ"}
-                      </button>
-                    )}
+                    {detail.CustomerPackageId ? (() => {
+                      const targetSvc = filteredServices[0] || services[0];
+                      if (!targetSvc) return <div style={{ color: "#64748b" }}>Chưa chọn dịch vụ</div>;
 
-                    {/* Nếu là Combo => nút "Hoàn thành bước của tôi"; nếu thường => nút "Hoàn thành" */}
-                    {canComplete && detail.CustomerPackageId && (
-                      <button
-                        className="tech-apd-action gold"
-                        type="button"
-                        disabled={!!actionLoading}
-                        onClick={async () => {
-                          const ok = window.confirm("Bạn có chắc muốn xác nhận HOÀN THÀNH bước dịch vụ của mình trong gói Combo? Bước tiếp theo sẽ được mở cho KTV tiếp theo.");
-                          if (!ok) return;
-                          try {
-                            setActionLoading("complete-step");
-                            const res = await axiosClient.patch(`/technician/appointments/${id}/complete-step`);
-                            if (res.data?.data?.allCompleted) {
-                              alert("🎉 Tất cả các bước Combo đã hoàn thành! Hệ thống đã gửi thông báo và email cho khách hàng.");
-                              navigate(`/technician/treatment-notes?appointmentId=${id}${services[0]?.ServiceId ? `&serviceId=${services[0].ServiceId}` : ""}`);
-                            } else {
-                              alert(`✅ Đã hoàn thành bước "${res.data?.data?.completedStep || "dịch vụ của bạn"}"! Bước tiếp theo đã được mở cho KTV tiếp theo.`);
-                              await load();
-                            }
-                          } catch (err) {
-                            alert(err.response?.data?.message || "Không thể hoàn thành bước dịch vụ");
-                          } finally {
-                            setActionLoading("");
+                      const stepStat = String(targetSvc.StepStatus || targetSvc.Status || "PENDING").toUpperCase();
+                      const targetSvcId = targetSvc.ServiceId;
+                      const targetApptSvcId = targetSvc.AppointmentServiceId;
+
+                      if (stepStat === "COMPLETED") {
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "center", background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", padding: "16px", borderRadius: "10px" }}>
+                            <div style={{ fontWeight: "700", fontSize: "0.95rem" }}>
+                              ✓ Dịch vụ "{targetSvc.ServiceName}" đã hoàn thành!
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate(`/technician/treatment-notes?appointmentId=${id}&serviceId=${targetSvcId}`);
+                              }}
+                              style={{
+                                background: "#2f593a",
+                                color: "#ffffff",
+                                border: "none",
+                                padding: "10px 20px",
+                                borderRadius: "8px",
+                                fontWeight: "700",
+                                fontSize: "0.88rem",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                boxShadow: "0 2px 8px rgba(47,89,58,0.25)",
+                                width: "100%",
+                                justifyContent: "center"
+                              }}
+                            >
+                              📝 Viết & Xem Phác Đồ Trị Liệu →
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      if (stepStat === "IN_PROGRESS") {
+                        return (
+                          <button
+                            className="tech-apd-action gold"
+                            type="button"
+                            disabled={!!actionLoading}
+                            onClick={async () => {
+                              const ok = window.confirm(`Xác nhận hoàn thành bước dịch vụ "${targetSvc.ServiceName}"?`);
+                              if (!ok) return;
+                              try {
+                                setActionLoading("complete-step");
+                                await axiosClient.patch(`/technician/appointments/${id}/complete-step`, { appointmentServiceId: targetApptSvcId });
+                                alert(`✅ Đã hoàn thành dịch vụ "${targetSvc.ServiceName}"!`);
+                                await load();
+
+                              } catch (err) {
+                                alert(err.response?.data?.message || "Không thể hoàn thành bước dịch vụ");
+                              } finally {
+                                setActionLoading("");
+                              }
+                            }}
+                          >
+                            ✓ {actionLoading === "complete-step" ? "Đang xử lý..." : `✅ Hoàn thành: ${targetSvc.ServiceName}`}
+                          </button>
+                        );
+                      }
+
+                      return (
+                        (() => {
+                          const apptStat = String(detail.Status || "").toUpperCase();
+                          const isCheckedIn = ["CHECKED_IN", "IN_PROGRESS"].includes(apptStat);
+
+                          if (!isCheckedIn) {
+                            return (
+                              <div style={{
+                                background: "#fffbeb",
+                                border: "1.5px solid #fde68a",
+                                borderRadius: 10,
+                                padding: "14px 16px",
+                                fontSize: "0.85rem",
+                                color: "#b45309",
+                                fontWeight: "700",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "10px"
+                              }}>
+                                <span style={{ fontSize: "1.2rem" }}>🔒</span>
+                                <span>Khách hàng chưa Check-in tại Salon. Vui lòng chờ Lễ tân Check-in lịch hẹn trước khi bắt đầu dịch vụ!</span>
+                              </div>
+                            );
                           }
-                        }}
-                      >
-                        ✓{" "}
-                        {actionLoading === "complete-step"
-                          ? "Đang xử lý..."
-                          : "✅ Hoàn thành bước của tôi (Combo)"}
-                      </button>
+
+                          const targetIdx = services.findIndex(s =>
+                            (targetApptSvcId && s.AppointmentServiceId === targetApptSvcId) ||
+                            (targetSvcId && s.ServiceId === targetSvcId)
+                          );
+
+                          if (targetIdx > 0) {
+                            const prevSteps = services.slice(0, targetIdx);
+                            const uncompletedPrev = prevSteps.filter(s => String(s.StepStatus || s.Status || "").toUpperCase() !== "COMPLETED");
+                            if (uncompletedPrev.length > 0) {
+                              return (
+                                <div style={{
+                                  background: "#eff6ff",
+                                  border: "1.5px solid #bfdbfe",
+                                  borderRadius: 10,
+                                  padding: "14px 16px",
+                                  fontSize: "0.85rem",
+                                  color: "#1e40af",
+                                  fontWeight: "700",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "10px"
+                                }}>
+                                  <span style={{ fontSize: "1.2rem" }}>⏳</span>
+                                  <span>
+                                    Vui lòng chờ dịch vụ trước (<strong>{uncompletedPrev[0].ServiceName}</strong>) hoàn thành trước khi bắt đầu dịch vụ "<strong>{targetSvc.ServiceName}</strong>"!
+                                  </span>
+                                </div>
+                              );
+                            }
+                          }
+
+                          return (
+                            <button
+                              className="tech-apd-action primary"
+                              type="button"
+                              disabled={!!actionLoading}
+                              onClick={async () => {
+                                const ok = window.confirm(`Bạn có chắc muốn BẮT ĐẦU thực hiện dịch vụ "${targetSvc.ServiceName}"?`);
+                                if (!ok) return;
+                                try {
+                                  setActionLoading("start");
+                                  await axiosClient.patch(`/technician/appointments/${id}/start`, { appointmentServiceId: targetApptSvcId, serviceId: targetSvcId });
+
+                                  await load();
+                                } catch (err) {
+                                  alert(err.response?.data?.message || "Không thể bắt đầu dịch vụ");
+                                } finally {
+                                  setActionLoading("");
+                                }
+                              }}
+                            >
+                              ▶ {actionLoading === "start" ? "Đang xử lý..." : `Bắt đầu dịch vụ: ${targetSvc.ServiceName}`}
+                            </button>
+                          );
+                        })()
+                      );
+                    })() : (
+
+                      <>
+                        {canStart && !canComplete && (
+                          <button
+                            className="tech-apd-action primary"
+                            type="button"
+                            disabled={!!actionLoading}
+                            onClick={() =>
+                              runAction(
+                                "start",
+                                `/technician/appointments/${id}/start`,
+                                "Bạn có chắc muốn bắt đầu thực hiện dịch vụ này?",
+                              )
+                            }
+                          >
+                            ▶ {actionLoading === "start" ? "Đang xử lý..." : "Bắt đầu dịch vụ"}
+                          </button>
+                        )}
+
+                        {canComplete && (
+                          <button
+                            className="tech-apd-action gold"
+                            type="button"
+                            disabled={!!actionLoading}
+                            onClick={() =>
+                              runAction(
+                                "complete",
+                                `/technician/appointments/${id}/complete`,
+                                "Bạn có chắc muốn đánh dấu hoàn thành dịch vụ này?",
+                              )
+                            }
+                          >
+                            ✓{" "}
+                            {actionLoading === "complete"
+                              ? "Đang xử lý..."
+                              : "Đánh dấu hoàn thành"}
+                          </button>
+                        )}
+                      </>
                     )}
 
-                    {canComplete && !detail.CustomerPackageId && (
-                      <button
-                        className="tech-apd-action gold"
-                        type="button"
-                        disabled={!!actionLoading}
-                        onClick={() =>
-                          runAction(
-                            "complete",
-                            `/technician/appointments/${id}/complete`,
-                            "Bạn có chắc muốn đánh dấu hoàn thành dịch vụ này?",
-                          )
-                        }
-                      >
-                        ✓{" "}
-                        {actionLoading === "complete"
-                          ? "Đang xử lý..."
-                          : "Đánh dấu hoàn thành"}
-                      </button>
-                    )}
 
                     {canNoShow && (
                       <button
@@ -1023,11 +1482,33 @@ export default function TechnicianAppointmentDetail() {
 
                   <div className="tech-apd-customer-note">
                     <b>Ghi chú lịch hẹn</b>
-                    <p>
-                      {detail.Notes ||
-                        "Khách chưa nhập ghi chú cho lịch hẹn này."}
-                    </p>
+                    <div>
+                      {(() => {
+                        const notesStr = detail.Notes;
+                        if (!notesStr) return <p>Khách chưa nhập ghi chú cho lịch hẹn này.</p>;
+                        const tags = notesStr.match(/\[(.*?)\]/g) || [];
+                        const uniqueTags = [...new Set(tags)];
+                        let cleanStr = notesStr;
+                        tags.forEach(t => { cleanStr = cleanStr.split(t).join(""); });
+                        cleanStr = cleanStr.trim();
+                        return (
+                          <div>
+                            {uniqueTags.length > 0 && (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                                {uniqueTags.map((tag, i) => (
+                                  <span key={i} style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: "700" }}>
+                                    {tag.replace(/^\[|\]$/g, "")}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <p style={{ margin: 0 }}>{cleanStr || "Khách chưa nhập ghi chú thêm."}</p>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
+
                 </div>
 
                 <div className="tech-apd-card">
@@ -1035,45 +1516,76 @@ export default function TechnicianAppointmentDetail() {
                     Thông tin thanh toán
                   </div>
 
-                  <div className="tech-apd-payment-row">
-                    <span>Trạng thái thanh toán</span>
-                    <b
-                      className={`tech-apd-badge ${statusClass(paymentStatus)}`}
-                    >
-                      {statusLabel(paymentStatus)}
-                    </b>
-                  </div>
+                  {detail.CustomerPackageId ? (
+                    <>
+                      <div className="tech-apd-payment-row">
+                        <span>Trạng thái thanh toán</span>
+                        <b style={{ background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", padding: "4px 12px", borderRadius: "12px", fontSize: "0.82rem", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          💳 Đã thanh toán thành công (Gói Combo)
+                        </b>
+                      </div>
 
-                  <div className="tech-apd-payment-row">
-                    <span>Tổng tiền</span>
-                    <strong>{money(detail.TotalAmount)}</strong>
-                  </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Chi phí ca hẹn</span>
+                        <strong style={{ color: "#059669" }}>📦 Trọn gói Combo</strong>
+                      </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Phương thức thanh toán</span>
+                        <strong>Thanh toán bằng Gói Combo</strong>
+                      </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Mã gói Combo</span>
+                        <strong>Gói Combo #{detail.CustomerPackageId}</strong>
+                      </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Tên gói Combo</span>
+                        <strong>{detail.PackageName || "Gói Combo đã đăng ký"}</strong>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="tech-apd-payment-row">
+                        <span>Trạng thái thanh toán</span>
+                        <b
+                          className={`tech-apd-badge ${statusClass(paymentStatus)}`}
+                        >
+                          {statusLabel(paymentStatus)}
+                        </b>
+                      </div>
 
-                  <div className="tech-apd-payment-row">
-                    <span>Giảm giá</span>
-                    <strong>{money(detail.DiscountAmount)}</strong>
-                  </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Tổng tiền</span>
+                        <strong>{money(detail.TotalAmount)}</strong>
+                      </div>
 
-                  <div className="tech-apd-payment-row">
-                    <span>Thành tiền</span>
-                    <strong>{money(detail.FinalAmount)}</strong>
-                  </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Giảm giá</span>
+                        <strong>{money(detail.DiscountAmount)}</strong>
+                      </div>
 
-                  <div className="tech-apd-payment-row">
-                    <span>Phương thức thanh toán</span>
-                    <strong>{getPaymentMethodLabel(detail.PaymentMethod)}</strong>
-                  </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Thành tiền</span>
+                        <strong>{money(detail.FinalAmount)}</strong>
+                      </div>
 
-                  <div className="tech-apd-payment-row">
-                    <span>Mã giao dịch</span>
-                    <strong>{detail.TransactionCode || "—"}</strong>
-                  </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Phương thức thanh toán</span>
+                        <strong>{getPaymentMethodLabel(detail.PaymentMethod)}</strong>
+                      </div>
 
-                  <div className="tech-apd-payment-row">
-                    <span>Ngày thanh toán</span>
-                    <strong>{safeDateTime(detail.PaidAt)}</strong>
-                  </div>
+                      <div className="tech-apd-payment-row">
+                        <span>Mã giao dịch</span>
+                        <strong>{detail.TransactionCode || "—"}</strong>
+                      </div>
+
+                      <div className="tech-apd-payment-row">
+                        <span>Ngày thanh toán</span>
+                        <strong>{safeDateTime(detail.PaidAt)}</strong>
+                      </div>
+                    </>
+                  )}
                 </div>
+
 
                 <div className="tech-apd-card">
                   <div className="tech-apd-card-title">Thao tác nhanh</div>

@@ -671,11 +671,8 @@ Tái khám hẹn tiếp theo: ${followUpDate ? formatDate(followUpDate) : "Chưa
                 🖨️ In / Xuất PDF
               </button>
 
-              <button className="tn-btn" onClick={handleShareNote}>
-                🔗 Chia sẻ
-              </button>
-
               <button className="tn-btn tn-btn-primary" onClick={() => setShowNewNoteModal(true)}>
+
                 ＋ Tạo ghi chú mới
               </button>
 
@@ -1039,149 +1036,7 @@ Tái khám hẹn tiếp theo: ${followUpDate ? formatDate(followUpDate) : "Chưa
                   )}
                 </div>
 
-                {/* Products Used */}
-                <div className="tn-card tn-products-card">
-                  <h3 className="tn-card-title">
-                    <span>🧴 Sản phẩm đã sử dụng</span>
-                    {isProductsEditing ? (
-                      <div className="tn-inline-edit-actions">
-                        <button className="tn-edit-icon-btn" onClick={() => handleSaveSection("products")} style={{ color: "#38a169", marginRight: "8px" }}>✓</button>
-                        <button className="tn-edit-icon-btn" onClick={() => handleCancelSection("products")} style={{ color: "#e53e3e" }}>✗</button>
-                      </div>
-                    ) : (
-                      <button className="tn-edit-icon-btn" onClick={() => enterEditField(null, "products")}>✏️</button>
-                    )}
-                  </h3>
-                  {isProductsEditing ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      
-                      {/* Search box */}
-                      <input 
-                        type="text" 
-                        className="tn-input-text" 
-                        placeholder="🔍 Tìm kiếm sản phẩm..." 
-                        value={productSearch}
-                        onChange={(e) => setProductSearch(e.target.value)}
-                        style={{ padding: "6px 10px", fontSize: "0.8rem", width: "100%" }}
-                      />
 
-                      <div className="tn-products-selector-grid" style={{ 
-                        display: "flex", 
-                        flexDirection: "column", 
-                        gap: "12px", 
-                        maxHeight: "220px", 
-                        overflowY: "auto", 
-                        padding: "10px", 
-                        border: "1px solid #ebdcc5", 
-                        borderRadius: "8px", 
-                        backgroundColor: "#fff" 
-                      }}>
-                        {Object.keys(groupedProducts).length === 0 ? (
-                          <div style={{ textAlign: "center", padding: "10px", color: "#a0aec0", fontStyle: "italic", fontSize: "0.8rem" }}>
-                            Không tìm thấy sản phẩm nào
-                          </div>
-                        ) : (
-                          Object.keys(groupedProducts).map((catName) => (
-                            <div key={catName} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                              <span style={{ fontSize: "0.75rem", fontWeight: "bold", color: "#b76e79", borderBottom: "1px dashed #ebdcc5", paddingBottom: "3px", marginBottom: "4px", display: "block" }}>
-                                {catName}
-                              </span>
-                              {groupedProducts[catName].map((prod) => {
-                                const isChecked = selectedProducts.includes(prod.name);
-                                return (
-                                  <label key={prod.id} style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.85rem", cursor: "pointer", color: "#4a5568", userSelect: "none", paddingLeft: "4px" }}>
-                                    <input 
-                                      type="checkbox" 
-                                      checked={isChecked} 
-                                      onChange={() => handleToggleProduct(prod.name)} 
-                                      style={{ width: "15px", height: "15px", accentColor: "#b76e79", cursor: "pointer" }}
-                                    />
-                                    <span>{prod.name}</span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          ))
-                        )}
-                      </div>
-
-                      {/* Custom product input */}
-                      <div style={{ borderTop: "1px solid #ebdcc5", paddingTop: "10px" }}>
-                        <span style={{ fontSize: "0.75rem", fontWeight: "bold", color: "#718096", display: "block", marginBottom: "6px" }}>Sản phẩm khác ngoài danh sách:</span>
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          <input 
-                            type="text" 
-                            id="custom-product-input"
-                            className="tn-input-text" 
-                            placeholder="Tên sản phẩm..." 
-                            style={{ flex: 1, padding: "5px 8px", fontSize: "0.8rem" }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const val = e.target.value.trim();
-                                if (val) {
-                                  let list = productsUsed ? productsUsed.split(",").map(p => p.trim()).filter(Boolean) : [];
-                                  if (!list.includes(val)) {
-                                    setProductsUsed([...list, val].join(", "));
-                                  }
-                                  e.target.value = "";
-                                }
-                              }
-                            }}
-                          />
-                          <button 
-                            className="tn-btn tn-btn-primary" 
-                            style={{ padding: "4px 10px", fontSize: "0.75rem", height: "32px", minWidth: "50px" }}
-                            onClick={() => {
-                              const input = document.getElementById("custom-product-input");
-                              const val = input ? input.value.trim() : "";
-                              if (val) {
-                                let list = productsUsed ? productsUsed.split(",").map(p => p.trim()).filter(Boolean) : [];
-                                if (!list.includes(val)) {
-                                  setProductsUsed([...list, val].join(", "));
-                                }
-                                input.value = "";
-                              }
-                            }}
-                          >
-                            Thêm
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="tn-product-list">
-                        {displayProducts.length === 0 ? (
-                          <div className="tn-product-item">
-                            <div className="tn-product-avatar-wrap">💅</div>
-                            <div className="tn-product-details">
-                              <span className="tn-product-name">Son gel OPI - Bubble Bath</span>
-                              <span className="tn-product-desc">Màu hồng nhạt</span>
-                            </div>
-                            <span className="tn-product-count">1 lần</span>
-                          </div>
-                        ) : (
-                          displayProducts.map((product, idx) => (
-                            <div className="tn-product-item" key={idx}>
-                              <div className="tn-product-avatar-wrap">
-                                {idx % 3 === 0 ? "💅" : idx % 3 === 1 ? "🧴" : "🧪"}
-                              </div>
-                              <div className="tn-product-details">
-                                <span className="tn-product-name">{product}</span>
-                                <span className="tn-product-desc">Sản phẩm trị liệu</span>
-                              </div>
-                              <span className="tn-product-count">1 lần</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                      <button className="tn-view-more-btn">
-                        Xem tất cả sản phẩm ({displayProducts.length || 3})
-                      </button>
-                    </>
-                  )}
-                </div>
 
               </aside>
 

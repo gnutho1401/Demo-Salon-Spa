@@ -424,7 +424,6 @@ async function rescheduleCustomerPackageAppointment(req, res) {
 }
 
 async function submitComboReview(req, res) {
-
   try {
     const { connectDB, sql } = require("../../config/db");
     const pool = await connectDB();
@@ -434,9 +433,21 @@ async function submitComboReview(req, res) {
     const customerId = custRes.recordset[0]?.CustomerId;
     if (!customerId) throw new Error("Không tìm thấy thông tin khách hàng");
 
+    const imageUrls = (req.files || []).map((file) => file.path || file.filename);
+    let stepReviews = req.body.stepReviews;
+    if (typeof stepReviews === "string") {
+      try {
+        stepReviews = JSON.parse(stepReviews);
+      } catch (_) {}
+    }
+
     const data = await service.submitComboReview({
       customerId,
-      ...req.body
+      appointmentId: req.body.appointmentId,
+      overallRating: req.body.overallRating,
+      overallComment: req.body.overallComment,
+      stepReviews,
+      imageUrls
     });
     return success(res, data, "Gửi đánh giá Combo thành công", 201);
   } catch (err) {

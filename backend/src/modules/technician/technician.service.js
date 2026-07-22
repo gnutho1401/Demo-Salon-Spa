@@ -21,17 +21,14 @@ async function getTechnicianByUserId(userId) {
     WHERE e.UserId = @UserId
   `);
 
-  if (!result.recordset[0]) {
-    throw new Error("Không tìm thấy hồ sơ kỹ thuật viên");
-  }
-
-  return result.recordset[0];
+  return result.recordset[0] || null;
 }
 
 async function getEmployeeIdByUserId(userId) {
   const tech = await getTechnicianByUserId(userId);
-  return tech.EmployeeId;
+  return tech ? tech.EmployeeId : null;
 }
+
 
 async function getDashboard(userId) {
   const pool = await connectDB();
@@ -309,6 +306,7 @@ async function getSchedule(userId, query) {
         NULL AS MyStepServiceName,
         NULL AS MyStepStatus,
         NULL AS AppointmentServiceId,
+        MAX(aps.ServiceId) AS ServiceId,
         NULL AS CustomerPackageId
       FROM Appointments a
       JOIN Customers c ON a.CustomerId = c.CustomerId
@@ -375,6 +373,7 @@ async function getSchedule(userId, query) {
         svc.ServiceName AS MyStepServiceName,
         myStep.Status AS MyStepStatus,
         myStep.AppointmentServiceId AS AppointmentServiceId,
+        myStep.ServiceId AS ServiceId,
         a.CustomerPackageId
       FROM Appointments a
       JOIN Customers c ON a.CustomerId = c.CustomerId
@@ -405,7 +404,7 @@ async function getSchedule(userId, query) {
         )
       GROUP BY
         a.AppointmentId, a.AppointmentDate, a.Status, a.Notes, a.CheckedInAt, a.CompletedAt,
-        myStep.StartTime, myStep.EndTime, myStep.Price, myStep.Status, myStep.AppointmentServiceId,
+        myStep.StartTime, myStep.EndTime, myStep.Price, myStep.Status, myStep.AppointmentServiceId, myStep.ServiceId,
         c.CustomerId, u.FullName, u.Phone, u.Email, u.AvatarUrl, r.ResourceName, svc.ServiceName,
         a.CustomerPackageId
 
@@ -616,7 +615,7 @@ async function getAvailableSlotsForTechnician(userId, query = {}) {
   };
 }
 
-async function startAppointment(userId, appointmentId) {
+async function startAppointment(userId, appointmentId, targetStepId = null) {
   const pool = await connectDB();
   const employeeId = await getEmployeeIdByUserId(userId);
 
@@ -633,7 +632,11 @@ async function startAppointment(userId, appointmentId) {
     throw new Error("Không tìm thấy lịch hẹn");
   }
 
-  // Lấy tất cả bước của appointment (có thứ tự)
+  const apptStatusUpper = String(current.Status || "").toUpperCase();
+  if (!["CHECKED_IN", "IN_PROGRESS"].includes(apptStatusUpper)) {
+    throw new Error("Khách hàng chưa Check-in tại Salon. Vui lòng chờ Lễ tân Check-in trước khi bắt đầu thực hiện dịch vụ!");
+  }
+
   const stepsRes = await pool.request()
     .input("AppointmentId", sql.Int, Number(appointmentId))
     .query(`
@@ -647,40 +650,30 @@ async function startAppointment(userId, appointmentId) {
   const steps = stepsRes.recordset || [];
 
   if (current.CustomerPackageId && steps.length > 0) {
-    // === COMBO: logic tuần tự nghiêm ngặt ===
-
-    // Tìm bước PENDING đầu tiên thuộc KTV này
-    const myPendingStep = steps.find(
-      s => Number(s.EmployeeId) === Number(employeeId) && s.Status === 'PENDING'
-    );
-
-    if (!myPendingStep) {
-      // Không có bước PENDING => kiểm tra xem đã hoàn thành chưa
-      const myAnyStep = steps.find(s => Number(s.EmployeeId) === Number(employeeId));
-      if (myAnyStep?.Status === 'COMPLETED') {
-        throw new Error(`Bước dịch vụ "${myAnyStep.ServiceName}" của bạn đã được hoàn thành trước đó!`);
-      }
-      if (myAnyStep?.Status === 'IN_PROGRESS') {
-        throw new Error(`Bước dịch vụ "${myAnyStep.ServiceName}" đã đang được thực hiện!`);
-      }
-      throw new Error("Không tìm thấy bước dịch vụ nào của bạn trong lịch hẹn này!");
+    let targetStep = null;
+    if (targetStepId) {
+      targetStep = steps.find(s => Number(s.AppointmentServiceId) === Number(targetStepId) || Number(s.ServiceId) === Number(targetStepId));
+    }
+    if (!targetStep) {
+      targetStep = steps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status !== 'COMPLETED') || steps[0];
     }
 
-    // Kiểm tra bước trước đó (theo thứ tự) đã hoàn thành chưa
-    const myStepIndex = steps.findIndex(s => s.AppointmentServiceId === myPendingStep.AppointmentServiceId);
-    if (myStepIndex > 0) {
-      const prevStep = steps[myStepIndex - 1];
-      if (prevStep && prevStep.Status !== 'COMPLETED') {
-        throw new Error(`Chưa thể bắt đầu! Bước trước đó ("${prevStep.ServiceName}") chưa được hoàn thành bởi KTV đảm nhận.`);
+    if (targetStep) {
+      // Validate sequential step completion: previous steps must be COMPLETED
+      const targetIdx = steps.findIndex(s => s.AppointmentServiceId === targetStep.AppointmentServiceId);
+      if (targetIdx > 0) {
+        const prevSteps = steps.slice(0, targetIdx);
+        const uncompletedPrev = prevSteps.filter(s => String(s.Status || "").toUpperCase() !== 'COMPLETED');
+        if (uncompletedPrev.length > 0) {
+          throw new Error(`Không thể bắt đầu dịch vụ "${targetStep.ServiceName}". Vui lòng chờ dịch vụ trước đó (${uncompletedPrev[0].ServiceName}) hoàn thành!`);
+        }
       }
+
+      await pool.request()
+        .input("AppointmentServiceId", sql.Int, targetStep.AppointmentServiceId)
+        .query(`UPDATE AppointmentServices SET Status = 'IN_PROGRESS' WHERE AppointmentServiceId = @AppointmentServiceId`);
     }
 
-    // Cập nhật bước này thành IN_PROGRESS
-    await pool.request()
-      .input("AppointmentServiceId", sql.Int, myPendingStep.AppointmentServiceId)
-      .query(`UPDATE AppointmentServices SET Status = 'IN_PROGRESS' WHERE AppointmentServiceId = @AppointmentServiceId`);
-
-    // Cập nhật Appointment.Status = IN_PROGRESS chỉ nếu chưa IN_PROGRESS
     if (current.Status !== 'IN_PROGRESS') {
       await pool.request()
         .input("AppointmentId", sql.Int, Number(appointmentId))
@@ -692,7 +685,7 @@ async function startAppointment(userId, appointmentId) {
         .input("UserId", sql.Int, userId)
         .query(`
           INSERT INTO AppointmentStatusHistory (AppointmentId, OldStatus, NewStatus, ChangedBy, Reason, ChangedAt)
-          VALUES (@AppointmentId, @OldStatus, 'IN_PROGRESS', @UserId, N'KTV bắt đầu bước Combo: ${myPendingStep.ServiceName}', GETDATE())
+          VALUES (@AppointmentId, @OldStatus, 'IN_PROGRESS', @UserId, N'KTV bắt đầu bước Combo: ${targetStep?.ServiceName || ""}', GETDATE())
         `);
     }
 
@@ -700,9 +693,10 @@ async function startAppointment(userId, appointmentId) {
       .input("AppointmentId", sql.Int, Number(appointmentId))
       .query(`SELECT * FROM Appointments WHERE AppointmentId = @AppointmentId`);
 
-    return { ...result.recordset[0], startedStep: myPendingStep.ServiceName };
+    return { ...result.recordset[0], startedStep: targetStep?.ServiceName };
 
   } else {
+
     // === Lịch thường: logic cũ ===
     const myStepIndex = steps.findIndex(s => Number(s.EmployeeId) === Number(employeeId));
 
@@ -734,14 +728,13 @@ async function startAppointment(userId, appointmentId) {
 }
 
 /**
- * KTV hoàn thành bước dịch vụ của mình trong Combo.
- * Tìm bước đang IN_PROGRESS của KTV này, rồi gọi updateAppointmentServiceStatus để đồng bộ với lễ tân.
+ * KTV hoàn thành bước/dịch vụ của mình trong Combo hoặc Lịch hẹn.
+ * Cập nhật trạng thái COMPLETED cho duy nhất bước dịch vụ được chọn.
  */
-async function completeMyStep(userId, appointmentId) {
+async function completeMyStep(userId, appointmentId, targetStepId = null) {
   const pool = await connectDB();
   const employeeId = await getEmployeeIdByUserId(userId);
 
-  // Lấy tất cả bước của appointment
   const stepsRes = await pool.request()
     .input("AppointmentId", sql.Int, Number(appointmentId))
     .query(`
@@ -757,44 +750,40 @@ async function completeMyStep(userId, appointmentId) {
   const allSteps = stepsRes.recordset || [];
 
   if (allSteps.length === 0) {
-    // Không có bước nào => lịch hẹn thường, dùng completeAppointment thông thường
     return await receptionistService.completeAppointment(Number(appointmentId), userId);
   }
 
-  // Tìm bước đang IN_PROGRESS thuộc KTV này
-  const myInProgressStep = allSteps.find(
-    s => Number(s.EmployeeId) === Number(employeeId) && s.Status === 'IN_PROGRESS'
-  );
-
-  if (!myInProgressStep) {
-    // Fallback: tìm bước PENDING của KTV này (nếu chưa bắt đầu mà muốn hoàn thành luôn)
-    const myPendingStep = allSteps.find(
-      s => Number(s.EmployeeId) === Number(employeeId) && s.Status === 'PENDING'
+  let stepToComplete = null;
+  if (targetStepId) {
+    stepToComplete = allSteps.find(
+      s => Number(s.AppointmentServiceId) === Number(targetStepId) || Number(s.ServiceId) === Number(targetStepId)
     );
+  }
 
-    if (myPendingStep) {
-      throw new Error(`Bạn chưa bắt đầu thực hiện bước "${myPendingStep.ServiceName}". Vui lòng bấm "Bắt đầu dịch vụ" trước.`);
-    }
+  if (!stepToComplete) {
+    stepToComplete = allSteps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status === 'IN_PROGRESS');
+  }
 
-    const myCompletedStep = allSteps.find(
-      s => Number(s.EmployeeId) === Number(employeeId) && s.Status === 'COMPLETED'
-    );
-    if (myCompletedStep) {
-      throw new Error(`Bước dịch vụ "${myCompletedStep.ServiceName}" của bạn đã được hoàn thành trước đó!`);
-    }
+  if (!stepToComplete) {
+    stepToComplete = allSteps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status !== 'COMPLETED');
+  }
 
-    // Không phải Combo có bước? => dùng complete thông thường
+  if (!stepToComplete) {
+    stepToComplete = allSteps.find(s => s.Status !== 'COMPLETED');
+  }
+
+  if (!stepToComplete) {
     return await receptionistService.completeAppointment(Number(appointmentId), userId);
   }
 
-  // Dùng updateAppointmentServiceStatus để đồng bộ với lễ tân (và gửi mail khi bước cuối xong)
-  const result = await receptionistService.updateAppointmentServiceStatus(myInProgressStep.AppointmentServiceId, 'COMPLETED');
+  const result = await receptionistService.updateAppointmentServiceStatus(stepToComplete.AppointmentServiceId, 'COMPLETED');
 
   return {
     success: true,
-    allCompleted: result.allCompleted,
-    appointmentId: result.appointmentId,
-    completedStep: myInProgressStep.ServiceName,
+    allCompleted: result?.allCompleted || false,
+    appointmentId: Number(appointmentId),
+    completedStepId: stepToComplete.AppointmentServiceId,
+    completedStep: stepToComplete.ServiceName,
   };
 }
 
@@ -1234,7 +1223,8 @@ async function getAppointmentDetail(userId, appointmentId) {
         p.TransactionCode,
         p.PaidAt,
 
-        a.CustomerPackageId
+        a.CustomerPackageId,
+        pkg.PackageName
       FROM Appointments a
       JOIN Customers c ON a.CustomerId = c.CustomerId
       JOIN Users cu ON c.UserId = cu.UserId
@@ -1242,7 +1232,10 @@ async function getAppointmentDetail(userId, appointmentId) {
       JOIN Employees e ON a.EmployeeId = e.EmployeeId
       JOIN Users eu ON e.UserId = eu.UserId
       LEFT JOIN Branches b ON COALESCE(a.BranchId, e.BranchId) = b.BranchId
+      LEFT JOIN CustomerPackages cp ON a.CustomerPackageId = cp.CustomerPackageId
+      LEFT JOIN Packages pkg ON cp.PackageId = pkg.PackageId
       LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+
       OUTER APPLY (
         SELECT TOP 1 *
         FROM Payments p2
@@ -1251,25 +1244,24 @@ async function getAppointmentDetail(userId, appointmentId) {
       ) p
       WHERE a.AppointmentId = @AppointmentId
         AND (
-          a.EmployeeId = @EmployeeId
+          @EmployeeId IS NULL
+          OR a.EmployeeId = @EmployeeId
           OR EXISTS (
             SELECT 1 FROM AppointmentServices aps_check 
             WHERE aps_check.AppointmentId = a.AppointmentId AND aps_check.EmployeeId = @EmployeeId
           )
         )
+
     `);
 
   if (!appointment.recordset[0]) {
     throw new Error("Không tìm thấy lịch hẹn");
   }
 
-  const servicesReq = pool.request()
-    .input("AppointmentId", sql.Int, Number(appointmentId));
-  if (employeeId) {
-    servicesReq.input("EmployeeId", sql.Int, employeeId);
-  }
-
-  const services = await servicesReq.query(`
+  const services = await pool
+    .request()
+    .input("AppointmentId", sql.Int, Number(appointmentId))
+    .query(`
       SELECT
         aps.AppointmentServiceId,
         s.ServiceId,
@@ -1292,13 +1284,6 @@ async function getAppointmentDetail(userId, appointmentId) {
       LEFT JOIN Employees e2 ON aps.EmployeeId = e2.EmployeeId
       LEFT JOIN Users eu ON e2.UserId = eu.UserId
       WHERE aps.AppointmentId = @AppointmentId
-        ${employeeId ? `AND (
-          -- Lịch Combo: chỉ trả bước của KTV này
-          (a.CustomerPackageId IS NOT NULL AND aps.EmployeeId = @EmployeeId)
-          OR
-          -- Lịch thường: trả tất cả dịch vụ
-          (a.CustomerPackageId IS NULL)
-        )` : ""}
       ORDER BY aps.AppointmentServiceId ASC
     `);
 
@@ -4265,6 +4250,9 @@ async function updateAppointmentDuration(userId, appointmentId, durationMinutes)
 
   return { message: "Đã cập nhật thời lượng dịch vụ thành công!", durationMinutes: duration, endTime: newEndTimeStr };
 }
+
+
+
 
 module.exports = {
   getDashboard,

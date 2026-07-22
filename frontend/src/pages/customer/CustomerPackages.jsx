@@ -38,15 +38,17 @@ function StatusBadge({ status }) {
 
 function formatDate(dateValue) {
   if (!dateValue) return "—";
-  if (typeof dateValue === "string" && dateValue.includes("T")) {
-    dateValue = dateValue.split("T")[0];
+  let str = dateValue instanceof Date ? dateValue.toISOString().slice(0, 10) : String(dateValue);
+  if (str.includes("T")) {
+    str = str.split("T")[0];
   }
-  if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-    const [y, m, d] = dateValue.split("-");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split("-");
     return `${d}/${m}/${y}`;
   }
-  return new Date(dateValue).toLocaleDateString("vi-VN");
+  return str;
 }
+
 
 function formatDateTime(dateValue, timeValue) {
   const dateText = formatDate(dateValue);
@@ -124,6 +126,71 @@ function PackageDetailPanel({ pkg, onClose, onRefresh, onCancelCombo }) {
   });
   const [bookingSuccess, setBookingSuccess] = useState(null);
   const [bookingError, setBookingError] = useState("");
+
+  // Change Tech Modal states
+  const [showTechModal, setShowTechModal] = useState(false);
+  const [techList, setTechList] = useState([]);
+  const [loadingTechs, setLoadingTechs] = useState(false);
+  const [selectedTechStepId, setSelectedTechStepId] = useState(null);
+  const [selectedNewTechId, setSelectedNewTechId] = useState("");
+  const [techError, setTechError] = useState("");
+
+  const openTechModalForPackageStep = async (appointmentId, stepId) => {
+    setSelectedTechStepId(stepId);
+    setSelectedNewTechId("");
+    setShowTechModal(true);
+    setLoadingTechs(true);
+    setTechError("");
+
+    try {
+      const res = await axiosClient.get(`/appointments/${appointmentId}/available-technicians${stepId ? `?appointmentServiceId=${stepId}` : ""}`);
+      const data = res.data?.data || {};
+      const list = data.availableTechnicians || [];
+      setTechList(list);
+      if (data.currentEmployeeId) {
+        setSelectedNewTechId(String(data.currentEmployeeId));
+      } else if (list.length > 0) {
+        setSelectedNewTechId(String(list[0].EmployeeId));
+      }
+    } catch (err) {
+      setTechError(err.response?.data?.message || "Không lấy được danh sách KTV rảnh trong giờ");
+      setTechList([]);
+    } finally {
+      setLoadingTechs(false);
+    }
+  };
+
+  const handleConfirmChangeTech = async (e) => {
+    e.preventDefault();
+    if (!selectedNewTechId) {
+      setTechError("Vui lòng chọn Kỹ thuật viên mới");
+      return;
+    }
+    setActionLoading(true);
+    setTechError("");
+
+    try {
+      const apptId = d?.ActiveAppointment?.AppointmentId;
+      if (!apptId) {
+        setTechError("Không tìm thấy thông tin ca hẹn để đổi Kỹ thuật viên");
+        return;
+      }
+      await axiosClient.patch(`/appointments/${apptId}/change-technician`, {
+        newEmployeeId: Number(selectedNewTechId),
+        appointmentServiceId: selectedTechStepId ? Number(selectedTechStepId) : null
+      });
+      setMessage("✅ Đổi Kỹ thuật viên thành công!");
+      setShowTechModal(false);
+      onRefresh();
+      loadDetail();
+    } catch (err) {
+      setTechError(err.response?.data?.message || "Lỗi khi đổi Kỹ thuật viên");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+
 
   const handleBookCombo = async () => {
     if (!bookingForm.appointmentDate || !bookingForm.startTime) {
@@ -210,7 +277,8 @@ function PackageDetailPanel({ pkg, onClose, onRefresh, onCancelCombo }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Trạng thái", value: <StatusBadge status={d.Status} /> },
-          { label: "Ngày bắt đầu", value: formatDate(d.StartDate) },
+          { label: "Ngày bắt đầu", value: formatDate(d.StartDate || d.PaidAt || d.CreatedAt) },
+
           { label: "Hạn sử dụng", value: d.EndDate ? formatDate(d.EndDate) : "Chưa xác định" },
           { 
             label: "Giá mua", 
@@ -255,163 +323,200 @@ function PackageDetailPanel({ pkg, onClose, onRefresh, onCancelCombo }) {
       )}
 
       {/* ACTIVE APPOINTMENT & RESCHEDULE BAR */}
-      {d.ActiveAppointment && (
-        <div style={{
-          background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
-          border: "1.5px solid #93c5fd",
-          borderRadius: 16,
-          padding: 16,
-          marginBottom: 24,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 12
-        }}>
-          <div>
-            <span style={{ background: "#2563eb", color: "#fff", fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 10 }}>
-              📅 ĐÃ CÓ LỊCH HẸN COMBO SẮP TỚI
-            </span>
-            <h4 style={{ margin: "6px 0 2px 0", fontSize: 15, fontWeight: 800, color: "#1e3a8a" }}>
-              Khung giờ: {d.ActiveAppointment.StartTime?.slice(0,5)} - {d.ActiveAppointment.EndTime?.slice(0,5)} ngày {formatDate(d.ActiveAppointment.AppointmentDate)}
-            </h4>
-            <span style={{ fontSize: 12, color: "#1d4ed8" }}>
-              Trạng thái: <b>{d.ActiveAppointment.Status}</b> • Trưởng nhóm KTV: <b>{d.ActiveAppointment.PrimaryTechName || "Tự động phân công"}</b>
-            </span>
+      {d.ActiveAppointment && (() => {
+        const apptStat = String(d.ActiveAppointment.Status || "").toUpperCase();
+        const isLive = ["CHECKED_IN", "IN_PROGRESS"].includes(apptStat);
+        const isInProgress = apptStat === "IN_PROGRESS";
+        const isCheckedIn = apptStat === "CHECKED_IN";
 
-            {/* STEP-BY-STEP SERVICE & TECHNICIAN BREAKDOWN */}
-            {d.ActiveAppointment.Services && d.ActiveAppointment.Services.length > 0 && (
-              <div style={{ marginTop: 12, borderTop: "1px dashed #bfdbfe", paddingTop: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#1e40af", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-                  ✂️ PHÂN CÔNG KỸ THUẬT VIÊN TƯƠNG ỨNG TỪNG DỊCH VỤ:
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
-                  {d.ActiveAppointment.Services.map((svcStep, idx) => (
-                    <div key={svcStep.AppointmentServiceId || idx} style={{
-                      background: "#ffffff",
-                      padding: "8px 12px",
-                      borderRadius: 10,
-                      border: "1px solid #bfdbfe",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between"
-                    }}>
-                      <div>
-                        <b style={{ color: "#1e3a8a", fontSize: 12, display: "block" }}>{idx + 1}. {svcStep.ServiceName}</b>
-                        <span style={{ fontSize: 11, color: "#64748b" }}>⏱ {svcStep.DurationMinutes || 30} phút</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <img
-                          src={resolveFileUrl(svcStep.TechnicianAvatar) || "/images/avatars/default-avatar.png"}
-                          alt={svcStep.TechnicianName}
-                          style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #2563eb" }}
-                        />
-                        <b style={{ fontSize: 12, color: "#1d4ed8" }}>{svcStep.TechnicianName || "KTV Rảnh"}</b>
-                      </div>
+        return (
+          <div style={{
+            background: isInProgress 
+              ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
+              : isCheckedIn
+                ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)"
+                : "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)",
+            border: isInProgress
+              ? "2px solid #86efac"
+              : isCheckedIn
+                ? "2px solid #93c5fd"
+                : "1.5px solid #fbcfe8",
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 24,
+            boxShadow: isInProgress ? "0 8px 24px rgba(16, 185, 129, 0.15)" : "none"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <span style={{
+                  background: isInProgress ? "#059669" : isCheckedIn ? "#2563eb" : "#db2777",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: "3px 10px",
+                  borderRadius: 12,
+                  letterSpacing: 0.5
+                }}>
+                  {isInProgress ? "▶ ĐANG THỰC HIỆN LIỆU TRÌNH TẠI SALON" : isCheckedIn ? "◇ ĐÃ CHECK-IN TẠI SALON" : "📅 ĐÃ CÓ LỊCH HẸN COMBO SẮP TỚI"}
+                </span>
+                <h4 style={{ margin: "8px 0 4px 0", fontSize: 16, fontWeight: 800, color: isInProgress ? "#065f46" : isCheckedIn ? "#1e3a8a" : "#831843" }}>
+                  Khung giờ: {d.ActiveAppointment.StartTime?.slice(0,5)} - {d.ActiveAppointment.EndTime?.slice(0,5)} ngày {formatDate(d.ActiveAppointment.AppointmentDate)}
+                </h4>
+                <span style={{ fontSize: 13, color: isInProgress ? "#047857" : isCheckedIn ? "#1d4ed8" : "#9d174d", fontWeight: "600" }}>
+                  Trạng thái ca: <b>{isInProgress ? "▶ Đang thực hiện" : isCheckedIn ? "◇ Đã check-in" : "✓ Đã xác nhận"}</b> • Trưởng nhóm KTV: <b>{d.ActiveAppointment.PrimaryTechName || "Tự động phân công"}</b>
+                </span>
+
+                {/* STEP-BY-STEP SERVICE & TECHNICIAN BREAKDOWN */}
+                {d.ActiveAppointment.Services && d.ActiveAppointment.Services.length > 0 && (
+                  <div style={{ marginTop: 14, borderTop: isInProgress ? "1px dashed #a7f3d0" : "1px dashed #bfdbfe", paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: isInProgress ? "#065f46" : "#1e40af", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+                      ✂️ TIẾN TRÌNH THỰC HIỆN TỪNG DỊCH VỤ TRONG COMBO:
                     </div>
-                  ))}
-                </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
+                      {d.ActiveAppointment.Services.map((svcStep, idx) => {
+                        const stepStat = String(svcStep.StepStatus || "PENDING").toUpperCase();
+                        const isStepDone = stepStat === "COMPLETED";
+                        const isStepDoing = stepStat === "IN_PROGRESS";
+
+                        return (
+                          <div key={svcStep.AppointmentServiceId || idx} style={{
+                            background: "#ffffff",
+                            padding: "10px 14px",
+                            borderRadius: 12,
+                            border: isStepDoing ? "2px solid #f59e0b" : isStepDone ? "1.5px solid #86efac" : "1px solid #e2e8f0",
+                            boxShadow: isStepDoing ? "0 2px 10px rgba(245, 158, 11, 0.2)" : "none"
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                              <b style={{ color: "#1e293b", fontSize: 13 }}>{idx + 1}. {svcStep.ServiceName}</b>
+                              <span style={{
+                                background: isStepDone ? "#dcfce7" : isStepDoing ? "#fef3c7" : "#f1f5f9",
+                                color: isStepDone ? "#15803d" : isStepDoing ? "#b45309" : "#64748b",
+                                fontSize: 10,
+                                fontWeight: 800,
+                                padding: "2px 8px",
+                                borderRadius: 10
+                              }}>
+                                {isStepDone ? "✓ Hoàn thành" : isStepDoing ? "▶ Đang làm" : "○ Chờ làm"}
+                              </span>
+                            </div>
+
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                              <span style={{ fontSize: 11, color: "#64748b" }}>⏱ {svcStep.DurationMinutes || 30} phút</span>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  cursor: isLive ? "default" : "pointer",
+                                  background: "#f8fafc",
+                                  padding: "3px 8px",
+                                  borderRadius: 20,
+                                  border: "1px solid #cbd5e1"
+                                }}
+                                onClick={() => !isLive && openTechModalForPackageStep(d.ActiveAppointment.AppointmentId, svcStep.AppointmentServiceId)}
+                                title={isLive ? "Không thể đổi KTV khi ca hẹn đã check-in/đang làm" : "Nhấn vào để đổi KTV mới"}
+                              >
+                                <img
+                                  src={resolveFileUrl(svcStep.TechnicianAvatar) || "/images/avatars/default-avatar.png"}
+                                  alt={svcStep.TechnicianName}
+                                  style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #2563eb" }}
+                                />
+                                <b style={{ fontSize: 11, color: "#334155" }}>{svcStep.TechnicianName || "KTV Rảnh"} {!isLive && "✎"}</b>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {isLive ? (
+              <div style={{
+                background: isInProgress ? "#ecfdf5" : "#fffbeb",
+                border: isInProgress ? "1.5px solid #a7f3d0" : "1.5px solid #fde68a",
+                borderRadius: 12,
+                padding: "10px 14px",
+                fontSize: 12,
+                color: isInProgress ? "#047857" : "#b45309",
+                fontWeight: 700,
+                marginTop: 14,
+                display: "flex",
+                alignItems: "center",
+                gap: 8
+              }}>
+                <span>{isInProgress ? "💆‍♀️" : "🔒"}</span>
+                <span>
+                  {isInProgress
+                    ? "Dịch vụ trong combo của Quý khách đang được thực hiện tại salon! Quý khách có thể theo dõi tiến trình thực hiện từng bước ở trên."
+                    : "Quý khách đã Check-in tại salon. Dịch vụ sắp sửa được thực hiện nên không thể đổi lịch hoặc hủy lịch hẹn này."
+                  }
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+                <button
+                  style={{
+                    background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: 12,
+                    padding: "10px 18px",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6
+                  }}
+                  onClick={() => {
+                    setIsRescheduleMode(true);
+                    const cleanNotes = String(d.ActiveAppointment.Notes || "")
+                      .replace(/\[(?:Gói Combo|Đổi lịch Combo|Tái khám từ lịch #[0-9]+):\s*[^\]]+\]/gi, "")
+                      .trim();
+                    setBookingForm({
+                      appointmentDate: d.ActiveAppointment.AppointmentDate || new Date().toISOString().slice(0, 10),
+                      startTime: d.ActiveAppointment.StartTime?.slice(0,5) || "09:00",
+                      notes: cleanNotes
+                    });
+                    setShowBookModal(true);
+                    setBookingSuccess(null);
+                    setBookingError("");
+                  }}
+                >
+                  🔄 Đổi Lịch Hẹn Combo Ngay
+                </button>
+
+                <button
+                  style={{
+                    background: "#fff1f2",
+                    color: "#e11d48",
+                    border: "1.5px solid #fecdd3",
+                    borderRadius: 12,
+                    padding: "10px 18px",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6
+                  }}
+                  onClick={() => {
+                    if (onCancelCombo) {
+                      onCancelCombo(d.CustomerPackageId || pkg.CustomerPackageId, d.ActiveAppointment?.AppointmentId);
+                    }
+                  }}
+                >
+                  ❌ Hủy Lịch Hẹn Combo
+                </button>
               </div>
             )}
           </div>
-
-          {["CHECKED_IN", "IN_PROGRESS", "COMPLETED"].includes(String(d.ActiveAppointment.Status).toUpperCase()) ? (
-            <div style={{
-              background: "#fffbeb",
-              border: "1.5px solid #fde68a",
-              borderRadius: 12,
-              padding: "10px 14px",
-              fontSize: 12,
-              color: "#b45309",
-              fontWeight: 700,
-              marginTop: 12,
-              display: "flex",
-              alignItems: "center",
-              gap: 8
-            }}>
-              <span>🔒</span>
-              <span>
-                Quý khách đã Check-in tại salon (Trạng thái: <strong>{d.ActiveAppointment.Status}</strong>). Dịch vụ đang được thực hiện nên không thể đổi lịch hoặc hủy lịch hẹn này!
-              </span>
-            </div>
-          ) : (
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-              <button
-                style={{
-                  background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "10px 18px",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6
-                }}
-                onClick={() => {
-                  setIsRescheduleMode(true);
-                  setBookingForm({
-                    appointmentDate: d.ActiveAppointment.AppointmentDate || new Date().toISOString().slice(0, 10),
-                    startTime: d.ActiveAppointment.StartTime?.slice(0,5) || "09:00",
-                    notes: d.ActiveAppointment.Notes || ""
-                  });
-                  setShowBookModal(true);
-                  setBookingSuccess(null);
-                  setBookingError("");
-                }}
-              >
-                🔄 Đổi Lịch Hẹn Combo Ngay
-              </button>
-
-              <button
-                style={{
-                  background: "#fef3c7",
-                  color: "#b45309",
-                  border: "1.5px solid #fde68a",
-                  borderRadius: 12,
-                  padding: "10px 18px",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6
-                }}
-                onClick={() => window.location.href = `/customer/appointments/${d.ActiveAppointment.AppointmentId}`}
-              >
-                👤 Đổi Kỹ Thuật Viên
-              </button>
-
-
-              <button
-                style={{
-                  background: "#fff1f2",
-                  color: "#e11d48",
-                  border: "1.5px solid #fecdd3",
-                  borderRadius: 12,
-                  padding: "10px 18px",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6
-                }}
-                onClick={() => {
-                  if (onCancelCombo) {
-                    onCancelCombo(d.CustomerPackageId || pkg.CustomerPackageId, d.ActiveAppointment?.AppointmentId);
-                  }
-                }}
-              >
-                ❌ Hủy Lịch Hẹn Combo
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* BOOK BUTTON BANNER IF NO ACTIVE APPOINTMENT & HAS SESSIONS */}
       {!d.ActiveAppointment && d.Status === "ACTIVE" && left > 0 && (
@@ -494,9 +599,13 @@ function PackageDetailPanel({ pkg, onClose, onRefresh, onCancelCombo }) {
             <h3 style={{ color: "#db2777", margin: "0 0 6px 0", fontSize: 20 }}>
               {isRescheduleMode ? "ĐỔI LỊCH THÀNH CÔNG!" : "ĐẶT LỊCH THÀNH CÔNG!"}
             </h3>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", padding: "6px 16px", borderRadius: "20px", fontWeight: "700", fontSize: "0.85rem", margin: "4px 0 12px 0" }}>
+              💳 Đã thanh toán thành công (Gói Combo)
+            </div>
             <p style={{ fontSize: 13, color: "#475569", margin: "0 0 16px 0" }}>
               Hệ thống đã cập nhật lịch hẹn và tự động gán KTV rảnh cho từng dịch vụ trong Combo của bạn!
             </p>
+
 
             <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", padding: 14, borderRadius: 12, textAlign: "left", marginBottom: 16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -602,7 +711,19 @@ function PackageDetailPanel({ pkg, onClose, onRefresh, onCancelCombo }) {
               </select>
             </label>
 
+            <label style={{ display: "block", marginBottom: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>📝 Ghi chú dặn dò (Không bắt buộc):</span>
+              <textarea
+                value={bookingForm.notes || ""}
+                onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })}
+                placeholder="Ví dụ: Da nhạy cảm, yêu cầu chỗ đỗ xe, có tiền sử dị ứng..."
+                rows={3}
+                style={{ width: "100%", padding: 10, marginTop: 4, borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
+              />
+            </label>
+
             <div style={{ background: "#f8fafc", padding: 10, borderRadius: 8, fontSize: 12, color: "#64748b", marginBottom: 16 }}>
+
               ℹ️ Gói Combo áp dụng 1 lần duy nhất trong suốt thời hạn. Toàn bộ các dịch vụ trong Combo sẽ được thực hiện liên tiếp trong cùng 1 ca.
             </div>
 
@@ -625,8 +746,81 @@ function PackageDetailPanel({ pkg, onClose, onRefresh, onCancelCombo }) {
         )}
       </Modal>
 
+      {/* CHANGE TECHNICIAN MODAL */}
+      <Modal open={showTechModal} onClose={() => setShowTechModal(false)} title="👤 Chọn Kỹ Thuật Viên Rảnh Trong Giờ">
+
+        <form onSubmit={handleConfirmChangeTech}>
+          {techError && <div className="alert error" style={{ marginBottom: 12 }}>{techError}</div>}
+
+          {loadingTechs ? (
+            <div style={{ textAlign: "center", padding: "20px 0", color: "#64748b" }}>
+              ⏳ Đang tải danh sách Kỹ thuật viên rảnh...
+            </div>
+          ) : techList.length === 0 ? (
+            <div className="alert error" style={{ marginBottom: 12 }}>
+              Không có Kỹ thuật viên rảnh phù hợp cho khung giờ này. Vui lòng liên hệ Lễ tân để hỗ trợ.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 320, overflowY: "auto", margin: "12px 0" }}>
+              {techList.map((t) => (
+                <label
+                  key={t.EmployeeId}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    border: String(selectedNewTechId) === String(t.EmployeeId) ? "2px solid #ec4899" : "1px solid #cbd5e1",
+                    background: String(selectedNewTechId) === String(t.EmployeeId) ? "#fdf2f8" : "#ffffff",
+                    cursor: "pointer"
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="newTech"
+                    value={t.EmployeeId}
+                    checked={String(selectedNewTechId) === String(t.EmployeeId)}
+                    onChange={(e) => setSelectedNewTechId(e.target.value)}
+                  />
+                  <img
+                    src={resolveFileUrl(t.AvatarUrl || t.ImageUrl) || "/images/avatars/default-avatar.png"}
+                    alt={t.FullName}
+                    style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <b style={{ fontSize: 13, color: "#1e293b", display: "block" }}>
+                      {t.FullName} {t.IsCurrent ? <span style={{ color: "#ec4899", fontSize: 11 }}>(Hiện tại)</span> : ""}
+                    </b>
+                    <span style={{ fontSize: 11, color: "#64748b" }}>{t.Specialization || t.Position || "Chuyên gia làm đẹp"}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={() => setShowTechModal(false)}
+              style={{ flex: 1, padding: 12, borderRadius: 8, border: "1px solid #cbd5e1", background: "#f8fafc", cursor: "pointer", fontWeight: 600 }}
+            >
+              Hủy Bỏ
+            </button>
+            <button
+              type="submit"
+              disabled={actionLoading || techList.length === 0}
+              style={{ flex: 1, padding: 12, borderRadius: 8, border: "none", background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)", color: "#fff", cursor: "pointer", fontWeight: 700 }}
+            >
+              {actionLoading ? "Đang xử lý..." : "Xác Nhận Đổi KTV"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
     </div>
   );
+
 }
 
 /* ===== MAIN CUSTOMER PACKAGES PAGE ===== */
@@ -643,6 +837,8 @@ export default function CustomerPackages() {
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [message, setMessage] = useState("");
   const [filters, setFilters] = useState({ search: "", category: "" });
+  const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
+
 
   // Dedicated History & Review States
   const [comboHistory, setComboHistory] = useState([]);
@@ -729,7 +925,85 @@ export default function CustomerPackages() {
     loadComboHistory();
   }, [queryString]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const targetPkgId = params.get("packageId") || params.get("customerPackageId");
+    const isPaid = params.get("paid") === "1" || params.get("status") === "success";
+
+    if (isPaid) {
+      setShowPaymentSuccessModal(true);
+      // Clean up query parameters so back button or refresh won't keep showing modal repeatedly
+      params.delete("paid");
+      params.delete("status");
+      const remainingSearch = params.toString();
+      const cleanUrl = `${window.location.pathname}${remainingSearch ? `?${remainingSearch}` : ""}`;
+      window.history.replaceState(null, "", cleanUrl);
+    }
+
+    const tabParam = params.get("tab");
+    if (tabParam === "reviews") {
+      navigate("/customer/reviews?type=combo");
+      return;
+    }
+    if (tabParam && ["packages", "history"].includes(tabParam)) {
+      setCustomerActiveTab(tabParam);
+    }
+
+    if (targetPkgId) {
+      setCustomerActiveTab("packages");
+      axiosClient.get(`/packages/my/${targetPkgId}/detail`)
+        .then(res => {
+          const detailData = res.data?.data || res.data;
+          if (detailData) {
+            setSelectedPkg(detailData);
+          }
+        })
+        .catch(() => {
+          axiosClient.get("/packages/my").then(r => {
+            const list = r.data?.data || r.data || [];
+            const found = list.find(p => String(p.CustomerPackageId) === String(targetPkgId));
+            if (found) setSelectedPkg(found);
+          });
+        });
+    }
+  }, [location.search]);
+
+
+
+  const repayVnpay = async (e, customerPackageId) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    try {
+      setMessage("");
+      const res = await axiosClient.post(`/packages/my/${customerPackageId}/repay`);
+      const data = res.data.data || res.data;
+      if (data && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        setMessage("❌ Không tạo được link thanh toán VNPay");
+      }
+    } catch (err) {
+      setMessage("❌ " + (err.response?.data?.message || "Lỗi tạo link thanh toán VNPay"));
+    }
+  };
+
+  const repayPayos = async (e, customerPackageId) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    try {
+      setMessage("");
+      const res = await axiosClient.post(`/packages/my/${customerPackageId}/repay-payos`);
+      const data = res.data.data || res.data;
+      if (data && data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        setMessage("❌ Không tạo được link thanh toán PayOS");
+      }
+    } catch (err) {
+      setMessage("❌ " + (err.response?.data?.message || "Lỗi tạo link thanh toán PayOS"));
+    }
+  };
+
   const buyVnpay = async (packageId) => {
+
     const confirmPayment = window.confirm(
       "⚠️ LƯU Ý QUAN TRỌNG:\nGói combo / liệu trình sau khi đã thanh toán thành công sẽ KHÔNG ĐƯỢC HỦY HOẶC HOÀN TIỀN dưới bất kỳ hình thức nào.\n\nBạn có chắc chắn muốn mua gói này?"
     );
@@ -770,45 +1044,10 @@ export default function CustomerPackages() {
   };
 
   const openReviewModal = (appt) => {
-    const initialStepRatings = {};
-    (appt.Services || []).forEach(s => {
-      initialStepRatings[s.ServiceId] = {
-        serviceId: s.ServiceId,
-        employeeId: s.EmployeeId,
-        serviceName: s.ServiceName,
-        technicianName: s.TechnicianName,
-        technicianAvatar: s.TechnicianAvatar,
-        rating: s.TechnicianRating || 5,
-        comment: s.ServiceComment || ""
-      };
-    });
-
-    setReviewForm({
-      overallRating: 5,
-      overallComment: "",
-      stepRatings: initialStepRatings
-    });
-    setReviewModalAppt(appt);
-  };
-
-  const handleSubmitReview = async () => {
-    if (!reviewModalAppt) return;
-    setSubmittingReview(true);
-    try {
-      const stepReviews = Object.values(reviewForm.stepRatings);
-      await axiosClient.post("/packages/my/combo-review", {
-        appointmentId: reviewModalAppt.AppointmentId,
-        overallRating: reviewForm.overallRating,
-        overallComment: reviewForm.overallComment,
-        stepReviews
-      });
-      setMessage("🎉 Cảm ơn bạn đã gửi đánh giá dịch vụ Combo & Kỹ thuật viên!");
-      setReviewModalAppt(null);
-      loadComboHistory();
-    } catch (err) {
-      alert(err.response?.data?.message || "Lỗi gửi đánh giá Combo");
-    } finally {
-      setSubmittingReview(false);
+    if (appt && appt.AppointmentId) {
+      navigate(`/customer/reviews?type=combo&appointmentId=${appt.AppointmentId}`);
+    } else {
+      navigate("/customer/reviews?type=combo");
     }
   };
 
@@ -905,7 +1144,7 @@ export default function CustomerPackages() {
             </button>
 
             <button
-              onClick={() => { setCustomerActiveTab("reviews"); setSelectedPkg(null); }}
+              onClick={() => navigate("/customer/reviews?type=combo")}
               style={{
                 padding: "10px 20px",
                 borderRadius: 14,
@@ -913,13 +1152,12 @@ export default function CustomerPackages() {
                 fontWeight: 800,
                 fontSize: 13,
                 cursor: "pointer",
-                background: customerActiveTab === "reviews" ? "#db2777" : "#ffffff",
-                color: customerActiveTab === "reviews" ? "#ffffff" : "#be185d",
-                boxShadow: customerActiveTab === "reviews" ? "0 4px 14px rgba(219,39,119,0.3)" : "none",
+                background: "#ffffff",
+                color: "#be185d",
                 transition: "all 0.2s"
               }}
             >
-              ⭐ Đánh Giá Combo & KTV
+              ⭐ Đánh Giá Combo & KTV →
             </button>
           </div>
         </div>
@@ -1026,7 +1264,47 @@ export default function CustomerPackages() {
 
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <StatusBadge status={p.Status} />
-                                {p.Status === "ACTIVE" && left > 0 ? (
+                                {p.Status === "PENDING_PAYMENT" ? (
+                                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => repayVnpay(e, p.CustomerPackageId)}
+                                      style={{
+                                        background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
+                                        border: "none",
+                                        color: "#fff",
+                                        fontSize: 11,
+                                        fontWeight: 800,
+                                        borderRadius: 10,
+                                        padding: "6px 12px",
+                                        cursor: "pointer",
+                                        boxShadow: "0 3px 10px rgba(2,132,199,0.3)"
+                                      }}
+                                      title="Thanh toán ngay bằng VNPay"
+                                    >
+                                      💳 VNPay
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => repayPayos(e, p.CustomerPackageId)}
+                                      style={{
+                                        background: "linear-gradient(135deg, #db2777 0%, #be185d 100%)",
+                                        border: "none",
+                                        color: "#fff",
+                                        fontSize: 11,
+                                        fontWeight: 800,
+                                        borderRadius: 10,
+                                        padding: "6px 12px",
+                                        cursor: "pointer",
+                                        boxShadow: "0 3px 10px rgba(219,39,119,0.3)"
+                                      }}
+                                      title="Thanh toán ngay bằng PayOS"
+                                    >
+                                      📲 PayOS
+                                    </button>
+                                  </div>
+                                ) : p.Status === "ACTIVE" && left > 0 ? (
+
                                   <span
                                     style={{
                                       background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
@@ -1056,7 +1334,7 @@ export default function CustomerPackages() {
                                     ) : (
                                       <button
                                         type="button"
-                                        onClick={(e) => { e.stopPropagation(); setCustomerActiveTab("reviews"); }}
+                                        onClick={(e) => { e.stopPropagation(); navigate("/customer/reviews?type=combo"); }}
                                         style={{ background: "#ec4899", border: "none", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: 10, padding: "4px 8px", cursor: "pointer" }}
                                       >
                                         ⭐ Đánh giá
@@ -1699,7 +1977,123 @@ export default function CustomerPackages() {
           </div>
         )}
 
+        {/* PAYMENT SUCCESS MODAL FOR COMBO PURCHASE */}
+
+        {showPaymentSuccessModal && (
+          <Modal open={true} onClose={() => setShowPaymentSuccessModal(false)} title="🎉 THANH TOÁN GÓI COMBO THÀNH CÔNG">
+            <div style={{ textAlign: "center", padding: "10px 0" }}>
+              <div style={{
+                width: 64, height: 64,
+                background: "linear-gradient(135deg, #dcfce7, #bbf7d0)",
+                borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 32, margin: "0 auto 12px auto",
+                border: "2px solid #86efac",
+                boxShadow: "0 8px 24px rgba(34,197,94,0.25)"
+              }}>
+                💳
+              </div>
+
+              <h3 style={{ color: "#15803d", margin: "0 0 4px 0", fontSize: 22, fontWeight: 800 }}>
+                THANH TOÁN THÀNH CÔNG!
+              </h3>
+              <p style={{ fontSize: 13, color: "#475569", margin: "0 0 16px 0" }}>
+                Cảm ơn quý khách đã đăng ký Gói Combo Spa trọn gói tại Luna Salon & Spa.
+              </p>
+
+              <div style={{ background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: 16, padding: 18, textAlign: "left", marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, paddingBottom: 10, borderBottom: "1px dashed #cbd5e1" }}>
+                  <span style={{ fontSize: 24 }}>📦</span>
+                  <div>
+                    <span style={{ background: "#166534", color: "#fff", fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 10 }}>GÓI COMBO TRỌN GÓI</span>
+                    <h4 style={{ margin: "2px 0 0 0", color: "#14532d", fontSize: 16, fontWeight: 800 }}>
+                      {selectedPkg?.PackageName || "Gói Combo Spa Trọn Gói"}
+                    </h4>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 13 }}>
+                  <div>
+                    <span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>MÃ GÓI COMBO:</span>
+                    <div style={{ fontWeight: 800, color: "#1e293b" }}>#{selectedPkg?.CustomerPackageId || "COMBO"}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>TRẠNG THÁI:</span>
+                    <div style={{ fontWeight: 800, color: "#15803d" }}>✓ Đã thanh toán 100%</div>
+                  </div>
+                </div>
+
+                {selectedPkg?.ServiceNames && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed #cbd5e1" }}>
+                    <span style={{ color: "#166534", fontSize: 11, fontWeight: 800, display: "block", marginBottom: 4 }}>DỊCH VỤ TRỌN GÓI ĐI KÈM:</span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {String(selectedPkg.ServiceNames).split(",").map((svc, i) => (
+                        <span key={i} style={{ background: "#ffffff", color: "#166534", border: "1px solid #86efac", padding: "3px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600 }}>
+                          ✓ {svc.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <button
+                  className="btn primary"
+                  style={{
+                    width: "100%",
+                    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    borderColor: "#047857",
+                    fontWeight: 800,
+                    padding: 12,
+                    borderRadius: 12,
+                    fontSize: 14,
+                    cursor: "pointer",
+                    color: "#fff",
+                    boxShadow: "0 4px 14px rgba(5,150,105,0.3)"
+                  }}
+                  onClick={() => {
+                    setShowPaymentSuccessModal(false);
+                    if (selectedPkg) {
+                      setBookingForm({
+                        appointmentDate: new Date().toISOString().slice(0, 10),
+                        startTime: "09:00",
+                        notes: ""
+                      });
+                      setIsRescheduleMode(false);
+                      setShowBookModal(true);
+                    }
+                  }}
+                >
+                  📅 Đặt Lịch Sử Dụng Ngay →
+                </button>
+
+                <button
+                  style={{
+                    width: "100%",
+                    background: "#f1f5f9",
+                    border: "1px solid #cbd5e1",
+                    color: "#334155",
+                    fontWeight: 700,
+                    padding: 10,
+                    borderRadius: 12,
+                    fontSize: 13,
+                    cursor: "pointer"
+                  }}
+                  onClick={() => {
+                    setShowPaymentSuccessModal(false);
+                    setCustomerActiveTab("packages");
+                  }}
+                >
+                  Quản Lý Các Gói Combo Của Tôi
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
       </section>
+
     </CustomerLayout>
   );
 }
