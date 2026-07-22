@@ -371,16 +371,34 @@ export default function TechnicianAppointmentDetail() {
               </div>
 
               <div>
-                <span>Ngày & giờ</span>
+                <span>Ngày &amp; giờ</span>
                 <strong>{safeDate(detail.AppointmentDate)}</strong>
                 <small>
-                  {detail.StartTime || "—"} - {detail.EndTime || "—"}
+                  {detail.CustomerPackageId
+                    ? /* Combo: dùng thời gian bước của KTV */
+                      `${services[0]?.StepStartTime || detail.StartTime || "—"} - ${services[services.length - 1]?.StepEndTime || detail.EndTime || "—"}`
+                    : /* Lịch thường */
+                      `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`
+                  }
                 </small>
               </div>
 
               <div>
                 <span>Thời lượng</span>
-                <strong>{detail.DurationMinutes || 0} phút</strong>
+                <strong>
+                  {detail.CustomerPackageId
+                    ? /* Combo: tổng thời gian các bước của KTV */
+                      services.reduce((sum, s) => {
+                        if (s.StepStartTime && s.StepEndTime) {
+                          const [sh, sm] = s.StepStartTime.split(':').map(Number);
+                          const [eh, em] = s.StepEndTime.split(':').map(Number);
+                          return sum + (eh * 60 + em) - (sh * 60 + sm);
+                        }
+                        return sum + (Number(s.DurationMinutes) || 0);
+                      }, 0)
+                    : services.reduce((sum, s) => sum + (Number(s.DurationMinutes) || 0), 0) || (detail.DurationMinutes || 0)
+                  } phút
+                </strong>
               </div>
 
               <div>
@@ -401,7 +419,7 @@ export default function TechnicianAppointmentDetail() {
                     services.map((srv, index) => (
                       <article
                         className="tech-apd-service"
-                        key={`${srv.ServiceId}-${index}`}
+                        key={`${srv.ServiceId}-${srv.AppointmentServiceId || index}`}
                       >
                         <img
                           src={fileUrl(srv.ImageUrl, DEFAULT_SERVICE_IMAGE)}
@@ -413,6 +431,24 @@ export default function TechnicianAppointmentDetail() {
 
                         <div>
                           <h3>{srv.ServiceName}</h3>
+
+                          {/* Với Combo: hiển thị thời gian bước riêng */}
+                          {detail.CustomerPackageId && (srv.StepStartTime || srv.StepEndTime) && (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                              <span style={{ background: "#dbeafe", color: "#1e40af", borderRadius: "6px", padding: "2px 8px", fontSize: "0.78rem", fontWeight: "700" }}>
+                                ⏱ {srv.StepStartTime} – {srv.StepEndTime}
+                              </span>
+                              {srv.StepStatus && (
+                                <span style={{
+                                  background: srv.StepStatus === 'COMPLETED' ? '#dcfce7' : srv.StepStatus === 'IN_PROGRESS' ? '#fef9c3' : '#f1f5f9',
+                                  color: srv.StepStatus === 'COMPLETED' ? '#15803d' : srv.StepStatus === 'IN_PROGRESS' ? '#92400e' : '#64748b',
+                                  borderRadius: "6px", padding: "2px 8px", fontSize: "0.75rem", fontWeight: "700"
+                                }}>
+                                  {srv.StepStatus === 'COMPLETED' ? '✓ Hoàn thành' : srv.StepStatus === 'IN_PROGRESS' ? '▶ Đang thực hiện' : '○ Chờ thực hiện'}
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           <p>
                             {srv.Description ||
@@ -427,52 +463,60 @@ export default function TechnicianAppointmentDetail() {
                                 0}{" "}
                               phút
                             </span>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                const curDur = srv.DurationMinutes || detail.DurationMinutes || 60;
-                                const val = window.prompt("Nhập thời lượng dịch vụ mới (tính theo phút):", curDur);
-                                if (!val) return;
-                                const num = Number(val);
-                                if (isNaN(num) || num <= 0) {
-                                  alert("Thời lượng phải là số lớn hơn 0");
-                                  return;
-                                }
-                                try {
-                                  setActionLoading("update_duration");
-                                  await axiosClient.patch(`/technician/appointments/${id}/duration`, { durationMinutes: num });
-                                  alert("Đã cập nhật thời gian thực hiện dịch vụ thành công!");
-                                  await load();
-                                } catch (err) {
-                                  alert(err.response?.data?.message || "Không thể đổi thời gian dịch vụ");
-                                } finally {
-                                  setActionLoading("");
-                                }
-                              }}
-                              style={{
-                                background: "#faf5ff",
-                                border: "1px solid #d8b4fe",
-                                borderRadius: "6px",
-                                padding: "3px 8px",
-                                fontSize: "0.75rem",
-                                fontWeight: "700",
-                                color: "#6b21a8",
-                                cursor: "pointer",
-                                transition: "all 0.2s"
-                              }}
-                              title="Thay đổi thời gian thực hiện dịch vụ ca hẹn này"
-                            >
-                              ✏️ Đổi thời gian
-                            </button>
+                            {!detail.CustomerPackageId && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const curDur = srv.DurationMinutes || detail.DurationMinutes || 60;
+                                  const val = window.prompt("Nhập thời lượng dịch vụ mới (tính theo phút):", curDur);
+                                  if (!val) return;
+                                  const num = Number(val);
+                                  if (isNaN(num) || num <= 0) {
+                                    alert("Thời lượng phải là số lớn hơn 0");
+                                    return;
+                                  }
+                                  try {
+                                    setActionLoading("update_duration");
+                                    await axiosClient.patch(`/technician/appointments/${id}/duration`, { durationMinutes: num });
+                                    alert("Đã cập nhật thời gian thực hiện dịch vụ thành công!");
+                                    await load();
+                                  } catch (err) {
+                                    alert(err.response?.data?.message || "Không thể đổi thời gian dịch vụ");
+                                  } finally {
+                                    setActionLoading("");
+                                  }
+                                }}
+                                style={{
+                                  background: "#faf5ff",
+                                  border: "1px solid #d8b4fe",
+                                  borderRadius: "6px",
+                                  padding: "3px 8px",
+                                  fontSize: "0.75rem",
+                                  fontWeight: "700",
+                                  color: "#6b21a8",
+                                  cursor: "pointer",
+                                  transition: "all 0.2s"
+                                }}
+                                title="Thay đổi thời gian thực hiện dịch vụ ca hẹn này"
+                              >
+                                ✏️ Đổi thời gian
+                              </button>
+                            )}
                             <span>◉ {money(srv.Price)}</span>
                           </div>
 
                           <div className="tech-apd-tags" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
                             <div style={{ display: "flex", gap: "6px" }}>
                               <span>{srv.CategoryName || "Dịch vụ"}</span>
-                              <small>
-                                {index + 1}/{services.length}
-                              </small>
+                              {detail.CustomerPackageId ? (
+                                <small style={{ background: "#fce7f3", color: "#831843", borderRadius: "6px", padding: "1px 6px", fontWeight: "700" }}>
+                                  📦 Gói Combo
+                                </small>
+                              ) : (
+                                <small>
+                                  {index + 1}/{services.length}
+                                </small>
+                              )}
                             </div>
                             <button
                               type="button"
@@ -501,13 +545,14 @@ export default function TechnicianAppointmentDetail() {
                               className={["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "hover-scale" : ""}
                               title={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
                             >
-                              📝 Ghi chú & Phác đồ
+                              📝 Ghi chú &amp; Phác đồ
                             </button>
                           </div>
                         </div>
                       </article>
                     ))
                   )}
+
                 </div>
 
                 <div className="tech-apd-card tech-apd-timeline-card">
@@ -639,7 +684,40 @@ export default function TechnicianAppointmentDetail() {
                       </button>
                     )}
 
-                    {canComplete && (
+                    {/* Nếu là Combo => nút "Hoàn thành bước của tôi"; nếu thường => nút "Hoàn thành" */}
+                    {canComplete && detail.CustomerPackageId && (
+                      <button
+                        className="tech-apd-action gold"
+                        type="button"
+                        disabled={!!actionLoading}
+                        onClick={async () => {
+                          const ok = window.confirm("Bạn có chắc muốn xác nhận HOÀN THÀNH bước dịch vụ của mình trong gói Combo? Bước tiếp theo sẽ được mở cho KTV tiếp theo.");
+                          if (!ok) return;
+                          try {
+                            setActionLoading("complete-step");
+                            const res = await axiosClient.patch(`/technician/appointments/${id}/complete-step`);
+                            if (res.data?.data?.allCompleted) {
+                              alert("🎉 Tất cả các bước Combo đã hoàn thành! Hệ thống đã gửi thông báo và email cho khách hàng.");
+                              navigate(`/technician/treatment-notes?appointmentId=${id}${services[0]?.ServiceId ? `&serviceId=${services[0].ServiceId}` : ""}`);
+                            } else {
+                              alert(`✅ Đã hoàn thành bước "${res.data?.data?.completedStep || "dịch vụ của bạn"}"! Bước tiếp theo đã được mở cho KTV tiếp theo.`);
+                              await load();
+                            }
+                          } catch (err) {
+                            alert(err.response?.data?.message || "Không thể hoàn thành bước dịch vụ");
+                          } finally {
+                            setActionLoading("");
+                          }
+                        }}
+                      >
+                        ✓{" "}
+                        {actionLoading === "complete-step"
+                          ? "Đang xử lý..."
+                          : "✅ Hoàn thành bước của tôi (Combo)"}
+                      </button>
+                    )}
+
+                    {canComplete && !detail.CustomerPackageId && (
                       <button
                         className="tech-apd-action gold"
                         type="button"
@@ -685,6 +763,7 @@ export default function TechnicianAppointmentDetail() {
                       </div>
                     )}
                   </div>
+
                 </div>
 
                 {/* Reschedule Request Card - chỉ hiện khi status = CONFIRMED hoặc đang có request */}

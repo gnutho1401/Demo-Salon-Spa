@@ -114,6 +114,34 @@ async function confirm(req, res) {
   }
 }
 
+async function getAvailableTechniciansForStep(req, res) {
+  try {
+    const appointmentId = req.params.id;
+    const appointmentServiceId = req.query.appointmentServiceId || null;
+    return success(res, await service.getAvailableTechniciansForAppointmentStep(appointmentId, appointmentServiceId));
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
+async function changeTechnician(req, res) {
+  try {
+    const appointmentId = req.params.id;
+    const { newEmployeeId, appointmentServiceId } = req.body;
+    return success(
+      res,
+      await service.changeTechnician(req.user.userId, appointmentId, {
+        newEmployeeId,
+        appointmentServiceId,
+        isReceptionist: false
+      }),
+      "Đổi Kỹ thuật viên thành công"
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
   getAll,
   getById,
@@ -126,4 +154,7 @@ module.exports = {
   update,
   remove,
   confirm,
+  getAvailableTechniciansForStep,
+  changeTechnician,
 };
+

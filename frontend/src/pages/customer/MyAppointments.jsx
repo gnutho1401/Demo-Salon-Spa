@@ -238,6 +238,8 @@ export default function MyAppointments() {
       })
       .filter((r) => {
         const status = String(r.Status || "").toUpperCase();
+
+
         const payment = String(r.PaymentStatus || "UNPAID").toUpperCase();
         const date = String(r.AppointmentDate || "").slice(0, 10);
 
@@ -840,15 +842,23 @@ export default function MyAppointments() {
                       </td>
 
                       <td>
-                        <b>
-                          {formatMoney(
-                            r.FinalAmount || r.TotalAmount || r.TotalPrice,
-                          )}
-                        </b>
-                        {Number(r.DiscountAmount || 0) > 0 && (
-                          <div className="muted">
-                            Giảm {formatMoney(r.DiscountAmount)}
-                          </div>
+                        {r.CustomerPackageId ? (
+                          <span style={{ color: "#6b21a8", fontWeight: 700, fontSize: "0.88rem" }}>
+                            📦 Trọn gói
+                          </span>
+                        ) : (
+                          <>
+                            <b>
+                              {formatMoney(
+                                r.FinalAmount || r.TotalAmount || r.TotalPrice,
+                              )}
+                            </b>
+                            {Number(r.DiscountAmount || 0) > 0 && (
+                              <div className="muted">
+                                Giảm {formatMoney(r.DiscountAmount)}
+                              </div>
+                            )}
+                          </>
                         )}
                       </td>
 
@@ -861,17 +871,23 @@ export default function MyAppointments() {
                       </td>
 
                       <td>
-                        <span
-                          className={`payment-badge ${
-                            paymentStatus === "PAID"
-                              ? "payment-paid"
-                              : paymentStatus === "REFUND_PENDING"
-                                ? "status-pending"
-                                : "payment-unpaid"
-                          }`}
-                        >
-                          {paymentText(paymentStatus)}
-                        </span>
+                        {r.CustomerPackageId ? (
+                          <span className="payment-badge" style={{ backgroundColor: "#f3e8ff", color: "#6b21a8", border: "1px solid #e9d5ff" }}>
+                            📦 Trọn gói Combo
+                          </span>
+                        ) : (
+                          <span
+                            className={`payment-badge ${
+                              paymentStatus === "PAID"
+                                ? "payment-paid"
+                                : paymentStatus === "REFUND_PENDING"
+                                  ? "status-pending"
+                                  : "payment-unpaid"
+                            }`}
+                          >
+                            {paymentText(paymentStatus)}
+                          </span>
+                        )}
 
                         {r.RefundStatus && (
                           <div className="muted" style={{ marginTop: 6 }}>
@@ -886,93 +902,109 @@ export default function MyAppointments() {
                         )}
                       </td>
 
+
                       <td>
                         <div className="action-row">
-                          <Link
-                            className="btn-detail"
-                            to={`/customer/appointments/${r.AppointmentId}`}
-                          >
-                            Chi tiết
-                          </Link>
-
-                          {status === "PENDING" && (
-                            <button
-                              type="button"
-                              className="btn-pay"
-                              style={{ backgroundColor: "#10b981", color: "#fff" }}
-                              onClick={() => handleConfirm(r.AppointmentId)}
-                              disabled={loadingId === r.AppointmentId}
-                            >
-                              {loadingId === r.AppointmentId ? "..." : "Xác nhận"}
-                            </button>
-                          )}
-
-                          {canPay(r) && (
-                            <button
-                              type="button"
-                              className="btn-pay"
-                              onClick={() =>
-                                navigate(`/customer/payment/${r.AppointmentId}`)
-                              }
-                            >
-                              Thanh toán
-                            </button>
-                          )}
-
-                          {canReschedule(r) && (
+                          {r.CustomerPackageId ? (
                             <button
                               type="button"
                               className="btn-detail"
-                              onClick={() =>
-                                navigate(
-                                  `/customer/reschedule/${r.AppointmentId}`,
-                                )
-                              }
+                              style={{ backgroundColor: "#831843", color: "#ffffff", borderColor: "#831843", fontWeight: 700 }}
+                              onClick={() => navigate("/customer/packages")}
+                              title="Bấm để chuyển đến chi tiết gói Combo của bạn"
                             >
-                              Đổi lịch
+                              📦 Chi tiết Combo
                             </button>
-                          )}
+                          ) : (
+                            <>
+                              <Link
+                                className="btn-detail"
+                                to={`/customer/appointments/${r.AppointmentId}`}
+                              >
+                                Chi tiết
+                              </Link>
 
-                          {canReview(r) && (
-                            <button
-                              type="button"
-                              className="btn-pay"
-                              onClick={() =>
-                                navigate(
-                                  `/customer/reviews?appointmentId=${r.AppointmentId}`,
-                                )
-                              }
-                            >
-                              Đánh giá
-                            </button>
-                          )}
+                              {status === "PENDING" && (
+                                <button
+                                  type="button"
+                                  className="btn-pay"
+                                  style={{ backgroundColor: "#10b981", color: "#fff" }}
+                                  onClick={() => handleConfirm(r.AppointmentId)}
+                                  disabled={loadingId === r.AppointmentId}
+                                >
+                                  {loadingId === r.AppointmentId ? "..." : "Xác nhận"}
+                                </button>
+                              )}
 
-                          {status === "COMPLETED" && (
-                            <button
-                              type="button"
-                              className="btn-again"
-                              onClick={() =>
-                                navigate(
-                                  `/customer/booking?serviceId=${r.ServiceId || ""}&employeeId=${r.EmployeeId || ""}`,
-                                )
-                              }
-                            >
-                              Đặt lại
-                            </button>
-                          )}
+                              {canPay(r) && (
+                                <button
+                                  type="button"
+                                  className="btn-pay"
+                                  onClick={() =>
+                                    navigate(`/customer/payment/${r.AppointmentId}`)
+                                  }
+                                >
+                                  Thanh toán
+                                </button>
+                              )}
 
-                          {canCancel(r) && (
-                            <button
-                              type="button"
-                              className="btn-cancel"
-                              disabled={loadingId === r.AppointmentId}
-                              onClick={() => openCancelModal(r)}
-                            >
-                              {paymentStatus === "PAID" && paymentMethod !== "PACKAGE" ? "Hủy & hoàn" : "Hủy"}
-                            </button>
+                              {canReschedule(r) && (
+                                <button
+                                  type="button"
+                                  className="btn-detail"
+                                  onClick={() =>
+                                    navigate(
+                                      `/customer/reschedule/${r.AppointmentId}`,
+                                    )
+                                  }
+                                >
+                                  Đổi lịch
+                                </button>
+                              )}
+
+                              {canReview(r) && (
+                                <button
+                                  type="button"
+                                  className="btn-pay"
+                                  onClick={() =>
+                                    navigate(
+                                      `/customer/reviews?appointmentId=${r.AppointmentId}`,
+                                    )
+                                  }
+                                >
+                                  Đánh giá
+                                </button>
+                              )}
+
+                              {status === "COMPLETED" && (
+                                <button
+                                  type="button"
+                                  className="btn-detail"
+                                  onClick={() =>
+                                    navigate(
+                                      `/customer/booking?serviceId=${r.ServiceId || ""}&employeeId=${r.EmployeeId || ""}`,
+                                    )
+                                  }
+                                >
+                                  Đặt lại
+                                </button>
+                              )}
+
+                              {canCancel(r) && (
+                                <button
+                                  type="button"
+                                  className="btn-cancel"
+                                  disabled={loadingId === r.AppointmentId}
+                                  onClick={() => openCancelModal(r)}
+                                >
+                                  Hủy
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>
+
                     </tr>
                   );
                 })}

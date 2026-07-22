@@ -22,6 +22,27 @@ router.get(
   authMiddleware,
   controller.getUsageHistoryPaginated,
 );
+router.post(
+  "/my/:customerPackageId/book",
+  authMiddleware,
+  controller.bookCustomerPackage,
+);
+router.post(
+  "/my/:customerPackageId/reschedule",
+  authMiddleware,
+  controller.rescheduleCustomerPackageAppointment,
+);
+router.post(
+  "/my/:customerPackageId/cancel-appointment",
+  authMiddleware,
+  controller.cancelCustomerPackageAppointment,
+);
+
+router.get("/my/combo-history", authMiddleware, controller.getComboHistoryAndReviews);
+router.post("/my/combo-review", authMiddleware, controller.submitComboReview);
+
+
+
 
 // Enterprise: Gia hạn / Đóng băng / Hủy đóng băng (Đã bãi bỏ)
 /*

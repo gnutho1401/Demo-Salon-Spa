@@ -56,6 +56,15 @@ async function completeAppointment(req, res) {
   }
 }
 
+async function completeMyStep(req, res) {
+  try {
+    const data = await service.completeMyStep(req.user.userId, req.params.id);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+}
+
 async function getAppointmentDetail(req, res) {
   try {
     const data = await service.getAppointmentDetail(
@@ -577,4 +586,5 @@ module.exports = {
   getWeeklyTimesheet,
   getMonthlyTimesheet,
   updateAppointmentDuration,
+  completeMyStep,
 };
