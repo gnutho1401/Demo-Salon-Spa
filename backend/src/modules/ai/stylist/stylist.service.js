@@ -1,272 +1,462 @@
-const { connectDB, sql } = require('../../../config/db');
-const { generateContent } = require('../../../config/gemini');
-const { analyzeImage } = require('../vision/face_analysis.service');
-const { SYSTEM_PROMPT } = require('./stylist.prompt');
+const { connectDB, sql } = require("../../../config/db");
+const { generateContent } = require("../../../config/gemini");
+const { analyzeImage } = require("../vision/face_analysis.service");
+const { SYSTEM_PROMPT } = require("./stylist.prompt");
+
+function normalizeAudience(value, customerGender = "") {
+  const requested = String(value || "").trim().toUpperCase();
+  if (["MALE", "FEMALE"].includes(requested)) return requested;
+  const gender = String(customerGender || "").trim().toLowerCase();
+  if (gender === "nam" || gender === "male") return "MALE";
+  if (gender === "nữ" || gender === "nu" || gender === "female") return "FEMALE";
+  return "FEMALE";
+}
 
 async function getCustomerContext(pool, customerId) {
-  // 1. Get customer details
-  const custResult = await pool.request()
-    .input('CustomerId', sql.Int, customerId)
+  const customerResult = await pool.request()
+    .input("CustomerId", sql.Int, customerId)
     .query(`
-      SELECT c.CustomerId, c.UserId, u.FullName, u.Phone, c.LoyaltyPoints, ml.LevelName
+      SELECT c.CustomerId, c.UserId, c.Gender, u.FullName, u.Phone, c.LoyaltyPoints, ml.LevelName
       FROM Customers c
       JOIN Users u ON c.UserId = u.UserId
       LEFT JOIN MembershipLevels ml ON c.MembershipLevelId = ml.MembershipLevelId
       WHERE c.CustomerId = @CustomerId
     `);
-  
-  if (custResult.recordset.length === 0) {
-    return null;
-  }
-  const profile = custResult.recordset[0];
+  if (!customerResult.recordset[0]) return null;
 
-  // 2. Get booking history + treatment notes + reviews
   const historyResult = await pool.request()
-    .input('CustomerId', sql.Int, customerId)
+    .input("CustomerId", sql.Int, customerId)
     .query(`
-      SELECT a.AppointmentId, a.AppointmentDate, a.Status, e.FullName AS StylistName,
-             tn.Title AS NoteTitle, tn.Content AS NoteContent, tn.ProductsUsed,
-             tn.SkinCondition, tn.Technique, tn.CustomerFeedback, tn.Recommendation AS NoteRec,
+      SELECT a.AppointmentId, a.AppointmentDate, a.Status, employeeUser.FullName AS StylistName,
+             tn.Content AS NoteContent, tn.CustomerFeedback, tn.Recommendation AS NoteRec,
              r.Rating, r.Comment AS ReviewComment,
              (
-               SELECT string_agg(s.ServiceName, ', ')
+               SELECT STRING_AGG(s.ServiceName, ', ')
                FROM AppointmentServices aps
                JOIN Services s ON aps.ServiceId = s.ServiceId
                WHERE aps.AppointmentId = a.AppointmentId
              ) AS Services
       FROM Appointments a
-      LEFT JOIN Employees emp ON a.EmployeeId = emp.EmployeeId
-      LEFT JOIN Users e ON emp.UserId = e.UserId
+      LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
+      LEFT JOIN Users employeeUser ON e.UserId = employeeUser.UserId
       LEFT JOIN TreatmentNotes tn ON tn.AppointmentId = a.AppointmentId
       LEFT JOIN Reviews r ON r.AppointmentId = a.AppointmentId
       WHERE a.CustomerId = @CustomerId
       ORDER BY a.AppointmentDate DESC
     `);
-  
-  return { profile, history: historyResult.recordset };
+
+  return { profile: customerResult.recordset[0], history: historyResult.recordset };
 }
 
-async function getSalonContext(pool) {
-  // 1. Get available services
-  const servicesResult = await pool.request().query(`
-    SELECT s.ServiceId, s.ServiceName, s.Price, s.DurationMinutes, c.CategoryName
-    FROM Services s
-    LEFT JOIN ServiceCategories c ON s.CategoryId = c.CategoryId
-    WHERE s.Status = 'AVAILABLE'
-  `);
-
-  // 2. Get active technicians and average rating
-  const techniciansResult = await pool.request().query(`
-    SELECT e.EmployeeId, u.FullName, e.Position, e.Specialization,
-           ISNULL(r.AverageRating, 0) AS AverageRating
-    FROM Employees e
-    JOIN Users u ON e.UserId = u.UserId
-    OUTER APPLY (
-      SELECT CAST(AVG(CAST(TechnicianRating AS DECIMAL(10,2))) AS DECIMAL(3,2)) AS AverageRating
-      FROM Reviews rv
-      WHERE rv.EmployeeId = e.EmployeeId AND rv.Status = 'APPROVED'
-    ) r
-    WHERE e.Status = 'ACTIVE'
-  `);
-
+async function getSalonContext(pool, audience) {
+  const [servicesResult, techniciansResult, stylesResult] = await Promise.all([
+    pool.request().query(`
+      SELECT s.ServiceId, s.ServiceName, s.Price, s.DurationMinutes, c.CategoryName
+      FROM Services s
+      LEFT JOIN ServiceCategories c ON s.CategoryId = c.CategoryId
+      WHERE s.Status = 'AVAILABLE'
+    `),
+    pool.request().query(`
+      SELECT e.EmployeeId, u.FullName, e.Position, e.Specialization,
+             ISNULL(r.AverageRating, 0) AS AverageRating
+      FROM Employees e
+      JOIN Users u ON e.UserId = u.UserId
+      OUTER APPLY (
+        SELECT CAST(AVG(CAST(TechnicianRating AS DECIMAL(10,2))) AS DECIMAL(3,2)) AS AverageRating
+        FROM Reviews rv
+        WHERE rv.EmployeeId = e.EmployeeId AND rv.Status = 'APPROVED'
+      ) r
+      WHERE e.Status = 'ACTIVE'
+    `),
+    pool.request()
+      .input("Audience", sql.NVarChar(10), audience)
+      .query(`
+      SELECT hs.StyleId, hs.StyleCode, hs.StyleName, hs.StyleType, hs.Description,
+             hs.PromptTemplate, hs.ServiceId, hs.SortOrder, s.ServiceName,
+             hs.Audience, hs.IsTrending, hs.TrendScore, hs.TrendYear,
+             hs.TrendSourceUrl, hs.TrendLastVerifiedAt,
+             hs.LoraTrigger, hs.PromptVersion
+      FROM AIHairStyles hs
+      LEFT JOIN Services s ON hs.ServiceId = s.ServiceId
+      WHERE hs.IsActive = 1 AND hs.Audience IN (@Audience, N'UNISEX')
+      ORDER BY hs.IsTrending DESC, hs.TrendScore DESC, hs.SortOrder, hs.StyleId
+    `),
+  ]);
   return {
     services: servicesResult.recordset,
-    technicians: techniciansResult.recordset
+    technicians: techniciansResult.recordset,
+    styles: stylesResult.recordset,
   };
 }
 
-function getRuleBasedFallback(visionResult, salonServices, salonTechnicians, profile) {
-  const isThin = String(visionResult.hair_type).toLowerCase().includes('mỏng') || String(visionResult.hair_type).toLowerCase().includes('yếu');
-  const isRound = String(visionResult.face_shape).toLowerCase().includes('tròn');
-  const isDark = String(visionResult.skin_tone).toLowerCase().includes('ngăm') || String(visionResult.skin_tone).toLowerCase().includes('tối');
+function styleRecommendation(style, reason) {
+  return {
+    style_id: style.StyleId,
+    code: style.StyleCode,
+    name: style.StyleName,
+    description: `${style.Description} ${reason}`.trim(),
+    service_id: style.ServiceId,
+    service_name: style.ServiceName,
+    audience: style.Audience || "UNISEX",
+    is_trending: Boolean(style.IsTrending),
+    trend_score: style.TrendScore == null ? null : Number(style.TrendScore),
+    trend_year: style.TrendYear || null,
+    trend_source_url: style.TrendSourceUrl || null,
+  };
+}
 
-  // Find a matching hairstyle and color
-  let recommendedHairstyle = isRound ? 'Tóc Layer tỉa dài ngang vai ôm sát' : 'Tóc uốn xoăn nhẹ lãng mạn';
-  let recommendedColor = isDark ? 'Màu nâu hạt dẻ ấm áp' : 'Màu nâu trà sữa trẻ trung';
-
-  // Find suitable services from available services
-  const uonService = salonServices.find(s => s.ServiceName.toLowerCase().includes('uốn')) || { ServiceId: 9, ServiceName: 'Uốn tóc setting', Price: 450000 };
-  const phuchoiService = salonServices.find(s => s.ServiceName.toLowerCase().includes('phục hồi') || s.ServiceName.toLowerCase().includes('hấp')) || { ServiceId: 7, ServiceName: 'Phục hồi tóc hư tổn', Price: 300000 };
-  const nhuomService = salonServices.find(s => s.ServiceName.toLowerCase().includes('nhuộm')) || { ServiceId: 6, ServiceName: 'Nhuộm màu thời trang', Price: 500000 };
-
-  // Select top stylist
-  const topStylist = salonTechnicians.sort((a, b) => b.AverageRating - a.AverageRating)[0] || { EmployeeId: 2, FullName: 'Nguyễn Stylist', AverageRating: 5.0 };
-
-  const upsellServices = [];
-  if (isThin) {
-    upsellServices.push({
-      service_id: uonService.ServiceId,
-      service_name: `Combo uốn phồng chân tóc chân ái + ${phuchoiService.ServiceName}`,
-      reason: 'Giúp tạo độ bồng bềnh tự nhiên cho chất tóc mỏng, đồng thời cấp ẩm phục hồi tránh hư tổn xơ yếu.'
-    });
-  } else {
-    upsellServices.push({
-      service_id: nhuomService.ServiceId,
-      service_name: `Combo Nhuộm thời trang + ${phuchoiService.ServiceName}`,
-      reason: 'Đổi mới phong cách với màu nhuộm tôn da sáng, kết hợp hấp collagen để bảo vệ biểu bì tóc.'
-    });
+function chooseByCodes(styles, codes, limit) {
+  const selected = [];
+  for (const code of codes) {
+    const style = styles.find((item) => item.StyleCode === code);
+    if (style && !selected.includes(style)) selected.push(style);
   }
+  for (const style of styles) {
+    if (selected.length >= limit) break;
+    if (!selected.includes(style)) selected.push(style);
+  }
+  return selected.slice(0, limit);
+}
+
+function buildLocalPayloadLegacy(vision, salonContext) {
+  const faceShape = String(vision.face_shape || "").toLowerCase();
+  const skinTone = String(vision.skin_tone || "").toLowerCase();
+  const haircutStyles = salonContext.styles.filter((style) => style.StyleType !== "COLOR");
+  const colorStyles = salonContext.styles.filter((style) => style.StyleType === "COLOR");
+
+  let haircutCodes = ["LAYER_FACE_FRAME", "KOREAN_VOLUME", "LONG_SOFT_WAVES"];
+  if (faceShape.includes("tròn")) haircutCodes = ["LAYER_FACE_FRAME", "LONG_SOFT_WAVES", "KOREAN_VOLUME"];
+  else if (faceShape.includes("vuông")) haircutCodes = ["LONG_SOFT_WAVES", "KOREAN_VOLUME", "LAYER_FACE_FRAME"];
+  else if (faceShape.includes("dài")) haircutCodes = ["FRENCH_BOB", "KOREAN_VOLUME", "TEXTURED_PIXIE"];
+  else if (faceShape.includes("kim cương")) haircutCodes = ["LAYER_FACE_FRAME", "FRENCH_BOB", "LONG_SOFT_WAVES"];
+  else if (faceShape.includes("trái xoan")) haircutCodes = ["FRENCH_BOB", "LAYER_FACE_FRAME", "KOREAN_VOLUME"];
+
+  let colorCodes = ["CHESTNUT_BROWN", "ASH_BROWN"];
+  if (skinTone.includes("ấm")) colorCodes = ["CHESTNUT_BROWN", "COPPER_GLOW"];
+  else if (skinTone.includes("lạnh")) colorCodes = ["ASH_BROWN", "PLATINUM_BEIGE"];
+  else if (skinTone.includes("ngăm")) colorCodes = ["CHESTNUT_BROWN", "COPPER_GLOW"];
+
+  const hairstyles = chooseByCodes(haircutStyles, haircutCodes, 2)
+    .map((style) => styleRecommendation(style, `Phù hợp với dáng mặt ${vision.face_shape || "hiện tại"}.`));
+  const colors = chooseByCodes(colorStyles, colorCodes, 2)
+    .map((style) => styleRecommendation(style, `Hài hòa với ${vision.skin_tone || "tông da hiện tại"}.`));
+
+  const hairServices = salonContext.services
+    .filter((service) => /tóc|hair|nhuộm|uốn|phục hồi/i.test(`${service.ServiceName} ${service.CategoryName || ""}`))
+    .sort((a, b) => Number(b.Price || 0) - Number(a.Price || 0));
+  const suggestedService = salonContext.services.find((service) => service.ServiceId === hairstyles[0]?.service_id)
+    || hairServices[0]
+    || salonContext.services[0]
+    || null;
+  const suggestedStylist = [...salonContext.technicians]
+    .sort((a, b) => Number(b.AverageRating || 0) - Number(a.AverageRating || 0))[0] || null;
 
   return {
     analysis: {
-      face_shape: visionResult.face_shape || 'Tròn nhẹ',
-      hair_type: visionResult.hair_type || 'Tóc tự nhiên',
-      skin_tone: visionResult.skin_tone || 'Sáng ấm'
+      face_shape: vision.face_shape,
+      hair_type: vision.hair_type,
+      skin_tone: vision.skin_tone,
+      hair_length: vision.hair_length,
+      current_hair_color: vision.current_hair_color,
+      confidence: vision.confidence,
+      quality_score: vision.quality_score,
+      warnings: vision.warnings || [],
     },
-    recommendations: {
-      hairstyles: [
-        {
-          name: recommendedHairstyle,
-          description: `Kiểu tóc giúp che khuyết điểm khuôn mặt ${visionResult.face_shape} và phù hợp chất tóc ${visionResult.hair_type}.`
-        }
-      ],
-      colors: [
-        {
-          name: recommendedColor,
-          description: `Tông màu nhuộm cực kỳ nịnh tông da ${visionResult.skin_tone} của bạn.`
-        }
-      ]
-    },
+    recommendations: { hairstyles, colors },
     trending: {
-      title: 'Trending Hè 2026',
-      styles: ['Màu trà sữa mật ong', 'Cắt layer tầng bồng bềnh']
+      title: "Lookbook tóc đang có tại salon",
+      styles: salonContext.styles.slice(0, 4).map((style) => style.StyleName),
     },
-    upsell: upsellServices,
-    booking_suggestion: {
-      recommended_service_id: upsellServices[0]?.service_id || uonService.ServiceId,
-      suggested_stylist_id: topStylist.EmployeeId,
-      reason: `Stylist ${topStylist.FullName} chuyên uốn tạo kiểu và nhuộm màu phục hồi, được đánh giá cao (${topStylist.AverageRating}/5 sao).`
-    },
-    marketing_insight: `Khách hàng ${profile.FullName} tích lũy được ${profile.LoyaltyPoints} điểm, đề xuất tặng thêm combo dầu gội phục hồi tại nhà để tăng gắn kết thương hiệu.`
+    upsell: hairServices.slice(0, 2).map((service) => ({
+      service_id: service.ServiceId,
+      service_name: service.ServiceName,
+      reason: "Dịch vụ tóc đang có thật trong hệ thống và phù hợp để stylist tư vấn thêm sau khi kiểm tra chất tóc.",
+    })),
+    booking_suggestion: suggestedService ? {
+      recommended_service_id: suggestedService.ServiceId,
+      suggested_stylist_id: suggestedStylist?.EmployeeId || null,
+      reason: suggestedStylist
+        ? `${suggestedStylist.FullName} đang có đánh giá phù hợp cho buổi tư vấn trực tiếp.`
+        : "Nên đặt lịch để stylist kiểm tra nền tóc và chất tóc trực tiếp.",
+    } : null,
+    marketing_insight: "Tư vấn được tạo từ phân tích local và dữ liệu dịch vụ thật của salon.",
+    provider: vision.provider,
+    model_name: vision.model_name,
+    api_enhanced: Boolean(vision.api_enhanced),
+    fallback_used: Boolean(vision.fallback_used),
+    degraded: Boolean(vision.degraded),
   };
 }
 
-async function getStylistRecommendations(customerId, imageUrl) {
-  const pool = await connectDB();
+function buildLocalPayload(vision, salonContext, audience = "FEMALE") {
+  const normalizedAudience = normalizeAudience(audience);
+  const faceShape = String(vision.face_shape || "").toLowerCase();
+  const skinTone = String(vision.skin_tone || "").toLowerCase();
+  const haircutStyles = salonContext.styles.filter((style) => style.StyleType !== "COLOR");
+  const colorStyles = salonContext.styles.filter((style) => style.StyleType === "COLOR");
 
-  // 1. Get Customer Context
-  const customerCtx = await getCustomerContext(pool, customerId);
-  if (!customerCtx) {
-    throw new Error(`Không tìm thấy khách hàng với CustomerId: ${customerId}`);
+  let haircutCodes;
+  if (normalizedAudience === "MALE") {
+    haircutCodes = ["SOFT_MODERN_MULLET_2026", "TEXTURED_CROP_TAPER_2026", "CURTAIN_FLOW_2026"];
+    if (faceShape.includes("tròn")) haircutCodes = ["TEXTURED_CROP_TAPER_2026", "MODERN_UNDERCUT", "CURTAIN_FLOW_2026"];
+    else if (faceShape.includes("vuông")) haircutCodes = ["CURTAIN_FLOW_2026", "SOFT_MODERN_MULLET_2026", "MODERN_BUZZ_2026"];
+    else if (faceShape.includes("dài")) haircutCodes = ["TEXTURED_CROP_TAPER_2026", "BURST_FADE_MULLET_2026", "MODERN_UNDERCUT"];
+    else if (faceShape.includes("kim cương")) haircutCodes = ["CURTAIN_FLOW_2026", "NATURAL_CURL_TAPER_2026", "SOFT_MODERN_MULLET_2026"];
+  } else {
+    haircutCodes = ["BUTTERFLY_LAYERS_2026", "GRADUATED_BOB_2026", "BIXIE_2026"];
+    if (faceShape.includes("tròn")) haircutCodes = ["BUTTERFLY_LAYERS_2026", "SOFT_SHAG_2026", "LAYER_FACE_FRAME"];
+    else if (faceShape.includes("vuông")) haircutCodes = ["SOFT_SHAG_2026", "BUTTERFLY_LAYERS_2026", "LONG_SOFT_WAVES"];
+    else if (faceShape.includes("dài")) haircutCodes = ["GRADUATED_BOB_2026", "BIXIE_2026", "KOREAN_VOLUME"];
+    else if (faceShape.includes("kim cương")) haircutCodes = ["BIXIE_2026", "LAYER_FACE_FRAME", "SOFT_SHAG_2026"];
+    else if (faceShape.includes("trái xoan")) haircutCodes = ["GRADUATED_BOB_2026", "BUTTERFLY_LAYERS_2026", "BIXIE_2026"];
   }
-  const { profile, history } = customerCtx;
 
-  // 2. Call Face Analysis service (multimodal vision)
-  let visionResult;
-  try {
-    visionResult = await analyzeImage(imageUrl);
-    if (visionResult && visionResult.is_face === false) {
-      throw new Error(visionResult.error || 'Không nhận diện được khuôn mặt trong ảnh của bạn. Vui lòng chụp hoặc tải lên ảnh chân dung rõ nét hơn!');
+  let colorCodes = ["CHESTNUT_BROWN", "ASH_BROWN"];
+  if (skinTone.includes("ấm")) colorCodes = ["COPPER_ROSE_2026", "CHESTNUT_BROWN"];
+  else if (skinTone.includes("lạnh")) colorCodes = ["ASH_BROWN", "PLATINUM_BEIGE"];
+  else if (skinTone.includes("ngăm")) colorCodes = ["CHESTNUT_BROWN", "COPPER_GLOW"];
+
+  const hairstyles = chooseByCodes(haircutStyles, haircutCodes, 3)
+    .map((style) => styleRecommendation(style, `Phù hợp với dáng mặt ${vision.face_shape || "hiện tại"}.`));
+  const colors = chooseByCodes(colorStyles, colorCodes, 2)
+    .map((style) => styleRecommendation(style, `Hài hòa với ${vision.skin_tone || "tông da hiện tại"}.`));
+
+  const hairServices = salonContext.services
+    .filter((service) => /tóc|hair|nhuộm|uốn|phục hồi/i.test(`${service.ServiceName} ${service.CategoryName || ""}`))
+    .sort((a, b) => Number(b.Price || 0) - Number(a.Price || 0));
+  const suggestedService = salonContext.services.find((service) => service.ServiceId === hairstyles[0]?.service_id)
+    || hairServices[0]
+    || salonContext.services[0]
+    || null;
+  const suggestedStylist = [...salonContext.technicians]
+    .sort((a, b) => Number(b.AverageRating || 0) - Number(a.AverageRating || 0))[0] || null;
+  const trendingStyles = salonContext.styles
+    .filter((style) => style.IsTrending)
+    .sort((a, b) => Number(b.TrendScore || 0) - Number(a.TrendScore || 0))
+    .slice(0, 6);
+
+  return {
+    audience: normalizedAudience,
+    analysis: {
+      face_shape: vision.face_shape,
+      hair_type: vision.hair_type,
+      skin_tone: vision.skin_tone,
+      hair_length: vision.hair_length,
+      current_hair_color: vision.current_hair_color,
+      confidence: vision.confidence,
+      quality_score: vision.quality_score,
+      warnings: vision.warnings || [],
+    },
+    recommendations: { hairstyles, colors },
+    trending: {
+      title: normalizedAudience === "MALE" ? "Hot trend tóc nam 2026" : "Hot trend tóc nữ 2026",
+      styles: trendingStyles.map((style) => style.StyleName),
+      catalog: trendingStyles.map((style) => styleRecommendation(style, "Xu hướng đã được biên tập và xác minh nguồn.")),
+      verified_at: trendingStyles[0]?.TrendLastVerifiedAt || null,
+    },
+    upsell: hairServices.slice(0, 2).map((service) => ({
+      service_id: service.ServiceId,
+      service_name: service.ServiceName,
+      reason: "Dịch vụ thật trong hệ thống, phù hợp để stylist kiểm tra nền tóc và chất tóc trước khi thực hiện.",
+    })),
+    booking_suggestion: suggestedService ? {
+      recommended_service_id: suggestedService.ServiceId,
+      suggested_stylist_id: suggestedStylist?.EmployeeId || null,
+      reason: suggestedStylist
+        ? `${suggestedStylist.FullName} đang có đánh giá phù hợp cho buổi tư vấn trực tiếp.`
+        : "Nên đặt lịch để stylist kiểm tra nền tóc và chất tóc trực tiếp.",
+    } : null,
+    marketing_insight: "API phân tích đặc điểm; catalog và lịch sử dịch vụ lấy từ database thật; ảnh thử tóc chỉ tạo bằng AI local.",
+    pipeline: {
+      analysis: "API_FIRST_WITH_LOCAL_FALLBACK",
+      try_on: "LOCAL_ONLY",
+      zero_generation_api_cost: true,
+    },
+    provider: vision.provider,
+    model_name: vision.model_name,
+    api_enhanced: Boolean(vision.api_enhanced),
+    fallback_used: Boolean(vision.fallback_used),
+    degraded: Boolean(vision.degraded),
+    warnings: vision.warnings || [],
+  };
+}
+
+function findCatalogStyle(value, styles, type) {
+  const needle = String(value?.code || value?.name || "").toLowerCase().trim();
+  if (!needle) return null;
+  return styles.find((style) => style.StyleType === type && (
+    String(style.StyleCode).toLowerCase() === needle
+    || String(style.StyleName).toLowerCase() === needle
+    || needle.includes(String(style.StyleName).toLowerCase())
+    || String(style.StyleName).toLowerCase().includes(needle)
+  )) || null;
+}
+
+function normalizeApiPayload(apiPayload, localPayload, salonContext) {
+  const apiRecommendations = apiPayload?.recommendations || {};
+  const hairstyles = (Array.isArray(apiRecommendations.hairstyles) ? apiRecommendations.hairstyles : [])
+    .map((item) => ({ item, style: findCatalogStyle(item, salonContext.styles, "CUT")
+      || findCatalogStyle(item, salonContext.styles, "TEXTURE") }))
+    .filter(({ style }) => style)
+    .map(({ item, style }) => styleRecommendation(style, item.description || ""));
+  const colors = (Array.isArray(apiRecommendations.colors) ? apiRecommendations.colors : [])
+    .map((item) => ({ item, style: findCatalogStyle(item, salonContext.styles, "COLOR") }))
+    .filter(({ style }) => style)
+    .map(({ item, style }) => styleRecommendation(style, item.description || ""));
+
+  const serviceIds = new Set(salonContext.services.map((service) => Number(service.ServiceId)));
+  const employeeIds = new Set(salonContext.technicians.map((employee) => Number(employee.EmployeeId)));
+  const upsell = (Array.isArray(apiPayload?.upsell) ? apiPayload.upsell : [])
+    .filter((item) => serviceIds.has(Number(item.service_id)));
+  const booking = apiPayload?.booking_suggestion;
+  const validBooking = booking && serviceIds.has(Number(booking.recommended_service_id))
+    ? {
+      ...booking,
+      suggested_stylist_id: employeeIds.has(Number(booking.suggested_stylist_id))
+        ? Number(booking.suggested_stylist_id)
+        : localPayload.booking_suggestion?.suggested_stylist_id || null,
     }
-  } catch (err) {
-    console.error('[AI Stylist] Face analysis failed:', err.message);
-    throw new Error(err.message || 'Không thể nhận diện khuôn mặt trong ảnh.');
-  }
+    : localPayload.booking_suggestion;
 
-  // 3. Get Salon Context (Services, Stylists)
-  const salonCtx = await getSalonContext(pool);
+  const trendingStyles = Array.isArray(apiPayload?.trending?.styles)
+    ? apiPayload.trending.styles
+    : typeof apiPayload?.trending?.styles === "string"
+      ? apiPayload.trending.styles.split(",").map((item) => item.trim()).filter(Boolean)
+      : localPayload.trending.styles;
 
-  // 4. Construct user message prompt with details
-  const historyText = history.length > 0
-    ? history.map(h => `- Ngày ${new Date(h.AppointmentDate).toLocaleDateString('vi-VN')}: Làm [${h.Services || 'Không rõ dịch vụ'}] do Stylist ${h.StylistName || 'Không rõ'} thực hiện. Đánh giá: ${h.Rating || 'Chưa đánh giá'}/5. Ghi chú điều trị: ${h.NoteContent || 'Không có'}.`).join('\n')
-    : 'Chưa có lịch sử làm tóc tại salon.';
+  return {
+    ...localPayload,
+    ...apiPayload,
+    analysis: localPayload.analysis,
+    audience: localPayload.audience,
+    pipeline: localPayload.pipeline,
+    recommendations: {
+      hairstyles: hairstyles.length ? hairstyles : localPayload.recommendations.hairstyles,
+      colors: colors.length ? colors : localPayload.recommendations.colors,
+    },
+    trending: {
+      title: apiPayload?.trending?.title || localPayload.trending.title,
+      styles: trendingStyles,
+    },
+    upsell: upsell.length ? upsell : localPayload.upsell,
+    booking_suggestion: validBooking,
+    provider: `${localPayload.provider}+api-advisor`,
+    model_name: `${localPayload.model_name} + AI Advisor`,
+    api_enhanced: true,
+    fallback_used: false,
+  };
+}
 
-  const servicesText = salonCtx.services.map(s => `- ID [${s.ServiceId}]: ${s.ServiceName} - Giá: ${s.Price?.toLocaleString('vi-VN')}đ (${s.CategoryName || 'Khác'})`).join('\n');
-  const stylistsText = salonCtx.technicians.map(t => `- ID [${t.EmployeeId}]: Stylist ${t.FullName} - Chuyên môn: ${t.Specialization || 'Làm tóc chung'} (Đánh giá: ${t.AverageRating}/5)`).join('\n');
+function buildAdvisorPrompt(profile, history, visionResult, salonContext) {
+  const historyText = history.length
+    ? history.slice(0, 12).map((item) => `- ${new Date(item.AppointmentDate).toLocaleDateString("vi-VN")}: ${item.Services || "Dịch vụ chưa rõ"}; đánh giá ${item.Rating || "chưa có"}/5.`).join("\n")
+    : "Chưa có lịch sử làm tóc tại salon.";
+  const serviceText = salonContext.services.map((service) => `- ID [${service.ServiceId}]: ${service.ServiceName} (${Number(service.Price || 0).toLocaleString("vi-VN")}đ)`).join("\n");
+  const stylistText = salonContext.technicians.map((stylist) => `- ID [${stylist.EmployeeId}]: ${stylist.FullName}; đánh giá ${stylist.AverageRating}/5`).join("\n");
+  const styleText = salonContext.styles.map((style) => `- ${style.StyleCode}: ${style.StyleName}; loại ${style.StyleType}; service_id ${style.ServiceId || "null"}`).join("\n");
+  return `[PHÂN TÍCH ẢNH ĐÃ CHUẨN HÓA]
+- Dáng mặt: ${visionResult.face_shape}
+- Tóc hiện tại: ${visionResult.hair_type}
+- Tông da: ${visionResult.skin_tone}
 
-  const userMessage = `[KẾT QUẢ PHÂN TÍCH VISION AI]:
-- Face Shape: ${visionResult.face_shape}
-- Hair Type: ${visionResult.hair_type}
-- Skin Tone: ${visionResult.skin_tone}
-
-[HỒ SƠ KHÁCH HÀNG]:
-- Tên khách hàng: ${profile.FullName}
-- Điểm Loyalty tích lũy: ${profile.LoyaltyPoints} điểm (Hạng: ${profile.LevelName || 'Standard'})
-- Lịch sử trị liệu tóc trước đây:
+[KHÁCH HÀNG]
+- Tên: ${profile.FullName}
+- Điểm: ${profile.LoyaltyPoints}; hạng ${profile.LevelName || "Standard"}
 ${historyText}
 
-[DANH SÁCH DỊCH VỤ HIỆN CÓ CỦA SALON]:
-${servicesText}
+[MẪU TÓC ĐƯỢC PHÉP ĐỀ XUẤT]
+${styleText}
 
-[DANH SÁCH STYLIST CỦA SALON]:
-${stylistsText}
+[DỊCH VỤ THẬT]
+${serviceText}
 
-Hãy phân tích và đưa ra đề xuất kiểu tóc, màu nhuộm, combo upsell dịch vụ giá trị cao và stylist phù hợp nhất cho khách hàng này. Đảm bảo trả về JSON cấu trúc chuẩn.`;
+[STYLIST THẬT]
+${stylistText}
 
-  let finalPayload;
-  let isFallback = false;
+Chỉ dùng mã mẫu, service_id và stylist_id có trong danh sách trên. Trả JSON đúng contract.`;
+}
 
+function parseAiPayload(response) {
+  const clean = String(response || "").trim().replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+  return JSON.parse(clean);
+}
+
+async function logPrediction(pool, customerId, profile, payload) {
   try {
-    const aiResponse = await generateContent(SYSTEM_PROMPT, userMessage, { jsonMode: true, maxTokens: 4096 });
-    let cleanAnswer = aiResponse.trim();
-    // Strip markdown code fence if present (fallback for non-jsonMode responses)
-    if (cleanAnswer.startsWith('```')) {
-      cleanAnswer = cleanAnswer.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
-    }
-    finalPayload = JSON.parse(cleanAnswer);
-
-    // --- Sanitize: ensure array fields are always arrays ---
-    if (finalPayload.trending) {
-      if (typeof finalPayload.trending.styles === 'string') {
-        // Split comma-separated string or wrap single value in array
-        finalPayload.trending.styles = finalPayload.trending.styles
-          .split(/,\s*/)
-          .map(s => s.trim())
-          .filter(Boolean);
-      } else if (!Array.isArray(finalPayload.trending.styles)) {
-        finalPayload.trending.styles = [];
-      }
-    }
-    if (finalPayload.recommendations) {
-      if (!Array.isArray(finalPayload.recommendations.hairstyles)) {
-        finalPayload.recommendations.hairstyles = finalPayload.recommendations.hairstyles ? [finalPayload.recommendations.hairstyles] : [];
-      }
-      if (!Array.isArray(finalPayload.recommendations.colors)) {
-        finalPayload.recommendations.colors = finalPayload.recommendations.colors ? [finalPayload.recommendations.colors] : [];
-      }
-    }
-    if (!Array.isArray(finalPayload.upsell)) {
-      finalPayload.upsell = finalPayload.upsell ? [finalPayload.upsell] : [];
-    }
-  } catch (err) {
-    console.error('[AI Stylist] LLM generation failed with details:', err.message);
-    finalPayload = getRuleBasedFallback(visionResult, salonCtx.services, salonCtx.technicians, profile);
-    isFallback = true;
-  }
-
-  finalPayload.image_url = imageUrl;
-
-  // 5. Log to AIPredictions and AIAuditLogs
-  try {
-    // Log to AIPredictions
     await pool.request()
-      .input('PredictionType', sql.NVarChar, 'STYLIST_ADVISOR')
-      .input('Result', sql.NVarChar, `Đề xuất kiểu tóc cho KH ${profile.FullName}: ${finalPayload.recommendations?.hairstyles?.[0]?.name || 'Không có'}`)
-      .query('INSERT INTO AIPredictions (PredictionType, Result) VALUES (@PredictionType, @Result)');
-
-    // Log to AIAuditLogs
+      .input("PredictionType", sql.NVarChar, "STYLIST_ADVISOR")
+      .input("Result", sql.NVarChar, `Đề xuất kiểu tóc cho KH ${profile.FullName}: ${payload.recommendations?.hairstyles?.[0]?.name || "Không có"}`)
+      .query("INSERT INTO AIPredictions (PredictionType, Result) VALUES (@PredictionType, @Result)");
     await pool.request()
-      .input('UserId', sql.Int, profile.UserId)
-      .input('FeatureName', sql.NVarChar, 'AI Stylist Advisor')
-      .input('Prompt', sql.NVarChar, `Phân tích ảnh chân dung khách hàng CustomerId ${customerId}`)
-      .input('AIResponse', sql.NVarChar, JSON.stringify(finalPayload))
-      .input('ModelName', sql.NVarChar, isFallback ? 'rule-based-fallback' : 'gemini-2.5-flash')
-      .input('InputToken', sql.Int, 1800)
-      .input('OutputToken', sql.Int, 1000)
-      .input('Cost', sql.Decimal(18, 4), isFallback ? 0 : 0.0180)
+      .input("UserId", sql.Int, profile.UserId)
+      .input("FeatureName", sql.NVarChar, "AI Stylist Advisor")
+      .input("Prompt", sql.NVarChar, `Phân tích ảnh chân dung CustomerId ${customerId}`)
+      .input("AIResponse", sql.NVarChar, JSON.stringify(payload))
+      .input("ModelName", sql.NVarChar, payload.model_name || "salon-local-stylist")
+      .input("InputToken", sql.Int, null)
+      .input("OutputToken", sql.Int, null)
+      .input("Cost", sql.Decimal(18, 4), payload.api_enhanced ? null : 0)
       .query(`
         INSERT INTO AIAuditLogs (UserId, FeatureName, Prompt, AIResponse, ModelName, InputToken, OutputToken, Cost)
         VALUES (@UserId, @FeatureName, @Prompt, @AIResponse, @ModelName, @InputToken, @OutputToken, @Cost)
       `);
-  } catch (logErr) {
-    console.error('[AI Stylist] DB logging predictions/audit failed:', logErr.message);
+  } catch (error) {
+    console.error("[AI Stylist] DB logging failed:", error.message);
   }
-
-  return {
-    ...finalPayload,
-    is_fallback: isFallback,
-    model_name: isFallback ? 'rule-based-fallback' : 'gemini-2.5-flash'
-  };
 }
 
-module.exports = { getStylistRecommendations };
+async function getStylistRecommendations(customerId, imageUrl, audience) {
+  const pool = await connectDB();
+  const customerContext = await getCustomerContext(pool, customerId);
+  const selectedAudience = normalizeAudience(audience, customerContext?.profile?.Gender);
+  if (!customerContext) throw new Error(`Không tìm thấy khách hàng với CustomerId: ${customerId}`);
+
+  const [visionResult, salonContext] = await Promise.all([
+    analyzeImage(imageUrl),
+    getSalonContext(pool, selectedAudience),
+  ]);
+  if (visionResult.is_face === false) {
+    throw new Error(visionResult.error || "Không nhận diện được khuôn mặt trong ảnh. Vui lòng dùng ảnh chân dung rõ nét hơn.");
+  }
+  if (visionResult.is_frontal === false) {
+    throw new Error("Ảnh chưa chính diện. Vui lòng nhìn thẳng vào camera, giữ đầu cân bằng và để thấy rõ hai bên tóc.");
+  }
+
+  const localPayload = buildLocalPayload(visionResult, salonContext, selectedAudience);
+  let finalPayload = localPayload;
+  const advisorApiEnabled = String(process.env.AI_STYLIST_API_ENHANCE_ENABLED || "true").toLowerCase() !== "false";
+  if (advisorApiEnabled) {
+    try {
+      const prompt = buildAdvisorPrompt(customerContext.profile, customerContext.history, visionResult, salonContext);
+      const response = await generateContent(SYSTEM_PROMPT, prompt, {
+        jsonMode: true,
+        maxTokens: 4096,
+        timeoutMs: Math.max(3000, Number(process.env.AI_STYLIST_TIMEOUT_MS) || 5000),
+        maxProviderAttempts: Math.max(1, Number(process.env.AI_STYLIST_API_MAX_ATTEMPTS) || 2),
+      });
+      finalPayload = normalizeApiPayload(parseAiPayload(response), localPayload, salonContext);
+    } catch (error) {
+      console.warn("[AI Stylist] API advisor unavailable, using local recommendations:", error.message);
+      finalPayload = {
+        ...localPayload,
+        fallback_used: true,
+        warnings: [...(localPayload.warnings || []), "Tư vấn API không khả dụng; đang dùng đề xuất local từ dữ liệu salon."],
+      };
+    }
+  }
+
+  const responsePayload = {
+    ...finalPayload,
+    image_url: imageUrl,
+    is_fallback: Boolean(finalPayload.fallback_used),
+  };
+  await logPrediction(pool, customerId, customerContext.profile, responsePayload);
+  return responsePayload;
+}
+
+module.exports = {
+  buildLocalPayload,
+  getStylistRecommendations,
+  normalizeApiPayload,
+  normalizeAudience,
+};

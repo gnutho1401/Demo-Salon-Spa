@@ -1,6 +1,11 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import { useAuth } from "../../context/AuthContext";
+import GlobalAnalyticsToolbar from "../../components/reports/GlobalAnalyticsToolbar";
+import RoleAnalyticsDashboard from "../../components/reports/RoleAnalyticsDashboard";
+import { ChartExportActions, ChartWidgetState } from "../../components/reports/InteractiveChartCard";
+import { useAnalyticsDashboard } from "../../components/reports/useInteractiveChart";
 import {
   AreaChart,
   Area,
@@ -17,6 +22,12 @@ import {
 } from "recharts";
 
 const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
+const ADMIN_CHART_KEYS = [
+  "revenueTrend",
+  "appointmentStatus",
+  "paymentStatus",
+  "servicePerformance",
+];
 
 function formatMoney(value) {
   return new Intl.NumberFormat("vi-VN", {
@@ -33,6 +44,21 @@ function formatDate(value) {
 function formatDateTime(value) {
   if (!value) return "N/A";
   return new Date(value).toLocaleString("vi-VN");
+}
+
+function formatAnalyticsPeriod(value) {
+  const label = String(value || "");
+  if (/^\d{4}-\d{2}$/.test(label)) {
+    const [year, month] = label.split("-");
+    return `Thg ${Number(month)}/${year}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
+    return new Date(`${label}T00:00:00`).toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+    });
+  }
+  return label;
 }
 
 function timeText(value) {
@@ -205,13 +231,27 @@ function MiniPanel({
 /* ═══════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════ */
-export default function AdminDashboard() {
+function AdminDashboardContent() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const [analyticsFilter, setAnalyticsFilter] = useState({ filterType: "last30Days" });
   const navigate = useNavigate();
+  const analytics = useAnalyticsDashboard(ADMIN_CHART_KEYS, analyticsFilter);
+  const chartController = (chartKey) => ({
+    data: analytics.getChart(chartKey),
+    loading: analytics.loading,
+    error: analytics.error,
+    reload: analytics.reload,
+    filter: analyticsFilter,
+  });
+  const revenueDayChart = chartController("revenueTrend");
+  const appointmentStatusChart = chartController("appointmentStatus");
+  const paymentStatusChart = chartController("paymentStatus");
+  const revenueMonthChart = revenueDayChart;
+  const servicePerformanceChart = chartController("servicePerformance");
 
   /* Quick link button style */
   const quickLinkStyle = {
@@ -254,64 +294,61 @@ export default function AdminDashboard() {
 
   /* ── Chart data preparations ── */
   const revenueByDayData = useMemo(() => {
-    if (!data?.revenueByDay) return [];
-    return data.revenueByDay.map((item) => ({
-      name: new Date(item.date).toLocaleDateString("vi-VN", {
-        weekday: "short",
-        day: "numeric",
-      }),
-      "Doanh thu": item.revenue,
+    const series = revenueDayChart.data?.data?.series || [];
+    return series.map((item) => ({
+      name: formatAnalyticsPeriod(item.label),
+      "Doanh thu": item.value,
     }));
-  }, [data]);
+  }, [revenueDayChart.data]);
 
   const revenueByMonthData = useMemo(() => {
-    if (!data?.revenueByMonth) return [];
-    return data.revenueByMonth.map((item) => ({
-      name: item.month?.slice(0, 7) || "",
-      "Doanh thu": item.revenue,
+    const series = revenueMonthChart.data?.data?.series || [];
+    return series.map((item) => ({
+      name: formatAnalyticsPeriod(item.label),
+      "Doanh thu": item.value,
     }));
-  }, [data]);
+  }, [revenueMonthChart.data]);
 
   const appointmentStatusData = useMemo(() => {
-    if (!data?.appointmentStatus) return [];
+    const series = appointmentStatusChart.data?.data?.series || [];
     const map = {
       COMPLETED: { label: "Hoàn thành", color: "#10b981" },
       CONFIRMED: { label: "Đã xác nhận", color: "#3b82f6" },
       PENDING: { label: "Chờ duyệt", color: "#f59e0b" },
       CANCELLED: { label: "Đã hủy", color: "#ef4444" },
     };
-    return data.appointmentStatus.map((item) => {
-      const c = map[item.status] || { label: item.status, color: "#6366f1" };
-      return { name: c.label, value: item.count, color: c.color };
+    return series.map((item) => {
+      const c = map[item.label] || { label: item.label, color: "#6366f1" };
+      return { name: c.label, value: item.value, color: c.color };
     });
-  }, [data]);
+  }, [appointmentStatusChart.data]);
 
   const paymentStatusData = useMemo(() => {
-    if (!data?.paymentStatus) return [];
+    const series = paymentStatusChart.data?.data?.series || [];
     const map = {
       PAID: { label: "Đã thanh toán", color: "#10b981" },
       PENDING: { label: "Chờ thanh toán", color: "#f59e0b" },
       FAILED: { label: "Lỗi thanh toán", color: "#ef4444" },
     };
-    return data.paymentStatus.map((item) => {
-      const c = map[item.status] || { label: item.status, color: "#6366f1" };
-      return { name: c.label, value: item.count, color: c.color };
+    return series.map((item) => {
+      const c = map[item.label] || { label: item.label, color: "#6366f1" };
+      return { name: c.label, value: item.value, color: c.color };
     });
-  }, [data]);
+  }, [paymentStatusChart.data]);
 
   const topServicesData = useMemo(() => {
-    if (!data?.topServices) return [];
-    return [...data.topServices]
-      .sort((a, b) => b.appointmentCount - a.appointmentCount)
+    const series = servicePerformanceChart.data?.data?.series || [];
+    return [...series]
+      .sort((a, b) => b.value - a.value)
       .slice(0, 6)
       .map((item) => ({
         name:
-          item.serviceName.length > 22
-            ? item.serviceName.slice(0, 22) + "…"
-            : item.serviceName,
-        "Lượt đặt": item.appointmentCount,
+          item.label.length > 22
+            ? item.label.slice(0, 22) + "…"
+            : item.label,
+        "Lượt đặt": item.value,
       }));
-  }, [data]);
+  }, [servicePerformanceChart.data]);
 
   const formatYAxis = (v) => {
     if (v >= 1000000) return (v / 1000000).toFixed(1) + "M";
@@ -346,14 +383,6 @@ export default function AdminDashboard() {
             liệu hệ thống.
           </p>
         </div>
-        <button
-          type="button"
-          className="admin-refresh-btn"
-          onClick={() => loadDashboard(true)}
-          disabled={refreshing}
-        >
-          {refreshing ? "Đang cập nhật..." : "🔄 Làm mới dữ liệu"}
-        </button>
       </div>
 
       {/* ── Loading / Error ── */}
@@ -489,34 +518,50 @@ export default function AdminDashboard() {
             </section>
           )}
 
-          {/* ── Tab điều hướng ── */}
-          <nav className="dashboard-subtab-nav">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                className={`subtab-btn${activeTab === t.key ? " active" : ""}`}
-                onClick={() => setActiveTab(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          {/* ── Bộ lọc toàn trang và tab điều hướng ── */}
+          <div className="dashboard-analysis-navigation">
+            <GlobalAnalyticsToolbar
+              filter={analyticsFilter}
+              onFilterChange={setAnalyticsFilter}
+              loading={analytics.loading || refreshing}
+              onRefresh={() => {
+                analytics.reload();
+                loadDashboard(true);
+              }}
+              scopeLabel="Toàn hệ thống"
+            />
+            <nav className="dashboard-subtab-nav" aria-label="Nhóm báo cáo">
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  className={`subtab-btn${activeTab === t.key ? " active" : ""}`}
+                  onClick={() => setActiveTab(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+          </div>
 
           {/* ════════════════════════════
               TAB: TỔNG QUAN
           ════════════════════════════ */}
           {activeTab === "overview" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              {/* Biểu đồ doanh thu 7 ngày + 2 donut */}
+              {/* Biểu đồ doanh thu và trạng thái dùng chung khoảng phân tích */}
               <div className="overview-tab-layout">
-                <article className="chart-card">
+                <article className="chart-card interactive-chart-card" aria-busy={revenueDayChart.loading}>
                 <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <h3>Doanh thu 7 ngày gần nhất</h3>
-                    <p>Tổng thu từ các giao dịch đã thanh toán trong tuần</p>
+                    <h3>Doanh thu theo thời gian</h3>
+                    <p>Tổng thu từ các giao dịch đã thanh toán trong kỳ được chọn</p>
                   </div>
-                  <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Báo cáo chi tiết →</button>
+                  <div className="interactive-chart-actions">
+                    <ChartExportActions chartKey="revenueTrend" filter={revenueDayChart.filter} />
+                    <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Báo cáo chi tiết →</button>
+                  </div>
                 </div>
+                  <ChartWidgetState loading={revenueDayChart.loading} error={revenueDayChart.error} onRetry={revenueDayChart.reload} />
                   <ResponsiveContainer width="100%" height={270}>
                     <AreaChart
                       data={revenueByDayData}
@@ -577,14 +622,18 @@ export default function AdminDashboard() {
                 </article>
 
                 <div className="donut-charts-row">
-                  <article className="chart-card">
+                  <article className="chart-card interactive-chart-card" aria-busy={appointmentStatusChart.loading}>
                     <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div>
                         <h3>Trạng thái Lịch hẹn</h3>
-                        <p>Toàn bộ trong hệ thống</p>
+                        <p>Toàn hệ thống trong kỳ được chọn</p>
                       </div>
-                      <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Quản lý →</button>
+                      <div className="interactive-chart-actions">
+                        <ChartExportActions chartKey="appointmentStatus" filter={appointmentStatusChart.filter} />
+                        <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Quản lý →</button>
+                      </div>
                     </div>
+                    <ChartWidgetState loading={appointmentStatusChart.loading} error={appointmentStatusChart.error} onRetry={appointmentStatusChart.reload} />
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
                         <Pie
@@ -620,14 +669,18 @@ export default function AdminDashboard() {
                     </div>
                   </article>
 
-                  <article className="chart-card">
+                  <article className="chart-card interactive-chart-card" aria-busy={paymentStatusChart.loading}>
                     <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div>
                         <h3>Trạng thái Thanh toán</h3>
-                        <p>Theo bảng Payments trong CSDL</p>
+                        <p>Giao dịch phát sinh trong kỳ được chọn</p>
                       </div>
-                      <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Xem hóa đơn →</button>
+                      <div className="interactive-chart-actions">
+                        <ChartExportActions chartKey="paymentStatus" filter={paymentStatusChart.filter} />
+                        <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Xem hóa đơn →</button>
+                      </div>
                     </div>
+                    <ChartWidgetState loading={paymentStatusChart.loading} error={paymentStatusChart.error} onRetry={paymentStatusChart.reload} />
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
                         <Pie
@@ -790,15 +843,19 @@ export default function AdminDashboard() {
                 ))}
               </div>
 
-              {/* Biểu đồ cột doanh thu 12 tháng */}
-              <article className="chart-card">
+              {/* Biểu đồ doanh thu theo khoảng phân tích */}
+              <article className="chart-card interactive-chart-card" aria-busy={revenueMonthChart.loading}>
                 <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <h3>📊 Doanh thu 12 tháng gần nhất</h3>
-                    <p>Tổng thu từ các giao dịch đã thanh toán theo từng tháng</p>
+                    <h3>📊 Doanh thu theo khoảng phân tích</h3>
+                    <p>Tổng thu từ các giao dịch đã thanh toán trong năm được chọn</p>
                   </div>
-                  <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Báo cáo →</button>
+                  <div className="interactive-chart-actions">
+                    <ChartExportActions chartKey="revenueTrend" filter={revenueMonthChart.filter} />
+                    <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Báo cáo →</button>
+                  </div>
                 </div>
+                <ChartWidgetState loading={revenueMonthChart.loading} error={revenueMonthChart.error} onRetry={revenueMonthChart.reload} />
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart
                     data={revenueByMonthData}
@@ -939,11 +996,17 @@ export default function AdminDashboard() {
           {activeTab === "staff" && (
             <div className="staff-services-tab-layout">
               {/* Biểu đồ cột ngang dịch vụ */}
-              <article className="chart-card">
-                <div className="chart-header">
-                  <h3>Top 6 dịch vụ được đặt nhiều nhất</h3>
-                  <p>Theo số lượng lịch hẹn tích lũy trong hệ thống</p>
+              <article className="chart-card interactive-chart-card" aria-busy={servicePerformanceChart.loading}>
+                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3>Top 6 dịch vụ được đặt nhiều nhất</h3>
+                    <p>Theo số lượng lịch hẹn trong kỳ được chọn</p>
+                  </div>
+                  <div className="interactive-chart-actions">
+                    <ChartExportActions chartKey="servicePerformance" filter={servicePerformanceChart.filter} />
+                  </div>
                 </div>
+                <ChartWidgetState loading={servicePerformanceChart.loading} error={servicePerformanceChart.error} onRetry={servicePerformanceChart.reload} />
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart
                     data={topServicesData}
@@ -1576,5 +1639,20 @@ export default function AdminDashboard() {
       )}
     </section>
   );
+}
+
+export default function AdminDashboard() {
+  const { user } = useAuth();
+  const role = String(user?.RoleName || user?.roleName || user?.Role || user?.role || "").toUpperCase();
+
+  if (role === "MANAGER") {
+    return (
+      <section className="admin-dashboard admin-page">
+        <RoleAnalyticsDashboard />
+      </section>
+    );
+  }
+
+  return <AdminDashboardContent />;
 }
 

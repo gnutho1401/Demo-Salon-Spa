@@ -37,10 +37,10 @@ const navGroups = [
     label: "Tài chính & kiểm soát",
     items: [
       { to: "/admin/refunds", label: "Hoàn tiền", icon: "refund" },
-      { to: "/admin/reports", label: "Báo cáo", icon: "report" },
-      { to: "/admin/package-reports", label: "Báo cáo gói", icon: "chart" },
-      { to: "/admin/system-logs", label: "Nhật ký hệ thống", icon: "log" },
-      { to: "/admin/ai-monitoring", label: "Giám sát AI", icon: "monitor" },
+      { to: "/admin/reports", label: "Báo cáo", icon: "report", adminOnly: true },
+      { to: "/admin/package-reports", label: "Báo cáo gói", icon: "chart", adminOnly: true },
+      { to: "/admin/system-logs", label: "Nhật ký hệ thống", icon: "log", adminOnly: true },
+      { to: "/admin/ai-monitoring", label: "Giám sát AI", icon: "monitor", adminOnly: true },
     ],
   },
 ];
@@ -79,8 +79,15 @@ export default function AdminLayout({ children }) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const role = String(user?.RoleName || user?.roleName || user?.Role || user?.role || "").toUpperCase();
+  const visibleNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.adminOnly || role === "ADMIN"),
+    }))
+    .filter((group) => group.items.length > 0);
 
-  const allNavItems = navGroups.flatMap((group) => group.items);
+  const allNavItems = visibleNavGroups.flatMap((group) => group.items);
   const currentPage =
     allNavItems
       .filter((item) =>
@@ -150,7 +157,7 @@ export default function AdminLayout({ children }) {
         </div>
 
         <nav className="admin-nav">
-          {navGroups.map((group) => (
+          {visibleNavGroups.map((group) => (
             <div className="admin-nav-group" key={group.label}>
               <p className="admin-nav-group-label">{group.label}</p>
               <div className="admin-nav-group-links">

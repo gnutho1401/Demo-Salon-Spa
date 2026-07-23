@@ -42,6 +42,7 @@ app.use("/api/admin/reports", require("./modules/admin/adminReports.routes"));
 app.use("/api/admin/system-logs", require("./modules/admin/adminSystemLogs.routes"));
 app.use("/api/admin/ai-monitoring", require("./modules/admin/adminAIMonitoring.routes"));
 app.use("/api/admin/customers", require("./modules/admin/adminCustomers.routes"));
+app.use("/api/internal-analytics", require("./modules/internal-analytics/internalAnalytics.routes"));
 app.use("/api/receptionist", require("./modules/receptionist/receptionist.routes"));
 app.use("/api/vouchers", require("./modules/vouchers/vouchers.routes"));
 app.use("/api/waiting-list", require("./modules/waiting-list/waiting-list.routes"));

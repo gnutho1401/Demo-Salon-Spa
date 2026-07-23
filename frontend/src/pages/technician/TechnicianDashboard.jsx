@@ -10,6 +10,7 @@ import {
 import axiosClient from "../../api/axiosClient";
 import TechnicianLayout from "../../layouts/TechnicianLayout";
 import { useNavigate } from "react-router-dom";
+import RoleAnalyticsDashboard from "../../components/reports/RoleAnalyticsDashboard";
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString("vi-VN") + "đ";
@@ -428,6 +429,8 @@ export default function TechnicianDashboard() {
           </div>
 
         </section>
+
+        <RoleAnalyticsDashboard embedded />
 
         {/* PERFORMANCE & CHART ROW */}
         <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "24px" }}>

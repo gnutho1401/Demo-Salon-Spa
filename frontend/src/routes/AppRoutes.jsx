@@ -102,6 +102,9 @@ function AdminProtectedPage({ children }) {
     </ProtectedRoute>
   );
 }
+function AdminOnlyPage({ children }) {
+  return <ProtectedRoute allowedRoles={["ADMIN"]}>{children}</ProtectedRoute>;
+}
 
 export default function AppRoutes() {
   return (
@@ -758,41 +761,41 @@ export default function AppRoutes() {
       <Route
         path="/admin/system-logs"
         element={
-          <AdminProtectedPage>
+          <AdminOnlyPage>
             <AdminLayout>
               <AdminSystemLogs />
             </AdminLayout>
-          </AdminProtectedPage>
+          </AdminOnlyPage>
         }
       />
       <Route
         path="/admin/reports"
         element={
-          <AdminProtectedPage>
+          <AdminOnlyPage>
             <AdminLayout>
               <AdminReports />
             </AdminLayout>
-          </AdminProtectedPage>
+          </AdminOnlyPage>
         }
       />
       <Route
         path="/admin/ai-monitoring"
         element={
-          <AdminProtectedPage>
+          <AdminOnlyPage>
             <AdminLayout>
               <AdminAIMonitoring />
             </AdminLayout>
-          </AdminProtectedPage>
+          </AdminOnlyPage>
         }
       />
       <Route
         path="/admin/package-reports"
         element={
-          <AdminProtectedPage>
+          <AdminOnlyPage>
             <AdminLayout>
               <PackageReportPage />
             </AdminLayout>
-          </AdminProtectedPage>
+          </AdminOnlyPage>
         }
       />
       <Route

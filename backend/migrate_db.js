@@ -22,7 +22,14 @@ async function main() {
     pool = await sql.connect(dbConfig);
     console.log("Connected successfully!");
 
-    const sqlFilePath = "C:\\Users\\HELLO\\.gemini\\antigravity-ide\\brain\\728ec183-9f15-4179-ad22-1179d6c0f834\\scratch\\create_treatment_notes_v2_prod.sql";
+    const requestedPath = process.argv[2];
+    if (!requestedPath) {
+      throw new Error("Usage: node migrate_db.js <path-to-migration.sql>");
+    }
+    const sqlFilePath = path.resolve(process.cwd(), requestedPath);
+    if (!fs.existsSync(sqlFilePath)) {
+      throw new Error(`Migration file not found: ${sqlFilePath}`);
+    }
     const rawSql = fs.readFileSync(sqlFilePath, "utf8");
 
     // Split SQL by GO keyword

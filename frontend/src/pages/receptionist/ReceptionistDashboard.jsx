@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
+import RoleAnalyticsDashboard from "../../components/reports/RoleAnalyticsDashboard";
 
 function money(value) {
   return Number(value || 0).toLocaleString("vi-VN") + "đ";
@@ -1209,6 +1210,8 @@ export default function ReceptionistDashboard() {
                 </div>
               </div>
             </section>
+
+            <RoleAnalyticsDashboard embedded />
 
             {/* Main Interactive Grid Workspace */}
             <section className="hq-workspace">

@@ -661,7 +661,14 @@ body:has(
 
 .admin-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 24px;
+}
+
+.admin-page > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-dashboard-hero {

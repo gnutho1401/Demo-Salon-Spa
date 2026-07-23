@@ -1,1381 +1,662 @@
-import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import CustomerLayout from '../../components/layout/CustomerLayout';
-import axiosClient from '../../api/axiosClient';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import CustomerLayout from "../../components/layout/CustomerLayout";
+import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import "../../styles/pages/ai-stylist-advisor.css";
 
-const SAMPLE_PORTRAITS = [
-  {
-    name: "Nữ tóc lửng (Mặt trái xoan)",
-    url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=60",
-    gender: "Female"
-  },
-  {
-    name: "Nam tóc undercut (Mặt tròn)",
-    url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=60",
-    gender: "Male"
-  },
-  {
-    name: "Nữ tóc uốn xoăn (Mặt kim cương)",
-    url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60",
-    gender: "Female"
-  }
+const FILTERS = [
+  { value: "ALL", label: "Tất cả" },
+  { value: "CUT", label: "Kiểu cắt" },
+  { value: "TEXTURE", label: "Uốn & phom" },
+  { value: "COLOR", label: "Màu tóc" },
 ];
 
-const TRYON_PRESETS = [
-  { label: "💇 Layer ngắn", prompt: "Cắt tóc layer ngắn, tạo độ phồng ôm sát khuôn mặt" },
-  { label: "💇 Tóc Bob cụp", prompt: "Cắt tóc bob ngắn ngang cằm, uốn cụp phần đuôi trẻ trung" },
-  { label: "💇 Undercut nam", prompt: "Cắt tóc undercut cạo sát hai bên, phần trên vuốt ngược lịch lãm" },
-  { label: "🎨 Nhuộm hồng khói", prompt: "Nhuộm tóc thành màu hồng khói trendy cá tính" },
-  { label: "🎨 Nhuộm xanh rêu", prompt: "Nhuộm tóc thành màu xanh rêu lạnh thời thượng tôn da" },
-  { label: "🎨 Nhuộm bạch kim", prompt: "Nhuộm tóc thành màu vàng bạch kim sang chảnh nổi bật" },
-  { label: "🎨 Nhuộm hạt dẻ", prompt: "Nhuộm tóc thành màu nâu hạt dẻ ấm áp tự nhiên" },
-  { label: "🌀 Uốn xoăn sóng", prompt: "Làm tóc uốn xoăn sóng bồng bềnh quyến rũ" }
+const AUDIENCES = [
+  { value: "FEMALE", label: "Tóc nữ", description: "Bob, layer, shag, butterfly & màu hot" },
+  { value: "MALE", label: "Tóc nam", description: "Crop, taper, curtain, mullet & texture" },
 ];
 
-// Helper to guess a matching color hex for beauty visual preview
-function getColorHex(colorName) {
-  if (!colorName) return "#d6b57e";
-  const normalized = colorName.toLowerCase();
-  if (normalized.includes("mật ong") || normalized.includes("honey")) return "#e6b06c";
-  if (normalized.includes("trà sữa") || normalized.includes("milk tea")) return "#cfa888";
-  if (normalized.includes("nâu tây")) return "#8f6d53";
-  if (normalized.includes("nâu lạnh") || normalized.includes("cold brown")) return "#614e41";
-  if (normalized.includes("hạt dẻ") || normalized.includes("chestnut")) return "#824b27";
-  if (normalized.includes("khói") || normalized.includes("ash") || normalized.includes("grey")) return "#a8a7a5";
-  if (normalized.includes("bạch kim") || normalized.includes("platinum")) return "#e8e7e3";
-  if (normalized.includes("đỏ") || normalized.includes("red")) return "#a83232";
-  if (normalized.includes("vàng") || normalized.includes("blonde")) return "#eed39b";
-  if (normalized.includes("hồng") || normalized.includes("pink")) return "#e3a8bf";
-  if (normalized.includes("rêu") || normalized.includes("green")) return "#5b6e58";
-  return "#d6b57e"; // Default gold/brown salon accent
+const LOADING_STAGES = [
+  "Đang giữ nguyên đường nét khuôn mặt",
+  "Đang dựng phom và đường chân tóc",
+  "Đang hòa sợi tóc với ánh sáng gốc",
+  "Đang hoàn thiện ảnh tư vấn salon",
+];
+
+const MAINTENANCE_LABELS = {
+  LOW: "Dễ chăm sóc",
+  MEDIUM: "Chăm sóc vừa",
+  HIGH: "Cần tạo kiểu",
+};
+
+function Icon({ name, size = 18 }) {
+  const paths = {
+    camera: <><path d="M14.5 5 13 3H7L5.5 5H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/><circle cx="10" cy="12" r="4"/></>,
+    upload: <><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></>,
+    sparkle: <><path d="m12 3 1.2 3.4L16.5 8l-3.3 1.6L12 13l-1.2-3.4L7.5 8l3.3-1.6Z"/><path d="m5 13 .8 2.2L8 16l-2.2.8L5 19l-.8-2.2L2 16l2.2-.8Z"/><path d="m19 12 .6 1.4L21 14l-1.4.6L19 16l-.6-1.4L17 14l1.4-.6Z"/></>,
+    shield: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></>,
+    check: <path d="m5 12 4 4L19 6"/>,
+    reset: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></>,
+    heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/>,
+    download: <><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></>,
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>,
+    trash: <><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6"/><path d="M10 11v5M14 11v5"/></>,
+    history: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></>,
+    image: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></>,
+    arrow: <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>,
+  };
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {paths[name] || paths.sparkle}
+    </svg>
+  );
+}
+
+function extractApiData(response) {
+  return response?.data?.data ?? response?.data ?? null;
+}
+
+function createLocalLookbookFallback(styles, audience) {
+  const scopedStyles = styles.filter((style) => [audience, "UNISEX"].includes(style.audience || "UNISEX"));
+  const hairstyles = scopedStyles.filter((style) => style.type !== "COLOR").slice(0, 2);
+  const colors = scopedStyles.filter((style) => style.type === "COLOR").slice(0, 2);
+  const toRecommendation = (style) => ({
+    style_id: style.style_id,
+    code: style.code,
+    name: style.name,
+    description: style.description,
+    service_id: style.service_id,
+  });
+  return {
+    analysis: {
+      face_shape: "Chưa xác định — hãy dùng ảnh chính diện",
+      hair_type: "Lookbook local vẫn sẵn sàng",
+      skin_tone: "Chưa xác định",
+      warnings: ["Không thể kết nối bộ phân tích; bạn vẫn có thể chọn mẫu tóc local."],
+    },
+    recommendations: {
+      hairstyles: hairstyles.map(toRecommendation),
+      colors: colors.map(toRecommendation),
+    },
+    provider: "local-lookbook-fallback",
+    model_name: "Salon Local Lookbook",
+    fallback_used: true,
+    degraded: true,
+  };
+}
+
+function optimizeImageFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      reject(new Error("Vui lòng chọn ảnh JPEG, PNG hoặc WEBP."));
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      reject(new Error("Ảnh vượt quá 10 MB. Vui lòng chọn ảnh nhỏ hơn."));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Không thể đọc tệp ảnh."));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("Tệp ảnh không hợp lệ."));
+      image.onload = () => {
+        const maxSide = 1600;
+        const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.9));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function BeforeAfter({ source, result, value, onChange }) {
+  return (
+    <div className="stylist-compare" aria-label="So sánh ảnh gốc và ảnh thử tóc">
+      <img src={source} alt="Ảnh gốc trước khi thử tóc" />
+      <div className="stylist-compare-after" style={{ clipPath: `inset(0 0 0 ${value}%)` }}>
+        <img src={result} alt="Ảnh sau khi AI áp dụng kiểu tóc" />
+      </div>
+      <div className="stylist-compare-line" style={{ left: `${value}%` }} aria-hidden="true">
+        <span>↔</span>
+      </div>
+      <span className="stylist-compare-label is-before">Ảnh gốc</span>
+      <span className="stylist-compare-label is-after">Thử tóc</span>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        aria-label="Kéo để so sánh ảnh gốc và kết quả"
+      />
+    </div>
+  );
 }
 
 export default function AiStylistAdvisor() {
-  const navigate = useNavigate();
-  const [imageUrl, setImageUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [data, setData] = useState(null);
-  const [activeTab, setActiveTab] = useState("morphology"); // "morphology", "styling", "offers"
+  const [styles, setStyles] = useState([]);
+  const [audience, setAudience] = useState("FEMALE");
   const [history, setHistory] = useState([]);
+  const [photo, setPhoto] = useState("");
+  const [analysis, setAnalysis] = useState(null);
+  const [selectedStyle, setSelectedStyle] = useState(null);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [activeFilter, setActiveFilter] = useState("ALL");
+  const [activeResult, setActiveResult] = useState(null);
+  const [sessionResults, setSessionResults] = useState([]);
+  const [compareValue, setCompareValue] = useState(50);
+  const [consent, setConsent] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [tryOnLoading, setTryOnLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0);
+  const [error, setError] = useState("");
+  const [styleError, setStyleError] = useState("");
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const objectUrlsRef = useRef([]);
 
-  // AI Hair Try-on states
-  const [tryonPrompt, setTryonPrompt] = useState("");
-  const [tryonResult, setTryonResult] = useState("");
-  const [tryonLoading, setTryonLoading] = useState(false);
-  const [tryonError, setTryonError] = useState("");
-  const [isMockResult, setIsMockResult] = useState(false);
+  const filteredStyles = useMemo(
+    () => styles.filter((style) => (
+      [audience, "UNISEX"].includes(style.audience || "UNISEX")
+      && (activeFilter === "ALL" || style.type === activeFilter)
+    )),
+    [styles, activeFilter, audience],
+  );
 
-  const fetchHistory = async () => {
-    try {
-      const res = await axiosClient.get('/ai/stylist/history');
-      setHistory(res.data.data || res.data || []);
-    } catch (err) {
-      console.error("Failed to load consult history:", err);
-    }
+  const progressStep = activeResult ? 3 : analysis ? 2 : photo ? 1 : 0;
+  const recommendations = analysis?.recommendations || {};
+
+  const stopCamera = () => {
+    if (videoRef.current) videoRef.current.srcObject = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraReady(false);
+    setCameraActive(false);
   };
 
   useEffect(() => {
-    fetchHistory();
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!cameraActive || !video || !stream) return undefined;
+
+    let active = true;
+    const markReady = () => {
+      if (active && video.videoWidth > 0) setCameraReady(true);
+    };
+    video.srcObject = stream;
+    video.addEventListener("loadedmetadata", markReady);
+    video.play().then(markReady).catch(() => {
+      if (active) setError("Camera đã mở nhưng chưa phát được hình ảnh. Hãy thử đóng và mở lại camera.");
+    });
+
+    return () => {
+      active = false;
+      video.removeEventListener("loadedmetadata", markReady);
+      if (video.srcObject === stream) video.srcObject = null;
+    };
+  }, [cameraActive]);
+
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([
+      axiosClient.get("/ai/stylist/styles"),
+      axiosClient.get("/ai/stylist/tryon/history"),
+    ]).then(([stylesResult, historyResult]) => {
+      if (!active) return;
+      if (stylesResult.status === "fulfilled") {
+        setStyles(extractApiData(stylesResult.value) || []);
+      } else {
+        setStyleError(stylesResult.reason?.response?.data?.message || "Không thể tải danh mục mẫu tóc.");
+      }
+      if (historyResult.status === "fulfilled") setHistory(extractApiData(historyResult.value) || []);
+    });
+    return () => {
+      active = false;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
   }, []);
 
-  const [cameraActive, setCameraActive] = useState(false);
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
+  useEffect(() => {
+    if (!tryOnLoading) {
+      setLoadingStage(0);
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      setLoadingStage((value) => (value + 1) % LOADING_STAGES.length);
+    }, 3200);
+    return () => window.clearInterval(timer);
+  }, [tryOnLoading]);
+
+  const resetPhotoState = (nextPhoto = "") => {
+    setPhoto(nextPhoto);
+    setAnalysis(null);
+    setSelectedStyle(null);
+    setCustomPrompt("");
+    setActiveResult(null);
+    setSessionResults([]);
+    setCompareValue(50);
+    setDeleteArmed(false);
+    setError("");
+  };
+
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      stopCamera();
+      resetPhotoState(await optimizeImageFile(file));
+    } catch (uploadError) {
+      setError(uploadError.message);
+    } finally {
+      event.target.value = "";
+    }
+  };
 
   const startCamera = async () => {
-    setCameraActive(true);
     setError("");
-    setData(null);
+    setCameraReady(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera API unavailable");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 1280 } },
+        audio: false,
+      });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      console.error("Camera access error:", err);
-      setError("Không thể truy cập camera. Vui lòng cấp quyền hoặc tải lên tệp ảnh.");
-      setCameraActive(false);
+      setCameraActive(true);
+    } catch {
+      setCameraReady(false);
+      setError("Không thể mở camera. Hãy cấp quyền hoặc chọn ảnh từ thiết bị.");
     }
   };
 
   const capturePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement("canvas");
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const base64 = canvas.toDataURL("image/jpeg");
-      setImageUrl(base64);
-      stopCamera();
+    const video = videoRef.current;
+    if (!cameraReady || !video?.videoWidth) {
+      setError("Camera chưa sẵn sàng. Vui lòng chờ hình ảnh xuất hiện rồi chụp lại.");
+      return;
     }
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setCameraActive(false);
-  };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageUrl(reader.result);
-        setData(null);
-        setError("");
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSelectSample = (url) => {
+    const maxSide = 1600;
+    const scale = Math.min(1, maxSide / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    resetPhotoState(canvas.toDataURL("image/jpeg", 0.9));
     stopCamera();
-    setImageUrl(url);
-    setData(null);
-    setError("");
   };
 
-  const handleAnalyze = async (e) => {
-    e.preventDefault();
-    if (!imageUrl.trim()) {
-      setError("Vui lòng chọn hoặc tải lên hình ảnh chân dung.");
-      return;
-    }
-
-    setLoading(true);
+  const analyzePhoto = async () => {
+    if (!photo) return setError("Vui lòng chụp hoặc tải lên một ảnh chân dung.");
+    if (!consent) return setError("Bạn cần đồng ý xử lý ảnh trước khi sử dụng AI Stylist.");
+    setAnalysisLoading(true);
     setError("");
-    setData(null);
-
     try {
-      const res = await axiosClient.post('/ai/stylist/analyze', {
-        image_url: imageUrl.trim()
-      });
-      setData(res.data.data || res.data || {});
-      setActiveTab("morphology"); // default to morphology tab upon complete
-      fetchHistory(); // refresh history list
-    } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-        err?.message ||
-        "Gặp lỗi khi kết nối máy chủ phân tích hình ảnh."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTryon = async (e) => {
-    if (e) e.preventDefault();
-    if (!tryonPrompt.trim()) {
-      setTryonError("Vui lòng nhập mô tả hoặc chọn một gợi ý nhanh bên dưới.");
-      return;
-    }
-    if (!imageUrl) {
-      setTryonError("Vui lòng tải lên ảnh chân dung và bấm phân tích trước.");
-      return;
-    }
-
-    setTryonLoading(true);
-    setTryonError("");
-    setTryonResult("");
-
-    try {
-      const res = await axiosClient.post("/ai/stylist/tryon", {
-        image_url: imageUrl,
-        prompt: tryonPrompt.trim()
-      });
-      if (res.data?.data?.edited_image_url || res.data?.edited_image_url) {
-        setTryonResult(res.data.data.edited_image_url || res.data.edited_image_url);
-        setIsMockResult(res.data.data.is_mock || false);
+      const response = await axiosClient.post("/ai/stylist/analyze", { image_url: photo, audience });
+      const data = extractApiData(response) || {};
+      setAnalysis(data);
+      const firstSuggestion = data.recommendations?.hairstyles?.[0]?.name;
+      if (firstSuggestion) setCustomPrompt(firstSuggestion);
+    } catch (requestError) {
+      if (styles.length > 0) {
+        setAnalysis(createLocalLookbookFallback(styles, audience));
+        setError("Phân tích ảnh đang gián đoạn; hệ thống đã mở lookbook local để bạn vẫn có thể thử tóc.");
       } else {
-        throw new Error("Không nhận được hình ảnh kết quả từ server.");
+        setError(requestError.response?.data?.message || requestError.message || "AI không thể phân tích ảnh này.");
       }
-    } catch (err) {
-      setTryonError(
-        err?.response?.data?.message ||
-        err?.message ||
-        "Gặp lỗi khi xử lý biến đổi kiểu tóc."
-      );
     } finally {
-      setTryonLoading(false);
+      setAnalysisLoading(false);
     }
   };
+
+  const createTryOn = async () => {
+    if (!photo || !analysis) return setError("Hãy hoàn tất bước phân tích chân dung trước.");
+    if (!selectedStyle && !customPrompt.trim()) return setError("Hãy chọn một mẫu tóc hoặc nhập mô tả riêng.");
+    setTryOnLoading(true);
+    setError("");
+    setDeleteArmed(false);
+    try {
+      const response = await axiosClient.post("/ai/stylist/tryon", {
+        image_url: photo,
+        style_id: selectedStyle?.style_id || null,
+        prompt: customPrompt.trim() || selectedStyle?.prompt,
+      });
+      const data = extractApiData(response);
+      const result = {
+        ...data,
+        sourceUrl: photo,
+        resultUrl: data.edited_image_data,
+        is_favorite: false,
+        created_at: new Date().toISOString(),
+      };
+      setActiveResult(result);
+      setSessionResults((items) => [result, ...items]);
+      setHistory((items) => [{
+        try_on_id: data.try_on_id,
+        prompt: data.prompt,
+        provider: data.provider,
+        model_name: data.model_name,
+        status: data.status,
+        latency_ms: data.latency_ms,
+        style: data.style,
+        is_favorite: false,
+        created_at: result.created_at,
+        source_image_endpoint: `/ai/stylist/tryon/${data.try_on_id}/image/source`,
+        result_image_endpoint: `/ai/stylist/tryon/${data.try_on_id}/image/result`,
+      }, ...items].slice(0, 24));
+      setCompareValue(50);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || requestError.message || "AI chưa thể tạo ảnh thử tóc.");
+    } finally {
+      setTryOnLoading(false);
+    }
+  };
+
+  const fetchPrivateImage = async (endpoint) => {
+    const response = await axiosClient.get(endpoint, { responseType: "blob" });
+    const url = URL.createObjectURL(response.data);
+    objectUrlsRef.current.push(url);
+    return url;
+  };
+
+  const openHistoryItem = async (item) => {
+    if (item.status !== "SUCCEEDED") return;
+    setHistoryLoading(true);
+    setError("");
+    try {
+      const [sourceUrl, resultUrl] = await Promise.all([
+        fetchPrivateImage(item.source_image_endpoint),
+        fetchPrivateImage(item.result_image_endpoint),
+      ]);
+      setPhoto(sourceUrl);
+      setActiveResult({ ...item, sourceUrl, resultUrl });
+      setSelectedStyle(item.style || null);
+      setCustomPrompt(item.prompt || "");
+      setCompareValue(50);
+      setDeleteArmed(false);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Không thể mở ảnh trong lịch sử.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!activeResult?.try_on_id) return;
+    const nextValue = !activeResult.is_favorite;
+    try {
+      await axiosClient.patch(`/ai/stylist/tryon/${activeResult.try_on_id}/favorite`, { is_favorite: nextValue });
+      setActiveResult((item) => ({ ...item, is_favorite: nextValue }));
+      setHistory((items) => items.map((item) => item.try_on_id === activeResult.try_on_id ? { ...item, is_favorite: nextValue } : item));
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Không thể cập nhật mẫu yêu thích.");
+    }
+  };
+
+  const deleteResult = async () => {
+    if (!deleteArmed) {
+      setDeleteArmed(true);
+      return;
+    }
+    try {
+      await axiosClient.delete(`/ai/stylist/tryon/${activeResult.try_on_id}`);
+      setHistory((items) => items.filter((item) => item.try_on_id !== activeResult.try_on_id));
+      setSessionResults((items) => items.filter((item) => item.try_on_id !== activeResult.try_on_id));
+      setActiveResult(null);
+      setDeleteArmed(false);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Không thể xóa ảnh thử tóc.");
+    }
+  };
+
+  const downloadResult = async () => {
+    if (!activeResult?.resultUrl) return;
+    const blob = await fetch(activeResult.resultUrl).then((response) => response.blob());
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `ai-hair-tryon-${activeResult.try_on_id || Date.now()}.jpg`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const chooseStyle = (style) => {
+    setSelectedStyle(style);
+    setCustomPrompt(style.prompt || "");
+    setError("");
+  };
+
+  const chooseAudience = (value) => {
+    if (value === audience) return;
+    setAudience(value);
+    setActiveFilter("ALL");
+    setSelectedStyle(null);
+    setCustomPrompt("");
+    setAnalysis(null);
+    setActiveResult(null);
+    setError("");
+  };
+
+  const chooseRecommendation = (item) => {
+    const catalogStyle = styles.find((style) => Number(style.style_id) === Number(item.style_id));
+    if (catalogStyle) chooseStyle(catalogStyle);
+    else {
+      setSelectedStyle(null);
+      setCustomPrompt(item.name || "");
+    }
+  };
+
+  const bookingServiceId = activeResult?.style?.service_id || selectedStyle?.service_id || analysis?.booking_suggestion?.recommended_service_id || "";
+  const bookingEmployeeId = analysis?.booking_suggestion?.suggested_stylist_id || "";
+  const bookingUrl = `/customer/booking?serviceId=${bookingServiceId}&employeeId=${bookingEmployeeId}&hairPrompt=${encodeURIComponent(activeResult?.prompt || customPrompt)}`;
 
   return (
     <CustomerLayout>
-      <div className="luxury-stylist-container">
-        <style>{`
-          .luxury-stylist-container {
-            font-family: 'Outfit', 'Inter', sans-serif;
-            color: #2f1d13;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 30px 20px;
-            animation: pageFadeIn 0.6s ease-out;
-          }
-          @keyframes pageFadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .header-section {
-            text-align: center;
-            margin-bottom: 40px;
-          }
-          .header-section h1 {
-            font-size: 36px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            margin-bottom: 12px;
-            background: linear-gradient(135deg, #a37f55 0%, #3e2511 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-          }
-          .header-section p {
-            color: #7c6c60;
-            font-size: 16px;
-            max-width: 650px;
-            margin: 0 auto;
-            line-height: 1.6;
-          }
+      <div className="ai-stylist-page">
+        <header className="ai-stylist-hero">
+          <div>
+            <span className="ai-stylist-eyebrow">AI Stylist · Gương thử tóc</span>
+            <h1>Tìm mái tóc hợp với bạn,<br />trước khi ngồi vào ghế salon.</h1>
+            <p>AI phân tích ảnh thật, gợi ý từ dữ liệu dịch vụ của salon và áp dụng trực tiếp từng kiểu tóc lên chính khuôn mặt của bạn.</p>
+          </div>
+          <div className="ai-stylist-trust">
+            <Icon name="shield" size={20} />
+            <div><strong>Ảnh được bảo vệ riêng tư</strong><span>Không lưu base64 trong database · Có thể xóa bất kỳ lúc nào</span></div>
+          </div>
+        </header>
 
-          /* Main content grid split */
-          .stylist-layout {
-            display: grid;
-            grid-template-columns: 380px 1fr;
-            gap: 30px;
-          }
-          @media (max-width: 992px) {
-            .stylist-layout {
-              grid-template-columns: 1fr;
-            }
-          }
-
-          /* Control column */
-          .control-card {
-            background: #ffffff;
-            border: 1px solid #eaddca;
-            border-radius: 24px;
-            padding: 24px;
-            box-shadow: 0 10px 40px rgba(139, 100, 70, 0.04);
-            height: fit-content;
-            position: sticky;
-            top: 20px;
-          }
-          .section-title {
-            font-size: 15px;
-            font-weight: 800;
-            color: #3e2511;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-
-          /* Sample portrait grid */
-          .sample-grid-compact {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-          }
-          .sample-card-compact {
-            border: 2px solid #ebdcc5;
-            border-radius: 12px;
-            overflow: hidden;
-            cursor: pointer;
-            position: relative;
-            aspect-ratio: 1;
-            transition: all 0.25s ease;
-          }
-          .sample-card-compact img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .sample-card-compact:hover, .sample-card-compact.active {
-            border-color: #a37f55;
-            transform: scale(1.05);
-            box-shadow: 0 8px 16px rgba(163, 127, 85, 0.2);
-          }
-          .sample-card-compact.active::after {
-            content: "✓";
-            position: absolute;
-            bottom: 4px;
-            right: 4px;
-            background: #a37f55;
-            color: #fff;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            font-weight: bold;
-          }
-
-          /* File & camera buttons */
-          .media-action-buttons {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
-          }
-          .media-btn {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid #eaddca;
-            border-radius: 14px;
-            font-weight: 700;
-            font-size: 13.5px;
-            cursor: pointer;
-            background: #ffffff;
-            color: #5c4a3c;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-          }
-          .media-btn:hover {
-            border-color: #a37f55;
-            background: #faf7f4;
-            color: #3e2511;
-          }
-          .media-btn.active {
-            background: #a37f55;
-            border-color: #a37f55;
-            color: #ffffff;
-          }
-
-          /* Live camera stream view */
-          .camera-stream-box {
-            position: relative;
-            background: #1a0f0a;
-            border-radius: 18px;
-            overflow: hidden;
-            aspect-ratio: 4/3;
-            margin-bottom: 20px;
-            border: 1px solid #ebdcc5;
-          }
-          .camera-stream-box video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1);
-          }
-          .camera-capture-trigger {
-            position: absolute;
-            bottom: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.9);
-            border: 0;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            transition: all 0.2s;
-          }
-          .camera-capture-trigger:hover {
-            transform: translateX(-50%) scale(1.1);
-            background: #ffffff;
-          }
-
-          /* Image Preview with scanner effect */
-          .image-preview-container {
-            position: relative;
-            border-radius: 18px;
-            overflow: hidden;
-            border: 2px solid #eaddca;
-            margin-bottom: 20px;
-            aspect-ratio: 4/3;
-            background: #faf8f5;
-          }
-          .image-preview-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .scanner-line {
-            position: absolute;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, rgba(214,181,126,0) 0%, rgba(214,181,126,1) 50%, rgba(214,181,126,0) 100%);
-            box-shadow: 0 0 15px #d6b57e;
-            animation: scanEffect 2s linear infinite;
-            pointer-events: none;
-            z-index: 10;
-          }
-          @keyframes scanEffect {
-            0% { top: 0%; }
-            50% { top: 100%; }
-            100% { top: 0%; }
-          }
-          .scanner-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(163, 127, 85, 0.15);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: #ffffff;
-            font-weight: 700;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            z-index: 5;
-          }
-          .scanner-overlay span {
-            font-size: 28px;
-            margin-bottom: 8px;
-            animation: pulseText 1.5s ease-in-out infinite;
-          }
-          @keyframes pulseText {
-            0%, 100% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.08); opacity: 1; }
-          }
-
-          /* Submit analyze button */
-          .luxury-submit-btn {
-            background: linear-gradient(135deg, #3e2511 0%, #1c1007 100%);
-            color: #ffffff;
-            border: 0;
-            width: 100%;
-            padding: 15px;
-            border-radius: 14px;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(62, 37, 17, 0.15);
-            transition: all 0.25s ease;
-          }
-          .luxury-submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(62, 37, 17, 0.3);
-          }
-          .luxury-submit-btn:disabled {
-            background: #d8ceca;
-            color: #8c7e74;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-          }
-
-          /* Results dashboard column */
-          .results-dashboard {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-          }
-
-          /* Navigation Tabs */
-          .tabs-header {
-            display: flex;
-            background: #f2ece6;
-            border-radius: 16px;
-            padding: 6px;
-            gap: 4px;
-          }
-          .tab-trigger {
-            flex: 1;
-            padding: 12px 6px;
-            font-weight: 700;
-            font-size: 14px;
-            border-radius: 12px;
-            border: 0;
-            cursor: pointer;
-            background: transparent;
-            color: #7c6c60;
-            transition: all 0.25s ease;
-          }
-          .tab-trigger.active {
-            background: #ffffff;
-            color: #3e2511;
-            box-shadow: 0 4px 12px rgba(62, 37, 17, 0.05);
-          }
-
-          /* Info card styling */
-          .glowing-card {
-            background: #ffffff;
-            border: 1px solid #ebdcc5;
-            border-radius: 24px;
-            padding: 28px;
-            box-shadow: 0 10px 30px rgba(120, 80, 40, 0.02);
-            animation: tabContentFade 0.4s ease-out;
-          }
-          @keyframes tabContentFade {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .glowing-card h2 {
-            font-size: 20px;
-            font-weight: 800;
-            color: #3e2511;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-          }
-
-          /* Grid and rows inside cards */
-          .badge-showcase {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-          }
-          @media (max-width: 576px) {
-            .badge-showcase {
-              grid-template-columns: 1fr;
-            }
-          }
-          .morphology-badge {
-            background: #faf8f5;
-            border: 1px solid #eaddca;
-            border-radius: 16px;
-            padding: 16px;
-            text-align: center;
-            transition: all 0.2s;
-          }
-          .morphology-badge:hover {
-            border-color: #a37f55;
-            background: #fffcf8;
-          }
-          .morphology-badge .label {
-            font-size: 11px;
-            font-weight: 700;
-            color: #a37f55;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            display: block;
-            margin-bottom: 6px;
-          }
-          .morphology-badge .value {
-            font-size: 14.5px;
-            font-weight: 800;
-            color: #3e2511;
-          }
-
-          /* Style suggestions grid */
-          .suggested-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-          }
-          @media (max-width: 768px) {
-            .suggested-grid {
-              grid-template-columns: 1fr;
-            }
-          }
-          .suggested-item {
-            background: #ffffff;
-            border: 1px solid #eaddca;
-            border-radius: 18px;
-            padding: 20px;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.25s ease;
-          }
-          .suggested-item::before {
-            content: "";
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #a37f55;
-          }
-          .suggested-item:hover {
-            transform: translateY(-3px);
-            border-color: #a37f55;
-            box-shadow: 0 8px 24px rgba(163, 127, 85, 0.1);
-          }
-          .suggested-item h4 {
-            font-size: 16px;
-            font-weight: 800;
-            color: #3e2511;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-          .suggested-item p {
-            margin: 0;
-            font-size: 13.5px;
-            color: #7c6c60;
-            line-height: 1.5;
-          }
-
-          /* Trending Section */
-          .trending-container {
-            background: linear-gradient(135deg, #fffbf8 0%, #fcf6ef 100%);
-            border: 1px solid #ebdcc5;
-            border-radius: 20px;
-            padding: 20px;
-          }
-          .trending-list {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-          }
-          .trending-pill {
-            background: #ffffff;
-            border: 1px solid #eaddca;
-            color: #8a653a;
-            padding: 8px 18px;
-            border-radius: 50px;
-            font-size: 13.5px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.02);
-            transition: all 0.2s;
-          }
-          .trending-pill:hover {
-            border-color: #8a653a;
-            transform: scale(1.03);
-          }
-
-          /* Exclusive promo card */
-          .promo-card {
-            background: linear-gradient(135deg, #fdfbfa 0%, #f7ece1 100%);
-            border: 1px dashed #a37f55;
-            border-radius: 24px;
-            padding: 32px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-          }
-          .promo-card::after {
-            content: "👑";
-            position: absolute;
-            top: -15px;
-            right: -15px;
-            font-size: 80px;
-            opacity: 0.05;
-            transform: rotate(20deg);
-          }
-          .promo-card h3 {
-            font-size: 22px;
-            font-weight: 850;
-            color: #3e2511;
-            margin-bottom: 12px;
-          }
-          .promo-card p.desc {
-            font-size: 14.5px;
-            color: #5c4a3c;
-            max-width: 600px;
-            margin: 0 auto 24px;
-            line-height: 1.6;
-          }
-          .pulse-booking-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: linear-gradient(135deg, #a37f55 0%, #876239 100%);
-            color: #ffffff;
-            border: 0;
-            padding: 14px 36px;
-            font-size: 15px;
-            font-weight: 800;
-            border-radius: 14px;
-            cursor: pointer;
-            text-decoration: none;
-            box-shadow: 0 8px 25px rgba(163, 127, 85, 0.3);
-            transition: all 0.25s;
-            animation: pulseButton 2s infinite;
-          }
-          @keyframes pulseButton {
-            0% { box-shadow: 0 0 0 0 rgba(163, 127, 85, 0.4); }
-            70% { box-shadow: 0 0 0 12px rgba(163, 127, 85, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(163, 127, 85, 0); }
-          }
-          .pulse-booking-btn:hover {
-            transform: translateY(-2px);
-            opacity: 0.95;
-            box-shadow: 0 10px 30px rgba(163, 127, 85, 0.55);
-          }
-        `}</style>
-
-        {/* Top Header */}
-        <div className="header-section">
-          <h1>🔮 AI Stylist Advisor Pro</h1>
-          <p>
-            Trải nghiệm công nghệ AI nhân trắc học cao cấp kết hợp máy học đa phương thức (Multimodal Vision).
-            Chúng tôi quét khuôn mặt, kiểm tra chất tóc của bạn để đề xuất màu sắc và kiểu tạo mẫu tối ưu nhất.
-          </p>
+        <div className="ai-audience-selector" role="group" aria-label="Chọn thư viện kiểu tóc nam hoặc nữ">
+          <div><span>Lookbook cá nhân</span><strong>Bạn muốn khám phá kiểu tóc nào?</strong></div>
+          {AUDIENCES.map((item) => (
+            <button type="button" key={item.value} className={audience === item.value ? "is-active" : ""} onClick={() => chooseAudience(item.value)}>
+              <span>{item.label}</span><small>{item.description}</small>
+            </button>
+          ))}
         </div>
 
-        {/* Main Grid */}
-        <div className="stylist-layout">
+        <ol className="ai-stylist-steps" aria-label="Tiến trình thử tóc">
+          {["Ảnh chân dung", "Tư vấn kiểu tóc", "Gương thử tóc"].map((label, index) => (
+            <li key={label} className={progressStep >= index + 1 ? "is-complete" : progressStep === index ? "is-active" : ""}>
+              <span>{progressStep > index ? <Icon name="check" size={15} /> : index + 1}</span>
+              <b>{label}</b>
+            </li>
+          ))}
+        </ol>
 
-          {/* Left Column: Image Controls */}
-          <div className="control-card">
-            <div className="section-title">
-              <span>📷</span> Tải hình chân dung
+        <section className="ai-stylist-workspace">
+          <div className="ai-stylist-mirror-panel">
+            <div className="ai-stylist-panel-heading">
+              <div><span>Gương salon</span><strong>{activeResult ? "Kéo để so sánh trước & sau" : cameraActive ? cameraReady ? "Căn khuôn mặt vào giữa khung" : "Đang khởi động camera…" : "Ảnh chân dung của bạn"}</strong></div>
+              {activeResult && <span className="ai-real-badge"><i /> AI ảnh thật · {activeResult.provider}</span>}
             </div>
 
-            {/* Input Selection tabs */}
-            <div className="media-action-buttons">
-              <button
-                type="button"
-                className={`media-btn ${cameraActive ? "active" : ""}`}
-                onClick={cameraActive ? stopCamera : startCamera}
-              >
-                <span>📷</span> Webcam
-              </button>
-              <label className="media-btn">
-                <span>📁</span> Chọn tệp
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  style={{ display: "none" }}
-                />
-              </label>
-            </div>
-
-            {/* Compact Sample Portraits */}
-            <div style={{ marginBottom: 12 }}>
-              <span style={{ fontSize: "11px", fontWeight: "700", color: "#8c7e74", display: "block", marginBottom: 8 }}>
-                Hoặc sử dụng ảnh mẫu:
-              </span>
-              <div className="sample-grid-compact">
-                {SAMPLE_PORTRAITS.map((p, idx) => (
-                  <div
-                    key={idx}
-                    className={`sample-card-compact ${imageUrl === p.url ? "active" : ""}`}
-                    onClick={() => handleSelectSample(p.url)}
-                  >
-                    <img src={p.url} alt={p.name} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Video stream box */}
-            {cameraActive && (
-              <div className="camera-stream-box">
-                <video ref={videoRef} autoPlay playsInline />
-                <button type="button" className="camera-capture-trigger" onClick={capturePhoto}>
-                  📸
-                </button>
-              </div>
-            )}
-
-            {/* Image Preview Box with scanning effect */}
-            {imageUrl && !cameraActive && (
-              <div className="image-preview-container">
-                <img src={imageUrl} alt="User portrait preview" />
-                {loading && (
-                  <>
-                    <div className="scanner-line"></div>
-                    <div className="scanner-overlay">
-                      <span>🤖</span>
-                      <div>AI ĐANG ĐỌC HÌNH THỂ...</div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Form submit */}
-            <form onSubmit={handleAnalyze}>
-              <div style={{ marginBottom: 12 }}>
-                <span style={{ fontSize: "11px", fontWeight: "700", color: "#8c7e74", display: "block", marginBottom: 6 }}>
-                  Hoặc điền URL ảnh công khai:
-                </span>
-                <input
-                  type="text"
-                  value={imageUrl.startsWith('data:') ? "" : imageUrl}
-                  onChange={(e) => {
-                    stopCamera();
-                    setImageUrl(e.target.value);
-                    setData(null);
-                    setError("");
-                  }}
-                  placeholder="Dán link ảnh trực tuyến..."
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    border: "1px solid #ebdcc5",
-                    fontSize: "13px",
-                    outline: "none",
-                    background: "#fdfcfb"
-                  }}
-                />
-              </div>
-
-              {error && (
-                <div style={{ color: "#d83b01", fontSize: "12px", marginBottom: 12, fontWeight: 700 }}>
-                  ⚠️ {error}
+            <div className={`ai-stylist-mirror ${photo || cameraActive ? "has-photo" : ""}`}>
+              {cameraActive ? (
+                <div className="ai-stylist-camera-view">
+                  <video ref={videoRef} autoPlay muted playsInline />
+                  <div className="ai-stylist-face-guide" aria-hidden="true" />
+                  <button type="button" className="ai-camera-shutter" onClick={capturePhoto} disabled={!cameraReady} aria-label={cameraReady ? "Chụp ảnh" : "Camera đang khởi động"}><span /></button>
+                  <button type="button" className="ai-camera-close" onClick={stopCamera}>Đóng camera</button>
                 </div>
+              ) : activeResult?.resultUrl ? (
+                <BeforeAfter source={activeResult.sourceUrl || photo} result={activeResult.resultUrl} value={compareValue} onChange={setCompareValue} />
+              ) : photo ? (
+                <img className="ai-stylist-portrait" src={photo} alt="Ảnh chân dung đã chọn" />
+              ) : (
+                <button type="button" className="ai-stylist-empty-mirror" onClick={() => fileInputRef.current?.click()}>
+                  <span className="ai-stylist-empty-icon"><Icon name="image" size={28} /></span>
+                  <strong>Bắt đầu với một ảnh rõ khuôn mặt</strong>
+                  <small>Ánh sáng đều · nhìn thẳng · không đội mũ · tối đa 10 MB</small>
+                  <em><Icon name="upload" size={16} /> Chọn ảnh từ thiết bị</em>
+                </button>
               )}
 
-              <button
-                className="luxury-submit-btn"
-                type="submit"
-                disabled={loading || !imageUrl}
-              >
-                {loading ? "Đang xử lý hình ảnh..." : "🔮 Phân Tích & Tư Vấn Thẩm Mỹ"}
-              </button>
-            </form>
-          </div>
-
-          {/* Right Column: Displaying results */}
-          <div className="results-dashboard">
-
-            {/* Connection Banner */}
-            {data && (
-              <div style={{
-                background: data.is_fallback ? "#fff9e6" : "#eefaf2",
-                border: "1px solid",
-                borderColor: data.is_fallback ? "#ffe28c" : "#a3e2b8",
-                borderRadius: "16px",
-                padding: "14px 20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                fontSize: "14px",
-                color: data.is_fallback ? "#856404" : "#155724"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span>{data.is_fallback ? "⚠️" : "🟢"}</span>
-                  <span>
-                    {data.is_fallback
-                      ? "Chế độ Dự phòng (API đang bận, đã kích hoạt bộ quy tắc salon)"
-                      : "Kết nối AI thật trực tiếp thành công (Gemini Vision)"}
-                  </span>
+              {tryOnLoading && (
+                <div className="ai-stylist-generating" role="status" aria-live="polite">
+                  <div className="ai-hair-strands" aria-hidden="true"><i /><i /><i /></div>
+                  <strong>AI đang tạo mái tóc mới</strong>
+                  <span>{LOADING_STAGES[loadingStage]}</span>
+                  <div className="ai-generation-progress"><i style={{ width: `${24 + loadingStage * 22}%` }} /></div>
+                  <small>Thường mất khoảng 15–45 giây. Vui lòng giữ trang này mở.</small>
                 </div>
-                <div style={{ fontSize: "11px", fontWeight: "800", opacity: 0.7, background: "rgba(0,0,0,0.05)", padding: "4px 10px", borderRadius: "50px" }}>
-                  Model: {data.model_name}
-                </div>
+              )}
+            </div>
+
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} hidden />
+            <div className="ai-stylist-mirror-actions">
+              <button type="button" onClick={() => fileInputRef.current?.click()}><Icon name="upload" /> Chọn ảnh</button>
+              <button type="button" onClick={cameraActive ? stopCamera : startCamera}><Icon name="camera" /> {cameraActive ? "Đóng camera" : "Chụp ảnh"}</button>
+              {photo && <button type="button" onClick={() => { stopCamera(); resetPhotoState(); }}><Icon name="reset" /> Làm lại</button>}
+            </div>
+
+            {activeResult && (
+              <div className="ai-stylist-result-actions">
+                <button type="button" className={activeResult.is_favorite ? "is-favorite" : ""} onClick={toggleFavorite}><Icon name="heart" /> {activeResult.is_favorite ? "Đã lưu" : "Lưu mẫu"}</button>
+                <button type="button" onClick={downloadResult}><Icon name="download" /> Tải ảnh</button>
+                <Link to={bookingUrl}><Icon name="calendar" /> Đặt lịch kiểu này</Link>
+                <button type="button" className={deleteArmed ? "is-danger" : ""} onClick={deleteResult}><Icon name="trash" /> {deleteArmed ? "Xác nhận xóa" : "Xóa ảnh"}</button>
               </div>
             )}
+          </div>
 
-            {data ? (
+          <aside className="ai-stylist-consult-panel">
+            {!analysis ? (
               <>
-                {/* Tabs selection */}
-                <div className="tabs-header">
-                  <button
-                    className={`tab-trigger ${activeTab === "morphology" ? "active" : ""}`}
-                    onClick={() => setActiveTab("morphology")}
-                  >
-                    👤 Đặc điểm nhân trắc
-                  </button>
-                  <button
-                    className={`tab-trigger ${activeTab === "styling" ? "active" : ""}`}
-                    onClick={() => setActiveTab("styling")}
-                  >
-                    💇 Kiểu tóc & Màu nhuộm
-                  </button>
-                  <button
-                    className={`tab-trigger ${activeTab === "offers" ? "active" : ""}`}
-                    onClick={() => setActiveTab("offers")}
-                  >
-                    👑 Đề xuất liệu trình VIP
-                  </button>
+                <div className="ai-consult-heading"><span>01</span><div><strong>Đọc đặc điểm tóc & khuôn mặt</strong><p>AI dùng ảnh thật và lịch sử dịch vụ của bạn để tạo tư vấn cá nhân hóa.</p></div></div>
+                <div className="ai-photo-guide">
+                  <div><i className="is-good" /><span><strong>Ảnh nên dùng</strong>Mặt nhìn thẳng, đủ sáng, thấy rõ toàn bộ tóc.</span></div>
+                  <div><i className="is-bad" /><span><strong>Nên tránh</strong>Mũ, kính che mặt, ảnh mờ hoặc nhiều người.</span></div>
                 </div>
-
-                {/* TAB 1: MORPHOLOGY */}
-                {activeTab === "morphology" && (
-                  <div className="glowing-card">
-                    <h2>👤 Phân Tích Hình Thể Học Khuôn Mặt</h2>
-                    <p style={{ color: "#7c6c60", fontSize: "14px", marginTop: -12, marginBottom: 24, lineHeight: 1.5 }}>
-                      Mô hình AI đa phương thức đã phân tích cấu trúc xương, kết cấu tóc và sắc tố dưới da của bạn để kết luận các chỉ số sau:
-                    </p>
-
-                    <div className="badge-showcase">
-                      <div className="morphology-badge">
-                        <span className="label">Hình dáng mặt</span>
-                        <span className="value">{data.analysis?.face_shape}</span>
-                      </div>
-                      <div className="morphology-badge">
-                        <span className="label">Kết cấu tóc</span>
-                        <span className="value">{data.analysis?.hair_type}</span>
-                      </div>
-                      <div className="morphology-badge">
-                        <span className="label">Sắc tố da</span>
-                        <span className="value">{data.analysis?.skin_tone}</span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 12, background: "#faf8f5", borderRadius: 16, padding: 18, border: "1px solid #ebdcc5" }}>
-                      <span style={{ fontSize: 20 }}>💡</span>
-                      <div style={{ fontSize: "13.5px", color: "#5c4a3c", lineHeight: "1.5" }}>
-                        <strong>Nhận xét từ Cố vấn Thẩm mỹ:</strong> Dáng mặt {data.analysis?.face_shape} là một lợi thế hình thể tuyệt vời. Thiết kế tóc phù hợp sẽ tập trung làm tôn lên các điểm sáng trên gò má và tạo độ thanh thoát tối đa.
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB 2: STYLING RECOMMENDATIONS */}
-                {activeTab === "styling" && (
-                  <div className="glowing-card">
-                    <h2>💇 Phác Thảo Thiết Kế Kiểu Tóc & Màu Sắc</h2>
-
-                    <div className="suggested-grid" style={{ marginBottom: 28 }}>
-                      <div>
-                        <h3 style={{ fontSize: "15px", color: "#a37f55", marginBottom: 12, textTransform: "uppercase" }}>
-                          Kiểu cắt tạo kiểu
-                        </h3>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                          {(data.recommendations?.hairstyles || []).map((h, idx) => (
-                            <div key={idx} className="suggested-item">
-                              <h4><span>✂️</span> {h.name}</h4>
-                              <p>{h.description}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 style={{ fontSize: "15px", color: "#a37f55", marginBottom: 12, textTransform: "uppercase" }}>
-                          Màu nhuộm nịnh da
-                        </h3>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                          {(data.recommendations?.colors || []).map((c, idx) => {
-                            const sampleColor = getColorHex(c.name);
-                            return (
-                              <div key={idx} className="suggested-item">
-                                <h4>
-                                  <span style={{
-                                    display: "inline-block",
-                                    width: 14,
-                                    height: 14,
-                                    borderRadius: "50%",
-                                    background: sampleColor,
-                                    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-                                    border: "1px solid #fff"
-                                  }} />
-                                  {c.name}
-                                </h4>
-                                <p>{c.description}</p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Trending banner inside tab */}
-                    {data.trending && (
-                      <div className="trending-container">
-                        <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: "800", color: "#3e2511" }}>
-                          🔥 Bắt nhịp xu hướng: {data.trending.title}
-                        </h4>
-                        <div className="trending-list">
-                          {(Array.isArray(data.trending.styles) ? data.trending.styles : []).map((s, idx) => (
-                            <span key={idx} className="trending-pill">
-                              ✨ {s}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* TAB 3: TREATMENTS & BOOKING SUGGESTION */}
-                {activeTab === "offers" && (
-                  <div className="glowing-card" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-
-                    {/* Treatment details */}
-                    <div>
-                      <h2>👑 Liệu Trình Chăm Sóc & Phục Hồi Cao Cấp</h2>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        {(data.upsell || []).map((u, idx) => (
-                          <div key={idx} style={{
-                            background: "#ffffff",
-                            border: "1px solid #eaddca",
-                            borderRadius: "16px",
-                            padding: "20px",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.01)"
-                          }}>
-                            <h4 style={{ fontSize: "15px", fontWeight: "800", color: "#8a653a", margin: "0 0 8px 0", display: "flex", alignItems: "center", gap: 8 }}>
-                              💎 {u.service_name}
-                            </h4>
-                            <p style={{ margin: 0, fontSize: "13.5px", color: "#5c4a3c", lineHeight: "1.5" }}>
-                              {u.reason}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Booking Card */}
-                    <div className="promo-card">
-                      <h3>📅 Đăng ký trải nghiệm dịch vụ cùng chuyên gia</h3>
-                      <p className="desc">
-                        {(data.upsell || [])[0]
-                          ? `Hệ thống gợi ý bạn nên thực hiện dịch vụ "${(data.upsell || [])[0].service_name}" để có mái tóc hoàn hảo nhất.`
-                          : "Đăng ký dịch vụ ngay để nhận ưu đãi thành viên."}
-                      </p>
-
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                        <a
-                          href={`/customer/booking?serviceId=${data.booking_suggestion?.recommended_service_id || ""}&employeeId=${data.booking_suggestion?.suggested_stylist_id || ""}`}
-                          className="pulse-booking-btn"
-                        >
-                          📅 Đặt Lịch Hẹn Ngay
-                        </a>
-
-                        {data.booking_suggestion?.reason && (
-                          <div style={{ fontSize: "12.5px", color: "#8c7e74", fontStyle: "italic", maxWidth: 500, lineHeight: 1.4 }}>
-                            <strong>Đề xuất từ salon:</strong> {data.booking_suggestion.reason}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* AI HAIR CUSTOMIZER SECTION */}
-                <div className="glowing-card" style={{ marginTop: 24, border: "1px solid #ffdce3", background: "#fffbfc" }}>
-                  <h2 style={{ display: "flex", alignItems: "center", gap: 10, color: "#e8396c", fontSize: "18px", margin: "0 0 12px 0" }}>
-                    <span>🔮</span> AI Hair Customizer (Thử Tóc Ảo)
-                  </h2>
-                  <p style={{ color: "#675464", fontSize: "13.5px", marginTop: 0, marginBottom: 20, lineHeight: 1.5 }}>
-                    Tự thiết kế mái tóc mơ ước của bạn! Chọn một gợi ý nhanh bên dưới hoặc tự nhập mô tả để thay đổi kiểu tóc/màu tóc trên ảnh gốc.
-                  </p>
-
-                  {/* Preset chips */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-                    {TRYON_PRESETS.map((p, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setTryonPrompt(p.prompt);
-                          setTryonError("");
-                        }}
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: "12px",
-                          borderRadius: "20px",
-                          border: tryonPrompt === p.prompt ? "1px solid #e8396c" : "1px solid #ffe0eb",
-                          background: tryonPrompt === p.prompt ? "#ffeef2" : "#ffffff",
-                          color: tryonPrompt === p.prompt ? "#e8396c" : "#675464",
-                          fontWeight: tryonPrompt === p.prompt ? "700" : "500",
-                          cursor: "pointer",
-                          transition: "all 0.2s"
-                        }}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Prompt Textarea */}
-                  <form onSubmit={handleTryon} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <textarea
-                      value={tryonPrompt}
-                      onChange={(e) => {
-                        setTryonPrompt(e.target.value);
-                        setTryonError("");
-                      }}
-                      placeholder="Mô tả kiểu tóc hoặc màu sắc bạn muốn thử (ví dụ: làm tóc ngang vai màu xám khói, cắt mái ngố)..."
-                      style={{
-                        width: "100%",
-                        height: "80px",
-                        padding: "12px",
-                        borderRadius: "12px",
-                        border: "1px solid #ffdce3",
-                        outline: "none",
-                        fontSize: "13px",
-                        resize: "none",
-                        fontFamily: "inherit",
-                        color: "#2d2430",
-                        boxSizing: "border-box"
-                      }}
-                    />
-
-                    {tryonError && (
-                      <div style={{ color: "#ff3366", fontSize: "12px", fontWeight: "700" }}>
-                        ⚠️ {tryonError}
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={tryonLoading || !tryonPrompt.trim()}
-                      style={{
-                        padding: "12px",
-                        background: tryonLoading ? "#b9a8b4" : "linear-gradient(135deg, #ff4778, #e8396c)",
-                        color: "white",
-                        fontWeight: "700",
-                        fontSize: "13.5px",
-                        border: "none",
-                        borderRadius: "12px",
-                        cursor: "pointer",
-                        transition: "all 0.3s",
-                        boxShadow: tryonLoading ? "none" : "0 4px 15px rgba(232, 57, 108, 0.2)"
-                      }}
-                    >
-                      {tryonLoading ? "⏳ AI đang thiết kế mái tóc mới..." : "🔮 Bắt Đầu Biến Đổi Tóc"}
-                    </button>
-                  </form>
-
-                  {/* Before / After results panel */}
-                  {(tryonResult || tryonLoading) && (
-                    <div style={{ marginTop: 24, borderTop: "1px dashed #ffdce3", paddingTop: 20 }}>
-                      <h3 style={{ fontSize: "14.5px", color: "#e8396c", marginBottom: 16, fontWeight: 700, marginTop: 0 }}>
-                        📸 So sánh kết quả biến đổi
-                      </h3>
-                      
-                      {isMockResult && !tryonLoading && (
-                        <div style={{
-                          background: "#fff9e6",
-                          border: "1px solid #ffe28c",
-                          borderRadius: "12px",
-                          padding: "12px 16px",
-                          marginBottom: 16,
-                          fontSize: "13px",
-                          color: "#856404",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          textAlign: "left",
-                          lineHeight: "1.4"
-                        }}>
-                          <span style={{ fontSize: "18px" }}>💡</span>
-                          <span>
-                            <strong>Chế độ Mô phỏng:</strong> Do chưa cấu hình khóa API thật `REPLICATE_API_TOKEN` ở backend, hệ thống đang hiển thị ảnh minh họa mẫu tương tự từ thư viện. Khi được cấu hình, AI thật sẽ thay thế kiểu tóc trực tiếp trên chính khuôn mặt bạn!
-                          </span>
-                        </div>
-                      )}
-                      
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                        {/* Before */}
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "11px", color: "#a38f9d", fontWeight: "700", display: "block", marginBottom: 6 }}>
-                            ẢNH GỐC
-                          </span>
-                          <div style={{ width: "100%", height: "200px", borderRadius: "12px", overflow: "hidden", border: "1px solid #f3e6e8" }}>
-                            <img src={imageUrl} alt="Before" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          </div>
-                        </div>
-
-                        {/* After */}
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "11px", color: "#e8396c", fontWeight: "700", display: "block", marginBottom: 6 }}>
-                            ẢNH BIẾN ĐỔI (AI)
-                          </span>
-                          <div style={{ 
-                            width: "100%", 
-                            height: "200px", 
-                            borderRadius: "12px", 
-                            overflow: "hidden", 
-                            border: "1px solid #ffccd7", 
-                            background: "#faf6f7",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            position: "relative"
-                          }}>
-                            {tryonLoading ? (
-                              <div style={{ textAlign: "center" }}>
-                                <div className="tryon-spinner" style={{
-                                  width: "32px",
-                                  height: "32px",
-                                  border: "3px solid #ffeef2",
-                                  borderTop: "3px solid #e8396c",
-                                  borderRadius: "50%",
-                                  animation: "spin 1s linear infinite",
-                                  margin: "0 auto 10px"
-                                }} />
-                                <span style={{ fontSize: "12px", color: "#e8396c", fontWeight: 600 }}>AI đang xử lý...</span>
-                              </div>
-                            ) : (
-                              <img src={tryonResult} alt="After" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Booking Action */}
-                      {!tryonLoading && tryonResult && (
-                        <div style={{ marginTop: 24, textAlign: "center", background: "#ffeef2", padding: "16px", borderRadius: "12px", border: "1px solid #ffccd7" }}>
-                          <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#e8396c", fontWeight: 800 }}>
-                            😍 Bạn hài lòng với kiểu tóc này?
-                          </h4>
-                          <p style={{ margin: "0 0 14px 0", fontSize: "12.5px", color: "#675464", lineHeight: 1.4 }}>
-                            Đăng ký làm tóc và nhuộm màu này ngay hôm nay để nhận tư vấn trực tiếp từ stylist hàng đầu!
-                          </p>
-                          <a
-                            href={`/customer/booking?serviceId=${data.booking_suggestion?.recommended_service_id || ""}&employeeId=${data.booking_suggestion?.suggested_stylist_id || ""}&hairPrompt=${encodeURIComponent(tryonPrompt)}&hairImage=${encodeURIComponent(tryonResult)}`}
-                            style={{
-                              display: "inline-block",
-                              padding: "10px 24px",
-                              background: "linear-gradient(135deg, #ff4778, #e8396c)",
-                              color: "white",
-                              borderRadius: "24px",
-                              fontWeight: "700",
-                              fontSize: "13px",
-                              textDecoration: "none",
-                              boxShadow: "0 4px 10px rgba(232, 57, 108, 0.2)",
-                              transition: "all 0.2s"
-                            }}
-                          >
-                            📅 Đặt Lịch Làm Tóc Kiểu Này
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Add keyframe spinner css if needed */}
-                  <style>{`
-                    @keyframes spin {
-                      0% { transform: rotate(0deg); }
-                      100% { transform: rotate(360deg); }
-                    }
-                  `}</style>
-                </div>
+                <label className="ai-consent-row">
+                  <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+                  <span><b>Tôi đồng ý cho hệ thống xử lý ảnh để tư vấn và thử tóc.</b><small>Ảnh chỉ hiển thị cho tài khoản này và tự hết hạn theo chính sách lưu trữ.</small></span>
+                </label>
+                <button type="button" className="ai-primary-action" onClick={analyzePhoto} disabled={!photo || analysisLoading}>
+                  <Icon name="sparkle" /> {analysisLoading ? "AI đang phân tích ảnh…" : "Phân tích & mở lookbook"}
+                </button>
               </>
             ) : (
-              // Empty initial dashboard view
-              <div style={{
-                background: "#ffffff",
-                border: "1px dashed #ebdcc5",
-                borderRadius: "24px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "80px 40px",
-                textAlign: "center",
-                height: "100%",
-                minHeight: 400
-              }}>
-                <span style={{ fontSize: "60px", marginBottom: 20, animation: "bounce 2s infinite" }}>🔮</span>
-                <style>{`
-                  @keyframes bounce {
-                    0%, 100% { transform: translateY(0); }
-                    50% { transform: translateY(-8px); }
-                  }
-                `}</style>
-                <h3 style={{ fontSize: "20px", fontWeight: "800", color: "#3e2511", marginBottom: 8 }}>
-                  Khởi Tạo AI Stylist Advisor
-                </h3>
-                <p style={{ color: "#8c7e74", fontSize: "14.5px", maxWidth: 450, margin: 0, lineHeight: 1.5 }}>
-                  Hãy chọn một bức ảnh chân dung mẫu ở cột bên trái hoặc tải ảnh chân dung cận cảnh của bạn lên để bắt đầu phân tích hình thể học.
-                </p>
+              <>
+                <div className="ai-consult-heading"><span>02</span><div><strong>Hồ sơ phong cách của bạn</strong><p>{analysis.api_enhanced ? "API phân tích + local kiểm tra an toàn" : "Local fallback"} · Ảnh thử tóc luôn tạo local.</p></div></div>
+                {analysis.fallback_used && (
+                  <div className="ai-local-mode-note" role="status">
+                    <Icon name="shield" size={16} />
+                    <span><strong>Đang dùng chế độ local</strong> API nâng cao không khả dụng nhưng lookbook và thử tóc vẫn hoạt động.</span>
+                  </div>
+                )}
+                <dl className="ai-profile-facts">
+                  <div><dt>Dáng khuôn mặt</dt><dd>{analysis.analysis?.face_shape || "Đã phân tích"}</dd></div>
+                  <div><dt>Chất tóc hiện tại</dt><dd>{analysis.analysis?.hair_type || "Đã phân tích"}</dd></div>
+                  <div><dt>Tông da</dt><dd>{analysis.analysis?.skin_tone || "Đã phân tích"}</dd></div>
+                </dl>
+                <div className="ai-recommendation-block">
+                  <span>Stylist AI đề xuất</span>
+                  {(recommendations.hairstyles || []).slice(0, 2).map((item, index) => (
+                    <button key={`${item.name}-${index}`} type="button" onClick={() => chooseRecommendation(item)}>
+                      <i>{String(index + 1).padStart(2, "0")}</i><span><strong>{item.name}</strong><small>{item.description}</small></span><Icon name="arrow" />
+                    </button>
+                  ))}
+                  {(recommendations.colors || []).slice(0, 1).map((item) => (
+                    <button key={item.name} type="button" onClick={() => chooseRecommendation(item)}>
+                      <i className="is-color" /><span><strong>{item.name}</strong><small>{item.description}</small></span><Icon name="arrow" />
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="ai-secondary-action" onClick={() => { setAnalysis(null); setActiveResult(null); }}><Icon name="reset" /> Phân tích lại ảnh</button>
+              </>
+            )}
+
+            {error && <div className="ai-stylist-error" role="alert"><strong>Chưa thể hoàn tất</strong><span>{error}</span></div>}
+          </aside>
+        </section>
+
+        {analysis && (
+          <section className="ai-lookbook-section">
+            <div className="ai-section-heading">
+              <div><span>02 · Lookbook salon</span><h2>Chọn một mẫu để thử trực tiếp</h2><p>Mỗi lựa chọn tạo một ảnh mới; bạn có thể so sánh nhiều mẫu trong cùng phiên.</p></div>
+              <div className="ai-lookbook-filters" role="group" aria-label="Lọc mẫu tóc">
+                {FILTERS.map((filter) => <button type="button" key={filter.value} className={activeFilter === filter.value ? "is-active" : ""} onClick={() => setActiveFilter(filter.value)}>{filter.label}</button>)}
+              </div>
+            </div>
+
+            {styleError ? <div className="ai-stylist-error"><span>{styleError}</span></div> : (
+              <div className="ai-style-grid">
+                {filteredStyles.map((style) => (
+                  <button type="button" key={style.style_id} className={`ai-style-card ${selectedStyle?.style_id === style.style_id ? "is-selected" : ""}`} onClick={() => chooseStyle(style)}>
+                    <div className="ai-style-image"><img src={resolveFileUrl(style.thumbnail_url)} alt={`Mẫu ${style.name}`} />{style.is_trending && <b className="ai-trend-badge">Hot {style.trend_year || 2026}</b>}<span style={{ background: style.accent_color || "#d6b57e" }} /></div>
+                    <div className="ai-style-card-body"><small>{style.type === "COLOR" ? "Màu tóc" : style.length === "SHORT" ? "Tóc ngắn" : style.length === "LONG" ? "Tóc dài" : "Tóc trung bình"}</small><strong>{style.name}</strong><p>{style.description}</p><em>{MAINTENANCE_LABELS[style.maintenance] || "Chăm sóc vừa"}</em></div>
+                    <span className="ai-style-check"><Icon name="check" size={14} /></span>
+                  </button>
+                ))}
               </div>
             )}
-          </div>
-        </div>
 
-        {/* History Section */}
-        {history.length > 0 && (
-          <div style={{ marginTop: 40, borderTop: "1px solid #eaddca", paddingTop: 30 }}>
-            <h3 style={{ fontSize: "20px", fontWeight: "800", color: "#3e2511", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
-              <span>📜</span> Lịch sử phân tích & tư vấn của bạn
-            </h3>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: 20
-            }}>
-              {history.map((item, idx) => {
-                const formattedDate = new Date(item.created_at).toLocaleString("vi-VN", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit"
-                });
-                const isFallbackItem = item.is_fallback;
+            <div className="ai-custom-look">
+              <div><span>Tinh chỉnh theo ý bạn</span><strong>{selectedStyle ? `Đang chọn: ${selectedStyle.name}` : "Mô tả mái tóc bạn muốn"}</strong></div>
+              <textarea value={customPrompt} onChange={(event) => setCustomPrompt(event.target.value)} maxLength={800} placeholder="Ví dụ: giữ phom layer này nhưng đổi sang màu nâu hạt dẻ, mái bay nhẹ và độ dài ngang vai…" />
+              <button type="button" onClick={createTryOn} disabled={tryOnLoading || (!selectedStyle && !customPrompt.trim())}><Icon name="sparkle" /> {tryOnLoading ? "Đang tạo ảnh thật…" : activeResult ? "Tạo thêm một phiên bản" : "Thử kiểu tóc này"}</button>
+            </div>
+          </section>
+        )}
+
+        {(sessionResults.length > 0 || history.length > 0) && (
+          <section className="ai-history-section">
+            <div className="ai-section-heading">
+              <div><span>03 · Bộ sưu tập riêng</span><h2>Những kiểu bạn đã thử</h2><p>Kết quả chỉ tải qua phiên đăng nhập của bạn. Chọn một mẫu để mở lại trong gương.</p></div>
+              <Icon name="history" size={24} />
+            </div>
+            <div className={`ai-history-rail ${historyLoading ? "is-loading" : ""}`}>
+              {history.filter((item) => item.status === "SUCCEEDED").map((item) => {
+                const liveResult = sessionResults.find((result) => result.try_on_id === item.try_on_id);
                 return (
-                  <div 
-                    key={item.audit_id || idx}
-                    onClick={() => {
-                      setData(item);
-                      if (item.image_url) {
-                        setImageUrl(item.image_url);
-                      }
-                      setActiveTab("morphology");
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    style={{
-                      background: "#ffffff",
-                      border: "1px solid",
-                      borderColor: data?.audit_id === item.audit_id ? "#a37f55" : "#eaddca",
-                      borderRadius: "16px",
-                      padding: "16px",
-                      cursor: "pointer",
-                      transition: "all 0.25s",
-                      boxShadow: data?.audit_id === item.audit_id ? "0 8px 24px rgba(163, 127, 85, 0.15)" : "none",
-                      display: "flex",
-                      gap: "14px",
-                      alignItems: "center"
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = "#a37f55";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (data?.audit_id !== item.audit_id) {
-                        e.currentTarget.style.borderColor = "#eaddca";
-                      }
-                      e.currentTarget.style.transform = "none";
-                    }}
-                  >
-                    {/* Portrait Thumbnail */}
-                    <div style={{ width: "65px", height: "65px", borderRadius: "10px", overflow: "hidden", border: "1px solid #eaddca", flexShrink: 0, background: "#faf8f5" }}>
-                      {item.image_url ? (
-                        <img src={item.image_url} alt="Portrait scanned" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", background: "#f2ece6", color: "#a37f55" }}>👤</div>
-                      )}
-                    </div>
-
-                    {/* Details Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                        <span style={{ fontSize: "11px", color: "#8c7e74", fontWeight: "700" }}>{formattedDate}</span>
-                        <span style={{
-                          fontSize: "9px",
-                          fontWeight: "800",
-                          padding: "2px 6px",
-                          borderRadius: "50px",
-                          background: isFallbackItem ? "#fff9e6" : "#eefaf2",
-                          color: isFallbackItem ? "#856404" : "#155724"
-                        }}>
-                          {isFallbackItem ? "Dự phòng" : "AI Thật"}
-                        </span>
-                      </div>
-                      
-                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                        <div style={{ fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          <strong>Kiểu tóc:</strong> <span style={{ color: "#8a653a", fontWeight: "700" }}>{item.recommendations?.hairstyles?.[0]?.name || "N/A"}</span>
-                        </div>
-                        <div style={{ fontSize: "11.5px", color: "#5c4a3c", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.analysis?.face_shape || "N/A"} | {item.analysis?.hair_type || "N/A"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <button type="button" key={item.try_on_id} className={activeResult?.try_on_id === item.try_on_id ? "is-active" : ""} onClick={() => liveResult ? setActiveResult(liveResult) : openHistoryItem(item)}>
+                    <div>{liveResult?.resultUrl ? <img src={liveResult.resultUrl} alt="Kết quả thử tóc" /> : <span style={{ background: item.style?.accent_color || "#d6b57e" }}><Icon name="image" /></span>}</div>
+                    <strong>{item.style?.name || item.prompt}</strong>
+                    <small>{new Date(item.created_at).toLocaleDateString("vi-VN")} · {Math.max(1, Math.round((item.latency_ms || 0) / 1000))}s</small>
+                    {item.is_favorite && <i><Icon name="heart" size={13} /></i>}
+                  </button>
                 );
               })}
             </div>
-          </div>
+          </section>
         )}
+
+        <footer className="ai-stylist-disclaimer">
+          <Icon name="shield" size={18} />
+          <p><strong>Kết quả dùng để tham khảo phong cách.</strong> Màu và phom tóc thực tế còn phụ thuộc nền tóc, chất tóc và kỹ thuật thực hiện. Hãy đặt lịch để stylist kiểm tra trực tiếp trước khi dùng hóa chất.</p>
+        </footer>
       </div>
     </CustomerLayout>
   );

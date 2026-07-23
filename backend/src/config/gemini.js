@@ -18,12 +18,15 @@ const MODELS = [
  * @returns {Promise<string>} - Response text từ AI
  */
 async function generateContent(systemPrompt, userMessage, options = {}) {
-  const { jsonMode = false, maxTokens = 4096 } = options;
+  const { jsonMode = false, maxTokens = 4096, timeoutMs = 20000, maxProviderAttempts = 2 } = options;
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+  let attempts = 0;
+  let lastError = null;
 
   // 1. Thử gọi Google Gemini trực tiếp
-  if (geminiApiKey) {
+  if (geminiApiKey && attempts < maxProviderAttempts) {
+    attempts += 1;
     try {
       console.log('[AI] Attempting call to direct Google Gemini API...');
       const response = await axios.post(
@@ -45,7 +48,7 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
         },
         {
           headers: { 'Content-Type': 'application/json' },
-          timeout: 20000
+          timeout: timeoutMs
         }
       );
 
@@ -55,6 +58,7 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
         return answer;
       }
     } catch (err) {
+      lastError = err;
       console.warn(`[AI] Direct Gemini API failed: ${err.message}. Falling back to OpenRouter...`);
     }
   }
@@ -64,9 +68,9 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
     throw new Error('Chưa cấu hình API Key cho Google Gemini (GEMINI_API_KEY) hoặc OpenRouter (OPENROUTER_API_KEY) trong file .env');
   }
 
-  let lastError = null;
-
   for (const model of MODELS) {
+    if (attempts >= maxProviderAttempts) break;
+    attempts += 1;
     try {
       console.log(`[AI] Attempting OpenRouter call with model: ${model}`);
       const response = await axios.post(
@@ -86,7 +90,7 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
             'HTTP-Referer': 'http://localhost:5173',
             'X-Title': 'Beauty Salon AI Assistant',
           },
-          timeout: 20000,
+          timeout: timeoutMs,
         }
       );
 

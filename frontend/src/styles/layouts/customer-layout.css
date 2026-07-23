@@ -23,6 +23,12 @@
   backdrop-filter: blur(18px);
 }
 
+.customer-pink-sidebar-overlay,
+.customer-pink-sidebar-close,
+.customer-pink-mobile-menu {
+  display: none;
+}
+
 .customer-pink-brand {
   display: flex;
   align-items: center;
@@ -264,8 +270,81 @@
   }
 
   .customer-pink-sidebar {
-    position: relative;
-    height: auto;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1001;
+    width: min(306px, 88vw);
+    height: 100dvh;
+    transform: translateX(-104%);
+    visibility: hidden;
+    box-shadow: 28px 0 64px rgba(60, 35, 49, 0.2);
+    transition: transform 220ms ease, visibility 0s linear 220ms;
+  }
+
+  .customer-pink-sidebar.is-open {
+    transform: translateX(0);
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .customer-pink-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    border: 0;
+    background: rgba(45, 36, 48, 0.42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+
+  .customer-pink-sidebar-overlay.is-visible {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .customer-pink-sidebar-close {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    width: 40px;
+    height: 40px;
+    margin: 0 0 10px auto;
+    border: 1px solid #f1d8e1;
+    border-radius: 50%;
+    background: #fff;
+    color: #2d2430;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .customer-pink-mobile-menu {
+    display: grid;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    align-content: center;
+    justify-items: center;
+    gap: 5px;
+    border: 1px solid #f1d8e1;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+  }
+
+  .customer-pink-mobile-menu span {
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: #2d2430;
+  }
+
+  .customer-pink-topbar-intro {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 }
 
@@ -277,8 +356,23 @@
   }
 
   .customer-pink-topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+  }
+
+  .customer-pink-topbar h1 {
+    font-size: 20px;
+  }
+
+  .customer-pink-top-actions a {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-pink-sidebar,
+  .customer-pink-sidebar-overlay {
+    transition: none;
   }
 }
 

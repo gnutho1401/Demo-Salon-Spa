@@ -1,0 +1,4 @@
+-r requirements.txt
+peft>=0.17,<1
+torchvision>=0.23,<1
+tensorboard>=2.20,<3

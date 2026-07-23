@@ -48,6 +48,7 @@ export default function CustomerLayout({ children }) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const sidebarRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const savedScrollTop = sessionStorage.getItem("customer-sidebar-scroll");
@@ -60,6 +61,34 @@ export default function CustomerLayout({ children }) {
       }
     }
   }, [location.pathname]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1100px)");
+    if (!mediaQuery.matches) setMenuOpen(false);
+    const handleViewportChange = (event) => {
+      if (!event.matches) setMenuOpen(false);
+    };
+    mediaQuery.addEventListener("change", handleViewportChange);
+    return () => mediaQuery.removeEventListener("change", handleViewportChange);
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [menuOpen]);
 
   const handleSidebarScroll = (e) => {
     sessionStorage.setItem("customer-sidebar-scroll", e.currentTarget.scrollTop);
@@ -130,11 +159,26 @@ export default function CustomerLayout({ children }) {
   return (
     <GuestLayout>
       <div className="customer-pink-shell">
+        <button
+          type="button"
+          className={`customer-pink-sidebar-overlay${menuOpen ? " is-visible" : ""}`}
+          aria-label="Đóng menu và quay lại nội dung"
+          onClick={() => setMenuOpen(false)}
+        />
         <aside 
           ref={sidebarRef}
           onScroll={handleSidebarScroll}
-          className="customer-pink-sidebar"
+          className={`customer-pink-sidebar${menuOpen ? " is-open" : ""}`}
+          id="customer-account-navigation"
         >
+          <button
+            type="button"
+            className="customer-pink-sidebar-close"
+            aria-label="Đóng menu tài khoản"
+            onClick={() => setMenuOpen(false)}
+          >
+            ×
+          </button>
           <Link to="/customer" className="customer-pink-brand">
             <div className="customer-pink-brand-icon">🌸</div>
             <div>
@@ -202,11 +246,25 @@ export default function CustomerLayout({ children }) {
           </div>
         </aside>
 
-        <section className="customer-pink-content">
+        <section className="customer-pink-content" inert={menuOpen ? true : undefined}>
           <header className="customer-pink-topbar">
-            <div>
-              <span>Xin chào, {displayName}</span>
-              <h1>Không gian chăm sóc sắc đẹp của bạn</h1>
+            <div className="customer-pink-topbar-intro">
+              <button
+                type="button"
+                className="customer-pink-mobile-menu"
+                aria-label="Mở menu tài khoản"
+                aria-controls="customer-account-navigation"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen(true)}
+              >
+                <span aria-hidden="true" />
+                <span aria-hidden="true" />
+                <span aria-hidden="true" />
+              </button>
+              <div>
+                <span>Xin chào, {displayName}</span>
+                <h1>Không gian chăm sóc sắc đẹp của bạn</h1>
+              </div>
             </div>
 
             <div className="customer-pink-top-actions">

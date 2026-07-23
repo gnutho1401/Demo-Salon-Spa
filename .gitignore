@@ -12,6 +12,20 @@ frontend/.env
 dist/
 build/
 
+# Local AI runtime and model weights
+ai-worker/hair-tryon/.venv/
+ai-worker/hair-tryon/.python/
+__pycache__/
+*.pyc
+.uv-cache/
+.ai-models/
+.wsl/
+.local-results/
+ai-worker/hair-tryon/models/*.onnx
+ai-worker/hair-tryon/models/natural-hair-lora/
+ai-worker/hair-tryon/training/data-*/
+ai-worker/hair-tryon/training/source/
+
 # Logs
 *.log
 

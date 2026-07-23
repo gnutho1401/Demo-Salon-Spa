@@ -11,7 +11,7 @@ async function getCustomerByUserId(pool, userId) {
 
 async function analyze(req, res) {
   try {
-    let { customer_id, image_url } = req.body;
+    let { customer_id, image_url, audience } = req.body;
     
     if (!image_url) {
       return error(res, 'Vui lòng cung cấp image_url', 400);
@@ -26,11 +26,12 @@ async function analyze(req, res) {
       customer_id = customer.CustomerId;
     }
 
-    const recommendations = await service.getStylistRecommendations(Number(customer_id), image_url);
+    const recommendations = await service.getStylistRecommendations(Number(customer_id), image_url, audience);
     return success(res, recommendations, 'Đề xuất từ AI Stylist thành công');
   } catch (err) {
     console.error('[AI Stylist Controller Error]:', err.message);
-    return error(res, err.message, 500);
+    const clientError = /ảnh chưa chính diện|không nhận diện được khuôn mặt|vui lòng cung cấp image_url/i.test(err.message);
+    return error(res, err.message, clientError ? 400 : 500);
   }
 }
 
