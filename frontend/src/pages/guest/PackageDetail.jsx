@@ -27,6 +27,12 @@ export default function PackageDetail() {
       navigate('/login');
       return;
     }
+
+    const confirmPayment = window.confirm(
+      "⚠️ LƯU Ý QUAN TRỌNG:\nGói combo / liệu trình sau khi đã thanh toán sẽ KHÔNG ĐƯỢC HỦY HOẶC HOÀN TIỀN dưới bất kỳ hình thức nào.\n\nBạn có chắc chắn muốn tiếp tục thanh toán?"
+    );
+    if (!confirmPayment) return;
+
     setPaying(true);
     setMessage('');
     try {
@@ -101,6 +107,26 @@ export default function PackageDetail() {
               >
                 <span className="payment-method-card-icon">💵</span>
                 <span className="payment-method-card-title">Tại quầy Spa</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#fffbe6',
+              border: '1px solid #ffe58f',
+              borderRadius: '10px',
+              padding: '12px 14px',
+              margin: '14px 0',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              color: '#8c6b00',
+              fontSize: '0.88rem',
+              lineHeight: '1.4'
+            }}>
+              <span style={{ fontSize: '1.2rem', lineHeight: '1' }}>⚠️</span>
+              <div>
+                <strong style={{ display: 'block', color: '#d48806', marginBottom: '2px' }}>Chính sách lưu ý:</strong>
+                Gói combo / liệu trình sau khi đã thanh toán thành công sẽ <strong>KHÔNG ĐƯỢC HỦY HOẶC HOÀN TIỀN</strong> dưới bất kỳ hình thức nào. Vui lòng kiểm tra kỹ trước khi thanh toán.
               </div>
             </div>
 

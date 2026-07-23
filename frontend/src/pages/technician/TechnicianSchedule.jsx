@@ -203,9 +203,12 @@ export default function TechnicianSchedule() {
       setSelected((current) => {
         if (!current) return nextData.appointments?.[0] || null;
 
-        const updated = nextData.appointments?.find(
-          (a) => a.AppointmentId === current.AppointmentId,
-        );
+        const updated = nextData.appointments?.find((a) => {
+          if (current.AppointmentServiceId && a.AppointmentServiceId) {
+            return Number(a.AppointmentServiceId) === Number(current.AppointmentServiceId);
+          }
+          return Number(a.AppointmentId) === Number(current.AppointmentId);
+        });
 
         return updated || nextData.appointments?.[0] || null;
       });
@@ -277,6 +280,7 @@ export default function TechnicianSchedule() {
 
       await axiosClient.patch(
         `/technician/appointments/${selected.AppointmentId}/start`,
+        { appointmentServiceId: selected.AppointmentServiceId, serviceId: selected.ServiceId }
       );
 
       await loadSchedule();
@@ -294,11 +298,18 @@ export default function TechnicianSchedule() {
       setActionLoading(true);
       setError("");
 
-      await axiosClient.patch(
-        `/technician/appointments/${selected.AppointmentId}/complete`,
-      );
-
-      navigate(`/technician/treatment-notes?appointmentId=${selected.AppointmentId}`);
+      if (selected.CustomerPackageId) {
+        await axiosClient.patch(
+          `/technician/appointments/${selected.AppointmentId}/complete-step`,
+          { appointmentServiceId: selected.AppointmentServiceId }
+        );
+      } else {
+        await axiosClient.patch(
+          `/technician/appointments/${selected.AppointmentId}/complete`,
+        );
+      }
+      await loadSchedule();
+      alert(`✅ Đã hoàn thành dịch vụ "${selected.ServiceName || ""}"!`);
     } catch (err) {
       setError(err.response?.data?.message || "Không thể hoàn thành dịch vụ");
     } finally {
@@ -328,9 +339,25 @@ export default function TechnicianSchedule() {
     }
   };
 
-  const canStart = selected && ["CONFIRMED", "PAID", "CHECKED_IN"].includes(selected.Status);
-  const canComplete = selected && selected.Status === "IN_PROGRESS";
-  const canNoShow = selected && ["CONFIRMED", "PAID", "CHECKED_IN"].includes(selected.Status);
+  // Với Combo: canStart = bước của mình còn PENDING và chưa IN_PROGRESS
+  // Với lịch thường: dựa vào appointment status
+  const canStart = selected && (() => {
+    if (selected.CustomerPackageId) {
+      // Combo: chỉ có thể bắt đầu nếu bước này còn PENDING
+      return selected.MyStepStatus === 'PENDING' && ['CONFIRMED','PAID','CHECKED_IN','IN_PROGRESS'].includes(selected.Status);
+    }
+    return ['CONFIRMED', 'PAID', 'CHECKED_IN'].includes(selected.Status);
+  })();
+
+  const canComplete = selected && (() => {
+    if (selected.CustomerPackageId) {
+      // Combo: chỉ hoàn thành được khi bước này đang IN_PROGRESS
+      return selected.MyStepStatus === 'IN_PROGRESS';
+    }
+    return selected.Status === 'IN_PROGRESS';
+  })();
+
+  const canNoShow = selected && !selected.CustomerPackageId && ['CONFIRMED', 'PAID', 'CHECKED_IN'].includes(selected.Status);
 
   return (
     <TechnicianLayout>
@@ -1057,9 +1084,9 @@ export default function TechnicianSchedule() {
                       ) : (
                         dayAppointments.map((a) => (
                           <button
-                            key={a.AppointmentId}
+                            key={a.AppointmentServiceId ? `${a.AppointmentId}-${a.AppointmentServiceId}` : a.AppointmentId}
                             className={`appointment-block ${String(
-                              a.Status,
+                              a.CustomerPackageId ? (a.MyStepStatus || a.Status) : a.Status,
                             ).toLowerCase()}`}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1068,13 +1095,14 @@ export default function TechnicianSchedule() {
                             onDoubleClick={(e) => {
                               e.stopPropagation();
                               navigate(
-                                `/technician/appointments/${a.AppointmentId}`,
+                                `/technician/appointments/${a.AppointmentId}?serviceId=${a.ServiceId || a.AppointmentServiceId || ""}`,
                               );
                             }}
                           >
                             <b>{a.StartTime}</b>
                             <span>{a.CustomerName}</span>
-                            <small>{a.ServiceName}</small>
+                            <small>{a.MyStepServiceName || a.ServiceName}</small>
+                            {a.CustomerPackageId && <small style={{color:'#ec4899'}}>📦 Combo</small>}
                           </button>
                         ))
                       )}
@@ -1099,9 +1127,9 @@ export default function TechnicianSchedule() {
                       <div className="calendar-cell" key={d + hour}>
                         {byDateHour(d, hour).map((a) => (
                           <button
-                            key={a.AppointmentId}
+                            key={a.AppointmentServiceId ? `${a.AppointmentId}-${a.AppointmentServiceId}` : a.AppointmentId}
                             className={`appointment-block ${String(
-                              a.Status,
+                              a.CustomerPackageId ? (a.MyStepStatus || a.Status) : a.Status,
                             ).toLowerCase()}`}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1110,13 +1138,14 @@ export default function TechnicianSchedule() {
                             onDoubleClick={(e) => {
                               e.stopPropagation();
                               navigate(
-                                `/technician/appointments/${a.AppointmentId}`,
+                                `/technician/appointments/${a.AppointmentId}?serviceId=${a.ServiceId || a.AppointmentServiceId || ""}`,
                               );
                             }}
                           >
                             <b>{a.StartTime}</b>
                             <span>{a.CustomerName}</span>
-                            <small>{a.ServiceName}</small>
+                            <small>{a.MyStepServiceName || a.ServiceName}</small>
+                            {a.CustomerPackageId && <small style={{color:'#ec4899'}}>📦 Combo</small>}
                           </button>
                         ))}
                       </div>
@@ -1173,7 +1202,21 @@ export default function TechnicianSchedule() {
                 <div className="detail-list">
                   <p>
                     <b>Dịch vụ</b>
-                    <span>{selected.ServiceName || "Không có dịch vụ"}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {selected.MyStepServiceName || selected.ServiceName || "Không có dịch vụ"}
+                      {selected.CustomerPackageId && (
+                        <span style={{ background: '#fce7f3', color: '#831843', borderRadius: '6px', padding: '1px 6px', fontSize: '0.72rem', fontWeight: 700 }}>📦 Gói Combo</span>
+                      )}
+                      {selected.CustomerPackageId && selected.MyStepStatus && (
+                        <span style={{
+                          background: selected.MyStepStatus === 'COMPLETED' ? '#dcfce7' : selected.MyStepStatus === 'IN_PROGRESS' ? '#fef9c3' : '#f1f5f9',
+                          color: selected.MyStepStatus === 'COMPLETED' ? '#15803d' : selected.MyStepStatus === 'IN_PROGRESS' ? '#92400e' : '#64748b',
+                          borderRadius: '6px', padding: '1px 6px', fontSize: '0.72rem', fontWeight: 700
+                        }}>
+                          {selected.MyStepStatus === 'COMPLETED' ? '✓ Bước hoàn thành' : selected.MyStepStatus === 'IN_PROGRESS' ? '▶ Đang thực hiện' : '○ Chờ thực hiện'}
+                        </span>
+                      )}
+                    </span>
                   </p>
 
                   <p>
@@ -1249,15 +1292,26 @@ export default function TechnicianSchedule() {
 
                   <button
                     className="note"
-                    disabled={!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase())}
+                    disabled={selected.CustomerPackageId
+                      ? !['IN_PROGRESS','COMPLETED'].includes(selected.MyStepStatus || '')
+                      : !["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase())}
                     onClick={() => {
-                      if (!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase())) {
-                        alert("Chỉ được viết và xem ghi chú điều trị khi dịch vụ ở trạng thái Đang thực hiện hoặc Hoàn thành.");
+                      const ok = selected.CustomerPackageId
+                        ? ['IN_PROGRESS','COMPLETED'].includes(selected.MyStepStatus || '')
+                        : ["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase());
+                      if (!ok) {
+                        alert("Chỉ được viết và xem ghi chú điều trị khi bước dịch vụ đang thực hiện hoặc hoàn thành.");
                         return;
                       }
-                      navigate(`/technician/treatment-notes?appointmentId=${selected.AppointmentId}`);
+                      const svcId = selected.ServiceId || "";
+                      navigate(`/technician/treatment-notes?appointmentId=${selected.AppointmentId}${svcId ? `&serviceId=${svcId}` : ""}`);
                     }}
-                    style={!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase()) ? { opacity: 0.5, cursor: "not-allowed" } : {}}
+                    style={(() => {
+                      const disabled = selected.CustomerPackageId
+                        ? !['IN_PROGRESS','COMPLETED'].includes(selected.MyStepStatus || '')
+                        : !["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase());
+                      return disabled ? { opacity: 0.5, cursor: "not-allowed" } : {};
+                    })()}
                     title={!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
                   >
                     📝 Ghi chú điều trị
@@ -1269,8 +1323,8 @@ export default function TechnicianSchedule() {
                       className="complete"
                       disabled={actionLoading}
                     >
-                      {selected.PaymentStatus === "PAID" || selected.CustomerPackageId
-                        ? "✓ Hoàn thành & Checkout"
+                      {selected.CustomerPackageId
+                        ? "✓ Xác nhận xong bước này"
                         : "✓ Hoàn thành ca"}
                     </button>
                   )}

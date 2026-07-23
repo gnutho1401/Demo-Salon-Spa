@@ -239,6 +239,20 @@ router.put(
   controller.completeAppointment,
 );
 
+// Hoàn thành bước dịch vụ của KTV trong Combo (đồng bộ với lễ tân)
+router.patch(
+  "/appointments/:id/complete-step",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.completeMyStep,
+);
+router.put(
+  "/appointments/:id/complete-step",
+  authMiddleware,
+  allowRoles("TECHNICIAN", "ADMIN", "MANAGER"),
+  controller.completeMyStep,
+);
+
 router.patch(
   "/appointments/:id/duration",
   authMiddleware,

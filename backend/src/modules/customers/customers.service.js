@@ -795,6 +795,10 @@ async function getMyReviews(userId) {
       CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
       CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
 
+      cp.CustomerPackageId,
+      pkg.PackageName,
+      pkg.ImageUrl AS PackageImageUrl,
+
       eu.FullName AS EmployeeName,
       e.Position AS EmployeePosition,
       e.Specialization AS EmployeeSpecialization,
@@ -811,6 +815,8 @@ async function getMyReviews(userId) {
     JOIN Customers c ON r.CustomerId = c.CustomerId
     LEFT JOIN Services s ON r.ServiceId = s.ServiceId
     LEFT JOIN Appointments a ON r.AppointmentId = a.AppointmentId
+    LEFT JOIN CustomerPackages cp ON a.CustomerPackageId = cp.CustomerPackageId
+    LEFT JOIN Packages pkg ON cp.PackageId = pkg.PackageId
     LEFT JOIN Employees e ON r.EmployeeId = e.EmployeeId
     LEFT JOIN Users eu ON e.UserId = eu.UserId
     WHERE c.UserId = @UserId
@@ -862,6 +868,12 @@ async function getMyServiceHistory(userId) {
 
         s.ServiceName,
         s.Description AS ServiceDescription,
+        CONVERT(VARCHAR(5), aps.StartTime, 108) AS StepStartTime,
+        CONVERT(VARCHAR(5), aps.EndTime, 108) AS StepEndTime,
+        aps.EmployeeId AS StepEmployeeId,
+        COALESCE(eu_step.FullName, eu.FullName) AS StepTechnicianName,
+        COALESCE(e_step.ImageUrl, e.ImageUrl) AS StepTechnicianAvatar,
+
         s.DurationMinutes,
         s.ImageUrl AS ServiceImageUrl,
         sc.CategoryId,
@@ -889,6 +901,7 @@ async function getMyServiceHistory(userId) {
 
         cp.CustomerPackageId,
         pkg.PackageName,
+        pkg.ImageUrl AS PackageImageUrl,
 
         p.PaymentId,
         ISNULL(p.Status, 'UNPAID') AS PaymentStatus,
@@ -919,6 +932,9 @@ async function getMyServiceHistory(userId) {
       JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
       JOIN Services s ON aps.ServiceId = s.ServiceId
       LEFT JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
+
+      LEFT JOIN Employees e_step ON aps.EmployeeId = e_step.EmployeeId
+      LEFT JOIN Users eu_step ON e_step.UserId = eu_step.UserId
 
       JOIN Employees e ON a.EmployeeId = e.EmployeeId
       JOIN Users eu ON e.UserId = eu.UserId
@@ -1246,12 +1262,17 @@ async function getMyReviewableServices(userId) {
         s.ImageUrl AS ServiceImageUrl,
         aps.Price,
         a.EmployeeId,
-        eu.FullName AS EmployeeName
+        eu.FullName AS EmployeeName,
+        cp.CustomerPackageId,
+        pkg.PackageName,
+        pkg.ImageUrl AS PackageImageUrl
       FROM Appointments a
       JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
       JOIN Services s ON aps.ServiceId = s.ServiceId
       JOIN Employees e ON a.EmployeeId = e.EmployeeId
       JOIN Users eu ON e.UserId = eu.UserId
+      LEFT JOIN CustomerPackages cp ON a.CustomerPackageId = cp.CustomerPackageId
+      LEFT JOIN Packages pkg ON cp.PackageId = pkg.PackageId
       LEFT JOIN Reviews r
         ON r.CustomerId = a.CustomerId
        AND r.AppointmentId = a.AppointmentId

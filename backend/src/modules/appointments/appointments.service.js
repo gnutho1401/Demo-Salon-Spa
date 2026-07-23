@@ -73,6 +73,42 @@ async function checkEmployeeBusy(
   );
 }
 
+async function checkCustomerBusy(
+  customerId,
+  appointmentDate,
+  startTime,
+  endTime,
+  excludeAppointmentId = null,
+  transaction = null
+) {
+  const req = transaction ? new sql.Request(transaction) : (await connectDB()).request();
+  req.input("CustomerId", sql.Int, customerId)
+    .input("AppointmentDate", sql.Date, appointmentDate)
+    .input("StartTime", sql.VarChar, startTime)
+    .input("EndTime", sql.VarChar, endTime);
+
+  let excludeQuery = "";
+  if (excludeAppointmentId) {
+    req.input("ExcludeId", sql.Int, excludeAppointmentId);
+    excludeQuery = "AND a.AppointmentId <> @ExcludeId";
+  }
+
+  const result = await req.query(`
+    SELECT TOP 1 a.AppointmentId
+    FROM Appointments a
+    WHERE a.CustomerId = @CustomerId
+      AND a.AppointmentDate = @AppointmentDate
+      AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'EXPIRED', 'REJECTED')
+      AND (@StartTime < a.EndTime AND @EndTime > a.StartTime)
+      ${excludeQuery}
+  `);
+
+  if (result.recordset.length > 0) {
+    throw new Error("Bạn đã có một lịch hẹn khác trong cùng khung giờ này rồi. Vui lòng chọn khung giờ khác!");
+  }
+}
+
+
 function normalizeDateOnly(value) {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -568,6 +604,8 @@ async function create(userId, data) {
   }
 
   await checkEmployeeBusy(employeeId, appointmentDate, startTime, endTime);
+  await checkCustomerBusy(customerId, appointmentDate, startTime, endTime);
+
 
   const pool = await connectDB();
 
@@ -960,6 +998,8 @@ async function getMyAppointments(userId) {
       WHERE a.CustomerId = @CustomerId
       ORDER BY a.AppointmentDate DESC, a.StartTime DESC, a.AppointmentId DESC
     `);
+
+
 
   return result.recordset;
 }
@@ -2100,6 +2140,215 @@ async function confirmAppointment(id, user) {
   }
 }
 
+async function getAvailableTechniciansForAppointmentStep(appointmentId, appointmentServiceId = null) {
+  const pool = await connectDB();
+
+  const apptRes = await pool.request()
+    .input("AppointmentId", sql.Int, Number(appointmentId))
+    .query(`
+      SELECT AppointmentId, CustomerId, EmployeeId, AppointmentDate, 
+             CONVERT(VARCHAR(5), StartTime, 108) AS StartTime,
+             CONVERT(VARCHAR(5), EndTime, 108) AS EndTime,
+             Status, BranchId, CustomerPackageId
+      FROM Appointments WHERE AppointmentId = @AppointmentId
+    `);
+  const appt = apptRes.recordset[0];
+  if (!appt) throw new Error("Không tìm thấy lịch hẹn");
+
+  let serviceId = null;
+  let startTime = appt.StartTime;
+  let endTime = appt.EndTime;
+  let currentEmployeeId = appt.EmployeeId;
+
+  if (appointmentServiceId) {
+    const stepRes = await pool.request()
+      .input("AppointmentServiceId", sql.Int, Number(appointmentServiceId))
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .query(`
+        SELECT AppointmentServiceId, ServiceId, EmployeeId, Status,
+               CONVERT(VARCHAR(5), StartTime, 108) AS StepStartTime,
+               CONVERT(VARCHAR(5), EndTime, 108) AS StepEndTime
+        FROM AppointmentServices
+        WHERE AppointmentServiceId = @AppointmentServiceId AND AppointmentId = @AppointmentId
+      `);
+    const step = stepRes.recordset[0];
+    if (step) {
+      serviceId = step.ServiceId;
+      if (step.StepStartTime) startTime = step.StepStartTime;
+      if (step.StepEndTime) endTime = step.StepEndTime;
+      if (step.EmployeeId) currentEmployeeId = step.EmployeeId;
+    }
+  }
+
+  if (!serviceId) {
+    const firstSvcRes = await pool.request()
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .query(`SELECT TOP 1 ServiceId FROM AppointmentServices WHERE AppointmentId = @AppointmentId ORDER BY AppointmentServiceId ASC`);
+    serviceId = firstSvcRes.recordset[0]?.ServiceId;
+  }
+
+  if (!serviceId) throw new Error("Không tìm thấy dịch vụ tương ứng trong lịch hẹn");
+
+
+
+  const startTimeSql = String(startTime || "08:00").slice(0, 5) + ":00";
+  const endTimeSql = String(endTime || "20:00").slice(0, 5) + ":00";
+
+  const result = await pool.request()
+    .input("ServiceId", sql.Int, serviceId)
+    .input("AppointmentDate", sql.Date, appt.AppointmentDate)
+    .input("StartTime", sql.VarChar, startTimeSql)
+    .input("EndTime", sql.VarChar, endTimeSql)
+    .input("ExcludeAppointmentId", sql.Int, Number(appointmentId))
+    .query(`
+      SELECT
+        e.EmployeeId,
+        e.EmployeeId AS TechnicianId,
+        u.FullName AS TechnicianName,
+        u.FullName,
+        u.Email AS TechnicianEmail,
+        u.Phone AS TechnicianPhone,
+        e.Position,
+        e.Specialization,
+        COALESCE(e.ImageUrl, u.AvatarUrl) AS ImageUrl,
+        u.AvatarUrl,
+        e.Status AS TechnicianStatus,
+        CASE WHEN e.EmployeeId = ${currentEmployeeId ? Number(currentEmployeeId) : 0} THEN 1 ELSE 0 END AS IsCurrent
+      FROM Employees e
+      JOIN Users u ON e.UserId = u.UserId
+      JOIN EmployeeServices es ON e.EmployeeId = es.EmployeeId AND es.ServiceId = @ServiceId
+      WHERE UPPER(COALESCE(e.Status, 'ACTIVE')) IN ('ACTIVE', 'AVAILABLE', 'WORKING')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM Appointments a
+          LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
+          WHERE (a.EmployeeId = e.EmployeeId OR aps.EmployeeId = e.EmployeeId)
+            AND a.AppointmentId <> @ExcludeAppointmentId
+            AND a.AppointmentDate = @AppointmentDate
+            AND UPPER(COALESCE(a.Status, '')) NOT IN (
+              'CANCELLED', 'REFUND_PENDING', 'REFUNDED', 'NO_SHOW'
+            )
+            AND (
+              @StartTime < CONVERT(VARCHAR(8), COALESCE(aps.EndTime, a.EndTime), 108)
+              AND @EndTime > CONVERT(VARCHAR(8), COALESCE(aps.StartTime, a.StartTime), 108)
+            )
+        )
+      ORDER BY IsCurrent DESC, u.FullName ASC
+    `);
+
+  return {
+    appointmentId: Number(appointmentId),
+    appointmentServiceId: appointmentServiceId ? Number(appointmentServiceId) : null,
+    serviceId,
+    appointmentDate: appt.AppointmentDate,
+    startTime: startTimeSql,
+    endTime: endTimeSql,
+    currentEmployeeId,
+    availableTechnicians: result.recordset || []
+  };
+}
+
+async function changeTechnician(userId, appointmentId, { newEmployeeId, appointmentServiceId = null, isReceptionist = false }) {
+  const pool = await connectDB();
+  const newEmpId = Number(newEmployeeId);
+  if (!newEmpId) throw new Error("Vui lòng chọn Kỹ thuật viên mới");
+
+  const apptRes = await pool.request()
+    .input("AppointmentId", sql.Int, Number(appointmentId))
+    .query(`
+      SELECT AppointmentId, CustomerId, EmployeeId, AppointmentDate, StartTime, EndTime, Status, CustomerPackageId
+      FROM Appointments WHERE AppointmentId = @AppointmentId
+    `);
+  const appt = apptRes.recordset[0];
+  if (!appt) throw new Error("Không tìm thấy lịch hẹn");
+
+  const apptStatus = String(appt.Status || "").toUpperCase();
+  if (['COMPLETED', 'CANCELLED', 'NO_SHOW', 'REFUNDED'].includes(apptStatus)) {
+    throw new Error("Không thể đổi Kỹ thuật viên cho lịch hẹn đã hoàn thành hoặc đã hủy");
+  }
+
+  if (!isReceptionist) {
+    const customerId = await getCustomerIdByUserId(userId);
+    if (appt.CustomerId !== customerId) {
+      throw new Error("Bạn không có quyền thay đổi lịch hẹn này");
+    }
+
+    if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(apptStatus)) {
+      throw new Error("Không thể đổi Kỹ thuật viên khi ca hẹn đang được thực hiện hoặc đã kết thúc");
+    }
+
+    const dateStr = normalizeDateOnly(appt.AppointmentDate);
+    const now = new Date();
+    const todayStr = normalizeDateOnly(now);
+
+    if (dateStr < todayStr) {
+      throw new Error("Không thể đổi Kỹ thuật viên cho lịch hẹn thuộc các ngày trong quá khứ");
+    }
+  }
+
+
+
+  const availInfo = await getAvailableTechniciansForAppointmentStep(appointmentId, appointmentServiceId);
+  const isValidTech = availInfo.availableTechnicians.some(t => Number(t.EmployeeId) === newEmpId);
+  if (!isValidTech) {
+    throw new Error("Kỹ thuật viên này không rảnh trong khung giờ dịch vụ hoặc không có chuyên môn phù hợp.");
+  }
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    if (appointmentServiceId) {
+      await new sql.Request(transaction)
+        .input("AppointmentServiceId", sql.Int, Number(appointmentServiceId))
+        .input("EmployeeId", sql.Int, newEmpId)
+        .query(`
+          UPDATE AppointmentServices
+          SET EmployeeId = @EmployeeId
+          WHERE AppointmentServiceId = @AppointmentServiceId
+        `);
+
+      const firstStepRes = await new sql.Request(transaction)
+        .input("AppointmentId", sql.Int, Number(appointmentId))
+        .query(`SELECT TOP 1 AppointmentServiceId FROM AppointmentServices WHERE AppointmentId = @AppointmentId ORDER BY AppointmentServiceId ASC`);
+
+      if (firstStepRes.recordset[0]?.AppointmentServiceId === Number(appointmentServiceId)) {
+        await new sql.Request(transaction)
+          .input("AppointmentId", sql.Int, Number(appointmentId))
+          .input("EmployeeId", sql.Int, newEmpId)
+          .query(`UPDATE Appointments SET EmployeeId = @EmployeeId, UpdatedAt = GETDATE() WHERE AppointmentId = @AppointmentId`);
+      }
+    } else {
+      await new sql.Request(transaction)
+        .input("AppointmentId", sql.Int, Number(appointmentId))
+        .input("EmployeeId", sql.Int, newEmpId)
+        .query(`
+          UPDATE Appointments SET EmployeeId = @EmployeeId, UpdatedAt = GETDATE() WHERE AppointmentId = @AppointmentId;
+          UPDATE AppointmentServices SET EmployeeId = @EmployeeId WHERE AppointmentId = @AppointmentId;
+        `);
+    }
+
+    const reasonText = isReceptionist 
+      ? `Lễ tân đổi KTV sang ID #${newEmpId}`
+      : `Khách hàng đổi KTV sang ID #${newEmpId}`;
+
+    await addStatusHistory(
+      transaction,
+      Number(appointmentId),
+      null,
+      appt.Status,
+      userId,
+      reasonText
+    );
+
+    await transaction.commit();
+    return { success: true, appointmentId: Number(appointmentId), newEmployeeId: newEmpId };
+  } catch (err) {
+    try { await transaction.rollback(); } catch (_) {}
+    throw err;
+  }
+}
+
 module.exports = {
   getAll,
   getById,
@@ -2117,4 +2366,7 @@ module.exports = {
   startAutoExpireScheduler,
   confirmAppointment,
   deductComboSession,
+  getAvailableTechniciansForAppointmentStep,
+  changeTechnician,
 };
+

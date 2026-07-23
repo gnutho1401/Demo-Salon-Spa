@@ -132,15 +132,28 @@ async function validateAvailability(technicianId, startTime, endTime, excludeApp
     .input("EndTime", sql.VarChar, reqEnd)
     .input("ExcludeAppointmentId", sql.Int, excludeAppointmentId ? Number(excludeAppointmentId) : null)
     .query(`
-      SELECT AppointmentId,
-             CONVERT(VARCHAR(8), StartTime, 108) AS StartTime,
-             CONVERT(VARCHAR(8), EndTime, 108) AS EndTime
-      FROM Appointments
-      WHERE EmployeeId = @EmployeeId
-        AND AppointmentDate = @AppointmentDate
-        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
-        AND (@StartTime < CONVERT(VARCHAR(8), EndTime, 108) AND @EndTime > CONVERT(VARCHAR(8), StartTime, 108))
-        AND (CAST(@ExcludeAppointmentId AS INT) IS NULL OR AppointmentId <> CAST(@ExcludeAppointmentId AS INT))
+      SELECT a.AppointmentId,
+             CONVERT(VARCHAR(8), a.StartTime, 108) AS StartTime,
+             CONVERT(VARCHAR(8), a.EndTime, 108) AS EndTime
+      FROM Appointments a
+      WHERE a.EmployeeId = @EmployeeId
+        AND a.CustomerPackageId IS NULL
+        AND a.AppointmentDate = @AppointmentDate
+        AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
+        AND (@StartTime < CONVERT(VARCHAR(8), a.EndTime, 108) AND @EndTime > CONVERT(VARCHAR(8), a.StartTime, 108))
+        AND (CAST(@ExcludeAppointmentId AS INT) IS NULL OR a.AppointmentId <> CAST(@ExcludeAppointmentId AS INT))
+      UNION ALL
+      SELECT a.AppointmentId,
+             CONVERT(VARCHAR(8), ISNULL(aps.StartTime, a.StartTime), 108) AS StartTime,
+             CONVERT(VARCHAR(8), ISNULL(aps.EndTime, a.EndTime), 108) AS EndTime
+      FROM AppointmentServices aps
+      JOIN Appointments a ON aps.AppointmentId = a.AppointmentId
+      WHERE aps.EmployeeId = @EmployeeId
+        AND a.AppointmentDate = @AppointmentDate
+        AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
+        AND aps.Status <> 'CANCELLED'
+        AND (@StartTime < CONVERT(VARCHAR(8), ISNULL(aps.EndTime, a.EndTime), 108) AND @EndTime > CONVERT(VARCHAR(8), ISNULL(aps.StartTime, a.StartTime), 108))
+        AND (CAST(@ExcludeAppointmentId AS INT) IS NULL OR a.AppointmentId <> CAST(@ExcludeAppointmentId AS INT))
     `);
 
   if (overlapResult.recordset.length > 0) {
@@ -185,49 +198,8 @@ async function calculateSlotsInternal({
   await checkEmployeeCanDoService(Number(employeeId), Number(serviceId));
 
   const pool = await connectDB();
-
-  const shiftsRes = await pool
-    .request()
-    .input("EmployeeId", sql.Int, Number(employeeId))
-    .input("AppointmentDate", sql.Date, appointmentDate).query(`
-      SELECT 
-        CONVERT(VARCHAR(8), ws.StartTime, 108) AS StartTime,
-        CONVERT(VARCHAR(8), ws.EndTime, 108) AS EndTime
-      FROM WorkShifts ws
-      LEFT JOIN ShiftRegistrations sr ON ws.ShiftId = sr.ShiftId AND sr.TechnicianId = @EmployeeId
-      WHERE ws.ShiftDate = @AppointmentDate
-        AND (
-          (sr.TechnicianId = @EmployeeId AND sr.Status = 'APPROVED')
-          OR (ws.ShiftName <> N'Cả Ngày' AND EXISTS (
-            SELECT 1 FROM Appointments a
-            WHERE a.EmployeeId = @EmployeeId
-              AND a.AppointmentDate = ws.ShiftDate
-              AND a.Status NOT IN ('CANCELLED', 'NO_SHOW')
-              AND CONVERT(VARCHAR(5), a.StartTime, 108) >= CONVERT(VARCHAR(5), ws.StartTime, 108)
-              AND CONVERT(VARCHAR(5), a.StartTime, 108) < CONVERT(VARCHAR(5), ws.EndTime, 108)
-          ))
-        )
-    `);
-
-  const shifts = shiftsRes.recordset;
-  let shiftStart = "08:00:00";
-  let shiftEnd = "20:00:00";
-
-  if (shifts.length > 0) {
-    shifts.sort((a, b) => a.StartTime.localeCompare(b.StartTime));
-    shiftStart = shifts[0].StartTime;
-    const endTimes = shifts.map(s => s.EndTime);
-    endTimes.sort();
-    shiftEnd = endTimes[endTimes.length - 1];
-  }
-
-  // Enforce global salon hours limit (08:00 - 20:00)
-  if (shiftStart < "08:00:00") {
-    shiftStart = "08:00:00";
-  }
-  if (shiftEnd > "20:00:00") {
-    shiftEnd = "20:00:00";
-  }
+  const shiftStart = "08:00:00";
+  const shiftEnd = "20:00:00";
 
   const bookedResult = await pool
     .request()
@@ -237,13 +209,25 @@ async function calculateSlotsInternal({
     .input("ExcludeWaitingId", sql.Int, excludeWaitingId ? Number(excludeWaitingId) : null)
     .query(`
       SELECT
-        CONVERT(VARCHAR(8), StartTime, 108) AS StartTime,
-        CONVERT(VARCHAR(8), EndTime, 108) AS EndTime
-      FROM Appointments
-      WHERE EmployeeId = @EmployeeId
-        AND AppointmentDate = @AppointmentDate
-        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
-        AND (CAST(@ExcludeAppointmentId AS INT) IS NULL OR AppointmentId <> CAST(@ExcludeAppointmentId AS INT))
+        CONVERT(VARCHAR(8), a.StartTime, 108) AS StartTime,
+        CONVERT(VARCHAR(8), a.EndTime, 108) AS EndTime
+      FROM Appointments a
+      WHERE a.EmployeeId = @EmployeeId
+        AND a.CustomerPackageId IS NULL
+        AND a.AppointmentDate = @AppointmentDate
+        AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
+        AND (CAST(@ExcludeAppointmentId AS INT) IS NULL OR a.AppointmentId <> CAST(@ExcludeAppointmentId AS INT))
+      UNION ALL
+      SELECT
+        CONVERT(VARCHAR(8), ISNULL(aps.StartTime, a.StartTime), 108) AS StartTime,
+        CONVERT(VARCHAR(8), ISNULL(aps.EndTime, a.EndTime), 108) AS EndTime
+      FROM AppointmentServices aps
+      JOIN Appointments a ON aps.AppointmentId = a.AppointmentId
+      WHERE aps.EmployeeId = @EmployeeId
+        AND a.AppointmentDate = @AppointmentDate
+        AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
+        AND aps.Status <> 'CANCELLED'
+        AND (CAST(@ExcludeAppointmentId AS INT) IS NULL OR a.AppointmentId <> CAST(@ExcludeAppointmentId AS INT))
       UNION ALL
       SELECT
         CONVERT(VARCHAR(8), MatchedStartTime, 108) AS StartTime,
@@ -272,9 +256,7 @@ async function calculateSlotsInternal({
     );
 
     if (slotEnd <= shiftEnd) {
-      const isInRegisteredShift = shifts.length === 0
-        ? (slotStart >= "08:00:00" && slotEnd <= "20:00:00")
-        : shifts.some(s => slotStart >= s.StartTime && slotEnd <= s.EndTime);
+      const isInRegisteredShift = (slotStart >= "08:00:00" && slotEnd <= "20:00:00");
 
       if (isInRegisteredShift) {
         const isBusy = booked.some((b) => slotStart < b.end && slotEnd > b.start);
@@ -468,10 +450,162 @@ async function getAvailableSlots(query) {
   return slots;
 }
 
+async function findAvailableTechnician(appointmentDate, startTime, endTime, serviceId = null) {
+  const pool = await connectDB();
+  const dateStr = normalizeDateOnly(appointmentDate);
+  const startStr = normalizeTimeOnly(startTime);
+  const endStr = normalizeTimeOnly(endTime);
+
+  const req = pool.request()
+    .input("AppointmentDate", sql.Date, dateStr)
+    .input("StartTime", sql.VarChar, startStr)
+    .input("EndTime", sql.VarChar, endStr);
+
+  let serviceFilter = "";
+  if (serviceId) {
+    req.input("ServiceId", sql.Int, Number(serviceId));
+    serviceFilter = "AND EXISTS (SELECT 1 FROM EmployeeServices es WHERE es.EmployeeId = e.EmployeeId AND es.ServiceId = @ServiceId)";
+  }
+
+  const query = `
+    SELECT 
+      e.EmployeeId,
+      u.FullName,
+      u.Email,
+      u.Phone,
+      ISNULL(u.AvatarUrl, e.ImageUrl) AS AvatarUrl,
+      ISNULL(rv.AvgRating, 5.0) AS AvgRating,
+      ISNULL(apCount.TodayCount, 0) AS TodayCount
+    FROM Employees e
+    JOIN Users u ON e.UserId = u.UserId
+    JOIN Roles r ON u.RoleId = r.RoleId
+    OUTER APPLY (
+      SELECT COUNT(*) AS TodayCount
+      FROM Appointments a
+      WHERE a.EmployeeId = e.EmployeeId
+        AND a.AppointmentDate = @AppointmentDate
+        AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED')
+    ) apCount
+    OUTER APPLY (
+      SELECT AVG(CAST(Rating AS FLOAT)) AS AvgRating
+      FROM Reviews rvw
+      WHERE rvw.EmployeeId = e.EmployeeId
+    ) rv
+    WHERE r.RoleName IN ('TECHNICIAN', 'STYLIST')
+      AND e.Status = 'ACTIVE'
+      ${serviceFilter}
+      AND NOT EXISTS (
+        SELECT 1 FROM Appointments a
+        WHERE a.EmployeeId = e.EmployeeId
+          AND a.CustomerPackageId IS NULL
+          AND a.AppointmentDate = @AppointmentDate
+          AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
+          AND (@StartTime < CAST(a.EndTime AS VARCHAR(8)) AND @EndTime > CAST(a.StartTime AS VARCHAR(8)))
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM AppointmentServices aps
+        JOIN Appointments a ON aps.AppointmentId = a.AppointmentId
+        WHERE aps.EmployeeId = e.EmployeeId
+          AND a.AppointmentDate = @AppointmentDate
+          AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
+          AND aps.Status <> 'CANCELLED'
+          AND aps.StartTime IS NOT NULL
+          AND (@StartTime < CAST(aps.EndTime AS VARCHAR(8)) AND @EndTime > CAST(aps.StartTime AS VARCHAR(8)))
+      )
+    ORDER BY TodayCount ASC, NEWID()
+  `;
+
+  let result = await req.query(query);
+
+  if ((!result.recordset || result.recordset.length === 0) && serviceId) {
+    const fallbackReq = pool.request()
+      .input("AppointmentDate", sql.Date, dateStr)
+      .input("StartTime", sql.VarChar, startStr)
+      .input("EndTime", sql.VarChar, endStr)
+      .input("ServiceId", sql.Int, Number(serviceId));
+
+    const fallbackQuery = `
+      SELECT 
+        e.EmployeeId,
+        u.FullName,
+        u.Email,
+        u.Phone,
+        ISNULL(u.AvatarUrl, e.ImageUrl) AS AvatarUrl,
+        ISNULL(rv.AvgRating, 5.0) AS AvgRating,
+        ISNULL(apCount.TodayCount, 0) AS TodayCount
+      FROM Employees e
+      JOIN Users u ON e.UserId = u.UserId
+      JOIN Roles r ON u.RoleId = r.RoleId
+      OUTER APPLY (
+        SELECT COUNT(*) AS TodayCount
+        FROM Appointments a
+        WHERE a.EmployeeId = e.EmployeeId
+          AND a.AppointmentDate = @AppointmentDate
+          AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED')
+      ) apCount
+      OUTER APPLY (
+        SELECT AVG(CAST(Rating AS FLOAT)) AS AvgRating
+        FROM Reviews rvw
+        WHERE rvw.EmployeeId = e.EmployeeId
+      ) rv
+      WHERE r.RoleName IN ('TECHNICIAN', 'STYLIST')
+        AND e.Status = 'ACTIVE'
+        AND EXISTS (SELECT 1 FROM EmployeeServices es WHERE es.EmployeeId = e.EmployeeId AND es.ServiceId = @ServiceId)
+        AND NOT EXISTS (
+          SELECT 1 FROM Appointments a
+          WHERE a.EmployeeId = e.EmployeeId
+            AND a.CustomerPackageId IS NULL
+            AND a.AppointmentDate = @AppointmentDate
+            AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
+            AND (@StartTime < CAST(a.EndTime AS VARCHAR(8)) AND @EndTime > CAST(a.StartTime AS VARCHAR(8)))
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM AppointmentServices aps
+          JOIN Appointments a ON aps.AppointmentId = a.AppointmentId
+          WHERE aps.EmployeeId = e.EmployeeId
+            AND a.AppointmentDate = @AppointmentDate
+            AND a.Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING')
+            AND aps.Status <> 'CANCELLED'
+            AND aps.StartTime IS NOT NULL
+            AND (@StartTime < CAST(aps.EndTime AS VARCHAR(8)) AND @EndTime > CAST(aps.StartTime AS VARCHAR(8)))
+        )
+      ORDER BY TodayCount ASC, NEWID()
+    `;
+    result = await fallbackReq.query(fallbackQuery);
+  }
+
+  if (!result.recordset || result.recordset.length === 0) {
+    const finalFallbackReq = pool.request();
+    let finalFallbackQuery = `
+      SELECT TOP 1 e.EmployeeId, u.FullName, u.Email, u.Phone, ISNULL(u.AvatarUrl, e.ImageUrl) AS AvatarUrl
+      FROM Employees e
+      JOIN Users u ON e.UserId = u.UserId
+      JOIN Roles r ON u.RoleId = r.RoleId
+      WHERE r.RoleName IN ('TECHNICIAN', 'STYLIST') AND e.Status = 'ACTIVE'
+    `;
+    if (serviceId) {
+      finalFallbackReq.input("ServiceId", sql.Int, Number(serviceId));
+      finalFallbackQuery += ` AND EXISTS (SELECT 1 FROM EmployeeServices es WHERE es.EmployeeId = e.EmployeeId AND es.ServiceId = @ServiceId) `;
+    }
+    finalFallbackQuery += ` ORDER BY NEWID() `;
+
+    const finalFallbackRes = await finalFallbackReq.query(finalFallbackQuery);
+
+    if (finalFallbackRes.recordset[0]) {
+      return finalFallbackRes.recordset[0];
+    }
+    throw new Error("Hiện tại không có kỹ thuật viên phù hợp chuyên môn rảnh vào khung giờ này. Vui lòng chọn khung giờ khác!");
+  }
+
+  return result.recordset[0];
+}
+
 module.exports = {
   checkAvailability,
   validateAvailability,
   getAvailableSlots,
   calculateSlotsInternal,
   getSlotAlternatives,
+  findAvailableTechnician,
 };
+

@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const token = "r8_HJTIRkea71e4IroceyUwN8QPBtzBIm61vArAG";
+const token = process.env.REPLICATE_API_TOKEN || "";
 // A small sample public image url for testing
 const testImageUrl = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200";
 const prompt = "make her hair pink";

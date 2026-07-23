@@ -38,7 +38,9 @@ router.patch(
 // Xóa / hủy lịch hẹn
 router.delete("/:id", authMiddleware, controller.remove);
 
-// Khách hàng xác nhận lịch hẹn tái khám
-router.post("/:id/confirm", authMiddleware, controller.confirm);
+// Khách hàng & Staff: Xem KTV khả dụng & Đổi KTV
+router.get("/:id/available-technicians", authMiddleware, controller.getAvailableTechniciansForStep);
+router.patch("/:id/change-technician", authMiddleware, controller.changeTechnician);
 
 module.exports = router;
+

@@ -884,32 +884,52 @@ export default function BookingPage() {
 
               {bookingType === "SERVICE" ? (
                 <>
-                  <div className="booking-toolbar">
+                  {/* CATEGORY PILL TABS */}
+                  <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 16, scrollbarWidth: "none" }}>
+                    {categories.map((c) => {
+                      const count = c === "ALL" ? services.length : services.filter(s => s.CategoryName === c).length;
+                      const isActive = categoryFilter === c;
+                      return (
+                        <button
+                          type="button"
+                          key={c}
+                          onClick={() => setCategoryFilter(c)}
+                          style={{
+                            padding: "8px 16px",
+                            borderRadius: 20,
+                            fontWeight: 700,
+                            fontSize: 13,
+                            whiteSpace: "nowrap",
+                            cursor: "pointer",
+                            border: isActive ? "none" : "1.5px solid #fbcfe8",
+                            background: isActive ? "linear-gradient(135deg, #ec4899, #db2777)" : "#ffffff",
+                            color: isActive ? "#ffffff" : "#be185d",
+                            boxShadow: isActive ? "0 4px 12px rgba(236,72,153,0.25)" : "none",
+                            transition: "all 0.2s"
+                          }}
+                        >
+                          {c === "ALL" ? "✨ Tất cả dịch vụ" : `🌸 ${c}`} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* SEARCH & FILTER TOOLBAR */}
+                  <div className="booking-toolbar" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
                     <input
                       className="booking-input"
+                      style={{ flex: "1 1 240px" }}
                       value={keyword}
                       onChange={(e) => setKeyword(e.target.value)}
-                      placeholder="Tìm kiếm dịch vụ theo tên hoặc mô tả..."
+                      placeholder="🔍 Tìm kiếm nhanh tên dịch vụ..."
                     />
-
-                    <select
-                      className="booking-select"
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                    >
-                      {categories.map((c) => (
-                        <option key={c} value={c}>
-                          {c === "ALL" ? "Tất cả danh mục" : c}
-                        </option>
-                      ))}
-                    </select>
 
                     <select
                       className="booking-select"
                       value={priceFilter}
                       onChange={(e) => setPriceFilter(e.target.value)}
                     >
-                      <option value="ALL">Tất cả mức giá</option>
+                      <option value="ALL">💰 Tất cả mức giá</option>
                       <option value="UNDER_100">Dưới 100.000đ</option>
                       <option value="100_300">100.000đ - 300.000đ</option>
                       <option value="300_500">300.000đ - 500.000đ</option>
@@ -921,7 +941,7 @@ export default function BookingPage() {
                       value={durationFilter}
                       onChange={(e) => setDurationFilter(e.target.value)}
                     >
-                      <option value="ALL">Tất cả thời lượng</option>
+                      <option value="ALL">⏱️ Tất cả thời lượng</option>
                       <option value="UNDER_30">Dưới 30 phút</option>
                       <option value="30_60">30 - 60 phút</option>
                       <option value="OVER_60">Trên 60 phút</option>
@@ -932,7 +952,7 @@ export default function BookingPage() {
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
                     >
-                      <option value="DEFAULT">Sắp xếp mặc định</option>
+                      <option value="DEFAULT">⇅ Sắp xếp mặc định</option>
                       <option value="PRICE_ASC">Giá: Thấp đến Cao</option>
                       <option value="PRICE_DESC">Giá: Cao đến Thấp</option>
                       <option value="DURATION_ASC">Thời gian: Nhanh đến Lâu</option>
@@ -941,46 +961,99 @@ export default function BookingPage() {
                   </div>
 
                   {pageLoading ? (
-                    <p className="booking-empty">Đang tải dữ liệu...</p>
+                    <p className="booking-empty">Đang tải danh sách dịch vụ...</p>
+                  ) : filteredServices.length === 0 ? (
+                    <div className="booking-empty" style={{ background: "#fff", padding: 30, borderRadius: 16, border: "1px dashed #fbcfe8" }}>
+                      📭 Không tìm thấy dịch vụ nào phù hợp với từ khóa của bạn.
+                    </div>
                   ) : (
-                    <div className="booking-service-grid">
-                      {filteredServices.length > 0 ? (
-                        filteredServices.map((item) => (
-                          <button
-                            type="button"
-                            key={item.ServiceId}
-                            className={`booking-service-card ${
-                              String(form.serviceId) === String(item.ServiceId)
-                                ? "selected"
-                                : ""
-                            }`}
-                            onClick={() => chooseService(item.ServiceId)}
-                          >
-                            <img
-                              src={
-                                resolveFileUrl(item.ImageUrl) ||
-                                "/images/services/default-service.png"
-                              }
-                              alt={item.ServiceName}
-                            />
+                    /* GROUPED BY CATEGORIES OR SINGLE LIST */
+                    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                      {(() => {
+                        // Group services by category if categoryFilter is ALL, else show single section
+                        const sectionsMap = new Map();
+                        filteredServices.forEach((s) => {
+                          const catName = s.CategoryName || "Dịch vụ khác";
+                          if (!sectionsMap.has(catName)) {
+                            sectionsMap.set(catName, []);
+                          }
+                          sectionsMap.get(catName).push(s);
+                        });
 
-                            <div className="booking-service-body">
-                              <h3>{item.ServiceName}</h3>
-                              <div className="booking-service-meta">
-                                <span>{item.DurationMinutes} phút</span>
-                                <strong>{formatMoney(item.Price)}</strong>
-                              </div>
-                              <p>
-                                {item.Description || "Dịch vụ chăm sóc cao cấp"}
-                              </p>
+                        const sections = Array.from(sectionsMap.entries());
+
+                        return sections.map(([catTitle, items]) => (
+                          <div key={catTitle}>
+                            <h3 style={{ fontSize: 16, fontWeight: 800, color: "#831843", marginBottom: 14, display: "flex", alignItems: "center", gap: 8, borderBottom: "1.5px solid #fce7f3", paddingBottom: 8 }}>
+                              <span>🌸</span> {catTitle} ({items.length} dịch vụ)
+                            </h3>
+
+                            <div className="booking-service-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+                              {items.map((item) => {
+                                const isSelected = String(form.serviceId) === String(item.ServiceId);
+                                return (
+                                  <div
+                                    key={item.ServiceId}
+                                    className={`booking-service-card ${isSelected ? "selected" : ""}`}
+                                    onClick={() => chooseService(item.ServiceId)}
+                                    style={{
+                                      background: isSelected ? "linear-gradient(135deg, #fff5f8 0%, #fdf2f8 100%)" : "#ffffff",
+                                      border: isSelected ? "2px solid #db2777" : "1.5px solid #fbcfe8",
+                                      borderRadius: 16,
+                                      padding: 14,
+                                      cursor: "pointer",
+                                      boxShadow: isSelected ? "0 6px 20px rgba(219,39,119,0.15)" : "0 4px 12px rgba(0,0,0,0.03)",
+                                      transition: "all 0.2s ease",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      position: "relative"
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                                      <img
+                                        src={
+                                          resolveFileUrl(item.ImageUrl) ||
+                                          "/images/services/default-service.png"
+                                        }
+                                        alt={item.ServiceName}
+                                        style={{ width: 72, height: 72, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: "1px solid #fbcfe8" }}
+                                      />
+                                      <div style={{ flex: 1 }}>
+                                        <b style={{ fontSize: 14, color: "#831843", display: "block", marginBottom: 4 }}>{item.ServiceName}</b>
+                                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                          <span style={{ fontSize: 11, color: "#64748b", background: "#f1f5f9", padding: "2px 6px", borderRadius: 6 }}>⏱️ {item.DurationMinutes} phút</span>
+                                          <b style={{ fontSize: 13, color: "#db2777" }}>{formatMoney(item.Price)}</b>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 12px 0", flex: 1, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                      {item.Description || "Dịch vụ chăm sóc sắc đẹp cao cấp tại salon."}
+                                    </p>
+
+                                    <button
+                                      type="button"
+                                      style={{
+                                        width: "100%",
+                                        padding: "8px 12px",
+                                        borderRadius: 10,
+                                        fontWeight: 800,
+                                        fontSize: 12,
+                                        border: "none",
+                                        background: isSelected ? "linear-gradient(135deg, #ec4899, #db2777)" : "#fdf2f8",
+                                        color: isSelected ? "#ffffff" : "#db2777",
+                                        cursor: "pointer"
+                                      }}
+                                    >
+                                      {isSelected ? "✓ ĐÃ CHỌN DỊCH VỤ NÀY" : "+ CHỌN DỊCH VỤ NÀY"}
+                                    </button>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="booking-empty">
-                          Không tìm thấy dịch vụ phù hợp.
-                        </p>
-                      )}
+                          </div>
+                        ));
+                      })()}
                     </div>
                   )}
                 </>

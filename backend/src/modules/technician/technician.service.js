@@ -21,17 +21,14 @@ async function getTechnicianByUserId(userId) {
     WHERE e.UserId = @UserId
   `);
 
-  if (!result.recordset[0]) {
-    throw new Error("Không tìm thấy hồ sơ kỹ thuật viên");
-  }
-
-  return result.recordset[0];
+  return result.recordset[0] || null;
 }
 
 async function getEmployeeIdByUserId(userId) {
   const tech = await getTechnicianByUserId(userId);
-  return tech.EmployeeId;
+  return tech ? tech.EmployeeId : null;
 }
+
 
 async function getDashboard(userId) {
   const pool = await connectDB();
@@ -68,24 +65,49 @@ async function getDashboard(userId) {
   const todaySchedule = await pool
     .request()
     .input("EmployeeId", sql.Int, employeeId).query(`
-    SELECT 
-  a.AppointmentId,
-  CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
-  CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
-  a.Status,
-  u.FullName AS CustomerName,
-  u.AvatarUrl AS CustomerAvatar,
-  STRING_AGG(s.ServiceName, ', ') AS ServiceName
+    -- Lịch thường hôm nay
+    SELECT
+      a.AppointmentId,
+      CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
+      CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
+      a.Status,
+      u.FullName AS CustomerName,
+      u.AvatarUrl AS CustomerAvatar,
+      STRING_AGG(s.ServiceName, ', ') AS ServiceName
     FROM Appointments a
     JOIN Customers c ON a.CustomerId = c.CustomerId
     JOIN Users u ON c.UserId = u.UserId
     LEFT JOIN AppointmentServices aps ON a.AppointmentId = aps.AppointmentId
     LEFT JOIN Services s ON aps.ServiceId = s.ServiceId
     WHERE a.EmployeeId = @EmployeeId
-    AND a.AppointmentDate = CAST(GETDATE() AS DATE)
+      AND a.CustomerPackageId IS NULL
+      AND a.AppointmentDate = CAST(GETDATE() AS DATE)
     GROUP BY a.AppointmentId, a.StartTime, a.EndTime, a.Status, u.FullName, u.AvatarUrl
-    ORDER BY a.StartTime
+
+    UNION ALL
+
+    -- Lịch Combo hôm nay: 1 row per bước của KTV này
+    SELECT
+      a.AppointmentId,
+      CONVERT(VARCHAR(5), myStep.StartTime, 108) AS StartTime,
+      CONVERT(VARCHAR(5), myStep.EndTime, 108) AS EndTime,
+      a.Status,
+      u.FullName AS CustomerName,
+      u.AvatarUrl AS CustomerAvatar,
+      svc.ServiceName AS ServiceName
+    FROM Appointments a
+    JOIN Customers c ON a.CustomerId = c.CustomerId
+    JOIN Users u ON c.UserId = u.UserId
+    JOIN AppointmentServices myStep ON myStep.AppointmentId = a.AppointmentId
+      AND myStep.EmployeeId = @EmployeeId
+    JOIN Services svc ON myStep.ServiceId = svc.ServiceId
+    WHERE a.CustomerPackageId IS NOT NULL
+      AND a.AppointmentDate = CAST(GETDATE() AS DATE)
+
+    ORDER BY StartTime
   `);
+
+
 
   const appointmentStatus = await pool
     .request()
@@ -259,6 +281,7 @@ async function getSchedule(userId, query) {
     .input("Status", sql.NVarChar, status)
     .input("ServiceId", sql.Int, serviceId)
     .input("Search", sql.NVarChar, search).query(`
+      -- Lịch thường (không phải Combo): lấy StartTime/EndTime tổng của Appointments
       SELECT
         a.AppointmentId,
         CONCAT('APT-', FORMAT(a.AppointmentDate, 'yyyyMMdd'), '-', a.AppointmentId) AS AppointmentCode,
@@ -270,20 +293,21 @@ async function getSchedule(userId, query) {
         a.Notes,
         a.CheckedInAt,
         a.CompletedAt,
-
         c.CustomerId,
         u.FullName AS CustomerName,
         u.Phone AS CustomerPhone,
         u.Email AS CustomerEmail,
         u.AvatarUrl AS CustomerAvatar,
-
         STRING_AGG(s.ServiceName, ', ') AS ServiceName,
         SUM(ISNULL(aps.Price, 0)) AS TotalPrice,
-
         MAX(i.FinalAmount) AS FinalAmount,
         MAX(latestPayment.Status) AS PaymentStatus,
-
-        ISNULL(r.ResourceName, N'Chưa có phòng') AS RoomName
+        ISNULL(r.ResourceName, N'Chưa có phòng') AS RoomName,
+        NULL AS MyStepServiceName,
+        NULL AS MyStepStatus,
+        NULL AS AppointmentServiceId,
+        MAX(aps.ServiceId) AS ServiceId,
+        NULL AS CustomerPackageId
       FROM Appointments a
       JOIN Customers c ON a.CustomerId = c.CustomerId
       JOIN Users u ON c.UserId = u.UserId
@@ -298,47 +322,96 @@ async function getSchedule(userId, query) {
         ORDER BY p2.CreatedAt DESC, p2.PaymentId DESC
       ) latestPayment
       WHERE a.EmployeeId = @EmployeeId
+        AND a.CustomerPackageId IS NULL
         AND a.AppointmentDate BETWEEN @StartDate AND @EndDate
         AND (@Status = 'ALL' OR a.Status = @Status)
         AND (
           @ServiceId IS NULL
           OR EXISTS (
-            SELECT 1
-            FROM AppointmentServices aps2
-            WHERE aps2.AppointmentId = a.AppointmentId
-              AND aps2.ServiceId = @ServiceId
+            SELECT 1 FROM AppointmentServices aps2
+            WHERE aps2.AppointmentId = a.AppointmentId AND aps2.ServiceId = @ServiceId
           )
         )
         AND (
-          u.FullName LIKE @Search
-          OR u.Phone LIKE @Search
-          OR u.Email LIKE @Search
+          u.FullName LIKE @Search OR u.Phone LIKE @Search OR u.Email LIKE @Search
           OR EXISTS (
-            SELECT 1
-            FROM AppointmentServices aps3
+            SELECT 1 FROM AppointmentServices aps3
             JOIN Services s3 ON aps3.ServiceId = s3.ServiceId
-            WHERE aps3.AppointmentId = a.AppointmentId
-              AND s3.ServiceName LIKE @Search
+            WHERE aps3.AppointmentId = a.AppointmentId AND s3.ServiceName LIKE @Search
           )
           OR CONCAT('APT-', FORMAT(a.AppointmentDate, 'yyyyMMdd'), '-', a.AppointmentId) LIKE @Search
         )
       GROUP BY
+        a.AppointmentId, a.AppointmentDate, a.StartTime, a.EndTime,
+        a.Status, a.Notes, a.CheckedInAt, a.CompletedAt,
+        c.CustomerId, u.FullName, u.Phone, u.Email, u.AvatarUrl, r.ResourceName
+
+      UNION ALL
+
+      -- Lịch Combo: mỗi bước dịch vụ của KTV này => 1 row riêng với thời gian bước đó
+      SELECT
         a.AppointmentId,
+        CONCAT('APT-', FORMAT(a.AppointmentDate, 'yyyyMMdd'), '-', a.AppointmentId) AS AppointmentCode,
         a.AppointmentDate,
-        a.StartTime,
-        a.EndTime,
+        CONVERT(VARCHAR(5), myStep.StartTime, 108) AS StartTime,
+        CONVERT(VARCHAR(5), myStep.EndTime, 108) AS EndTime,
+        DATEDIFF(MINUTE, myStep.StartTime, myStep.EndTime) AS DurationMinutes,
         a.Status,
         a.Notes,
         a.CheckedInAt,
         a.CompletedAt,
         c.CustomerId,
-        u.FullName,
-        u.Phone,
-        u.Email,
-        u.AvatarUrl,
-        r.ResourceName
-      ORDER BY a.AppointmentDate, a.StartTime;
+        u.FullName AS CustomerName,
+        u.Phone AS CustomerPhone,
+        u.Email AS CustomerEmail,
+        u.AvatarUrl AS CustomerAvatar,
+        svc.ServiceName AS ServiceName,
+        ISNULL(myStep.Price, 0) AS TotalPrice,
+        MAX(i.FinalAmount) AS FinalAmount,
+        MAX(latestPayment2.Status) AS PaymentStatus,
+        ISNULL(r.ResourceName, N'Chưa có phòng') AS RoomName,
+        svc.ServiceName AS MyStepServiceName,
+        myStep.Status AS MyStepStatus,
+        myStep.AppointmentServiceId AS AppointmentServiceId,
+        myStep.ServiceId AS ServiceId,
+        a.CustomerPackageId
+      FROM Appointments a
+      JOIN Customers c ON a.CustomerId = c.CustomerId
+      JOIN Users u ON c.UserId = u.UserId
+      -- Chỉ lấy bước thuộc KTV này
+      JOIN AppointmentServices myStep ON myStep.AppointmentId = a.AppointmentId
+        AND myStep.EmployeeId = @EmployeeId
+      JOIN Services svc ON myStep.ServiceId = svc.ServiceId
+      LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+      LEFT JOIN ServiceResources r ON a.ResourceId = r.ResourceId
+      OUTER APPLY (
+        SELECT TOP 1 p2.Status
+        FROM Payments p2
+        WHERE p2.InvoiceId = i.InvoiceId
+        ORDER BY p2.CreatedAt DESC, p2.PaymentId DESC
+      ) latestPayment2
+      WHERE a.CustomerPackageId IS NOT NULL
+        AND a.AppointmentDate BETWEEN @StartDate AND @EndDate
+        AND (@Status = 'ALL' OR a.Status = @Status)
+        AND (
+          @ServiceId IS NULL
+          OR myStep.ServiceId = @ServiceId
+        )
+        AND (
+          u.FullName LIKE @Search OR u.Phone LIKE @Search OR u.Email LIKE @Search
+          OR svc.ServiceName LIKE @Search
+          OR CONCAT('APT-', FORMAT(a.AppointmentDate, 'yyyyMMdd'), '-', a.AppointmentId) LIKE @Search
+        )
+      GROUP BY
+        a.AppointmentId, a.AppointmentDate, a.Status, a.Notes, a.CheckedInAt, a.CompletedAt,
+        myStep.StartTime, myStep.EndTime, myStep.Price, myStep.Status, myStep.AppointmentServiceId, myStep.ServiceId,
+        c.CustomerId, u.FullName, u.Phone, u.Email, u.AvatarUrl, r.ResourceName, svc.ServiceName,
+        a.CustomerPackageId
+
+      ORDER BY AppointmentDate, StartTime;
     `);
+
+
 
   const services = await pool.request().input("EmployeeId", sql.Int, employeeId)
     .query(`
@@ -542,53 +615,179 @@ async function getAvailableSlotsForTechnician(userId, query = {}) {
   };
 }
 
-async function startAppointment(userId, appointmentId) {
+async function startAppointment(userId, appointmentId, targetStepId = null) {
   const pool = await connectDB();
   const employeeId = await getEmployeeIdByUserId(userId);
 
   const currentResult = await pool.request()
     .input("AppointmentId", sql.Int, Number(appointmentId))
-    .input("EmployeeId", sql.Int, employeeId)
     .query(`
-      SELECT Status, AppointmentDate, StartTime
+      SELECT Status, AppointmentDate, StartTime, CustomerPackageId
       FROM Appointments
       WHERE AppointmentId = @AppointmentId
-        AND EmployeeId = @EmployeeId
     `);
 
   const current = currentResult.recordset[0];
   if (!current) {
-    throw new Error("Không tìm thấy lịch hẹn của kỹ thuật viên này");
+    throw new Error("Không tìm thấy lịch hẹn");
   }
 
-  // Validate state transition
-  appointmentStateService.validateTransition(current.Status, "IN_PROGRESS");
+  const apptStatusUpper = String(current.Status || "").toUpperCase();
+  if (!["CHECKED_IN", "IN_PROGRESS"].includes(apptStatusUpper)) {
+    throw new Error("Khách hàng chưa Check-in tại Salon. Vui lòng chờ Lễ tân Check-in trước khi bắt đầu thực hiện dịch vụ!");
+  }
 
-  const result = await pool
-    .request()
+  const stepsRes = await pool.request()
     .input("AppointmentId", sql.Int, Number(appointmentId))
-    .input("EmployeeId", sql.Int, employeeId)
-    .input("UserId", sql.Int, userId)
-    .input("OldStatus", sql.NVarChar, current.Status).query(`
-      UPDATE Appointments
-      SET Status = 'IN_PROGRESS',
-          UpdatedAt = GETDATE()
-      WHERE AppointmentId = @AppointmentId
-        AND EmployeeId = @EmployeeId;
-
-      INSERT INTO AppointmentStatusHistory
-        (AppointmentId, OldStatus, NewStatus, ChangedBy, Reason, ChangedAt)
-      VALUES
-        (@AppointmentId, @OldStatus, 'IN_PROGRESS', @UserId, N'Technician bắt đầu dịch vụ', GETDATE());
-
-      SELECT *
-      FROM Appointments
-      WHERE AppointmentId = @AppointmentId
-        AND EmployeeId = @EmployeeId;
+    .query(`
+      SELECT aps.AppointmentServiceId, aps.ServiceId, aps.EmployeeId, aps.Status, s.ServiceName
+      FROM AppointmentServices aps
+      JOIN Services s ON aps.ServiceId = s.ServiceId
+      WHERE aps.AppointmentId = @AppointmentId
+      ORDER BY aps.AppointmentServiceId ASC
     `);
 
-  return result.recordset[0];
+  const steps = stepsRes.recordset || [];
+
+  if (current.CustomerPackageId && steps.length > 0) {
+    let targetStep = null;
+    if (targetStepId) {
+      targetStep = steps.find(s => Number(s.AppointmentServiceId) === Number(targetStepId) || Number(s.ServiceId) === Number(targetStepId));
+    }
+    if (!targetStep) {
+      targetStep = steps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status !== 'COMPLETED') || steps[0];
+    }
+
+    if (targetStep) {
+      // Validate sequential step completion: previous steps must be COMPLETED
+      const targetIdx = steps.findIndex(s => s.AppointmentServiceId === targetStep.AppointmentServiceId);
+      if (targetIdx > 0) {
+        const prevSteps = steps.slice(0, targetIdx);
+        const uncompletedPrev = prevSteps.filter(s => String(s.Status || "").toUpperCase() !== 'COMPLETED');
+        if (uncompletedPrev.length > 0) {
+          throw new Error(`Không thể bắt đầu dịch vụ "${targetStep.ServiceName}". Vui lòng chờ dịch vụ trước đó (${uncompletedPrev[0].ServiceName}) hoàn thành!`);
+        }
+      }
+
+      await pool.request()
+        .input("AppointmentServiceId", sql.Int, targetStep.AppointmentServiceId)
+        .query(`UPDATE AppointmentServices SET Status = 'IN_PROGRESS' WHERE AppointmentServiceId = @AppointmentServiceId`);
+    }
+
+    if (current.Status !== 'IN_PROGRESS') {
+      await pool.request()
+        .input("AppointmentId", sql.Int, Number(appointmentId))
+        .query(`UPDATE Appointments SET Status = 'IN_PROGRESS', UpdatedAt = GETDATE() WHERE AppointmentId = @AppointmentId`);
+
+      await pool.request()
+        .input("AppointmentId", sql.Int, Number(appointmentId))
+        .input("OldStatus", sql.VarChar, current.Status)
+        .input("UserId", sql.Int, userId)
+        .query(`
+          INSERT INTO AppointmentStatusHistory (AppointmentId, OldStatus, NewStatus, ChangedBy, Reason, ChangedAt)
+          VALUES (@AppointmentId, @OldStatus, 'IN_PROGRESS', @UserId, N'KTV bắt đầu bước Combo: ${targetStep?.ServiceName || ""}', GETDATE())
+        `);
+    }
+
+    const result = await pool.request()
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .query(`SELECT * FROM Appointments WHERE AppointmentId = @AppointmentId`);
+
+    return { ...result.recordset[0], startedStep: targetStep?.ServiceName };
+
+  } else {
+
+    // === Lịch thường: logic cũ ===
+    const myStepIndex = steps.findIndex(s => Number(s.EmployeeId) === Number(employeeId));
+
+    if (myStepIndex >= 0) {
+      await pool.request()
+        .input("AppointmentServiceId", sql.Int, steps[myStepIndex].AppointmentServiceId)
+        .query(`UPDATE AppointmentServices SET Status = 'IN_PROGRESS' WHERE AppointmentServiceId = @AppointmentServiceId`);
+    }
+
+    await pool.request()
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .query(`UPDATE Appointments SET Status = 'IN_PROGRESS', UpdatedAt = GETDATE() WHERE AppointmentId = @AppointmentId`);
+
+    await pool.request()
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .input("OldStatus", sql.VarChar, current.Status)
+      .input("UserId", sql.Int, userId)
+      .query(`
+        INSERT INTO AppointmentStatusHistory (AppointmentId, OldStatus, NewStatus, ChangedBy, Reason, ChangedAt)
+        VALUES (@AppointmentId, @OldStatus, 'IN_PROGRESS', @UserId, N'Technician bắt đầu dịch vụ', GETDATE())
+      `);
+
+    const result = await pool.request()
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .query(`SELECT * FROM Appointments WHERE AppointmentId = @AppointmentId`);
+
+    return result.recordset[0];
+  }
 }
+
+/**
+ * KTV hoàn thành bước/dịch vụ của mình trong Combo hoặc Lịch hẹn.
+ * Cập nhật trạng thái COMPLETED cho duy nhất bước dịch vụ được chọn.
+ */
+async function completeMyStep(userId, appointmentId, targetStepId = null) {
+  const pool = await connectDB();
+  const employeeId = await getEmployeeIdByUserId(userId);
+
+  const stepsRes = await pool.request()
+    .input("AppointmentId", sql.Int, Number(appointmentId))
+    .query(`
+      SELECT aps.AppointmentServiceId, aps.ServiceId, aps.Status, aps.EmployeeId, s.ServiceName,
+             a.CustomerPackageId
+      FROM AppointmentServices aps
+      JOIN Services s ON aps.ServiceId = s.ServiceId
+      JOIN Appointments a ON aps.AppointmentId = a.AppointmentId
+      WHERE aps.AppointmentId = @AppointmentId
+      ORDER BY aps.AppointmentServiceId ASC
+    `);
+
+  const allSteps = stepsRes.recordset || [];
+
+  if (allSteps.length === 0) {
+    return await receptionistService.completeAppointment(Number(appointmentId), userId);
+  }
+
+  let stepToComplete = null;
+  if (targetStepId) {
+    stepToComplete = allSteps.find(
+      s => Number(s.AppointmentServiceId) === Number(targetStepId) || Number(s.ServiceId) === Number(targetStepId)
+    );
+  }
+
+  if (!stepToComplete) {
+    stepToComplete = allSteps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status === 'IN_PROGRESS');
+  }
+
+  if (!stepToComplete) {
+    stepToComplete = allSteps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status !== 'COMPLETED');
+  }
+
+  if (!stepToComplete) {
+    stepToComplete = allSteps.find(s => s.Status !== 'COMPLETED');
+  }
+
+  if (!stepToComplete) {
+    return await receptionistService.completeAppointment(Number(appointmentId), userId);
+  }
+
+  const result = await receptionistService.updateAppointmentServiceStatus(stepToComplete.AppointmentServiceId, 'COMPLETED');
+
+  return {
+    success: true,
+    allCompleted: result?.allCompleted || false,
+    appointmentId: Number(appointmentId),
+    completedStepId: stepToComplete.AppointmentServiceId,
+    completedStep: stepToComplete.ServiceName,
+  };
+}
+
+
 
 async function getAppointmentByIdInternal(pool, id) {
   const result = await pool.request().input("AppointmentId", sql.Int, id)
@@ -1022,7 +1221,10 @@ async function getAppointmentDetail(userId, appointmentId) {
         p.PaymentMethod,
         p.Status AS PaymentStatus,
         p.TransactionCode,
-        p.PaidAt
+        p.PaidAt,
+
+        a.CustomerPackageId,
+        pkg.PackageName
       FROM Appointments a
       JOIN Customers c ON a.CustomerId = c.CustomerId
       JOIN Users cu ON c.UserId = cu.UserId
@@ -1030,7 +1232,10 @@ async function getAppointmentDetail(userId, appointmentId) {
       JOIN Employees e ON a.EmployeeId = e.EmployeeId
       JOIN Users eu ON e.UserId = eu.UserId
       LEFT JOIN Branches b ON COALESCE(a.BranchId, e.BranchId) = b.BranchId
+      LEFT JOIN CustomerPackages cp ON a.CustomerPackageId = cp.CustomerPackageId
+      LEFT JOIN Packages pkg ON cp.PackageId = pkg.PackageId
       LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+
       OUTER APPLY (
         SELECT TOP 1 *
         FROM Payments p2
@@ -1038,7 +1243,15 @@ async function getAppointmentDetail(userId, appointmentId) {
         ORDER BY p2.CreatedAt DESC, p2.PaymentId DESC
       ) p
       WHERE a.AppointmentId = @AppointmentId
-        AND a.EmployeeId = @EmployeeId
+        AND (
+          @EmployeeId IS NULL
+          OR a.EmployeeId = @EmployeeId
+          OR EXISTS (
+            SELECT 1 FROM AppointmentServices aps_check 
+            WHERE aps_check.AppointmentId = a.AppointmentId AND aps_check.EmployeeId = @EmployeeId
+          )
+        )
+
     `);
 
   if (!appointment.recordset[0]) {
@@ -1047,21 +1260,34 @@ async function getAppointmentDetail(userId, appointmentId) {
 
   const services = await pool
     .request()
-    .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
+    .input("AppointmentId", sql.Int, Number(appointmentId))
+    .query(`
       SELECT
+        aps.AppointmentServiceId,
         s.ServiceId,
         s.ServiceName,
         s.Description,
         s.DurationMinutes,
         s.ImageUrl,
         aps.Price,
-        sc.CategoryName
+        aps.EmployeeId,
+        aps.Status AS StepStatus,
+        CONVERT(VARCHAR(5), aps.StartTime, 108) AS StepStartTime,
+        CONVERT(VARCHAR(5), aps.EndTime, 108) AS StepEndTime,
+        sc.CategoryName,
+        eu.FullName AS AssignedTechnicianName,
+        eu.AvatarUrl AS AssignedTechnicianAvatar
       FROM AppointmentServices aps
       JOIN Services s ON aps.ServiceId = s.ServiceId
+      JOIN Appointments a ON aps.AppointmentId = a.AppointmentId
       LEFT JOIN ServiceCategories sc ON s.CategoryId = sc.CategoryId
+      LEFT JOIN Employees e2 ON aps.EmployeeId = e2.EmployeeId
+      LEFT JOIN Users eu ON e2.UserId = eu.UserId
       WHERE aps.AppointmentId = @AppointmentId
-      ORDER BY s.ServiceName
+      ORDER BY aps.AppointmentServiceId ASC
     `);
+
+
 
   const history = await pool
     .request()
@@ -4025,6 +4251,9 @@ async function updateAppointmentDuration(userId, appointmentId, durationMinutes)
   return { message: "Đã cập nhật thời lượng dịch vụ thành công!", durationMinutes: duration, endTime: newEndTimeStr };
 }
 
+
+
+
 module.exports = {
   getDashboard,
   getSchedule,
@@ -4067,4 +4296,5 @@ module.exports = {
   getShiftQuotas,
   getAttendanceWeeklyStats,
   updateAppointmentDuration,
+  completeMyStep,
 };

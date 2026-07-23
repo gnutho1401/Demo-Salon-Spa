@@ -1,6 +1,7 @@
 const { sql, connectDB } = require("../../config/db");
 const crypto = require("crypto");
 const { getPayOS } = require("../../config/payos.config");
+const { findAvailableTechnician } = require("../appointments/availability.service");
 
 function formatVnpDate(date = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -35,6 +36,63 @@ function createVnpHash(params) {
     .createHmac("sha512", secret)
     .update(Buffer.from(signData, "utf-8"))
     .digest("hex");
+}
+
+async function checkAndExpirePackages() {
+  try {
+    const pool = await connectDB();
+    const expiredPkgs = await pool.request().query(`
+      SELECT cp.CustomerPackageId, cp.CustomerId, cp.EndDate, cp.Status, p.PackageName, u.UserId, u.Email, u.FullName
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      JOIN Customers c ON cp.CustomerId = c.CustomerId
+      JOIN Users u ON c.UserId = u.UserId
+      WHERE cp.Status = 'ACTIVE'
+        AND cp.EndDate < CAST(GETDATE() AS DATE)
+    `);
+
+    if (!expiredPkgs.recordset || expiredPkgs.recordset.length === 0) return;
+
+    const sendMail = require("../../utils/sendMail");
+    const { create: createNotification } = require("../notifications/notifications.service");
+
+    for (const pkg of expiredPkgs.recordset) {
+      await pool.request()
+        .input("CustomerPackageId", sql.Int, pkg.CustomerPackageId)
+        .query(`UPDATE CustomerPackages SET Status = 'EXPIRED', UpdatedAt = GETDATE() WHERE CustomerPackageId = @CustomerPackageId`);
+
+      // 1. Web Notification
+      await createNotification({
+        userId: pkg.UserId,
+        title: "⏳ Gói Combo đã hết hạn sử dụng",
+        content: `Gói Combo '${pkg.PackageName}' (#CP-${pkg.CustomerPackageId}) của bạn đã hết thời hạn sử dụng. Gói Combo đã tự động thanh lý và không thể đặt thêm lịch mới.`,
+        type: "COMBO_EXPIRED"
+      });
+
+      // 2. Email Notification
+      if (pkg.Email) {
+        const endDateStr = pkg.EndDate ? new Date(pkg.EndDate).toLocaleDateString("vi-VN") : "—";
+        sendMail({
+          to: pkg.Email,
+          subject: "Beauty Salon - Thông báo gói Combo đã hết hạn sử dụng",
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; background: #fff1f2; border-radius: 12px;">
+              <h2 style="color: #be123c;">Xin chào ${pkg.FullName},</h2>
+              <p>Beauty Salon xin thông báo gói Combo <strong>${pkg.PackageName}</strong> của bạn đã hết thời hạn sử dụng.</p>
+              <div style="background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #fecdd3; margin: 15px 0;">
+                <p style="margin: 4px 0;">📍 <strong>Mã gói Combo:</strong> #CP-${pkg.CustomerPackageId}</p>
+                <p style="margin: 4px 0;">📅 <strong>Hạn cuối sử dụng:</strong> ${endDateStr}</p>
+              </div>
+              <p>Theo quy định của Salon, các gói Combo quá hạn sẽ tự động thanh lý và không thể tiếp tục đăng ký đặt lịch mới.</p>
+              <p style="color: #881337; font-size: 13px; margin-top: 20px;">Trân trọng,<br/>Đội ngũ Beauty Salon</p>
+            </div>
+          `
+        }).catch(err => console.error("Send mail expired combo error:", err.message));
+      }
+    }
+  } catch (err) {
+    console.error("Error in checkAndExpirePackages:", err.message);
+  }
 }
 
 function verifyVnpParams(query) {
@@ -363,6 +421,8 @@ async function getUsageHistory(userId, customerPackageId) {
         a.EndTime,
         a.Status AS AppointmentStatus,
         eu.FullName AS TechnicianName,
+        eu.FullName AS EmployeeName,
+        a.AppointmentDate AS UsedDate,
         uu.FullName AS UsedByName
       FROM CustomerPackageUsages u
       JOIN CustomerPackages cp
@@ -388,6 +448,79 @@ async function getUsageHistory(userId, customerPackageId) {
     `);
 
   return result.recordset;
+}
+
+async function getUsageHistoryPaginated(userId, customerPackageId, page = 1, limit = 5) {
+  const pool = await connectDB();
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
+
+  const p = Math.max(1, Number(page) || 1);
+  const l = Math.max(1, Number(limit) || 5);
+  const offset = (p - 1) * l;
+
+  const countRes = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId)).query(`
+      SELECT COUNT(*) AS Total
+      FROM CustomerPackageUsages u
+      JOIN CustomerPackages cp ON u.CustomerPackageId = cp.CustomerPackageId
+      WHERE u.CustomerPackageId = @CustomerPackageId
+        AND (cp.CustomerId = @CustomerId OR EXISTS (
+          SELECT 1 FROM PackageMembers pm WHERE pm.CustomerPackageId = cp.CustomerPackageId AND pm.FamilyCustomerId = @CustomerId
+        ))
+    `);
+
+  const total = countRes.recordset[0]?.Total || 0;
+
+  const result = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .input("Offset", sql.Int, offset)
+    .input("Limit", sql.Int, l).query(`
+      SELECT
+        u.UsageId,
+        u.CustomerPackageId,
+        u.AppointmentId,
+        u.ServiceId,
+        s.ServiceName,
+        u.SessionsUsed,
+        u.Status,
+        u.UsedAt,
+        a.AppointmentDate,
+        a.StartTime,
+        a.EndTime,
+        a.Status AS AppointmentStatus,
+        eu.FullName AS TechnicianName,
+        eu.FullName AS EmployeeName,
+        a.AppointmentDate AS UsedDate,
+        uu.FullName AS UsedByName
+      FROM CustomerPackageUsages u
+      JOIN CustomerPackages cp ON u.CustomerPackageId = cp.CustomerPackageId
+      JOIN Appointments a ON u.AppointmentId = a.AppointmentId
+      JOIN Services s ON u.ServiceId = s.ServiceId
+      LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
+      LEFT JOIN Users eu ON e.UserId = eu.UserId
+      LEFT JOIN Users uu ON u.UsedBy = uu.UserId
+      WHERE u.CustomerPackageId = @CustomerPackageId
+        AND (cp.CustomerId = @CustomerId OR EXISTS (
+          SELECT 1 FROM PackageMembers pm WHERE pm.CustomerPackageId = cp.CustomerPackageId AND pm.FamilyCustomerId = @CustomerId
+        ))
+      ORDER BY u.UsedAt DESC, u.UsageId DESC
+      OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY
+    `);
+
+  return {
+    data: result.recordset,
+    pagination: {
+      total,
+      page: p,
+      limit: l,
+      totalPages: Math.ceil(total / l)
+    }
+  };
 }
 
 async function getActivePackage(pool, packageId) {
@@ -548,11 +681,28 @@ async function checkPendingPackage(pool, customerId, packageId) {
   }
 }
 
+async function resolveCustomer(pool, userId, payload = {}) {
+  const custId = payload?.customerId || payload?.CustomerId;
+  if (custId) {
+    const custRes = await pool
+      .request()
+      .input("CustomerId", sql.Int, Number(custId))
+      .query(`
+        SELECT CustomerId, UserId
+        FROM Customers
+        WHERE CustomerId = @CustomerId
+      `);
+    if (custRes.recordset[0]) return custRes.recordset[0];
+  }
+  return await getCustomerByUserId(pool, userId);
+}
+
 async function buyPackage(userId, packageId, payload = {}) {
   const pool = await connectDB();
 
-  const customer = await getCustomerByUserId(pool, userId);
+  const customer = await resolveCustomer(pool, userId, payload);
   if (!customer) throw new Error("Không tìm thấy hồ sơ khách hàng");
+
 
   const pkg = await getActivePackage(pool, packageId);
   if (!pkg)
@@ -967,8 +1117,9 @@ async function handleVnpayReturn(query) {
     }
   }
 
-  return `${frontendUrl}/customer/packages?paid=1`;
+  return `${frontendUrl}/customer/packages?paid=1&packageId=${payment.CustomerPackageId}`;
 }
+
 
 async function create(data) {
   const pool = await connectDB();
@@ -1562,9 +1713,61 @@ async function getMyPackageDetail(userId, customerPackageId, customerId = null) 
       WHERE ps.PackageId = @PackageId
     `);
 
+  const activeApptResult = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, customerPackageId).query(`
+      SELECT TOP 1
+        a.AppointmentId,
+        CONVERT(VARCHAR(10), a.AppointmentDate, 120) AS AppointmentDate,
+        CAST(a.StartTime AS VARCHAR(8)) AS StartTime,
+        CAST(a.EndTime AS VARCHAR(8)) AS EndTime,
+        a.Status,
+        a.Notes,
+        u.FullName AS PrimaryTechName,
+        u.AvatarUrl AS PrimaryTechAvatar
+      FROM Appointments a
+      LEFT JOIN Employees e ON a.EmployeeId = e.EmployeeId
+      LEFT JOIN Users u ON e.UserId = u.UserId
+      WHERE a.CustomerPackageId = @CustomerPackageId
+        AND a.Status IN ('CONFIRMED', 'PENDING', 'CHECKED_IN', 'IN_PROGRESS')
+      ORDER BY a.CreatedAt DESC
+    `);
+
+
+  let activeAppointment = activeApptResult.recordset[0] || null;
+  if (activeAppointment) {
+    const apptServicesRes = await pool
+      .request()
+      .input("AppointmentId", sql.Int, activeAppointment.AppointmentId)
+      .query(`
+        SELECT 
+          aps.AppointmentServiceId,
+          aps.ServiceId,
+          s.ServiceName,
+          s.DurationMinutes,
+          s.ImageUrl,
+          aps.EmployeeId,
+          aps.Status AS StepStatus,
+          CONVERT(VARCHAR(5), aps.StartTime, 108) AS StepStartTime,
+          CONVERT(VARCHAR(5), aps.EndTime, 108) AS StepEndTime,
+          u.FullName AS TechnicianName,
+          u.Phone AS TechnicianPhone,
+          ISNULL(u.AvatarUrl, e.ImageUrl) AS TechnicianAvatar
+        FROM AppointmentServices aps
+        JOIN Services s ON aps.ServiceId = s.ServiceId
+        LEFT JOIN Employees e ON aps.EmployeeId = e.EmployeeId
+        LEFT JOIN Users u ON e.UserId = u.UserId
+        WHERE aps.AppointmentId = @AppointmentId
+        ORDER BY aps.AppointmentServiceId ASC
+      `);
+    activeAppointment.Services = apptServicesRes.recordset || [];
+  }
+
   return {
     ...pkg,
+    ActiveAppointment: activeAppointment,
     Members: membersResult.recordset,
+
     FreezeHistory: freezeResult.recordset,
     ExtensionHistory: extensionResult.recordset,
     Benefits: benefitsResult.recordset,
@@ -1572,6 +1775,7 @@ async function getMyPackageDetail(userId, customerPackageId, customerId = null) 
     Services: servicesResult.recordset,
   };
 }
+
 
 /**
  * [Staff] Lấy danh sách yêu cầu chờ duyệt (gia hạn + đóng băng)
@@ -1956,8 +2160,9 @@ async function handlePayosReturn(query = {}) {
           throw err;
         }
       }
-      return `${frontendUrl}/customer/packages?paid=1`;
+      return `${frontendUrl}/customer/packages?paid=1&packageId=${payment.CustomerPackageId}`;
     }
+
   } catch (err) {
     console.error("PayOS package verify error:", err.message);
   }
@@ -1993,6 +2198,7 @@ module.exports = {
   approveRequest,
   getPackageReport,
   findMember,
+  bookCustomerPackage,
 };
 
 async function findMember(keyword, currentUserId) {
@@ -2021,3 +2227,722 @@ async function findMember(keyword, currentUserId) {
 
   return result.recordset || [];
 }
+
+async function bookCustomerPackage(userId, customerPackageId, bookingData = {}) {
+  const pool = await connectDB();
+  const { appointmentDate, startTime, notes } = bookingData;
+
+  if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn");
+  if (!startTime) throw new Error("Vui lòng chọn giờ bắt đầu");
+
+  // 1. Get Customer profile
+  const customer = await resolveCustomer(pool, userId, bookingData);
+  if (!customer) throw new Error("Không tìm thấy thông tin hồ sơ khách hàng");
+
+
+  // 2. Fetch CustomerPackage details
+  const pkgRes = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .query(`
+      SELECT cp.*, p.PackageName, p.Description
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE cp.CustomerPackageId = @CustomerPackageId
+        AND (
+          cp.CustomerId = @CustomerId
+          OR EXISTS (
+            SELECT 1 FROM PackageMembers pm
+            WHERE pm.CustomerPackageId = cp.CustomerPackageId
+              AND pm.FamilyCustomerId = @CustomerId
+          )
+        )
+    `);
+
+  const cp = pkgRes.recordset[0];
+  if (!cp) throw new Error("Gói Combo không tồn tại hoặc bạn không có quyền dùng gói này");
+
+  if (cp.Status === "CANCELLED" || cp.Status === "EXPIRED") {
+    throw new Error(`Gói Combo '${cp.PackageName}' của bạn đã hết hạn hoặc đã bị hủy. Không thể đăng ký đặt lịch mới!`);
+  }
+  if (cp.RemainingSessions <= 0 && cp.TotalSessions > 0) {
+    throw new Error("Gói Combo này đã được sử dụng hết số lượt");
+  }
+
+  // Check end date expiry
+  if (cp.EndDate) {
+    const today = new Date().toISOString().slice(0, 10);
+    const endDateStr = new Date(cp.EndDate).toISOString().slice(0, 10);
+    if (today > endDateStr) {
+      await pool.request()
+        .input("CustomerPackageId", sql.Int, cp.CustomerPackageId)
+        .query(`UPDATE CustomerPackages SET Status = 'EXPIRED', UpdatedAt = GETDATE() WHERE CustomerPackageId = @CustomerPackageId`);
+      throw new Error(`Gói Combo '${cp.PackageName}' của bạn đã hết thời hạn sử dụng (Hạn cuối: ${new Date(cp.EndDate).toLocaleDateString("vi-VN")}). Gói Combo đã tự động thanh lý và không thể đặt lịch mới!`);
+    }
+  }
+
+  // 3. Lifetime Single-Use Limit Check (1 time total per purchased combo package)
+  const lifetimeCheck = await pool
+    .request()
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .query(`
+      SELECT COUNT(*) AS BookedCount
+      FROM Appointments
+      WHERE CustomerPackageId = @CustomerPackageId
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED')
+    `);
+
+  if (lifetimeCheck.recordset[0]?.BookedCount >= 1) {
+    throw new Error("Gói Combo này chỉ được áp dụng 1 lần duy nhất trong suốt thời hạn sử dụng. Bạn đã có lịch hẹn hoặc đã sử dụng gói Combo này!");
+  }
+
+  // 4. Fetch Services in Combo & Calculate total duration
+  const svcsRes = await pool
+    .request()
+    .input("PackageId", sql.Int, cp.PackageId)
+    .query(`
+      SELECT s.ServiceId, s.ServiceName, s.DurationMinutes, s.Price
+      FROM PackageServices ps
+      JOIN Services s ON ps.ServiceId = s.ServiceId
+      WHERE ps.PackageId = @PackageId
+    `);
+
+  const services = svcsRes.recordset || [];
+  if (services.length === 0) throw new Error("Không có dịch vụ nào trong gói Combo này");
+
+  const totalDurationMinutes = services.reduce((acc, s) => acc + (Number(s.DurationMinutes) || 30), 0);
+
+  // Calculate endTime
+  const pad = (n) => String(n).padStart(2, "0");
+  const [h, m] = startTime.split(":").map(Number);
+  const startD = new Date();
+  startD.setHours(h, m, 0, 0);
+  const endD = new Date(startD.getTime() + totalDurationMinutes * 60 * 1000);
+  const endTime = `${pad(endD.getHours())}:${pad(endD.getMinutes())}:00`;
+
+  // Check customer availability (prevent double-booking customer across combos / single appts)
+  const customerOverlap = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .input("AppointmentDate", sql.Date, appointmentDate)
+    .input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime)
+    .input("EndTime", sql.VarChar, endTime)
+    .query(`
+      SELECT TOP 1 AppointmentId
+      FROM Appointments
+      WHERE CustomerId = @CustomerId
+        AND AppointmentDate = @AppointmentDate
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'EXPIRED', 'REJECTED')
+        AND (@StartTime < EndTime AND @EndTime > StartTime)
+
+    `);
+
+  if (customerOverlap.recordset.length > 0) {
+    throw new Error("Bạn đã có một lịch hẹn khác (dịch vụ lẻ hoặc gói Combo khác) trùng trong khoảng thời gian này rồi. Vui lòng chọn khung giờ khác!");
+  }
+
+
+  // 5. Calculate step-by-step times and auto-assign dedicated technician for EACH service step in combo
+  let currentStepStart = startD;
+  const serviceAssignments = [];
+
+  for (const svc of services) {
+    const durMins = Number(svc.DurationMinutes) || 30;
+    const stepEnd = new Date(currentStepStart.getTime() + durMins * 60 * 1000);
+
+    const stepStartStr = `${pad(currentStepStart.getHours())}:${pad(currentStepStart.getMinutes())}:00`;
+    const stepEndStr = `${pad(stepEnd.getHours())}:${pad(stepEnd.getMinutes())}:00`;
+
+    // Bắt buộc tìm KTV có chuyên môn đúng với dịch vụ này và đang rảnh trong khung giờ đó
+    let stepTech;
+    try {
+      stepTech = await findAvailableTechnician(appointmentDate, stepStartStr, stepEndStr, svc.ServiceId);
+    } catch (err) {
+      // Không fallback sang KTV không có chuyên môn — thông báo lỗi rõ ràng
+      throw new Error(
+        `Không tìm được kỹ thuật viên phù hợp cho dịch vụ "${svc.ServiceName}" trong khung giờ ${stepStartStr} - ${stepEndStr}. ` +
+        `Vui lòng chọn khung giờ khác hoặc thử lại vào ngày khác.`
+      );
+    }
+
+    serviceAssignments.push({
+      serviceId: svc.ServiceId,
+      serviceName: svc.ServiceName,
+      durationMinutes: durMins,
+      startTime: stepStartStr,
+      endTime: stepEndStr,
+      technician: stepTech
+    });
+
+    currentStepStart = stepEnd;
+  }
+
+  const primaryTechnician = serviceAssignments[0]?.technician || await findAvailableTechnician(appointmentDate, startTime, endTime);
+
+  // 6. DB Transaction for appointment creation & package usage update
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    // Insert Appointment
+    const apptReq = new sql.Request(transaction);
+    apptReq.input("CustomerId", sql.Int, customer.CustomerId);
+    apptReq.input("EmployeeId", sql.Int, primaryTechnician.EmployeeId);
+    apptReq.input("AppointmentDate", sql.Date, appointmentDate);
+    apptReq.input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime);
+    apptReq.input("EndTime", sql.VarChar, endTime);
+    apptReq.input("Status", sql.NVarChar, "CONFIRMED");
+    const cleanNoteInsert = String(notes || "")
+      .replace(/\[(?:Gói Combo|Đổi lịch Combo|Tái khám từ lịch #[0-9]+):\s*[^\]]+\]/gi, "")
+      .trim();
+    apptReq.input("Notes", sql.NVarChar, cleanNoteInsert ? `[Gói Combo: ${cp.PackageName}] ${cleanNoteInsert}` : `[Gói Combo: ${cp.PackageName}]`);
+
+    apptReq.input("CustomerPackageId", sql.Int, cp.CustomerPackageId);
+
+    const apptResult = await apptReq.query(`
+      INSERT INTO Appointments (
+        CustomerId, EmployeeId, AppointmentDate, StartTime, EndTime,
+        Status, Notes, CustomerPackageId, CreatedAt
+      )
+      OUTPUT INSERTED.AppointmentId
+      VALUES (
+        @CustomerId, @EmployeeId, @AppointmentDate, @StartTime, @EndTime,
+        @Status, @Notes, @CustomerPackageId, GETDATE()
+      )
+    `);
+
+    const appointmentId = apptResult.recordset[0].AppointmentId;
+
+    // Insert AppointmentServices with dedicated EmployeeId + StartTime + EndTime for each service step
+    for (const step of serviceAssignments) {
+      const svcReq = new sql.Request(transaction);
+      svcReq.input("AppointmentId", sql.Int, appointmentId);
+      svcReq.input("ServiceId", sql.Int, step.serviceId);
+      svcReq.input("Price", sql.Decimal(18, 2), 0);
+      svcReq.input("EmployeeId", sql.Int, step.technician.EmployeeId);
+      svcReq.input("StartTime", sql.VarChar, step.startTime);
+      svcReq.input("EndTime", sql.VarChar, step.endTime);
+      await svcReq.query(`
+        INSERT INTO AppointmentServices (AppointmentId, ServiceId, Price, EmployeeId, Status, StartTime, EndTime)
+        VALUES (@AppointmentId, @ServiceId, @Price, @EmployeeId, 'PENDING', @StartTime, @EndTime)
+      `);
+    }
+
+    await transaction.commit();
+
+    return {
+      appointmentId,
+      packageName: cp.PackageName,
+      appointmentDate,
+      startTime,
+      endTime,
+      totalDurationMinutes,
+      technician: {
+        employeeId: primaryTechnician.EmployeeId,
+        fullName: primaryTechnician.FullName,
+        phone: primaryTechnician.Phone,
+        avatarUrl: primaryTechnician.AvatarUrl
+      },
+      serviceAssignments: serviceAssignments.map(s => ({
+        serviceId: s.serviceId,
+        serviceName: s.serviceName,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        durationMinutes: s.durationMinutes,
+        technician: {
+          employeeId: s.technician.EmployeeId,
+          fullName: s.technician.FullName,
+          phone: s.technician.Phone,
+          avatarUrl: s.technician.AvatarUrl
+        }
+      })),
+      services: services.map(s => s.ServiceName)
+    };
+
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
+}
+
+async function rescheduleCustomerPackageAppointment(userId, customerPackageId, bookingData = {}) {
+  const pool = await connectDB();
+  const { appointmentDate, startTime, notes } = bookingData;
+
+  if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn mới");
+  if (!startTime) throw new Error("Vui lòng chọn giờ bắt đầu mới");
+
+  const customer = await resolveCustomer(pool, userId, bookingData);
+  if (!customer) throw new Error("Không tìm thấy thông tin hồ sơ khách hàng");
+
+
+  const apptRes = await pool.request()
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .query(`
+      SELECT TOP 1 *
+      FROM Appointments
+      WHERE CustomerPackageId = @CustomerPackageId
+        AND CustomerId = @CustomerId
+        AND Status IN ('CONFIRMED', 'PENDING', 'BOOKED')
+      ORDER BY CreatedAt DESC
+    `);
+
+  const currentAppt = apptRes.recordset[0];
+  if (!currentAppt) {
+    throw new Error("Không tìm thấy lịch hẹn Combo ở trạng thái chờ để đổi lịch (Khách hàng đã check-in hoặc chưa đặt lịch)!");
+  }
+
+  const pkgRes = await pool.request()
+    .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+    .query(`
+      SELECT cp.*, p.PackageName
+      FROM CustomerPackages cp
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE cp.CustomerPackageId = @CustomerPackageId
+    `);
+  const cp = pkgRes.recordset[0];
+
+  const svcsRes = await pool.request()
+    .input("PackageId", sql.Int, cp.PackageId)
+    .query(`
+      SELECT s.ServiceId, s.ServiceName, s.DurationMinutes, s.Price
+      FROM PackageServices ps
+      JOIN Services s ON ps.ServiceId = s.ServiceId
+      WHERE ps.PackageId = @PackageId
+    `);
+  const services = svcsRes.recordset || [];
+  const totalDurationMinutes = services.reduce((acc, s) => acc + (Number(s.DurationMinutes) || 30), 0);
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const [h, m] = startTime.split(":").map(Number);
+  const startD = new Date();
+  startD.setHours(h, m, 0, 0);
+  const endD = new Date(startD.getTime() + totalDurationMinutes * 60 * 1000);
+  const endTime = `${pad(endD.getHours())}:${pad(endD.getMinutes())}:00`;
+
+  // Check customer availability (excluding current combo appointment)
+  const customerOverlap = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .input("AppointmentDate", sql.Date, appointmentDate)
+    .input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime)
+    .input("EndTime", sql.VarChar, endTime)
+    .input("CurrentApptId", sql.Int, currentAppt.AppointmentId)
+    .query(`
+      SELECT TOP 1 AppointmentId
+      FROM Appointments
+      WHERE CustomerId = @CustomerId
+        AND AppointmentDate = @AppointmentDate
+        AND AppointmentId <> @CurrentApptId
+        AND Status NOT IN ('CANCELLED', 'NO_SHOW', 'REFUNDED', 'EXPIRED', 'REJECTED')
+        AND (@StartTime < EndTime AND @EndTime > StartTime)
+    `);
+
+  if (customerOverlap.recordset.length > 0) {
+    throw new Error("Bạn đã có một lịch hẹn khác (dịch vụ lẻ hoặc gói Combo khác) trùng trong khoảng thời gian này rồi. Vui lòng chọn khung giờ khác!");
+  }
+
+
+  let currentStepStart = startD;
+  const serviceAssignments = [];
+
+  for (const svc of services) {
+    const durMins = Number(svc.DurationMinutes) || 30;
+    const stepEnd = new Date(currentStepStart.getTime() + durMins * 60 * 1000);
+
+    const stepStartStr = `${pad(currentStepStart.getHours())}:${pad(currentStepStart.getMinutes())}:00`;
+    const stepEndStr = `${pad(stepEnd.getHours())}:${pad(stepEnd.getMinutes())}:00`;
+
+    // Bắt buộc tìm KTV có chuyên môn đúng với dịch vụ này và đang rảnh trong khung giờ đó
+    let stepTech;
+    try {
+      stepTech = await findAvailableTechnician(appointmentDate, stepStartStr, stepEndStr, svc.ServiceId);
+    } catch (err) {
+      // Không fallback sang KTV không có chuyên môn — thông báo lỗi rõ ràng
+      throw new Error(
+        `Không tìm được kỹ thuật viên phù hợp cho dịch vụ "${svc.ServiceName}" trong khung giờ ${stepStartStr} - ${stepEndStr}. ` +
+        `Vui lòng chọn khung giờ khác hoặc thử lại vào ngày khác.`
+      );
+    }
+
+    serviceAssignments.push({
+      serviceId: svc.ServiceId,
+      serviceName: svc.ServiceName,
+      durationMinutes: durMins,
+      startTime: stepStartStr,
+      endTime: stepEndStr,
+      technician: stepTech
+    });
+
+    currentStepStart = stepEnd;
+  }
+
+  const primaryTechnician = serviceAssignments[0]?.technician;
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const apptReq = new sql.Request(transaction);
+    apptReq.input("AppointmentId", sql.Int, currentAppt.AppointmentId);
+    apptReq.input("EmployeeId", sql.Int, primaryTechnician.EmployeeId);
+    apptReq.input("AppointmentDate", sql.Date, appointmentDate);
+    apptReq.input("StartTime", sql.VarChar, startTime.length === 5 ? startTime + ":00" : startTime);
+    apptReq.input("EndTime", sql.VarChar, endTime);
+    const cleanRescheduleNote = String(notes || "")
+      .replace(/\[(?:Gói Combo|Đổi lịch Combo|Tái khám từ lịch #[0-9]+):\s*[^\]]+\]/gi, "")
+      .trim();
+    apptReq.input("Notes", sql.NVarChar, cleanRescheduleNote ? `[Đổi lịch Combo: ${cp.PackageName}] ${cleanRescheduleNote}` : `[Đổi lịch Combo: ${cp.PackageName}]`);
+
+
+    await apptReq.query(`
+      UPDATE Appointments
+      SET EmployeeId = @EmployeeId,
+          AppointmentDate = @AppointmentDate,
+          StartTime = @StartTime,
+          EndTime = @EndTime,
+          Notes = @Notes,
+          UpdatedAt = GETDATE()
+      WHERE AppointmentId = @AppointmentId
+    `);
+
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, currentAppt.AppointmentId)
+      .query(`DELETE FROM AppointmentServices WHERE AppointmentId = @AppointmentId`);
+
+    for (const step of serviceAssignments) {
+      const svcReq = new sql.Request(transaction);
+      svcReq.input("AppointmentId", sql.Int, currentAppt.AppointmentId);
+      svcReq.input("ServiceId", sql.Int, step.serviceId);
+      svcReq.input("Price", sql.Decimal(18, 2), 0);
+      svcReq.input("EmployeeId", sql.Int, step.technician.EmployeeId);
+      svcReq.input("StartTime", sql.VarChar, step.startTime);
+      svcReq.input("EndTime", sql.VarChar, step.endTime);
+      await svcReq.query(`
+        INSERT INTO AppointmentServices (AppointmentId, ServiceId, Price, EmployeeId, Status, StartTime, EndTime)
+        VALUES (@AppointmentId, @ServiceId, @Price, @EmployeeId, 'PENDING', @StartTime, @EndTime)
+      `);
+    }
+
+    await transaction.commit();
+
+    return {
+      appointmentId: currentAppt.AppointmentId,
+      packageName: cp.PackageName,
+      appointmentDate,
+      startTime,
+      endTime,
+      totalDurationMinutes,
+      technician: {
+        employeeId: primaryTechnician.EmployeeId,
+        fullName: primaryTechnician.FullName,
+        phone: primaryTechnician.Phone,
+        avatarUrl: primaryTechnician.AvatarUrl
+      },
+      serviceAssignments: serviceAssignments.map(s => ({
+        serviceId: s.serviceId,
+        serviceName: s.serviceName,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        durationMinutes: s.durationMinutes,
+        technician: {
+          employeeId: s.technician.EmployeeId,
+          fullName: s.technician.FullName,
+          phone: s.technician.Phone,
+          avatarUrl: s.technician.AvatarUrl
+        }
+      }))
+    };
+  } catch (err) {
+    try { await transaction.rollback(); } catch {}
+    throw err;
+  }
+}
+
+async function getComboHistoryAndReviews(customerId) {
+  const pool = await connectDB();
+
+  // 1. Fetch completed combo appointments for this customer
+  const apptsRes = await pool
+    .request()
+    .input("CustomerId", sql.Int, customerId)
+    .query(`
+      SELECT 
+        a.AppointmentId,
+        a.CustomerPackageId,
+        p.PackageName,
+        CONVERT(VARCHAR(10), a.AppointmentDate, 120) AS AppointmentDate,
+        CAST(a.StartTime AS VARCHAR(5)) AS StartTime,
+        CAST(a.EndTime AS VARCHAR(5)) AS EndTime,
+        a.Status,
+        a.Notes
+      FROM Appointments a
+      JOIN CustomerPackages cp ON a.CustomerPackageId = cp.CustomerPackageId
+      JOIN Packages p ON cp.PackageId = p.PackageId
+      WHERE a.CustomerId = @CustomerId
+        AND (
+          a.Status = 'COMPLETED'
+          OR EXISTS (
+            SELECT 1 FROM CustomerPackageUsages u 
+            WHERE u.AppointmentId = a.AppointmentId AND u.Status = 'USED'
+          )
+        )
+      ORDER BY a.AppointmentDate DESC, a.StartTime DESC
+    `);
+
+  const appts = apptsRes.recordset || [];
+
+  for (const appt of appts) {
+    // 2. Fetch service steps + technicians for each combo appointment
+    const servicesRes = await pool
+      .request()
+      .input("AppointmentId", sql.Int, appt.AppointmentId)
+      .query(`
+        SELECT 
+          aps.AppointmentServiceId,
+          aps.ServiceId,
+          s.ServiceName,
+          s.DurationMinutes,
+          aps.EmployeeId,
+          u.FullName AS TechnicianName,
+          u.Phone AS TechnicianPhone,
+          COALESCE(e.ImageUrl, u.AvatarUrl) AS TechnicianAvatar,
+          r.Rating AS ServiceRating,
+          r.TechnicianRating,
+          r.Comment AS ServiceComment,
+          r.CreatedAt AS ReviewCreatedAt
+        FROM AppointmentServices aps
+        JOIN Services s ON aps.ServiceId = s.ServiceId
+        LEFT JOIN Employees e ON aps.EmployeeId = e.EmployeeId
+        LEFT JOIN Users u ON e.UserId = u.UserId
+        LEFT JOIN Reviews r ON r.AppointmentId = aps.AppointmentId AND r.ServiceId = aps.ServiceId
+        WHERE aps.AppointmentId = @AppointmentId
+        ORDER BY aps.AppointmentServiceId ASC
+      `);
+
+    appt.Services = servicesRes.recordset || [];
+
+    // 3. Fetch Treatment Notes for this appointment
+    const notesRes = await pool
+      .request()
+      .input("AppointmentId", sql.Int, appt.AppointmentId)
+      .query(`
+        SELECT TOP 1 Content AS NoteText, SkinCondition, CustomerFeedback
+        FROM TreatmentNotes
+        WHERE AppointmentId = @AppointmentId
+        ORDER BY CreatedAt DESC
+      `);
+
+    appt.TreatmentNote = notesRes.recordset[0] || null;
+
+    // Calculate overall combo rating and comments
+    const reviewedSteps = appt.Services.filter(s => (s.ServiceRating > 0 || s.TechnicianRating > 0));
+    appt.IsReviewed = reviewedSteps.length > 0;
+    if (appt.IsReviewed) {
+      const sumRating = reviewedSteps.reduce((acc, s) => acc + Number(s.ServiceRating || s.TechnicianRating || 5), 0);
+      appt.OverallRating = Math.round(sumRating / reviewedSteps.length);
+      const comments = reviewedSteps.map(s => s.ServiceComment).filter(Boolean);
+      const uniqueComments = [...new Set(comments)];
+      appt.OverallComment = uniqueComments.join(" • ");
+    } else {
+      appt.OverallRating = null;
+      appt.OverallComment = null;
+    }
+  }
+
+  return appts;
+}
+
+async function cancelCustomerPackageAppointment(userId, customerPackageId, reason = "", appointmentId = null) {
+  const pool = await connectDB();
+  const customer = await getCustomerByUserId(pool, userId);
+  if (!customer) throw new Error("Không tìm thấy thông tin hồ sơ khách hàng");
+
+  let currentAppt;
+  if (appointmentId) {
+    const apptRes = await pool.request()
+      .input("AppointmentId", sql.Int, Number(appointmentId))
+      .query(`
+        SELECT TOP 1 *
+        FROM Appointments
+        WHERE AppointmentId = @AppointmentId
+      `);
+    currentAppt = apptRes.recordset[0];
+  }
+
+  if (!currentAppt && customerPackageId) {
+    const apptRes = await pool.request()
+      .input("CustomerPackageId", sql.Int, Number(customerPackageId))
+      .input("CustomerId", sql.Int, customer.CustomerId)
+      .query(`
+        SELECT TOP 1 *
+        FROM Appointments
+        WHERE CustomerPackageId = @CustomerPackageId
+          AND (CustomerId = @CustomerId OR EXISTS (
+            SELECT 1 FROM CustomerPackages cp WHERE cp.CustomerPackageId = @CustomerPackageId AND cp.CustomerId = @CustomerId
+          ))
+        ORDER BY CreatedAt DESC
+      `);
+    currentAppt = apptRes.recordset[0];
+  }
+
+  if (!currentAppt) {
+    throw new Error("Không tìm thấy lịch hẹn Combo để thao tác!");
+  }
+
+  if (currentAppt.Status === 'CANCELLED') {
+    return {
+      success: true,
+      message: "Lịch hẹn Combo này đã được hủy trước đó!",
+      appointmentId: currentAppt.AppointmentId
+    };
+  }
+
+  if (["CHECKED_IN", "IN_PROGRESS", "COMPLETED"].includes(String(currentAppt.Status).toUpperCase())) {
+    throw new Error("Khách hàng đã check-in tại quầy salon, dịch vụ đang được thực hiện. Không thể hủy lịch hẹn này!");
+  }
+
+  const cancelReasonText = String(reason || "Khách hàng hủy lịch sử dụng Combo").trim();
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, currentAppt.AppointmentId)
+      .input("Reason", sql.NVarChar, cancelReasonText)
+      .query(`
+        UPDATE Appointments
+        SET Status = 'CANCELLED',
+            CancelReason = @Reason,
+            UpdatedAt = GETDATE()
+        WHERE AppointmentId = @AppointmentId
+      `);
+
+    await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, currentAppt.AppointmentId)
+      .query(`
+        DELETE FROM CustomerPackageUsages
+        WHERE AppointmentId = @AppointmentId AND Status <> 'USED'
+      `);
+
+    await transaction.commit();
+    return {
+      success: true,
+      message: "Hủy lịch hẹn Combo thành công! Số buổi của bạn vẫn được bảo lưu.",
+      appointmentId: currentAppt.AppointmentId
+    };
+  } catch (err) {
+    try { await transaction.rollback(); } catch {}
+    throw err;
+  }
+}
+
+async function submitComboReview({ customerId, appointmentId, overallRating, overallComment, stepReviews = [], imageUrls = [] }) {
+  const pool = await connectDB();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const validAppointmentId = Number(appointmentId);
+    if (!validAppointmentId) {
+      throw new Error("Mã ca hẹn không hợp lệ");
+    }
+
+    for (const step of stepReviews) {
+      const serviceId = Number(step.serviceId || step.ServiceId);
+      if (!serviceId) continue;
+
+      let employeeId = Number(step.employeeId || step.EmployeeId || step.StepEmployeeId || 0) || null;
+      const rating = Number(step.rating || step.TechnicianRating || overallRating || 5);
+      const comment = String(step.comment || step.Comment || overallComment || "").trim();
+
+      if (!employeeId) {
+        const empRes = await new sql.Request(transaction)
+          .input("AppointmentId", sql.Int, validAppointmentId)
+          .input("ServiceId", sql.Int, serviceId)
+          .query(`SELECT TOP 1 EmployeeId FROM AppointmentServices WHERE AppointmentId = @AppointmentId AND ServiceId = @ServiceId`);
+        employeeId = empRes.recordset[0]?.EmployeeId || null;
+      }
+
+      // Check if review already exists
+      const checkRes = await new sql.Request(transaction)
+        .input("CustomerId", sql.Int, customerId)
+        .input("AppointmentId", sql.Int, validAppointmentId)
+        .input("ServiceId", sql.Int, serviceId)
+        .query(`
+          SELECT ReviewId FROM Reviews 
+          WHERE CustomerId = @CustomerId 
+            AND AppointmentId = @AppointmentId 
+            AND ServiceId = @ServiceId
+        `);
+
+      let reviewId;
+      if (checkRes.recordset.length > 0) {
+        reviewId = checkRes.recordset[0].ReviewId;
+        await new sql.Request(transaction)
+          .input("ReviewId", sql.Int, reviewId)
+          .input("EmployeeId", sql.Int, employeeId)
+          .input("Rating", sql.Int, Number(overallRating || rating))
+          .input("TechnicianRating", sql.Int, rating)
+          .input("Comment", sql.NVarChar(sql.MAX), comment)
+          .query(`
+            UPDATE Reviews
+            SET EmployeeId = ISNULL(@EmployeeId, EmployeeId),
+                Rating = @Rating,
+                TechnicianRating = @TechnicianRating,
+                Comment = @Comment,
+                UpdatedAt = CURRENT_TIMESTAMP
+            WHERE ReviewId = @ReviewId
+          `);
+      } else {
+        const insRes = await new sql.Request(transaction)
+          .input("CustomerId", sql.Int, customerId)
+          .input("AppointmentId", sql.Int, validAppointmentId)
+          .input("ServiceId", sql.Int, serviceId)
+          .input("EmployeeId", sql.Int, employeeId)
+          .input("Rating", sql.Int, Number(overallRating || rating))
+          .input("TechnicianRating", sql.Int, rating)
+          .input("Comment", sql.NVarChar(sql.MAX), comment)
+          .input("Status", sql.NVarChar, "APPROVED")
+          .query(`
+            INSERT INTO Reviews (CustomerId, AppointmentId, ServiceId, EmployeeId, Rating, TechnicianRating, Comment, Status, CreatedAt)
+            OUTPUT INSERTED.ReviewId
+            VALUES (@CustomerId, @AppointmentId, @ServiceId, @EmployeeId, @Rating, @TechnicianRating, @Comment, @Status, CURRENT_TIMESTAMP)
+          `);
+        reviewId = insRes.recordset[0]?.ReviewId;
+      }
+
+      if (reviewId && imageUrls && imageUrls.length > 0) {
+        for (const url of imageUrls) {
+          await new sql.Request(transaction)
+            .input("ReviewId", sql.Int, reviewId)
+            .input("ImageUrl", sql.NVarChar(500), url)
+            .query(`INSERT INTO ReviewImages (ReviewId, ImageUrl) VALUES (@ReviewId, @ImageUrl)`);
+        }
+      }
+    }
+
+    await transaction.commit();
+    return { success: true, message: "Cảm ơn bạn đã đánh giá Combo & Kỹ thuật viên!" };
+  } catch (err) {
+    try { await transaction.rollback(); } catch {}
+    throw err;
+  }
+}
+
+module.exports = {
+  ...module.exports,
+  getUsageHistoryPaginated,
+  rescheduleCustomerPackageAppointment,
+  cancelCustomerPackageAppointment,
+  getComboHistoryAndReviews,
+  submitComboReview
+};
+
+
+

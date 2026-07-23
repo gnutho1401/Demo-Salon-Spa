@@ -161,14 +161,20 @@ export default function TechnicianAppointments() {
     }
   };
 
-  const completeAppointment = async (id) => {
+  const completeAppointment = async (id, serviceId = null, customerPackageId = null) => {
     try {
-      await axiosClient.patch(`/technician/appointments/${id}/complete`);
-      navigate(`/technician/treatment-notes?appointmentId=${id}`);
+      if (customerPackageId) {
+        await axiosClient.patch(`/technician/appointments/${id}/complete-step`, { appointmentServiceId: serviceId });
+      } else {
+        await axiosClient.patch(`/technician/appointments/${id}/complete`);
+      }
+      alert("✅ Đã hoàn thành dịch vụ!");
+      await refreshPage();
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể hoàn thành lịch hẹn");
+      alert(err.response?.data?.message || "Không thể hoàn thành dịch vụ");
     }
   };
+
 
   const markNoShow = async (id) => {
     if (!window.confirm("Đánh dấu khách hàng này không đến (No-show)?")) return;
@@ -890,11 +896,12 @@ export default function TechnicianAppointments() {
                                 title="Chi tiết lịch hẹn"
                                 onClick={() =>
                                   navigate(
-                                    `/technician/appointments/${a.AppointmentId}`,
+                                    `/technician/appointments/${a.AppointmentId}?serviceId=${a.ServiceId || a.AppointmentServiceId || ""}`,
                                   )
                                 }
                                 style={{ border: "1px solid #eadfca", background: "white", cursor: "pointer" }}
                               >
+
                                 👁
                               </button>
 
@@ -916,13 +923,14 @@ export default function TechnicianAppointments() {
                                 <button
                                   title="Hoàn thành dịch vụ"
                                   onClick={() =>
-                                    completeAppointment(a.AppointmentId)
+                                    completeAppointment(a.AppointmentId, a.ServiceId || a.AppointmentServiceId, a.CustomerPackageId)
                                   }
                                   style={{ border: "none", background: "#e5aa3d", color: "white", cursor: "pointer" }}
                                 >
                                   ✅
                                 </button>
                               )}
+
 
                               {["CONFIRMED", "PAID", "CHECKED_IN"].includes(
                                 a.Status,

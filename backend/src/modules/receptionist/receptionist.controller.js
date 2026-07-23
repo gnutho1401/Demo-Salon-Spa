@@ -545,6 +545,25 @@ async function getSmartBookingSuggestions(req, res) {
   }
 }
 
+async function changeTechnician(req, res) {
+  try {
+    const appointmentsService = require("../appointments/appointments.service");
+    const appointmentId = req.params.id;
+    const { newEmployeeId, appointmentServiceId } = req.body;
+    return success(
+      res,
+      await appointmentsService.changeTechnician(req.user.userId, appointmentId, {
+        newEmployeeId,
+        appointmentServiceId,
+        isReceptionist: true
+      }),
+      "Đổi Kỹ thuật viên thành công"
+    );
+  } catch (err) {
+    return error(res, err.message, 400);
+  }
+}
+
 module.exports = {
   getSmartBookingSuggestions,
   getDashboard,
@@ -599,4 +618,15 @@ module.exports = {
   getTechnicianWorkload,
   assignTechnician,
   transferAppointments,
+  updateAppointmentServiceStatus: async (req, res) => {
+    try {
+      const data = await service.updateAppointmentServiceStatus(req.params.id, req.body.status);
+      return success(res, data, "Cập nhật trạng thái bước dịch vụ thành công");
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  },
+  changeTechnician,
 };
+
+

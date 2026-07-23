@@ -327,6 +327,96 @@ function getDefaults(name = "") {
 }
 
 /* ─────────────────────────────────────────
+
+   QUICK SAMPLE TEMPLATES FOR BEFORE & AFTER
+   ───────────────────────────────────────── */
+const QUICK_BEFORE_SAMPLES = {
+  "Waxing": [
+    "Lông rậm, thô cứng, nang lông sâu",
+    "Lông mọc lại sần mẫn, ngứa nhẹ",
+    "Da khô, nhạy cảm vùng wax",
+    "Lông mọc ngược, nổi nấc nang lông"
+  ],
+  "Nail": [
+    "Móng khô giòn, da quanh móng thô sần",
+    "Móng mỏng yếu, có vệt trầy xước",
+    "Có lớp sơn gel cũ bị tróc",
+    "Phom móng chưa đều, da tay khô"
+  ],
+  "Massage": [
+    "Đau mỏi vùng cổ vai gáy kéo dài",
+    "Căng cứng cơ bả vai và thắt lưng",
+    "Cơ thể mệt mỏi, uể uải, thiếu ngủ",
+    "Khí huyết kém lưu thông, tê nhức tay chân"
+  ],
+  "Facial": [
+    "Da khô thiếu ẩm, bề mặt thô ráp",
+    "Da dầu mụn ẩn nhiều vùng T-zone",
+    "Da xỉn màu, xạm nắng, không đều màu",
+    "Lỗ chân lông to, nhiều mụn đầu đen"
+  ],
+  "default": [
+    "Bề mặt thô sần, thiếu độ ẩm",
+    "Cơ thể căng thẳng, mệt mỏi",
+    "Cần chăm sóc và phục hồi chuyên sâu",
+    "Tình trạng bình thường, da nhạy cảm nhẹ"
+  ]
+};
+
+const QUICK_AFTER_SAMPLES = {
+  "Waxing": [
+    "Sạch lông 100%, da mịn màng, không rát",
+    "Triệt sạch nang lông thô, da sáng đều",
+    "Làm dịu da hoàn hảo, hết sần mẫn",
+    "Lỗ chân lông se khít, thoáng sạch"
+  ],
+  "Nail": [
+    "Móng tròn đẹp, sơn gel bóng bền màu",
+    "Phom móng chuẩn, da mềm mại mượt mà",
+    "Móng chắc khỏe, viền da gọn gàng",
+    "Màu sơn chuẩn sắc, độ bóng cao"
+  ],
+  "Massage": [
+    "Giải cơ vai gáy, giảm đau mỏi 90%",
+    "Cơ thể nhẹ nhõm, thư thái toàn thân",
+    "Khí huyết lưu thông tốt, dễ chịu",
+    "Các nhóm cơ mềm mại, hết co thắt"
+  ],
+  "Facial": [
+    "Da căng bóng, ẩm mượt, mịn màng",
+    "Sạch sâu lỗ chân lông, hết dầu thừa",
+    "Da hồng hào, tươi trẻ, mờ thâm",
+    "Bề mặt da mịn màng, sáng khỏe"
+  ],
+  "default": [
+    "Kết quả cải thiện rõ rệt, mịn màng",
+    "Khách hàng rất hài lòng với kết quả",
+    "Phục hồi da/cơ thể mượt mà, săn chắc",
+    "Hoàn thiện dịch vụ chuẩn phác đồ"
+  ]
+};
+
+function getQuickBeforeSamples(name = "") {
+  const n = String(name || "").toLowerCase();
+  if (n.includes("wax") || n.includes("triệt")) return QUICK_BEFORE_SAMPLES["Waxing"];
+  if (n.includes("nail") || n.includes("móng") || n.includes("gel")) return QUICK_BEFORE_SAMPLES["Nail"];
+  if (n.includes("massage") || n.includes("body") || n.includes("vai gáy")) return QUICK_BEFORE_SAMPLES["Massage"];
+  if (n.includes("facial") || n.includes("da") || n.includes("mặt")) return QUICK_BEFORE_SAMPLES["Facial"];
+  return QUICK_BEFORE_SAMPLES["default"];
+}
+
+function getQuickAfterSamples(name = "") {
+  const n = String(name || "").toLowerCase();
+  if (n.includes("wax") || n.includes("triệt")) return QUICK_AFTER_SAMPLES["Waxing"];
+  if (n.includes("nail") || n.includes("móng") || n.includes("gel")) return QUICK_AFTER_SAMPLES["Nail"];
+  if (n.includes("massage") || n.includes("body") || n.includes("vai gáy")) return QUICK_AFTER_SAMPLES["Massage"];
+  if (n.includes("facial") || n.includes("da") || n.includes("mặt")) return QUICK_AFTER_SAMPLES["Facial"];
+  return QUICK_AFTER_SAMPLES["default"];
+}
+
+
+
+/* ─────────────────────────────────────────
    TOAST
    ───────────────────────────────────────── */
 function Toast({ msg, type, onClose }) {
@@ -360,6 +450,7 @@ export default function TreatmentNotesV2() {
   const [services,     setServices]     = useState([]);
   const [employees,    setEmployees]    = useState([]);
   const [userRole,     setUserRole]     = useState("Technician");
+  const [currentAppointment, setCurrentAppointment] = useState(null); // appointment đang xem (dùng để check combo)
 
   /* ── ui ── */
   const [loading,   setLoading]   = useState(false);
@@ -635,8 +726,15 @@ export default function TreatmentNotesV2() {
             activeNote = r.data?.data;
             if (activeNote) {
               customerId = activeNote.customer_id;
+              // Load appointment để kiểm tra Combo
+              try {
+                const apptR2 = await axiosClient.get(`/technician/appointments/${activeApptId}`);
+                const apptData = apptR2.data?.data || {};
+                setCurrentAppointment({ ...(apptData.appointment || {}), services: apptData.services || [] });
+              } catch {}
             }
           } catch {}
+
 
           if (!activeNote) {
             try {
@@ -647,16 +745,23 @@ export default function TreatmentNotesV2() {
               const serviceId = serviceIdParam ? Number(serviceIdParam) : (servicesList[0]?.ServiceId || 1);
               const technicianId = fullAppt.TechnicianId || 1;
               customerId = fullAppt.CustomerId;
+              // Lưu thông tin appointment để kiểm tra Combo
+              setCurrentAppointment({ ...fullAppt, services: servicesList });
 
               if (customerId) {
+                const apptDateRaw = fullAppt.AppointmentDate || new Date().toISOString().slice(0, 10);
+                const dateStr = String(apptDateRaw).includes("T") ? String(apptDateRaw).split("T")[0] : String(apptDateRaw).slice(0, 10);
+                const timeStr = fullAppt.StartTime || "10:00:00";
+
                 const createRes = await axiosClient.post("/v2/treatment-notes", {
                   customerId,
                   appointmentId: Number(activeApptId),
                   serviceId,
                   technicianId,
-                  serviceDateTime: `${fullAppt.AppointmentDate.split("T")[0]} ${fullAppt.StartTime || "10:00:00"}`,
+                  serviceDateTime: `${dateStr} ${timeStr.length === 5 ? timeStr + ":00" : timeStr}`,
                   status: "draft"
                 });
+
                 const noteId = createRes.data?.data?.noteId;
                 if (noteId) {
                   const fullRes = await axiosClient.get(`/v2/treatment-notes/${noteId}`);
@@ -729,9 +834,37 @@ export default function TreatmentNotesV2() {
           } catch {}
         }
 
-        const note = activeNote
-          || (activeApptId ? hist.find(n => String(n.appointment_id) === String(activeApptId)) : null)
-          || (hist.length > 0 ? hist[0] : null);
+        let note = activeNote;
+        if (!note && activeApptId && serviceIdParam) {
+          note = hist.find(n =>
+            String(n.appointment_id) === String(activeApptId) &&
+            (String(n.service_id) === String(serviceIdParam) || String(n.ServiceId) === String(serviceIdParam) || String(n.AppointmentServiceId) === String(serviceIdParam))
+          );
+        }
+        if (!note && activeApptId && !serviceIdParam) {
+          note = hist.find(n => String(n.appointment_id) === String(activeApptId));
+        }
+        if (!note && !activeApptId && hist.length > 0) {
+          note = hist[0];
+        }
+
+        if (!note && activeApptId && serviceIdParam && customerId) {
+          try {
+            const createRes = await axiosClient.post("/v2/treatment-notes", {
+              appointmentId: Number(activeApptId),
+              serviceId: Number(serviceIdParam),
+              customerId,
+              status: "draft"
+            });
+            const newNoteId = createRes.data?.data?.noteId;
+            if (newNoteId) {
+              const fullRes = await axiosClient.get(`/v2/treatment-notes/${newNoteId}`);
+              note = fullRes.data?.data;
+            }
+          } catch (err) {
+            console.warn("Auto create note failed:", err.message);
+          }
+        }
 
         if (note) {
           setSelectedNote(note);
@@ -739,6 +872,7 @@ export default function TreatmentNotesV2() {
         } else {
           setSelectedNote(null);
         }
+
       } catch (e) {
         toast$(e.response?.data?.message || e.message || "Lỗi tải dữ liệu.", "error");
       } finally {
@@ -897,6 +1031,12 @@ export default function TreatmentNotesV2() {
 
   const clearFilters = () => { setSearch(""); setFilterSvc(""); setFilterKtv(""); setFilterStatus(""); setFilterStart(""); setFilterEnd(""); };
 
+  const isLockedNote = useMemo(() => {
+    if (!selectedNote) return false;
+    const stat = String(selectedNote.status || selectedNote.Status || "").toLowerCase();
+    return stat === "finalized" || stat === "final" || Boolean(selectedNote.is_locked);
+  }, [selectedNote]);
+
   /* ── crud helpers ── */
   const buildPayload = () => ({
     duration_minutes: editDuration,
@@ -906,7 +1046,7 @@ export default function TreatmentNotesV2() {
     recommendations: editRecs,
     internal_notes: editInternal,
     procedure_steps: editSteps,
-    products_used: editProducts.map(p => `${p.name}${p.desc ? ` - ${p.desc}` : ""}`),
+    products_used: editProducts.map(p => typeof p === "object" ? `${p.name}${p.desc ? ` - ${p.desc}` : ""}` : String(p)),
     before_images: beforeImgs,
     after_images: afterImgs,
     detailed_images: detailedImgs,
@@ -921,9 +1061,9 @@ export default function TreatmentNotesV2() {
 
   const handleSave = async () => {
     if (!selectedNote) return;
-    const apptStatus = String(selectedNote?.AppointmentStatus || "").toUpperCase();
-    if (selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(apptStatus)) {
-      toast$("Chỉ được thực hiện/lưu phác đồ khi dịch vụ ở trạng thái Đang thực hiện hoặc Hoàn thành.", "error");
+    if (isLockedNote) {
+      toast$("Hồ sơ điều trị này đã được khóa chính thức, không thể sửa đổi!", "error");
+      setIsEditing(false);
       return;
     }
     try {
@@ -940,15 +1080,13 @@ export default function TreatmentNotesV2() {
 
   const handleFinalize = async () => {
     if (!selectedNote) return;
-    const apptStatus = String(selectedNote?.AppointmentStatus || "").toUpperCase();
-    if (selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(apptStatus)) {
-      toast$("Chỉ được khóa phác đồ khi dịch vụ ở trạng thái Đang thực hiện hoặc Hoàn thành.", "error");
-      return;
-    }
-    if (!window.confirm("Sau khi KHÓA hồ sơ sẽ không thể chỉnh sửa. Tiếp tục?")) return;
+
+    if (!window.confirm("Sau khi KHÓA hồ sơ sẽ chuyển sang trạng thái chính thức. Bạn có chắc chắn muốn khóa hồ sơ này?")) return;
     try {
       setSaving(true);
-      await axiosClient.patch(`/v2/treatment-notes/${selectedNote.id}`, buildPayload());
+      if (!isLockedNote) {
+        await axiosClient.patch(`/v2/treatment-notes/${selectedNote.id}`, buildPayload());
+      }
       await axiosClient.post(`/v2/treatment-notes/${selectedNote.id}/finalize`);
       toast$("Đã khóa hồ sơ điều trị!");
       setIsEditing(false);
@@ -958,6 +1096,7 @@ export default function TreatmentNotesV2() {
     } catch (e) { toast$(e.response?.data?.message || "Khóa thất bại.", "error"); }
     finally { setSaving(false); }
   };
+
 
   const handleCustomerDeclines = async () => {
     if (!selectedNote) return;
@@ -1370,9 +1509,22 @@ export default function TreatmentNotesV2() {
         {/* ── HEADER ── */}
         <div className="tn-header">
           <div className="tn-header__top-row">
-            <button className="tn-back" onClick={() => navigate(-1)}>
-              <span className="tn-back-arrow">←</span> Quay lại danh sách khách hàng
-            </button>
+            {appointmentId ? (
+              <button
+                className="tn-back"
+                type="button"
+                onClick={() => navigate(`/technician/appointments/${appointmentId}`)}
+                style={{ background: "#2f593a", color: "#ffffff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "6px" }}
+              >
+                <span>←</span> Quay lại chi tiết lịch hẹn #{appointmentId}
+              </button>
+            ) : (
+              <button className="tn-back" onClick={() => navigate(-1)} type="button">
+                <span className="tn-back-arrow">←</span> Quay lại
+              </button>
+            )}
+
+
             <div className="tn-header__actions">
               <button className="tn-btn tn-btn--primary" onClick={openCreateNoteModal} type="button">
                 <span className="tn-btn-icon">+</span> Tạo ghi chú mới
@@ -1954,29 +2106,54 @@ export default function TreatmentNotesV2() {
                         </span>
                       </div>
                     </div>
-                    <div className="tn-detail__head-actions">
-                      {!isFinalized && !isEditing && (
-                        <button 
-                          className="tn-btn tn-btn--outline" 
-                          onClick={() => {
-                            const apptStatus = String(selectedNote?.AppointmentStatus || "").toUpperCase();
-                            if (selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(apptStatus)) {
-                              toast$("Chỉ được thực hiện/chỉnh sửa phác đồ khi dịch vụ ở trạng thái Đang thực hiện hoặc Hoàn thành.", "error");
-                              return;
-                            }
-                            setIsEditing(true);
-                          }} 
-                          type="button"
-                          disabled={selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(String(selectedNote.AppointmentStatus).toUpperCase())}
-                          style={selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(String(selectedNote.AppointmentStatus).toUpperCase()) ? { opacity: 0.5, cursor: "not-allowed" } : {}}
-                          title={selectedNote?.AppointmentStatus && !["IN_PROGRESS", "COMPLETED"].includes(String(selectedNote.AppointmentStatus).toUpperCase()) ? "Dịch vụ phải ở trạng thái Đang thực hiện hoặc Hoàn thành mới được chỉnh sửa" : ""}
-                        >
-                          ✏ Chỉnh sửa
-                        </button>
+                    <div className="tn-detail__head-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      {isLockedNote ? (
+                        <div style={{
+                          background: "#f0fdf4",
+                          border: "1.5px solid #86efac",
+                          color: "#166534",
+                          padding: "6px 14px",
+                          borderRadius: "10px",
+                          fontWeight: "700",
+                          fontSize: "0.85rem",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}>
+                          🔒 Hồ sơ đã KHÓA chính thức (Không thể chỉnh sửa)
+                        </div>
+                      ) : (
+                        !isEditing && (
+                          <>
+                            <button 
+                              className="tn-btn tn-btn--primary" 
+                              onClick={() => {
+                                setIsEditing(true);
+                              }} 
+                              type="button"
+                              style={{ background: "#2f593a", color: "#ffffff", border: "none", fontWeight: "700" }}
+                            >
+                              ✏ Viết & Chỉnh sửa phác đồ
+                            </button>
+
+                            <button 
+                              className="tn-btn" 
+                              onClick={handleFinalize} 
+                              disabled={saving}
+                              type="button"
+                              style={{ background: "linear-gradient(135deg, #059669, #047857)", color: "#ffffff", border: "none", fontWeight: "700" }}
+                              title="Bấm để khóa chính thức hồ sơ điều trị này"
+                            >
+                              🔒 Khóa hồ sơ
+                            </button>
+                          </>
+                        )
                       )}
+
                       <button className="tn-btn tn-btn--outline" onClick={() => window.print()} type="button">📥 In / PDF</button>
-                      <button className="tn-btn tn-btn--outline" onClick={handleShare} type="button">🔗 Chia sẻ</button>
                     </div>
+
+
                   </div>
 
                   <div className="tn-detail__meta">
@@ -2154,110 +2331,7 @@ export default function TreatmentNotesV2() {
                       )}
                     </div>
 
-                    <div className="tn-col3">
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <h4 className="tn-col3__title" style={{ margin: 0 }}>Sản phẩm sử dụng</h4>
-                        {isEditing && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const d = getDefaults(selectedNote?.ServiceName);
-                              setEditProducts(d.products || []);
-                            }}
-                            className="tn-btn-template"
-                            style={{
-                              fontSize: "0.72rem",
-                              padding: "4px 8px",
-                              borderRadius: 6,
-                              background: "#eff6ff",
-                              color: "#2563eb",
-                              border: "1px solid #bfdbfe",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                              outline: "none"
-                            }}
-                          >
-                            📋 Áp dụng Mẫu
-                          </button>
-                        )}
-                      </div>
-                      <div className="tn-prods">
-                        {editProducts.map((p, i) => (
-                          <div key={i} className="tn-prod">
-                            <div className="tn-prod__icon">💅</div>
-                            <div className="tn-prod__info">
-                              <strong>{typeof p === "string" ? p : p.name}</strong>
-                              {typeof p !== "string" && p.desc && <span>{p.desc}</span>}
-                            </div>
-                            {isEditing && <button className="tn-del" onClick={() => setEditProducts(prev => prev.filter((_, j) => j !== i))} type="button">✕</button>}
-                          </div>
-                        ))}
-                        {editProducts.length === 0 && !isEditing && (
-                          <p style={{ fontSize: "0.82rem", color: "var(--text-muted-gray)", margin: 0 }}>Chưa chọn sản phẩm nào.</p>
-                        )}
-                      </div>
-                      {isEditing && (() => {
-                        const catalog = getProductsByCategory(
-                          selectedNote?.CategoryName || "",
-                          selectedNote?.ServiceName || ""
-                        );
-                        const selectedNames = editProducts.map(p => typeof p === "string" ? p : p.name);
-                        return (
-                          <div style={{ marginTop: "10px", position: "relative" }}>
-                            <button
-                              type="button"
-                              onClick={() => setShowProductPicker(v => !v)}
-                              style={{
-                                width: "100%", padding: "7px 12px", border: "1.5px solid var(--mint-border)",
-                                borderRadius: "var(--r-item)", background: "#f9fafb", cursor: "pointer",
-                                fontSize: "0.85rem", color: "var(--primary-green)", fontWeight: "600",
-                                display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px"
-                              }}
-                            >
-                              <span>➕ Chọn sản phẩm theo dịch vụ</span>
-                              <span>{showProductPicker ? "▲" : "▼"}</span>
-                            </button>
-                            {showProductPicker && (
-                              <div style={{
-                                position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200,
-                                background: "#fff", border: "1.5px solid var(--mint-border)",
-                                borderRadius: "var(--r-item)", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                                maxHeight: "220px", overflowY: "auto", padding: "6px",
-                                marginTop: "4px"
-                              }}>
-                                {catalog.map((prod, idx) => {
-                                  const checked = selectedNames.includes(prod);
-                                  return (
-                                    <label key={idx} style={{
-                                      display: "flex", alignItems: "center", gap: "8px",
-                                      padding: "6px 8px", cursor: "pointer", borderRadius: "6px",
-                                      fontSize: "0.83rem", fontWeight: checked ? "600" : "400",
-                                      color: checked ? "var(--primary-green)" : "var(--text-charcoal)",
-                                      background: checked ? "#f0fdf4" : "transparent",
-                                      transition: "background 0.15s"
-                                    }}>
-                                      <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={() => {
-                                          if (checked) {
-                                            setEditProducts(prev => prev.filter(p => (typeof p === "string" ? p : p.name) !== prod));
-                                          } else {
-                                            setEditProducts(prev => [...prev, prod]);
-                                          }
-                                        }}
-                                        style={{ width: "15px", height: "15px", accentColor: "var(--primary-green)" }}
-                                      />
-                                      {prod}
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
+
 
                     <div className="tn-col3">
                       <h4 className="tn-col3__title">Thông tin chi tiết</h4>
@@ -2284,21 +2358,88 @@ export default function TreatmentNotesV2() {
                             </td>
                           </tr>
                           <tr>
-                            <td className="tn-spec-lbl">Tình trạng ban đầu</td>
+                            <td className="tn-spec-lbl" style={{ verticalAlign: "top", paddingTop: "8px" }}>Tình trạng ban đầu</td>
                             <td className="tn-spec-val">
-                              {isEditing
-                                ? <input className="tn-spec-inp" value={editBefore} onChange={e => setEditBefore(e.target.value)} placeholder="Nhập tình trạng..." />
-                                : <span>{editBefore || "—"}</span>}
+                              {isEditing ? (
+                                <div>
+                                  <input
+                                    className="tn-spec-inp"
+                                    value={editBefore}
+                                    onChange={e => setEditBefore(e.target.value)}
+                                    placeholder="Nhập hoặc bấm chọn mẫu nhanh tình trạng ban đầu..."
+                                    style={{ width: "100%", marginBottom: "6px" }}
+                                  />
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                    {getQuickBeforeSamples(selectedNote?.ServiceName || selectedNote?.CategoryName).map((sample, idx) => (
+                                      <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => setEditBefore(sample)}
+                                        style={{
+                                          fontSize: "0.72rem",
+                                          padding: "3px 8px",
+                                          borderRadius: "12px",
+                                          border: "1px solid #bfdbfe",
+                                          background: editBefore === sample ? "#dbeafe" : "#f0f9ff",
+                                          color: editBefore === sample ? "#1d4ed8" : "#2563eb",
+                                          cursor: "pointer",
+                                          fontWeight: "600",
+                                          transition: "all 0.15s"
+                                        }}
+                                        title="Bấm để chọn mẫu nhanh này"
+                                      >
+                                        + {sample}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span>{editBefore || "—"}</span>
+                              )}
                             </td>
                           </tr>
                           <tr>
-                            <td className="tn-spec-lbl">Kết quả đạt được</td>
+                            <td className="tn-spec-lbl" style={{ verticalAlign: "top", paddingTop: "8px" }}>Kết quả đạt được</td>
                             <td className="tn-spec-val">
-                              {isEditing
-                                ? <input className="tn-spec-inp" value={editAfter} onChange={e => setEditAfter(e.target.value)} placeholder="Nhập kết quả..." />
-                                : <span>{editAfter || "—"}</span>}
+                              {isEditing ? (
+                                <div>
+                                  <input
+                                    className="tn-spec-inp"
+                                    value={editAfter}
+                                    onChange={e => setEditAfter(e.target.value)}
+                                    placeholder="Nhập hoặc bấm chọn mẫu nhanh kết quả..."
+                                    style={{ width: "100%", marginBottom: "6px" }}
+                                  />
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                    {getQuickAfterSamples(selectedNote?.ServiceName || selectedNote?.CategoryName).map((sample, idx) => (
+                                      <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => setEditAfter(sample)}
+                                        style={{
+                                          fontSize: "0.72rem",
+                                          padding: "3px 8px",
+                                          borderRadius: "12px",
+                                          border: "1px solid #bbf7d0",
+                                          background: editAfter === sample ? "#dcfce7" : "#f0fdf4",
+                                          color: editAfter === sample ? "#15803d" : "#166534",
+                                          cursor: "pointer",
+                                          fontWeight: "600",
+                                          transition: "all 0.15s"
+                                        }}
+                                        title="Bấm để chọn mẫu nhanh này"
+                                      >
+                                        + {sample}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span>{editAfter || "—"}</span>
+                              )}
                             </td>
                           </tr>
+
                           <tr>
                             <td className="tn-spec-lbl">Thời gian thực hiện</td>
                             <td className="tn-spec-val">
@@ -2464,149 +2605,151 @@ export default function TreatmentNotesV2() {
                   </div>
 
 
-                  {/* Booking Proposal */}
-                  {selectedNote.follow_up_appointment_id ? (
-                    <div className="tn-card tn-followup-card-wrapper" style={{ margin: 0, display: "flex", flexDirection: "column", gap: "14px", background: "linear-gradient(135deg, #eff6ff, #dbeafe)", border: "1.5px solid #bfdbfe", padding: "20px", height: "100%" }}>
-                      <p className="tn-followup__tag" style={{ margin: 0, fontSize: "0.8rem", fontWeight: "700", textTransform: "uppercase", color: "#1d4ed8" }}>Lịch tái khám đã được đặt</p>
-                      {followUpApptDetail ? (
-                        <div className="tn-followup__main" style={{ display: "flex", gap: "12px" }}>
-                          <div className="tn-followup__date" style={{ background: "#3b82f6" }}>
-                            <span className="tn-fdate__day">{getDayOfWeekVn(new Date(followUpApptDetail.AppointmentDate))}</span>
-                            <span className="tn-fdate__num">{pad(new Date(followUpApptDetail.AppointmentDate).getDate())}</span>
-                            <span className="tn-fdate__mo">TH{pad(new Date(followUpApptDetail.AppointmentDate).getMonth() + 1)}</span>
-                            <span className="tn-fdate__yr">{new Date(followUpApptDetail.AppointmentDate).getFullYear()}</span>
-                          </div>
-                          <div className="tn-followup__info">
-                            <strong>{followUpApptDetail.ServiceName || selectedNote.ServiceName}</strong>
-                            <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>⏰ {formatTime(followUpApptDetail.StartTime) || "10:00"} (CN {followUpApptDetail.BranchId || 1})</p>
-                            <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>👤 KTV: {followUpApptDetail.EmployeeName || selectedNote.TechnicianName}</p>
-                            <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>🏷️ Trạng thái: <strong style={{ color: followUpApptDetail.Status === "CONFIRMED" ? "#16a34a" : "#d97706" }}>{followUpApptDetail.Status === "CONFIRMED" ? "Đã xác nhận" : "Chờ xác nhận"}</strong></p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 80, fontSize: "0.83rem", color: "#1e3a8a" }}>
-                          ⏳ Đang tải thông tin lịch tái khám...
-                        </div>
-                      )}
-                      <div className="tn-followup__btns" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "auto" }}>
-                        {selectedNote.status === "finalized" ? (
-                          <div style={{
-                            background: "#f3f4f6",
-                            border: "1.5px solid #e5e7eb",
-                            borderRadius: 10,
-                            padding: "10px 12px",
-                            textAlign: "center",
-                            fontSize: "0.8rem",
-                            color: "#6b7280",
-                            fontWeight: 600,
-                            lineHeight: "1.4",
-                          }}>
-                            🔒 Hồ sơ điều trị đã khóa.<br />Không thể chỉnh sửa lịch tái khám.
-                          </div>
-                        ) : (
-                          <button className="tn-btn tn-btn--sm" onClick={openEditFollowUpModal} type="button" style={{ justifyContent: "center", width: "100%", background: "#2563eb", color: "#fff", border: "none" }}>
-                            ✏️ Chỉnh sửa lịch tái khám
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ) : suggestDate ? (
-                    <div className="tn-card tn-followup-card-wrapper" style={{ margin: 0, display: "flex", flexDirection: "column", gap: "14px", background: "linear-gradient(135deg, #f0fdf4, #ecfdf5)", border: "1.5px solid var(--mint-border)", padding: "20px", height: "100%" }}>
-                      <p className="tn-followup__tag" style={{ margin: 0, fontSize: "0.8rem", fontWeight: "700", textTransform: "uppercase", color: "var(--primary-green)" }}>Lịch hẹn tiếp theo (Đề xuất)</p>
-                      <div className="tn-followup__main" style={{ display: "flex", gap: "12px" }}>
-                        <div className="tn-followup__date">
-                          <span className="tn-fdate__day">{getDayOfWeekVn(suggestDate)}</span>
-                          <span className="tn-fdate__num">{pad(suggestDate.getDate())}</span>
-                          <span className="tn-fdate__mo">TH{pad(suggestDate.getMonth() + 1)}</span>
-                          <span className="tn-fdate__yr">{suggestDate.getFullYear()}</span>
-                        </div>
-                        <div className="tn-followup__info">
-                          <strong>{selectedNote.ServiceName}</strong>
-                          <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#4b5563" }}>⏰ 10:00 - 11:30 (1h30m)</p>
-                          <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#4b5563" }}>👤 KTV: {selectedNote.TechnicianName}</p>
-                          <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#4b5563" }}>📍 Luna Salon - CN 1</p>
-                        </div>
-                      </div>
-                      <div className="tn-followup__btns" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "auto" }}>
-                        {selectedNote.status === "finalized" ? (
-                          <div style={{
-                            background: "#f3f4f6",
-                            border: "1.5px solid #e5e7eb",
-                            borderRadius: 10,
-                            padding: "10px 12px",
-                            textAlign: "center",
-                            fontSize: "0.8rem",
-                            color: "#6b7280",
-                            fontWeight: 600,
-                            lineHeight: "1.4",
-                          }}>
-                            🔒 Hồ sơ điều trị đã khóa.<br />Không thể đặt lịch tái khám.
-                          </div>
-                        ) : selectedNote.AppointmentStatus === "COMPLETED" ? (
-                          <>
-                            <button className="tn-btn tn-btn--primary tn-btn--sm" onClick={() => {
-                              const y = suggestDate.getFullYear(), m = suggestDate.getMonth()+1, d = suggestDate.getDate();
-                              setBookDate(`${y}-${pad(m)}-${pad(d)}`);
-                              setBookDateLocked(true);
-                              setBookSvc(String(selectedNote.service_id || ""));
-                              setBookSvcName(selectedNote.ServiceName || "");
-                              setBookSvcImage(services.find(s => String(s.ServiceId) === String(selectedNote.service_id))?.ImageUrl || "");
-                              setBookKtv(String(selectedNote.technician_id || ""));
-                              setBookKtvName(selectedNote.TechnicianName || "");
-                              setBookKtvAvatar(selectedNote.TechnicianAvatar || "");
-                              setBookTime("10:00");
-                              setBookNote("");
-                              setShowBook(true);
-                            }} type="button" style={{ justifyContent: "center", width: "100%" }}>
-                              📅 Đặt lịch ngay
-                            </button>
-                            <button className="tn-btn tn-btn--ghost tn-btn--sm" style={{ justifyContent: "center", width: "100%" }} onClick={() => {
-                              setBookDate("");
-                              setBookDateLocked(false);
-                              setBookSvc(String(selectedNote.service_id || ""));
-                              setBookSvcName(selectedNote.ServiceName || "");
-                              setBookSvcImage(services.find(s => String(s.ServiceId) === String(selectedNote.service_id))?.ImageUrl || "");
-                              setBookKtv(String(selectedNote.technician_id || ""));
-                              setBookKtvName(selectedNote.TechnicianName || "");
-                              setBookKtvAvatar(selectedNote.TechnicianAvatar || "");
-                              setBookTime("10:00");
-                              setBookNote("");
-                              setShowBook(true);
-                            }} type="button">🔁 Chọn ngày khác
-                            </button>
-                            <button className="tn-btn tn-btn--sm" style={{ justifyContent: "center", width: "100%", backgroundColor: "#fff5f5", color: "#c53030", border: "1px solid #feb2b2", fontWeight: "700" }} onClick={handleCustomerDeclines} type="button">
-                              🚫 Khách hàng không muốn
-                            </button>
-                          </>
-                        ) : (
-                          <div style={{
-                            background: "#fffbeb",
-                            border: "1.5px solid #fde68a",
-                            borderRadius: 10,
-                            padding: "10px 12px",
-                            textAlign: "center",
-                            fontSize: "0.8rem",
-                            color: "#b45309",
-                            fontWeight: 600,
-                            lineHeight: "1.4",
-                          }}>
-                            ⚠️ Chỉ đặt lịch tái khám khi lịch gốc đã hoàn thành. (Hiện tại: {
-                              selectedNote.AppointmentStatus === "CONFIRMED" ? "Đã xác nhận" :
-                              selectedNote.AppointmentStatus === "PENDING" ? "Chờ xác nhận" :
-                              selectedNote.AppointmentStatus === "CHECKED_IN" ? "Đã check-in" :
-                              selectedNote.AppointmentStatus === "CANCELLED" ? "Đã hủy" :
-                              selectedNote.AppointmentStatus || "Chưa bắt đầu"
-                            })
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                  {/* Booking Proposal - ẨN hoàn toàn nếu là lịch Combo */}
+                  {(() => {
+                    const isCombo = !!(currentAppointment?.CustomerPackageId
+                      || selectedNote?.CustomerPackageId
+                      || selectedNote?.CustomerPackageName
+                      || selectedNote?.isCombo
+                      || (typeof selectedNote?.Notes === 'string' && selectedNote.Notes.includes('[Gói Combo:'))
+                      || (typeof selectedNote?.notes === 'string' && selectedNote.notes.includes('[Gói Combo:')));
 
-                  ) : (
-                    <div className="tn-card" style={{ margin: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid var(--border-color)", padding: "20px", height: "100%", color: "var(--text-muted-gray)", fontSize: "0.85rem" }}>
-                      Chưa có đề xuất lịch hẹn tiếp theo.
-                    </div>
-                  )}
+                    if (isCombo) {
+                      return (
+                        <div className="tn-card tn-followup-card-wrapper" style={{ margin: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "12px", background: "linear-gradient(135deg, #fdf2f8, #fce7f3)", border: "1.5px solid #fbcfe8", padding: "20px", height: "100%", textAlign: "center" }}>
+                          <span style={{ fontSize: "2.2rem" }}>📦</span>
+                          <b style={{ color: "#831843", fontSize: "1rem" }}>Gói Combo Trọn Gói</b>
+                          <p style={{ margin: 0, fontSize: "0.82rem", color: "#9d174d", lineHeight: 1.5 }}>
+                            Lịch hẹn này thuộc gói Combo của khách hàng.<br/>
+                            Khách hàng sẽ tự chọn ngày và đặt lịch các buổi tiếp theo trên tài khoản của mình. Không có lịch tái khám lẻ.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    // Lịch thường: hiển thị tái khám bình thường
+                    if (selectedNote.follow_up_appointment_id) {
+                      return (
+                        <div className="tn-card tn-followup-card-wrapper" style={{ margin: 0, display: "flex", flexDirection: "column", gap: "14px", background: "linear-gradient(135deg, #eff6ff, #dbeafe)", border: "1.5px solid #bfdbfe", padding: "20px", height: "100%" }}>
+                          <p className="tn-followup__tag" style={{ margin: 0, fontSize: "0.8rem", fontWeight: "700", textTransform: "uppercase", color: "#1d4ed8" }}>Lịch tái khám đã được đặt</p>
+                          {followUpApptDetail ? (
+                            <div className="tn-followup__main" style={{ display: "flex", gap: "12px" }}>
+                              <div className="tn-followup__date" style={{ background: "#3b82f6" }}>
+                                <span className="tn-fdate__day">{getDayOfWeekVn(new Date(followUpApptDetail.AppointmentDate))}</span>
+                                <span className="tn-fdate__num">{pad(new Date(followUpApptDetail.AppointmentDate).getDate())}</span>
+                                <span className="tn-fdate__mo">TH{pad(new Date(followUpApptDetail.AppointmentDate).getMonth() + 1)}</span>
+                                <span className="tn-fdate__yr">{new Date(followUpApptDetail.AppointmentDate).getFullYear()}</span>
+                              </div>
+                              <div className="tn-followup__info">
+                                <strong>{followUpApptDetail.ServiceName || selectedNote.ServiceName}</strong>
+                                <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>⏰ {formatTime(followUpApptDetail.StartTime) || "10:00"} (CN {followUpApptDetail.BranchId || 1})</p>
+                                <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>👤 KTV: {followUpApptDetail.EmployeeName || selectedNote.TechnicianName}</p>
+                                <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#1e3a8a" }}>🏷️ Trạng thái: <strong style={{ color: followUpApptDetail.Status === "CONFIRMED" ? "#16a34a" : "#d97706" }}>{followUpApptDetail.Status === "CONFIRMED" ? "Đã xác nhận" : "Chờ xác nhận"}</strong></p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 80, fontSize: "0.83rem", color: "#1e3a8a" }}>
+                              ⏳ Đang tải thông tin lịch tái khám...
+                            </div>
+                          )}
+                          <div className="tn-followup__btns" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "auto" }}>
+                            {selectedNote.status === "finalized" ? (
+                              <div style={{ background: "#f3f4f6", border: "1.5px solid #e5e7eb", borderRadius: 10, padding: "10px 12px", textAlign: "center", fontSize: "0.8rem", color: "#6b7280", fontWeight: 600, lineHeight: "1.4" }}>
+                                🔒 Hồ sơ điều trị đã khóa.<br />Không thể chỉnh sửa lịch tái khám.
+                              </div>
+                            ) : (
+                              <button className="tn-btn tn-btn--sm" onClick={openEditFollowUpModal} type="button" style={{ justifyContent: "center", width: "100%", background: "#2563eb", color: "#fff", border: "none" }}>
+                                ✏️ Chỉnh sửa lịch tái khám
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (suggestDate) {
+                      return (
+                        <div className="tn-card tn-followup-card-wrapper" style={{ margin: 0, display: "flex", flexDirection: "column", gap: "14px", background: "linear-gradient(135deg, #f0fdf4, #ecfdf5)", border: "1.5px solid var(--mint-border)", padding: "20px", height: "100%" }}>
+                          <p className="tn-followup__tag" style={{ margin: 0, fontSize: "0.8rem", fontWeight: "700", textTransform: "uppercase", color: "var(--primary-green)" }}>Lịch hẹn tiếp theo (Đề xuất)</p>
+                          <div className="tn-followup__main" style={{ display: "flex", gap: "12px" }}>
+                            <div className="tn-followup__date">
+                              <span className="tn-fdate__day">{getDayOfWeekVn(suggestDate)}</span>
+                              <span className="tn-fdate__num">{pad(suggestDate.getDate())}</span>
+                              <span className="tn-fdate__mo">TH{pad(suggestDate.getMonth() + 1)}</span>
+                              <span className="tn-fdate__yr">{suggestDate.getFullYear()}</span>
+                            </div>
+                            <div className="tn-followup__info">
+                              <strong>{selectedNote.ServiceName}</strong>
+                              <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#4b5563" }}>⏰ 10:00 - 11:30 (1h30m)</p>
+                              <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#4b5563" }}>👤 KTV: {selectedNote.TechnicianName}</p>
+                              <p style={{ margin: "2px 0", fontSize: "0.8rem", color: "#4b5563" }}>📍 Luna Salon - CN 1</p>
+                            </div>
+                          </div>
+                          <div className="tn-followup__btns" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "auto" }}>
+                            {selectedNote.status === "finalized" ? (
+                              <div style={{ background: "#f3f4f6", border: "1.5px solid #e5e7eb", borderRadius: 10, padding: "10px 12px", textAlign: "center", fontSize: "0.8rem", color: "#6b7280", fontWeight: 600, lineHeight: "1.4" }}>
+                                🔒 Hồ sơ điều trị đã khóa.<br />Không thể đặt lịch tái khám.
+                              </div>
+                            ) : selectedNote.AppointmentStatus === "COMPLETED" ? (
+                              <>
+                                <button className="tn-btn tn-btn--primary tn-btn--sm" onClick={() => {
+                                  const y = suggestDate.getFullYear(), m = suggestDate.getMonth()+1, d = suggestDate.getDate();
+                                  setBookDate(`${y}-${pad(m)}-${pad(d)}`);
+                                  setBookDateLocked(true);
+                                  setBookSvc(String(selectedNote.service_id || ""));
+                                  setBookSvcName(selectedNote.ServiceName || "");
+                                  setBookSvcImage(services.find(s => String(s.ServiceId) === String(selectedNote.service_id))?.ImageUrl || "");
+                                  setBookKtv(String(selectedNote.technician_id || ""));
+                                  setBookKtvName(selectedNote.TechnicianName || "");
+                                  setBookKtvAvatar(selectedNote.TechnicianAvatar || "");
+                                  setBookTime("10:00");
+                                  setBookNote("");
+                                  setShowBook(true);
+                                }} type="button" style={{ justifyContent: "center", width: "100%" }}>
+                                  📅 Đặt lịch ngay
+                                </button>
+                                <button className="tn-btn tn-btn--ghost tn-btn--sm" style={{ justifyContent: "center", width: "100%" }} onClick={() => {
+                                  setBookDate("");
+                                  setBookDateLocked(false);
+                                  setBookSvc(String(selectedNote.service_id || ""));
+                                  setBookSvcName(selectedNote.ServiceName || "");
+                                  setBookSvcImage(services.find(s => String(s.ServiceId) === String(selectedNote.service_id))?.ImageUrl || "");
+                                  setBookKtv(String(selectedNote.technician_id || ""));
+                                  setBookKtvName(selectedNote.TechnicianName || "");
+                                  setBookKtvAvatar(selectedNote.TechnicianAvatar || "");
+                                  setBookTime("10:00");
+                                  setBookNote("");
+                                  setShowBook(true);
+                                }} type="button">🔁 Chọn ngày khác
+                                </button>
+                                <button className="tn-btn tn-btn--sm" style={{ justifyContent: "center", width: "100%", backgroundColor: "#fff5f5", color: "#c53030", border: "1px solid #feb2b2", fontWeight: "700" }} onClick={handleCustomerDeclines} type="button">
+                                  🚫 Khách hàng không muốn
+                                </button>
+                              </>
+                            ) : (
+                              <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 10, padding: "10px 12px", textAlign: "center", fontSize: "0.8rem", color: "#b45309", fontWeight: 600, lineHeight: "1.4" }}>
+                                ⚠️ Chỉ đặt lịch tái khám khi lịch gốc đã hoàn thành. (Hiện tại: {
+                                  selectedNote.AppointmentStatus === "CONFIRMED" ? "Đã xác nhận" :
+                                  selectedNote.AppointmentStatus === "PENDING" ? "Chờ xác nhận" :
+                                  selectedNote.AppointmentStatus === "CHECKED_IN" ? "Đã check-in" :
+                                  selectedNote.AppointmentStatus === "CANCELLED" ? "Đã hủy" :
+                                  selectedNote.AppointmentStatus || "Chưa bắt đầu"
+                                })
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="tn-card" style={{ margin: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid var(--border-color)", padding: "20px", height: "100%", color: "var(--text-muted-gray)", fontSize: "0.85rem" }}>
+                        Chưa có đề xuất lịch hẹn tiếp theo.
+                      </div>
+                    );
+                  })()}
+
+
 
                 </div>
 
@@ -2622,12 +2765,53 @@ export default function TreatmentNotesV2() {
 
                 {/* ── CARD 7: EDIT ACTIONS ── */}
                 {isEditing && (
-                  <div className="tn-card tn-edit-bar" style={{ borderBottom: "none", marginBottom: "16px" }}>
-                    <button className="tn-btn tn-btn--success" onClick={handleSave} disabled={saving} type="button">💾 {saving ? "Đang lưu..." : "Lưu bản nháp"}</button>
-                    <button className="tn-btn tn-btn--lock" onClick={handleFinalize} disabled={saving} type="button">🔒 Khóa hồ sơ</button>
-                    <button className="tn-btn tn-btn--ghost" onClick={() => { setIsEditing(false); initFields(selectedNote); }} type="button">Hủy bỏ</button>
+                  <div className="tn-card tn-edit-bar" style={{ borderBottom: "none", marginBottom: "16px", display: "flex", gap: "10px", alignItems: "center" }}>
+                    <button className="tn-btn tn-btn--success" onClick={handleSave} disabled={saving} type="button">
+                      💾 {saving ? "Đang lưu..." : "Lưu bản nháp"}
+                    </button>
+                    {(() => {
+                      const apptStatus = String(selectedNote?.AppointmentStatus || selectedNote?.appointment_status || currentAppointment?.Status || "").toUpperCase();
+                      const noteSvcId = selectedNote?.service_id || selectedNote?.ServiceId || selectedNote?.AppointmentServiceId;
+                      const currentServiceStep = currentAppointment?.services?.find(s =>
+                        String(s.ServiceId) === String(noteSvcId) || String(s.AppointmentServiceId) === String(noteSvcId)
+                      );
+                      const svcStepStatus = String(
+                        currentServiceStep?.StepStatus ||
+                        selectedNote?.StepStatus ||
+                        selectedNote?.step_status ||
+                        selectedNote?.ServiceStatus ||
+                        ""
+                      ).toUpperCase();
+
+                      const isCompleted = apptStatus === "COMPLETED" || svcStepStatus === "COMPLETED";
+
+                      return (
+                        <button
+                          className="tn-btn tn-btn--lock"
+                          onClick={handleFinalize}
+                          disabled={saving || !isCompleted}
+                          type="button"
+                          style={{
+                            opacity: isCompleted ? 1 : 0.5,
+                            cursor: isCompleted ? "pointer" : "not-allowed",
+                            background: "linear-gradient(135deg, #059669, #047857)",
+                            color: "#fff",
+                            fontWeight: 700
+                          }}
+                          title={!isCompleted ? "Chỉ được khóa hồ sơ khi bước dịch vụ này hoặc toàn bộ ca hẹn đã hoàn thành" : "Khóa chính thức hồ sơ phác đồ trị liệu"}
+                        >
+                          🔒 Khóa hồ sơ {!isCompleted && "(Yêu cầu hoàn thành dịch vụ)"}
+                        </button>
+                      );
+                    })()}
+
+
+                    <button className="tn-btn tn-btn--ghost" onClick={() => { setIsEditing(false); initFields(selectedNote); }} type="button">
+                      Hủy bỏ
+                    </button>
                   </div>
                 )}
+
 
                 {/* ── CARD 8: BOTTOM ACTION BAR ── */}
                 <div className="tn-card tn-bot-bar" style={{ borderBottom: "none" }}>

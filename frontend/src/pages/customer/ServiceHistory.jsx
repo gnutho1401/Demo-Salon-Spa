@@ -187,18 +187,35 @@ export default function ServiceHistory() {
     toDate,
   ]);
 
-  const groupedByMonth = useMemo(() => {
+  const groupedAppointments = useMemo(() => {
     const map = new Map();
 
     for (const item of filteredItems) {
-      const key = buildMonthKey(item.AppointmentDate);
+      const apptId = item.AppointmentId;
+      if (!map.has(apptId)) {
+        map.set(apptId, {
+          ...item,
+          services: [],
+        });
+      }
+      map.get(apptId).services.push(item);
+    }
+
+    return Array.from(map.values());
+  }, [filteredItems]);
+
+  const groupedByMonth = useMemo(() => {
+    const map = new Map();
+
+    for (const appt of groupedAppointments) {
+      const key = buildMonthKey(appt.AppointmentDate);
       const current = map.get(key) || [];
-      current.push(item);
+      current.push(appt);
       map.set(key, current);
     }
 
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [filteredItems]);
+  }, [groupedAppointments]);
 
   const filteredStats = useMemo(() => {
     const total = filteredItems.length;
@@ -630,11 +647,11 @@ export default function ServiceHistory() {
           </section>
         )}
 
-        {!loading && viewMode === "cards" && filteredItems.length > 0 && (
+        {!loading && viewMode === "cards" && groupedAppointments.length > 0 && (
           <section className="history-card-grid-pro">
-            {filteredItems.map((item) => (
+            {groupedAppointments.map((item) => (
               <HistoryCard
-                key={`${item.AppointmentId}-${item.ServiceId}`}
+                key={item.AppointmentId}
                 item={item}
                 navigate={navigate}
                 loadingId={loadingId}
@@ -674,6 +691,33 @@ export default function ServiceHistory() {
   );
 }
 
+function getStepTimeRange(step, allSteps, apptStartTime) {
+  if (step.StepStartTime && step.StepEndTime) {
+    return `${step.StepStartTime.slice(0, 5)} - ${step.StepEndTime.slice(0, 5)}`;
+  }
+  if (!apptStartTime || !apptStartTime.includes(":")) return null;
+
+  const idx = allSteps.indexOf(step);
+  let accumulatedMins = 0;
+  const [h, m] = apptStartTime.split(":").map(Number);
+  const startTotal = (h || 0) * 60 + (m || 0);
+
+  for (let i = 0; i < (idx >= 0 ? idx : 0); i++) {
+    accumulatedMins += Number(allSteps[i].DurationMinutes) || 0;
+  }
+
+  const stepStartMins = startTotal + accumulatedMins;
+  const stepEndMins = stepStartMins + (Number(step.DurationMinutes) || 0);
+
+  const fmt = (mins) => {
+    const hrs = Math.floor(mins / 60) % 24;
+    const minsVal = mins % 60;
+    return `${String(hrs).padStart(2, "0")}:${String(minsVal).padStart(2, "0")}`;
+  };
+
+  return `${fmt(stepStartMins)} - ${fmt(stepEndMins)}`;
+}
+
 function HistoryCard({
   item,
   navigate,
@@ -682,28 +726,59 @@ function HistoryCard({
   toggleFavoriteEmployee,
 }) {
   const reviewed = Number(item.ReviewId || 0) > 0;
+  const isCombo = Boolean(item.CustomerPackageId || item.PackageName);
+  const displayTitle = isCombo ? (item.PackageName || item.ServiceName || "Gói Combo Spa") : (item.ServiceName || "Dịch vụ");
+  const displayImage = isCombo ? (item.PackageImageUrl || item.ServiceImageUrl) : item.ServiceImageUrl;
+  const totalDuration = Array.isArray(item.services) && item.services.length > 0
+    ? item.services.reduce((acc, s) => acc + (Number(s.DurationMinutes) || 0), 0)
+    : (item.DurationMinutes || 0);
 
-  const displayPrice = item.Price;
-  const isPackagePaid = item.PaidPrice === 0 || item.CustomerPackageId || item.PackageName;
+  const allTechNames = isCombo && Array.isArray(item.services)
+    ? Array.from(new Set(item.services.map(s => s.StepTechnicianName || s.EmployeeName).filter(Boolean))).join(", ")
+    : (item.EmployeeName || "Chuyên viên Salon");
+
+  const comboTechnicians = useMemo(() => {
+    if (!isCombo || !Array.isArray(item.services)) return [];
+    const map = new Map();
+    for (const s of item.services) {
+      const techName = s.StepTechnicianName || s.EmployeeName || "KTV Salon";
+      const techAvatar = s.StepTechnicianAvatar || s.EmployeeImageUrl || FALLBACK_AVATAR;
+      const techId = s.StepEmployeeId || s.EmployeeId || techName;
+
+      if (!map.has(techId)) {
+        map.set(techId, {
+          EmployeeId: s.StepEmployeeId || s.EmployeeId,
+          EmployeeName: techName,
+          EmployeeImageUrl: techAvatar,
+          Specialization: s.Specialization || "Chuyên viên làm đẹp",
+          IsFavoriteEmployee: s.IsFavoriteEmployee
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [isCombo, item.services]);
+
+  const displayPrice = isCombo ? 0 : item.Price;
+  const isPackagePaid = item.PaidPrice === 0 || isCombo;
 
   return (
     <article className="history-service-card-pro">
       <div className="history-service-image">
         <img
-          src={resolveFileUrl(item.ServiceImageUrl) || FALLBACK_SERVICE}
-          alt={item.ServiceName}
+          src={resolveFileUrl(displayImage) || FALLBACK_SERVICE}
+          alt={displayTitle}
         />
-        <span>{item.CategoryName || "Beauty Service"}</span>
+        <span>{isCombo ? "Gói Combo Spa" : (item.CategoryName || "Beauty Service")}</span>
       </div>
 
       <div className="history-service-body">
         <div className="history-card-head">
           <div className="history-card-title-group">
             <small>{appointmentCode(item.AppointmentId)}</small>
-            <h3>{item.ServiceName || "Dịch vụ"}</h3>
+            <h3>{displayTitle}</h3>
           </div>
           <div className="history-card-price-group">
-            <b className="history-card-price">{formatMoney(displayPrice)}</b>
+            <b className="history-card-price">{isCombo ? "Trọn gói Combo" : formatMoney(displayPrice)}</b>
             {isPackagePaid && (
               <span className="badge-package-paid">Thanh toán bằng Combo</span>
             )}
@@ -713,6 +788,41 @@ function HistoryCard({
         <p className="history-card-desc">
           {item.ServiceDescription || "Dịch vụ chăm sóc sắc đẹp tại salon."}
         </p>
+
+        {/* BƯỚC DỊCH VỤ TRONG COMBO (NẾU CÓ) */}
+        {isCombo && Array.isArray(item.services) && item.services.length > 0 && (
+          <div style={{ background: "#fdf2f8", padding: "12px 16px", borderRadius: 14, border: "1px solid #fbcfe8", margin: "14px 0" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#be185d", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+              ✂️ CÁC BƯỚC DỊCH VỤ TRONG COMBO & KTV THỰC HIỆN:
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
+              {item.services.map((s, idx) => {
+                const stepTimeStr = getStepTimeRange(s, item.services, item.StartTime);
+                const techNameStr = s.StepTechnicianName || s.EmployeeName || "KTV Salon";
+                const techAvatarStr = s.StepTechnicianAvatar || s.EmployeeImageUrl || FALLBACK_AVATAR;
+
+                return (
+                  <div key={idx} style={{ background: "#ffffff", padding: "8px 12px", borderRadius: 10, border: "1px solid #fbcfe8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <b style={{ color: "#831843", fontSize: 12, display: "block" }}>{idx + 1}. {s.ServiceName}</b>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>
+                        ⏱ {stepTimeStr ? `${stepTimeStr} (${s.DurationMinutes || 30} phút)` : `${s.DurationMinutes || 30} phút`}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#be185d", background: "#fdf2f8", padding: "3px 8px", borderRadius: 12, border: "1px solid #fbcfe8", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <img
+                        src={resolveFileUrl(techAvatarStr) || FALLBACK_AVATAR}
+                        alt={techNameStr}
+                        style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover" }}
+                      />
+                      {techNameStr}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="history-info-grid">
           <div className="info-item">
@@ -726,7 +836,9 @@ function HistoryCard({
             </span>
             <div className="info-text">
               <span>Ngày thực hiện</span>
-              <b>{formatDate(item.AppointmentDate)} · {formatTime(item.StartTime)}</b>
+              <b>
+                {formatDate(item.AppointmentDate)} · {formatTime(item.StartTime)}{item.EndTime ? ` - ${formatTime(item.EndTime)}` : ""}
+              </b>
             </div>
           </div>
 
@@ -739,7 +851,7 @@ function HistoryCard({
             </span>
             <div className="info-text">
               <span>Kỹ thuật viên</span>
-              <b>{item.EmployeeName || "Chưa có"}</b>
+              <b>{allTechNames || "Chuyên viên Salon"}</b>
             </div>
           </div>
 
@@ -765,8 +877,8 @@ function HistoryCard({
             </span>
             <div className="info-text">
               <span>Thanh toán</span>
-              <span className={`payment-status-badge ${paymentBadgeClass(item.PaymentStatus)}`}>
-                {paymentText(item.PaymentStatus)}
+              <span className={`payment-status-badge ${isCombo ? "badge-paid" : paymentBadgeClass(item.PaymentStatus)}`}>
+                {isCombo ? "Đã thanh toán" : paymentText(item.PaymentStatus)}
               </span>
             </div>
           </div>
@@ -780,7 +892,7 @@ function HistoryCard({
             </span>
             <div className="info-text">
               <span>Thời lượng</span>
-              <b>{item.DurationMinutes || 0} phút</b>
+              <b>{totalDuration} phút</b>
             </div>
           </div>
 
@@ -793,36 +905,72 @@ function HistoryCard({
             </span>
             <div className="info-text">
               <span>Voucher / Combo</span>
-              <b className="voucher-code-text">{item.VoucherCode || item.PackageName || "Không dùng"}</b>
+              <b className="voucher-code-text">{item.PackageName || item.VoucherCode || "Gói Combo"}</b>
             </div>
           </div>
         </div>
 
-        <div className="history-employee-mini">
-          <img
-            src={resolveFileUrl(item.EmployeeImageUrl || FALLBACK_AVATAR)}
-            alt={item.EmployeeName}
-          />
-
-          <div className="employee-info-content">
-            <b>{item.EmployeeName || "Kỹ thuật viên"}</b>
-            <span>
-              {item.Specialization || item.Position || "Beauty Expert"}
-            </span>
+        {/* THẺ KỸ THUẬT VIÊN (HIỂN THỊ ĐẦY ĐỦ CHO TẤT CẢ KTV TRONG COMBO) */}
+        {isCombo && comboTechnicians.length > 0 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, margin: "14px 0" }}>
+            {comboTechnicians.map((tech, tIdx) => (
+              <div
+                key={tIdx}
+                className="history-employee-mini"
+                style={{ flex: "1 1 200px", margin: 0, background: "#ffffff", border: "1px solid #fbcfe8", borderRadius: 14, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}
+              >
+                <img
+                  src={resolveFileUrl(tech.EmployeeImageUrl) || FALLBACK_AVATAR}
+                  alt={tech.EmployeeName}
+                  style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "1.5px solid #ec4899" }}
+                />
+                <div className="employee-info-content" style={{ flex: 1 }}>
+                  <b style={{ fontSize: 13, color: "#831843" }}>{tech.EmployeeName}</b>
+                  <span style={{ fontSize: 11, color: "#64748b" }}>{tech.Specialization || "Chuyên viên làm đẹp"}</span>
+                </div>
+                {tech.EmployeeId && (
+                  <button
+                    type="button"
+                    className={`favorite-employee-btn ${Number(tech.IsFavoriteEmployee) ? "active" : ""}`}
+                    disabled={loadingId === `employee-${tech.EmployeeId}`}
+                    onClick={() => toggleFavoriteEmployee(tech.EmployeeId)}
+                    aria-label="Yêu thích kỹ thuật viên"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill={Number(tech.IsFavoriteEmployee) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
+        ) : (
+          <div className="history-employee-mini">
+            <img
+              src={resolveFileUrl(item.EmployeeImageUrl || FALLBACK_AVATAR)}
+              alt={item.EmployeeName}
+            />
 
-          <button
-            type="button"
-            className={`favorite-employee-btn ${Number(item.IsFavoriteEmployee) ? "active" : ""}`}
-            disabled={loadingId === `employee-${item.EmployeeId}`}
-            onClick={() => toggleFavoriteEmployee(item.EmployeeId)}
-            aria-label="Yêu thích kỹ thuật viên"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill={Number(item.IsFavoriteEmployee) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
-            </svg>
-          </button>
-        </div>
+            <div className="employee-info-content">
+              <b>{item.EmployeeName || "Kỹ thuật viên"}</b>
+              <span>
+                {item.Specialization || item.Position || "Beauty Expert"}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className={`favorite-employee-btn ${Number(item.IsFavoriteEmployee) ? "active" : ""}`}
+              disabled={loadingId === `employee-${item.EmployeeId}`}
+              onClick={() => toggleFavoriteEmployee(item.EmployeeId)}
+              aria-label="Yêu thích kỹ thuật viên"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill={Number(item.IsFavoriteEmployee) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+              </svg>
+            </button>
+          </div>
+        )}
 
         <div className="history-review-box">
           {reviewed ? (
@@ -869,48 +1017,80 @@ function HistoryCard({
             </>
           ) : (
             <div className="history-not-reviewed">
-              <b>Chưa đánh giá dịch vụ này</b>
+              <b>{isCombo ? "Chưa đánh giá ca hẹn Combo này" : "Chưa đánh giá dịch vụ này"}</b>
               <span>Hãy đánh giá để giúp salon cải thiện chất lượng dịch vụ tốt hơn.</span>
             </div>
           )}
         </div>
 
         <div className="history-actions-pro">
-          <Link to={`/customer/appointments/${item.AppointmentId}`} className="btn-detail-ap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-            Chi tiết
-          </Link>
+          {isCombo ? (
+            <div style={{ display: "flex", gap: 8, width: "100%", justifyContent: "flex-end", flexWrap: "wrap", alignItems: "center" }}>
+              <button
+                type="button"
+                className="btn-rebook-ap"
+                style={{ background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)", color: "#ffffff", border: "none", fontWeight: 800, borderRadius: "10px", padding: "8px 16px", cursor: "pointer", boxShadow: "0 4px 12px rgba(236,72,153,0.3)" }}
+                onClick={() => navigate(`/customer/packages?packageId=${item.CustomerPackageId}`)}
+                title="Bấm để chuyển đến gói Combo và đặt lịch 1 lượt tiếp theo"
+              >
+                🔄 Đặt Lại Combo →
+              </button>
+              <button
+                type="button"
+                className="btn-detail-ap"
+                style={{ background: "#fdf2f8", color: "#db2777", border: "1px solid #fbcfe8", fontWeight: 700, borderRadius: "10px", padding: "8px 16px", cursor: "pointer" }}
+                onClick={() => navigate(`/customer/packages?packageId=${item.CustomerPackageId}`)}
+              >
+                📦 Chi Tiết
+              </button>
+              <button
+                type="button"
+                className="btn-review-ap"
+                style={{ background: "#fff1f2", color: "#be185d", border: "1px solid #fecdd3", fontWeight: 700, borderRadius: "10px", padding: "8px 16px", cursor: "pointer" }}
+                onClick={() => navigate(`/customer/packages?tab=reviews`)}
+              >
+                ⭐ Đánh Giá
+              </button>
+            </div>
+          ) : (
+            <>
+              <Link to={`/customer/appointments/${item.AppointmentId}`} className="btn-detail-ap">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                Chi tiết
+              </Link>
 
-          {!reviewed && (
-            <Link
-              to={`/customer/reviews?appointmentId=${item.AppointmentId}&serviceId=${item.ServiceId}`}
-              className="btn-review-ap"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              </svg>
-              Đánh giá
-            </Link>
+              {!reviewed && (
+                <Link
+                  to={`/customer/reviews?appointmentId=${item.AppointmentId}&serviceId=${item.ServiceId}`}
+                  className="btn-review-ap"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                  Đánh giá
+                </Link>
+              )}
+
+              <button
+                type="button"
+                className="btn-rebook-ap"
+                onClick={() =>
+                  navigate(
+                    `/customer/booking?serviceId=${item.ServiceId || ""}&employeeId=${item.EmployeeId || ""}`,
+                  )
+                }
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                Đặt lại
+              </button>
+            </>
           )}
-
-          <button
-            type="button"
-            className="btn-rebook-ap"
-            onClick={() =>
-              navigate(
-                `/customer/booking?serviceId=${item.ServiceId || ""}&employeeId=${item.EmployeeId || ""}`,
-              )
-            }
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-            </svg>
-            Đặt lại
-          </button>
 
           <button
             type="button"

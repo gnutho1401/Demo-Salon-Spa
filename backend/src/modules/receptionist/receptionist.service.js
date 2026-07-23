@@ -425,8 +425,27 @@ async function getAppointments(filters = {}) {
         a.CustomerPackageId,
         pkg.PackageName AS CustomerPackageName,
         COALESCE(a.BranchId, e.BranchId) AS BranchId,
-        b.BranchName
+        b.BranchName,
+        (
+          SELECT
+            aps.AppointmentServiceId,
+            aps.ServiceId,
+            ss.ServiceName,
+            ss.DurationMinutes,
+            ISNULL(aps.Status, 'PENDING') AS Status,
+            aps.EmployeeId,
+            seu.FullName AS TechnicianName,
+            COALESCE(se.ImageUrl, seu.AvatarUrl) AS TechnicianAvatar
+          FROM AppointmentServices aps
+          JOIN Services ss ON aps.ServiceId = ss.ServiceId
+          LEFT JOIN Employees se ON aps.EmployeeId = se.EmployeeId
+          LEFT JOIN Users seu ON se.UserId = seu.UserId
+          WHERE aps.AppointmentId = a.AppointmentId
+          ORDER BY aps.AppointmentServiceId ASC
+          FOR JSON PATH
+        ) AS ServicesJson
       FROM Appointments a
+
       JOIN Customers c ON a.CustomerId = c.CustomerId
       JOIN Users cu ON c.UserId = cu.UserId
       JOIN Employees e ON a.EmployeeId = e.EmployeeId
@@ -670,13 +689,15 @@ async function confirmAppointment(id, userId = null) {
 async function checkInAppointment(id, userId = null) {
   const pool = await connectDB();
   const current = await getAppointmentById(id);
-  if (!current) throw new Error("Không tìm thấy lịch hẹn");
   if (String(current.Status).toUpperCase() !== "CONFIRMED") {
     throw new Error("Chỉ được check-in lịch đã xác nhận");
   }
-  if (String(current.PaymentStatus).toUpperCase() !== "PAID") {
+  const isComboAppt = !!(current.CustomerPackageId || current.CustomerPackageName);
+  if (!isComboAppt && String(current.PaymentStatus).toUpperCase() !== "PAID" && Number(current.FinalAmount || 0) > 0) {
     throw new Error("Khách hàng chưa thanh toán. Vui lòng hoàn tất thanh toán trước khi check-in.");
   }
+
+
 
   await pool.request().input("AppointmentId", sql.Int, id).query(`
       UPDATE Appointments
@@ -752,6 +773,34 @@ async function completeAppointment(id, userId = null) {
     const current = currentResult.recordset[0];
     if (!current) throw new Error("Không tìm thấy lịch hẹn");
 
+    // Kiểm tra tất cả dịch vụ trong lịch hẹn đã hoàn thành chưa
+    const servicesCheckResult = await new sql.Request(transaction)
+      .input("AppointmentId", sql.Int, id)
+      .query(`
+        SELECT 
+          aps.AppointmentServiceId,
+          s.ServiceName,
+          ISNULL(aps.Status, 'PENDING') AS ServiceStatus
+        FROM AppointmentServices aps
+        JOIN Services s ON aps.ServiceId = s.ServiceId
+        WHERE aps.AppointmentId = @AppointmentId
+      `);
+
+    const totalServices = servicesCheckResult.recordset.length;
+    const incompleteServices = servicesCheckResult.recordset.filter(
+      (s) => (s.ServiceStatus || 'PENDING') !== 'COMPLETED'
+    );
+
+    // Bắt buộc tất cả dịch vụ trong combo (hoặc lịch hẹn có nhiều dịch vụ) phải hoàn thành trước
+    if ((current.CustomerPackageId || totalServices > 1) && incompleteServices.length > 0) {
+      const incompleteNames = incompleteServices
+        .map((s, i) => `${i + 1}. ${s.ServiceName}`)
+        .join(", ");
+      throw new Error(
+        `Chưa thể hoàn thành lịch hẹn. Bạn phải hoàn thành tất cả các dịch vụ trong combo trước! Các dịch vụ chưa hoàn thành: ${incompleteNames}`
+      );
+    }
+
     // Validate state transition using state machine service
     appointmentStateService.validateTransition(current.Status, "COMPLETED");
 
@@ -762,7 +811,7 @@ async function completeAppointment(id, userId = null) {
             CompletedAt = CURRENT_TIMESTAMP,
             UpdatedAt = CURRENT_TIMESTAMP
         WHERE AppointmentId = @AppointmentId
-          AND Status = 'IN_PROGRESS'
+          AND Status <> 'COMPLETED'
       `);
 
     await new sql.Request(transaction)
@@ -874,7 +923,7 @@ async function completeAppointment(id, userId = null) {
             INSERT INTO TechnicianPayoutLedger
             (EmployeeId, ReferenceType, ReferenceId, Amount, EntryType, Description, CreatedAt)
             VALUES
-            (@EmployeeId, 'APPOINTMENT', @AppointmentId, @Amount, 'EARNING', 'Hoa hồng hoàn thành lịch hẹn #' || CAST(@AppointmentId AS TEXT), CURRENT_TIMESTAMP)
+            (@EmployeeId, 'APPOINTMENT', @AppointmentId, @Amount, 'EARNING', CONCAT(N'Hoa hồng hoàn thành lịch hẹn #', @AppointmentId), CURRENT_TIMESTAMP)
           `);
       }
     }
@@ -889,70 +938,47 @@ async function completeAppointment(id, userId = null) {
           FROM CustomerPackageUsages
           WHERE AppointmentId = @AppointmentId
             AND Status = 'USED'
-      ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY`);
+      `);
 
       if (usageCheck.recordset.length === 0) {
         const packageCheck = await new sql.Request(transaction)
-          .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
-          .input("ServiceId", sql.Int, current.ServiceId).query(`
-            SELECT
-              cp.CustomerPackageId,
-              cp.RemainingSessions,
-              cp.UsedSessions,
-              cp.Status,
-              cp.EndDate,
-              COALESCE(ps.SessionCount, 1) AS MaxSessions,
-              (
-                SELECT COALESCE(SUM(SessionsUsed), 0)
-                FROM CustomerPackageUsages
-                WHERE CustomerPackageId = @CustomerPackageId
-                  AND ServiceId = @ServiceId
-                  AND Status <> 'CANCELLED'
-              ) AS UsedCount
-            FROM CustomerPackages cp
-            JOIN PackageServices ps
-              ON cp.PackageId = ps.PackageId
-            WHERE cp.CustomerPackageId = @CustomerPackageId
-              AND ps.ServiceId = @ServiceId
+          .input("CustomerPackageId", sql.Int, current.CustomerPackageId).query(`
+            SELECT CustomerPackageId, RemainingSessions, UsedSessions, Status
+            FROM CustomerPackages
+            WHERE CustomerPackageId = @CustomerPackageId
           `);
 
         const cp = packageCheck.recordset[0];
-        if (!cp) throw new Error("Combo không chứa dịch vụ của lịch hẹn này");
-        if (String(cp.Status).toUpperCase() !== "ACTIVE") {
-          throw new Error("Combo không còn ở trạng thái ACTIVE");
-        }
-        if (new Date(cp.EndDate) < new Date(new Date().toDateString())) {
-          throw new Error("Combo đã hết hạn, không thể trừ buổi");
-        }
-        if (Number(cp.RemainingSessions || 0) < 1) {
-          throw new Error("Combo không còn đủ số buổi để hoàn thành lịch này");
-        }
-        if (cp.UsedCount >= cp.MaxSessions) {
-          throw new Error(`Dịch vụ này đã dùng hết số buổi quy định trong combo (Tối đa ${cp.MaxSessions} buổi)`);
-        }
+        if (cp) {
+          const mainSvcRes = await new sql.Request(transaction)
+            .input("AppointmentId", sql.Int, id).query(`
+              SELECT TOP 1 ServiceId FROM AppointmentServices WHERE AppointmentId = @AppointmentId
+            `);
+          const mainServiceId = mainSvcRes.recordset[0]?.ServiceId || null;
 
-        await new sql.Request(transaction)
-          .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
-          .input("AppointmentId", sql.Int, id)
-          .input("ServiceId", sql.Int, current.ServiceId).query(`
-            INSERT INTO CustomerPackageUsages
-              (CustomerPackageId, AppointmentId, ServiceId, SessionsUsed, Status, UsedAt, UsedBy)
-            SELECT @CustomerPackageId, @AppointmentId, @ServiceId, 1, 'USED', CURRENT_TIMESTAMP, c.UserId
-            FROM Appointments a
-            JOIN Customers c ON a.CustomerId = c.CustomerId
-            WHERE a.AppointmentId = @AppointmentId;
+          await new sql.Request(transaction)
+            .input("CustomerPackageId", sql.Int, current.CustomerPackageId)
+            .input("AppointmentId", sql.Int, id)
+            .input("ServiceId", sql.Int, mainServiceId).query(`
+              INSERT INTO CustomerPackageUsages
+                (CustomerPackageId, AppointmentId, ServiceId, SessionsUsed, Status, UsedAt, UsedBy)
+              SELECT @CustomerPackageId, @AppointmentId, @ServiceId, 1, 'USED', CURRENT_TIMESTAMP, c.UserId
+              FROM Appointments a
+              JOIN Customers c ON a.CustomerId = c.CustomerId
+              WHERE a.AppointmentId = @AppointmentId;
+            `);
 
-            UPDATE CustomerPackages
-            SET
-              RemainingSessions = CASE WHEN RemainingSessions > 0 THEN RemainingSessions - 1 ELSE 0 END,
-              UsedSessions = UsedSessions + 1,
-              Status = CASE
-                WHEN RemainingSessions - 1 <= 0 THEN 'USED_UP'
-                ELSE 'ACTIVE'
-              END,
-              UpdatedAt = CURRENT_TIMESTAMP
-            WHERE CustomerPackageId = @CustomerPackageId;
-          `);
+          await new sql.Request(transaction)
+            .input("CustomerPackageId", sql.Int, current.CustomerPackageId).query(`
+              UPDATE CustomerPackages
+              SET
+                RemainingSessions = CASE WHEN RemainingSessions > 0 THEN RemainingSessions - 1 ELSE 0 END,
+                UsedSessions = ISNULL(UsedSessions, 0) + 1,
+                Status = CASE WHEN (ISNULL(RemainingSessions, 1) - 1) <= 0 THEN 'COMPLETED' ELSE Status END,
+                UpdatedAt = CURRENT_TIMESTAMP
+              WHERE CustomerPackageId = @CustomerPackageId;
+            `);
+        }
       }
     }
 
@@ -1180,11 +1206,11 @@ async function cancelAppointment(id, data = {}, userId = null) {
   }
 }
 
-async function noShowAppointment(id, userId = null) {
+async function noShowAppointment(id, userId) {
   const pool = await connectDB();
   const current = await getAppointmentById(id);
 
-  const allowed = ["PENDING", "PENDING_PAYMENT", "CONFIRMED"];
+  const allowed = ["PENDING", "PENDING_PAYMENT", "CONFIRMED", "BOOKED"];
   if (!current) throw new Error("Không tìm thấy lịch hẹn");
   if (!allowed.includes(String(current.Status).toUpperCase())) {
     throw new Error("Không thể đánh dấu No Show");
@@ -1201,6 +1227,11 @@ async function noShowAppointment(id, userId = null) {
         WHERE AppointmentId = @AppointmentId
       `);
 
+    await new sql.Request(transaction).input("AppointmentId", sql.Int, id).query(`
+        DELETE FROM CustomerPackageUsages
+        WHERE AppointmentId = @AppointmentId AND Status <> 'USED'
+      `);
+
     await addStatusHistory(
       transaction,
       id,
@@ -1209,11 +1240,6 @@ async function noShowAppointment(id, userId = null) {
       userId,
       "Receptionist marked customer as no-show",
     );
-
-    // Tự động trừ buổi combo nếu có liên kết CustomerPackageId
-    if (current.CustomerPackageId) {
-      await deductComboSession(transaction, id);
-    }
 
     await transaction.commit();
   } catch (err) {
@@ -4338,7 +4364,12 @@ async function finalizeCheckout(pool, id, userId = null) {
 
   const servicesResult = await pool.request()
     .input("AppointmentId", sql.Int, id)
-    .query(`SELECT ServiceId, Price FROM AppointmentServices WHERE AppointmentId = @AppointmentId`);
+    .query(`
+      SELECT aps.ServiceId, aps.Price, s.ServiceName, s.DurationMinutes 
+      FROM AppointmentServices aps
+      JOIN Services s ON aps.ServiceId = s.ServiceId
+      WHERE aps.AppointmentId = @AppointmentId
+    `);
   const apptServices = servicesResult.recordset || [];
 
   if (current.CustomerEmail) {
@@ -4347,36 +4378,43 @@ async function finalizeCheckout(pool, id, userId = null) {
       
       let servicesListHtml = "";
       if (apptServices.length > 0) {
-        servicesListHtml = apptServices.map(s => `<li>Dịch vụ giá: ${Number(s.Price).toLocaleString('vi-VN')}đ</li>`).join("");
+        servicesListHtml = apptServices.map(s => 
+          `<li style="margin-bottom: 6px;"><strong>${s.ServiceName}</strong> (${s.DurationMinutes || 30} phút) - ${current.CustomerPackageId ? "Trọn gói Combo" : `${Number(s.Price || 0).toLocaleString('vi-VN')}đ`}</li>`
+        ).join("");
       }
 
+      const isCombo = !!current.CustomerPackageId;
+      const paymentInfoHtml = isCombo
+        ? `<p style="margin-bottom: 0; font-size: 0.95rem;">Hình thức thanh toán: <strong style="color: #059669;">📦 Trọn gói Combo (${current.CustomerPackageName || 'Gói Combo'})</strong></p>`
+        : `<p style="margin-bottom: 0; font-size: 0.95rem;">Tổng số tiền thanh toán: <strong>${Number(current.FinalAmount || 0).toLocaleString('vi-VN')}đ</strong></p>`;
+
       const emailHtml = `
-        <div style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333;">
-          <h2 style="color: #d91f68; border-bottom: 2px solid #fce7f3; padding-bottom: 8px;">Cảm ơn quý khách đã đồng hành cùng BeautyMS!</h2>
+        <div style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h2 style="color: #2f593a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: 0;">Cảm ơn quý khách đã trải nghiệm dịch vụ!</h2>
           <p>Chào <strong>${current.CustomerName}</strong>,</p>
-          <p>Chúng tôi xin gửi lời cảm ơn chân thành nhất vì quý khách đã tin tưởng và sử dụng dịch vụ tại salon của chúng tôi vào ngày <strong>${new Date(current.AppointmentDate).toLocaleDateString('vi-VN')}</strong>.</p>
+          <p>Chúng tôi xin gửi lời cảm ơn chân thành vì quý khách đã tin tưởng và sử dụng dịch vụ tại salon của chúng tôi vào ngày <strong>${new Date(current.AppointmentDate).toLocaleDateString('vi-VN')}</strong>.</p>
           
-          <div style="background: #fafafa; border: 1px solid #eaeaea; border-radius: 8px; padding: 15px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #555;">Tóm tắt dịch vụ đã thực hiện:</h3>
-            <ul>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #2f593a; font-size: 1rem;">Tóm tắt dịch vụ đã thực hiện:</h3>
+            <ul style="padding-left: 20px; margin-bottom: 12px;">
               ${servicesListHtml || '<li>Dịch vụ chăm sóc sắc đẹp</li>'}
             </ul>
-            <p style="margin-bottom: 0;">Tổng số tiền thanh toán: <strong>${Number(current.FinalAmount).toLocaleString('vi-VN')}đ</strong></p>
+            ${paymentInfoHtml}
           </div>
           
-          <p>Mọi góp ý hoặc phản hồi của quý khách về dịch vụ và tay nghề Kỹ thuật viên <strong>${current.TechnicianName || 'Chuyên viên'}</strong> sẽ giúp chúng tôi hoàn thiện chất lượng phục vụ ngày một tốt hơn.</p>
-          <p>Quý khách có thể đánh giá dịch vụ trực tuyến tại đây: 
-            <a href="http://localhost:3000/customer/reviews" style="display: inline-block; background: #d91f68; color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; margin-top: 5px;">Viết Đánh Giá Ngay</a>
-          </p>
+          <p>Mọi góp ý hoặc phản hồi của quý khách về dịch vụ và tay nghề Kỹ thuật viên <strong>${current.TechnicianName || 'Chuyên viên'}</strong> sẽ giúp salon không ngừng nâng cao chất lượng phục vụ.</p>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="http://localhost:3000/customer/reviews" style="display: inline-block; background: #2f593a; color: #ffffff; text-decoration: none; padding: 10px 22px; border-radius: 8px; font-weight: bold; font-size: 0.9rem;">Viết Đánh Giá Ngay</a>
+          </div>
           
-          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
-          <p style="font-size: 12px; color: #999;">Đây là email tự động gửi từ hệ thống chăm sóc khách hàng của BeautyMS. Vui lòng không trả lời trực tiếp email này.</p>
+          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 25px 0;" />
+          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 0;">Đây là email tự động gửi từ hệ thống chăm sóc khách hàng. Vui lòng không trả lời trực tiếp email này.</p>
         </div>
       `;
 
       await sendMail({
         to: current.CustomerEmail,
-        subject: "[BeautyMS] Cảm ơn quý khách đã sử dụng dịch vụ",
+        subject: `[Salon & Spa] Cảm ơn quý khách đã hoàn thành ${isCombo ? `buổi hẹn Combo '${current.CustomerPackageName || 'Combo'}'` : 'dịch vụ'}`,
         html: emailHtml
       });
       console.log(`[Checkout] Thank-you email sent successfully to ${current.CustomerEmail}`);
@@ -4384,6 +4422,7 @@ async function finalizeCheckout(pool, id, userId = null) {
       console.error(`[Checkout] Failed to send check-out email to ${current.CustomerEmail}:`, mailErr.message);
     }
   }
+
 
   if (current.CustomerId) {
     try {
@@ -5385,7 +5424,9 @@ module.exports = {
   assignTechnician,
   transferAppointments,
   getSmartBookingSuggestions,
+  updateAppointmentServiceStatus,
 };
+
 
 async function ensureShiftForAppointment(technicianId, appointmentDate, startTime, endTime, serviceIds = []) {
   const pool = await connectDB();
@@ -5668,3 +5709,82 @@ async function getSmartBookingSuggestions({ customerId, serviceId, branchId, app
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 }
+
+async function updateAppointmentServiceStatus(appointmentServiceId, status) {
+  const pool = await connectDB();
+  
+  // 1. Fetch all steps for this appointment ordered by AppointmentServiceId ASC
+  const stepsRes = await pool.request()
+    .input("AppointmentServiceId", sql.Int, appointmentServiceId)
+    .query(`
+      SELECT 
+        aps.AppointmentServiceId,
+        aps.AppointmentId,
+        aps.ServiceId,
+        aps.Status,
+        s.ServiceName,
+        a.CustomerPackageId
+      FROM AppointmentServices aps
+      JOIN Services s ON aps.ServiceId = s.ServiceId
+      JOIN Appointments a ON aps.AppointmentId = a.AppointmentId
+      WHERE aps.AppointmentId = (
+        SELECT AppointmentId FROM AppointmentServices WHERE AppointmentServiceId = @AppointmentServiceId
+      )
+      ORDER BY aps.AppointmentServiceId ASC
+    `);
+
+  const allSteps = stepsRes.recordset || [];
+  const targetIndex = allSteps.findIndex(s => Number(s.AppointmentServiceId) === Number(appointmentServiceId));
+
+  // Requirement 1: Step sequential ordering check
+  if (targetIndex > 0 && (status === 'IN_PROGRESS' || status === 'COMPLETED')) {
+    const prevStep = allSteps[targetIndex - 1];
+    if (prevStep && prevStep.Status !== 'COMPLETED') {
+      throw new Error(`Chưa thể bắt đầu làm bước '${allSteps[targetIndex].ServiceName}'! Bước dịch vụ trước đó ('${prevStep.ServiceName}') trong gói Combo chưa hoàn thành.`);
+    }
+  }
+
+  await pool.request()
+    .input("AppointmentServiceId", sql.Int, appointmentServiceId)
+    .input("Status", sql.NVarChar, status)
+    .query(`
+      UPDATE AppointmentServices
+      SET Status = @Status
+      WHERE AppointmentServiceId = @AppointmentServiceId
+    `);
+
+  const checkRes = await pool.request()
+    .input("AppointmentServiceId", sql.Int, appointmentServiceId)
+    .query(`
+      SELECT 
+        aps.AppointmentId,
+        (SELECT COUNT(*) FROM AppointmentServices WHERE AppointmentId = aps.AppointmentId) AS TotalServices,
+        (SELECT COUNT(*) FROM AppointmentServices WHERE AppointmentId = aps.AppointmentId AND ISNULL(Status,'PENDING') = 'COMPLETED') AS CompletedServices
+      FROM AppointmentServices aps
+      WHERE aps.AppointmentServiceId = @AppointmentServiceId
+    `);
+
+  const info = checkRes.recordset[0];
+  let allCompleted = false;
+
+  // Requirement 2: Only complete appointment & send email when the FINAL service step is completed
+  if (info && info.TotalServices > 0 && info.TotalServices === info.CompletedServices) {
+    allCompleted = true;
+    try {
+      await completeAppointment(info.AppointmentId);
+    } catch (err) {
+      console.log("[updateAppointmentServiceStatus] completeAppointment error:", err.message);
+      await pool.request()
+        .input("AppointmentId", sql.Int, info.AppointmentId)
+        .query(`
+          UPDATE Appointments
+          SET Status = 'COMPLETED', CompletedAt = CURRENT_TIMESTAMP
+          WHERE AppointmentId = @AppointmentId AND Status <> 'COMPLETED'
+        `);
+    }
+  }
+
+  return { success: true, allCompleted, appointmentId: info?.AppointmentId };
+}
+
+

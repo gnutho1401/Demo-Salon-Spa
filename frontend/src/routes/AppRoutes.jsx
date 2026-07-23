@@ -68,6 +68,7 @@ import ReceptionistReviews from "../pages/receptionist/ReceptionistReviews";
 import ReceptionistNotifications from "../pages/receptionist/ReceptionistNotifications";
 import TechnicianDispatcher from "../pages/receptionist/TechnicianDispatcher";
 import ReceptionistRescheduleRequests from "../pages/receptionist/ReceptionistRescheduleRequests";
+import ReceptionistPackages from "../pages/receptionist/ReceptionistPackages";
 import TechnicianDashboard from "../pages/technician/TechnicianDashboard";
 import TechnicianSchedule from "../pages/technician/TechnicianSchedule";
 import ProtectedRoute from "./ProtectedRoute";
@@ -525,6 +526,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
             <ReceptionistRescheduleRequests />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/receptionist/packages"
+        element={
+          <ProtectedRoute allowedRoles={["RECEPTIONIST", "ADMIN", "MANAGER"]}>
+            <ReceptionistPackages />
           </ProtectedRoute>
         }
       />

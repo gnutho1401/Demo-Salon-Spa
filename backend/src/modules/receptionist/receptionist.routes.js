@@ -67,6 +67,8 @@ router.post("/technicians/transfer-appointments", controller.transferAppointment
 router.put("/appointments/:id/cancel", controller.cancelAppointment);
 router.put("/appointments/:id/reschedule", controller.rescheduleAppointment);
 router.put("/appointments/:id/no-show", controller.noShowAppointment);
+router.put("/appointment-services/:id/status", controller.updateAppointmentServiceStatus);
+
 
 router.get("/waiting-list", controller.getWaitingList);
 router.post("/waiting-list", controller.createWaitingList);
@@ -92,4 +94,7 @@ router.get("/settings", controller.getSettings);
 router.put("/settings", controller.updateSettings);
 router.put("/avatar", uploadAvatar.single("avatar"), controller.updateAvatar);
 
+router.patch("/appointments/:id/change-technician", controller.changeTechnician);
+
 module.exports = router;
+

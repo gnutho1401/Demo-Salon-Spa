@@ -167,8 +167,12 @@ function canPay(item) {
   if (["COMPLETED", "CANCELLED", "NO_SHOW"].includes(status)) return false;
   if (payment === "PAID" || isBilledUnderPackage) return false;
 
-  return ["UNPAID", "PENDING", "FAILED"].includes(payment);
+  return (
+    ["UNPAID", "PENDING", "PENDING_PAYMENT", "FAILED"].includes(payment) ||
+    status === "PENDING_PAYMENT"
+  );
 }
+
 
 function canCancel(item) {
   const status = String(item?.Status || "").toUpperCase();
@@ -301,8 +305,78 @@ export default function AppointmentDetail() {
 
   const [bankList, setBankList] = useState([]);
   const [bankCode, setBankCode] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountName, setAccountName] = useState("");
+  const [bankName, setBankName] = useState("");
+
+  // States cho modal đổi KTV
+  const [showTechModal, setShowTechModal] = useState(false);
+  const [techList, setTechList] = useState([]);
+  const [loadingTechs, setLoadingTechs] = useState(false);
+  const [selectedTechStepId, setSelectedTechStepId] = useState(null);
+  const [selectedNewTechId, setSelectedNewTechId] = useState("");
+  const [techActionLoading, setTechActionLoading] = useState(false);
+
+  function canChangeTech(appt) {
+    if (!appt) return false;
+    const status = String(appt.Status || "").toUpperCase();
+    if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW', 'REFUNDED', 'REFUND_PENDING'].includes(status)) {
+      return false;
+    }
+    return true;
+  }
+
+
+  async function openChangeTechModal(stepId = null) {
+    setSelectedTechStepId(stepId);
+    setSelectedNewTechId("");
+    setShowTechModal(true);
+    setLoadingTechs(true);
+    setError("");
+
+    try {
+      const res = await axiosClient.get(`/appointments/${id}/available-technicians${stepId ? `?appointmentServiceId=${stepId}` : ""}`);
+      const data = res.data?.data || {};
+      const list = data.availableTechnicians || [];
+      setTechList(list);
+      if (data.currentEmployeeId) {
+        setSelectedNewTechId(String(data.currentEmployeeId));
+      } else if (list.length > 0) {
+        setSelectedNewTechId(String(list[0].EmployeeId));
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Không thể lấy danh sách Kỹ thuật viên khả dụng");
+      setTechList([]);
+    } finally {
+      setLoadingTechs(false);
+    }
+  }
+
+  async function handleConfirmChangeTech(e) {
+    e.preventDefault();
+    if (!selectedNewTechId) {
+      alert("Vui lòng chọn Kỹ thuật viên mới!");
+      return;
+    }
+
+    try {
+      setTechActionLoading(true);
+      setError("");
+      setMessage("");
+
+      await axiosClient.patch(`/appointments/${id}/change-technician`, {
+        newEmployeeId: Number(selectedNewTechId),
+        appointmentServiceId: selectedTechStepId || null,
+      });
+
+      setMessage("✅ Đã đổi Kỹ thuật viên thành công!");
+      setShowTechModal(false);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Đổi Kỹ thuật viên thất bại");
+    } finally {
+      setTechActionLoading(false);
+    }
+  }
+
 
   useEffect(() => {
     fetch("https://api.vietqr.io/v2/banks")
@@ -537,6 +611,7 @@ export default function AppointmentDetail() {
               </button>
             )}
 
+
             {canReview(appointment, services) && (
               <button
                 type="button"
@@ -590,11 +665,17 @@ export default function AppointmentDetail() {
               <b className={`ap-v2-badge status status-${statusClass(appointment.Status)}`}>
                 {statusEmoji(appointment.Status)} {statusText(appointment.Status)}
               </b>
-              <b className={`ap-v2-badge payment-${statusClass(appointment.PaymentStatus || "UNPAID")}`}>
-                💳 {paymentText(appointment.PaymentStatus)}
-              </b>
-              {appointment.CustomerPackageId && (
-                <b className="ap-v2-badge combo">📦 Combo: {appointment.CustomerPackageName || "Dùng combo"}</b>
+              {appointment.CustomerPackageId ? (
+                <b className="ap-v2-badge combo" style={{ background: "#f3e8ff", color: "#6b21a8", border: "1px solid #e9d5ff" }}>
+                  📦 Trọn gói Combo
+                </b>
+              ) : (
+                <b className={`ap-v2-badge payment-${statusClass(appointment.PaymentStatus || "UNPAID")}`}>
+                  💳 {paymentText(appointment.PaymentStatus)}
+                </b>
+              )}
+              {appointment.CustomerPackageId && appointment.CustomerPackageName && (
+                <b className="ap-v2-badge combo">📦 Gói: {appointment.CustomerPackageName}</b>
               )}
               {appointment.VoucherCode && (
                 <b className="ap-v2-badge voucher">🏷 {appointment.VoucherCode}</b>
@@ -603,22 +684,36 @@ export default function AppointmentDetail() {
           </div>
 
           <div className="ap-v2-price-glass">
-            <span>Tổng số tiền thanh toán</span>
-            <strong>{money(appointment.FinalAmount)}</strong>
+            <span>Thanh toán</span>
+            {appointment.CustomerPackageId ? (
+              <strong style={{ fontSize: "1.3rem", color: "#fbcfe8" }}>📦 Trọn gói Combo</strong>
+            ) : (
+              <strong>{money(appointment.FinalAmount)}</strong>
+            )}
             
             <div className="ap-v2-price-breakdowns">
-              <div className="ap-v2-price-row">
-                <span>Tạm tính:</span>
-                <span>{money(appointment.TotalAmount)}</span>
-              </div>
-              {Number(appointment.DiscountAmount) > 0 && (
-                <div className="ap-v2-price-row" style={{ color: "#f472b6" }}>
-                  <span>Giảm giá:</span>
-                  <span>-{money(appointment.DiscountAmount)}</span>
+              {appointment.CustomerPackageId ? (
+                <div className="ap-v2-price-row">
+                  <span>Trạng thái:</span>
+                  <span>Đã thanh toán trọn gói</span>
                 </div>
+              ) : (
+                <>
+                  <div className="ap-v2-price-row">
+                    <span>Tạm tính:</span>
+                    <span>{money(appointment.TotalAmount)}</span>
+                  </div>
+                  {Number(appointment.DiscountAmount) > 0 && (
+                    <div className="ap-v2-price-row" style={{ color: "#f472b6" }}>
+                      <span>Giảm giá:</span>
+                      <span>-{money(appointment.DiscountAmount)}</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
+
         </section>
 
         {/* ── TIMELINE BAR PROGRESS ── */}
@@ -943,7 +1038,13 @@ export default function AppointmentDetail() {
                 <h3>✂ Kỹ thuật viên</h3>
               </div>
 
-              <div className="ap-v2-tech-profile">
+
+              <div
+                className="ap-v2-tech-profile"
+                style={{ cursor: canChangeTech(appointment) ? "pointer" : "default" }}
+                onClick={() => canChangeTech(appointment) && openChangeTechModal(null)}
+                title={canChangeTech(appointment) ? "Nhấn vào đây để xem và chọn Kỹ thuật viên rảnh khác" : ""}
+              >
                 <div className="ap-v2-tech-avatar-container">
                   <img
                     className="ap-v2-tech-avatar"
@@ -952,10 +1053,18 @@ export default function AppointmentDetail() {
                   />
                 </div>
                 <div>
-                  <h4 className="ap-v2-tech-name">{appointment.EmployeeName || "Chưa phân công"}</h4>
+                  <h4 className="ap-v2-tech-name">
+                    {appointment.EmployeeName || "Chưa phân công"}
+                    {canChangeTech(appointment) && <span style={{ fontSize: "0.85rem", marginLeft: 6, color: "#d97706" }}>✎</span>}
+                  </h4>
                   <p className="ap-v2-tech-title">
                     {appointment.Specialization || appointment.Position || "Chuyên gia làm đẹp"}
                   </p>
+                  {canChangeTech(appointment) && (
+                    <span style={{ fontSize: "0.78rem", color: "#b45309", backgroundColor: "#fef3c7", padding: "2px 8px", borderRadius: "10px", marginTop: "4px", display: "inline-block", fontWeight: 600 }}>
+                      ✎ Nhấp vào để xem KTV rảnh trong giờ
+                    </span>
+                  )}
                   <div className="ap-v2-tech-contacts">
                     {appointment.EmployeePhone && (
                       <span className="ap-v2-tech-contact-item">
@@ -970,7 +1079,9 @@ export default function AppointmentDetail() {
                   </div>
                 </div>
               </div>
+
             </div>
+
 
             {/* Time & Location (Branch Address) */}
             <div className="ap-v2-panel">
@@ -1248,7 +1359,97 @@ export default function AppointmentDetail() {
             </div>
           </div>
         )}
+        {/* ── CHANGE TECHNICIAN MODAL ── */}
+        {showTechModal && (
+          <div className="ap-v2-modal-overlay" onClick={() => setShowTechModal(false)}>
+            <div className="ap-v2-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
+              <button
+                type="button"
+                className="ap-v2-modal-close"
+                onClick={() => setShowTechModal(false)}
+              >
+                ×
+              </button>
+
+              <div className="ap-v2-modal-warning-icon" style={{ color: "#d97706", background: "#fef3c7" }}>👤</div>
+              <h3 className="ap-v2-modal-title">Chọn Kỹ thuật viên mới</h3>
+              <p className="ap-v2-modal-desc">
+                Chỉ hiển thị các Kỹ thuật viên có chuyên môn phù hợp và đang rảnh trong khung giờ dịch vụ của bạn.
+              </p>
+
+              {loadingTechs ? (
+                <div style={{ padding: "30px 0", textAlign: "center", color: "#6b7280" }}>
+                  ⏳ Đang tải danh sách Kỹ thuật viên rảnh...
+                </div>
+              ) : techList.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "#ef4444", background: "#fef2f2", borderRadius: "10px", margin: "15px 0" }}>
+                  Rất tiếc, hiện không có Kỹ thuật viên nào khác rảnh trong khung giờ này.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", margin: "15px 0", maxHeight: "250px", overflowY: "auto" }}>
+                  {techList.map((tech) => (
+                    <label
+                      key={tech.EmployeeId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "12px",
+                        borderRadius: "10px",
+                        border: selectedNewTechId === String(tech.EmployeeId) ? "2px solid #d91f68" : "1px solid #e5e7eb",
+                        background: selectedNewTechId === String(tech.EmployeeId) ? "#fdf2f8" : "#fff",
+                        cursor: "pointer",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="newTechnician"
+                        value={tech.EmployeeId}
+                        checked={selectedNewTechId === String(tech.EmployeeId)}
+                        onChange={(e) => setSelectedNewTechId(e.target.value)}
+                      />
+                      <img
+                        src={resolveFileUrl(tech.ImageUrl || tech.AvatarUrl) || DEFAULT_AVATAR}
+                        alt={tech.FullName}
+                        style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover" }}
+                      />
+                      <div style={{ textTransform: "none", flex: 1 }}>
+                        <b style={{ color: "#111827", fontSize: "0.95rem" }}>{tech.FullName || tech.TechnicianName}</b>
+                        <p style={{ margin: "2px 0 0", fontSize: "0.8rem", color: "#6b7280" }}>
+                          {tech.Specialization || tech.Position || "Chuyên viên trị liệu"}
+                        </p>
+                      </div>
+                      {tech.IsCurrent === 1 && (
+                        <span style={{ fontSize: "0.75rem", background: "#e0e7ff", color: "#3730a3", padding: "2px 8px", borderRadius: "6px", fontWeight: "bold" }}>Hiện tại</span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div className="ap-v2-modal-actions">
+                <button
+                  type="button"
+                  className="ap-btn-v2 secondary"
+                  onClick={() => setShowTechModal(false)}
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  className="ap-btn-v2 primary"
+                  disabled={techActionLoading || loadingTechs || techList.length === 0}
+                  onClick={handleConfirmChangeTech}
+                >
+                  {techActionLoading ? "Đang cập nhật..." : "Xác nhận đổi KTV"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </CustomerLayout>
   );
 }
+

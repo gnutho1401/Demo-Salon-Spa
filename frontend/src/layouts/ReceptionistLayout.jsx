@@ -78,6 +78,8 @@ export default function ReceptionistLayout({ children }) {
             <p className="rx-menu-group-title">Nghiệp vụ Salon</p>
             <NavLink to="/receptionist/dashboard">📊 Tổng quan</NavLink>
             <NavLink to="/receptionist/appointments">📅 Lịch hẹn</NavLink>
+            <NavLink to="/receptionist/packages">📦 Quản lý Combo</NavLink>
+
             {/* <NavLink to="/receptionist/dispatch">⚡ Điều phối KTV</NavLink> */}
             <NavLink to="/receptionist/appointments/create">
               ➕ Tạo lịch hẹn mới
