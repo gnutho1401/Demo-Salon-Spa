@@ -7,19 +7,25 @@ const DEFAULT_BRANCHES = [
     BranchName: "LUNA Beauty Salon - Hải Châu",
     Address: "123 Nguyễn Văn Linh, Hải Châu, Đà Nẵng",
     Phone: "0900 000 001",
-    Hours: "08:00 - 20:00"
+    Hours: "08:00 - 20:00",
   },
   {
     BranchId: 2,
     BranchName: "LUNA Beauty Salon - Thanh Khê",
     Address: "456 Điện Biên Phủ, Thanh Khê, Đà Nẵng",
     Phone: "0900 000 002",
-    Hours: "08:00 - 20:00"
-  }
+    Hours: "08:00 - 20:00",
+  },
 ];
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ fullName: "", email: "", phone: "", subject: "", content: "" });
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    subject: "",
+    content: "",
+  });
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(DEFAULT_BRANCHES[0]);
   const [loadingBranches, setLoadingBranches] = useState(true);
@@ -36,7 +42,7 @@ export default function ContactPage() {
           // Map hours if missing
           const mapped = data.map((b) => ({
             ...b,
-            Hours: b.Hours || "08:00 - 20:00"
+            Hours: b.Hours || "08:00 - 20:00",
           }));
           setBranches(mapped);
           setSelectedBranch(mapped[0]);
@@ -69,17 +75,22 @@ export default function ContactPage() {
     }
 
     setSubmitting(true);
-    setMessage(""); 
+    setMessage("");
     setError("");
 
     try {
       await axiosClient.post("/customers/contact", form);
-      setMessage(" Gửi liên hệ thành công. Chúng tôi sẽ phản hồi lại cho bạn sớm nhất!");
+      setMessage(
+        " Gửi liên hệ thành công. Chúng tôi sẽ phản hồi lại cho bạn sớm nhất!",
+      );
       setForm({ fullName: "", email: "", phone: "", subject: "", content: "" });
       // Clear message after 5 seconds
       setTimeout(() => setMessage(""), 6000);
-    } catch (err) { 
-      setError(err.response?.data?.message || "Gửi liên hệ thất bại. Vui lòng thử lại sau."); 
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          "Gửi liên hệ thất bại. Vui lòng thử lại sau.",
+      );
       setTimeout(() => setError(""), 5000);
     } finally {
       setSubmitting(false);
@@ -388,12 +399,37 @@ export default function ContactPage() {
       <div className="contact-hero">
         <div className="eyebrow">Liên Hệ & Tra Cứu</div>
         <h1>Beauty Salon & Spa Center</h1>
-        <p>Gửi ý kiến đóng góp, câu hỏi phản hồi hoặc tra cứu vị trí các chi nhánh làm đẹp trong hệ thống trên bản đồ.</p>
+        <p>
+          Gửi ý kiến đóng góp, câu hỏi phản hồi hoặc tra cứu vị trí các chi
+          nhánh làm đẹp trong hệ thống trên bản đồ.
+        </p>
       </div>
 
       {/* Alerts */}
-      {message && <div className="alert success" style={{ maxWidth: 1200, margin: "0 auto 24px", borderRadius: "16px" }}>{message}</div>}
-      {error && <div className="alert error" style={{ maxWidth: 1200, margin: "0 auto 24px", borderRadius: "16px" }}>{error}</div>}
+      {message && (
+        <div
+          className="alert success"
+          style={{
+            maxWidth: 1200,
+            margin: "0 auto 24px",
+            borderRadius: "16px",
+          }}
+        >
+          {message}
+        </div>
+      )}
+      {error && (
+        <div
+          className="alert error"
+          style={{
+            maxWidth: 1200,
+            margin: "0 auto 24px",
+            borderRadius: "16px",
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       {/* Contact Grid */}
       <div className="contact-grid">
@@ -404,7 +440,9 @@ export default function ContactPage() {
 
           <div className="form-row-2">
             <div>
-              <label>Họ và tên <span style={{ color: "#ef4f83" }}>*</span></label>
+              <label>
+                Họ và tên <span style={{ color: "#ef4f83" }}>*</span>
+              </label>
               <input
                 value={form.fullName}
                 onChange={(e) => setForm({ ...form, fullName: e.target.value })}
@@ -413,7 +451,9 @@ export default function ContactPage() {
               />
             </div>
             <div>
-              <label>Số điện thoại <span style={{ color: "#ef4f83" }}>*</span></label>
+              <label>
+                Số điện thoại <span style={{ color: "#ef4f83" }}>*</span>
+              </label>
               <input
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -424,7 +464,9 @@ export default function ContactPage() {
           </div>
 
           <div>
-            <label>Địa chỉ Email <span style={{ color: "#ef4f83" }}>*</span></label>
+            <label>
+              Địa chỉ Email <span style={{ color: "#ef4f83" }}>*</span>
+            </label>
             <input
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -435,7 +477,9 @@ export default function ContactPage() {
           </div>
 
           <div>
-            <label>Tiêu đề liên hệ <span style={{ color: "#ef4f83" }}>*</span></label>
+            <label>
+              Tiêu đề liên hệ <span style={{ color: "#ef4f83" }}>*</span>
+            </label>
             <input
               value={form.subject}
               onChange={(e) => setForm({ ...form, subject: e.target.value })}
@@ -445,7 +489,9 @@ export default function ContactPage() {
           </div>
 
           <div>
-            <label>Nội dung chi tiết <span style={{ color: "#ef4f83" }}>*</span></label>
+            <label>
+              Nội dung chi tiết <span style={{ color: "#ef4f83" }}>*</span>
+            </label>
             <textarea
               rows="5"
               value={form.content}
@@ -455,7 +501,11 @@ export default function ContactPage() {
             />
           </div>
 
-          <button className="btn-submit-contact" type="submit" disabled={submitting}>
+          <button
+            className="btn-submit-contact"
+            type="submit"
+            disabled={submitting}
+          >
             {submitting ? "⌛ Đang gửi liên hệ..." : "🚀 Gửi liên hệ ngay"}
           </button>
         </form>
@@ -493,14 +543,19 @@ export default function ContactPage() {
       {/* Branches Header */}
       <div className="branches-heading">
         <h2>Hệ thống chi nhánh & Bản đồ định vị</h2>
-        <p>Chọn chi nhánh bất kỳ bên dưới để hiển thị địa chỉ chi tiết và định vị đường đi trên bản đồ Google Maps.</p>
+        <p>
+          Chọn chi nhánh bất kỳ bên dưới để hiển thị địa chỉ chi tiết và định vị
+          đường đi trên bản đồ Google Maps.
+        </p>
       </div>
 
       {/* Branches Grid */}
       <div className="branches-section">
         <div className="branch-card-list">
           {loadingBranches ? (
-            <p style={{ color: "#8c7c85", padding: "10px" }}>Đang tải danh sách chi nhánh...</p>
+            <p style={{ color: "#8c7c85", padding: "10px" }}>
+              Đang tải danh sách chi nhánh...
+            </p>
           ) : (
             branches.map((b) => (
               <div

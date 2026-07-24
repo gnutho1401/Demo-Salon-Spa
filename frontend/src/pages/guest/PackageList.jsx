@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import axiosClient, { resolveFileUrl } from '../../api/axiosClient';
-import { useAuth } from '../../context/AuthContext';
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import { useAuth } from "../../context/AuthContext";
 
-const money = (value) => `${Number(value || 0).toLocaleString('vi-VN')} đ`;
+const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 
 export default function PackageList() {
   const navigate = useNavigate();
@@ -11,13 +11,20 @@ export default function PackageList() {
   const [packages, setPackages] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-  const [filters, setFilters] = useState({ search: '', category: '', sort: 'newest', minPrice: '', maxPrice: '' });
+  const [message, setMessage] = useState("");
+  const [filters, setFilters] = useState({
+    search: "",
+    category: "",
+    sort: "newest",
+    minPrice: "",
+    maxPrice: "",
+  });
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== '' && value !== null && value !== undefined) params.append(key, value);
+      if (value !== "" && value !== null && value !== undefined)
+        params.append(key, value);
     });
     return params.toString();
   }, [filters]);
@@ -27,37 +34,44 @@ export default function PackageList() {
     try {
       const [pkgRes, catRes] = await Promise.all([
         axiosClient.get(`/packages?${queryString}`),
-        axiosClient.get('/packages/categories/list'),
+        axiosClient.get("/packages/categories/list"),
       ]);
       setPackages(pkgRes.data.data || pkgRes.data || []);
       setCategories(catRes.data.data || catRes.data || []);
-      setMessage('');
+      setMessage("");
     } catch (err) {
-      setMessage('Không tải được danh sách combo / liệu trình');
+      setMessage("Không tải được danh sách combo / liệu trình");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load().catch(() => { 
-      setLoading(false); 
-      setMessage('Không tải được danh sách combo / liệu trình'); 
+    load().catch(() => {
+      setLoading(false);
+      setMessage("Không tải được danh sách combo / liệu trình");
     });
   }, [queryString]);
 
   const buyNow = async (packageId) => {
     if (!user) {
-      navigate('/login');
+      navigate("/login");
       return;
     }
     navigate(`/packages/${packageId}`);
   };
 
-  const setFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const setFilter = (key, value) =>
+    setFilters((prev) => ({ ...prev, [key]: value }));
 
   const clearFilters = () => {
-    setFilters({ search: '', category: '', sort: 'newest', minPrice: '', maxPrice: '' });
+    setFilters({
+      search: "",
+      category: "",
+      sort: "newest",
+      minPrice: "",
+      maxPrice: "",
+    });
   };
 
   return (
@@ -615,22 +629,40 @@ export default function PackageList() {
       {/* Hero Section */}
       <div className="premium-hero">
         <div className="premium-hero-left">
-          <div style={{ textTransform: 'uppercase', fontSize: '12px', fontWeight: 800, color: '#ff4778', letterSpacing: '1.5px', marginBottom: '8px' }}>
+          <div
+            style={{
+              textTransform: "uppercase",
+              fontSize: "12px",
+              fontWeight: 800,
+              color: "#ff4778",
+              letterSpacing: "1.5px",
+              marginBottom: "8px",
+            }}
+          >
             Combo / Liệu Trình Cao Cấp
           </div>
           <h1>Gói dịch vụ chăm sóc chuyên sâu</h1>
-          <p>Các liệu trình thiết kế khoa học theo từng nhu cầu riêng biệt của làn da và vóc dáng, tối ưu hiệu quả và tiết kiệm chi phí vượt trội so với dịch vụ lẻ.</p>
+          <p>
+            Các liệu trình thiết kế khoa học theo từng nhu cầu riêng biệt của
+            làn da và vóc dáng, tối ưu hiệu quả và tiết kiệm chi phí vượt trội
+            so với dịch vụ lẻ.
+          </p>
           <div className="premium-benefits-list">
             <span className="premium-benefit-pill">💗 Tiết kiệm đến 22%</span>
             <span className="premium-benefit-pill">🛡️ Cam kết hiệu quả</span>
-            <span className="premium-benefit-pill">🏥 Liệu trình chuẩn y khoa</span>
+            <span className="premium-benefit-pill">
+              🏥 Liệu trình chuẩn y khoa
+            </span>
           </div>
         </div>
         <div className="premium-hero-right-card">
           <h4>Đặc quyền hội viên</h4>
-          <p>Mua các gói liệu trình tiết kiệm và theo dõi chi tiết số buổi đã sử dụng trực quan ngay trong tài khoản.</p>
-          <Link className="btn-vip" to={user ? '/customer/packages' : '/login'}>
-            {user ? '💎 Combo của tôi' : 'Đăng nhập ngay'}
+          <p>
+            Mua các gói liệu trình tiết kiệm và theo dõi chi tiết số buổi đã sử
+            dụng trực quan ngay trong tài khoản.
+          </p>
+          <Link className="btn-vip" to={user ? "/customer/packages" : "/login"}>
+            {user ? "💎 Combo của tôi" : "Đăng nhập ngay"}
           </Link>
         </div>
       </div>
@@ -642,22 +674,27 @@ export default function PackageList() {
           <div className="premium-sidebar-card">
             <h3>
               <span>Danh mục combo</span>
-              {(filters.category || filters.search || filters.minPrice || filters.maxPrice) && (
-                <button className="premium-clear-btn" onClick={clearFilters}>Xóa lọc</button>
+              {(filters.category ||
+                filters.search ||
+                filters.minPrice ||
+                filters.maxPrice) && (
+                <button className="premium-clear-btn" onClick={clearFilters}>
+                  Xóa lọc
+                </button>
               )}
             </h3>
-            <button 
-              className={`category-filter-btn ${!filters.category ? 'active' : ''}`} 
-              onClick={() => setFilter('category', '')}
+            <button
+              className={`category-filter-btn ${!filters.category ? "active" : ""}`}
+              onClick={() => setFilter("category", "")}
             >
               <span>Tất cả</span>
               <small>{packages.length + (filters.category ? 1 : 0)}</small>
             </button>
             {categories.map((c) => (
-              <button 
-                key={c.CategoryName} 
-                className={`category-filter-btn ${filters.category === c.CategoryName ? 'active' : ''}`} 
-                onClick={() => setFilter('category', c.CategoryName)}
+              <button
+                key={c.CategoryName}
+                className={`category-filter-btn ${filters.category === c.CategoryName ? "active" : ""}`}
+                onClick={() => setFilter("category", c.CategoryName)}
               >
                 <span>{c.CategoryName}</span>
                 <small>{c.Total}</small>
@@ -668,17 +705,17 @@ export default function PackageList() {
           <div className="premium-sidebar-card">
             <h3>Lọc theo giá</h3>
             <div className="price-filter-inputs">
-              <input 
-                type="number" 
-                placeholder="Giá từ (đ)" 
-                value={filters.minPrice} 
-                onChange={(e) => setFilter('minPrice', e.target.value)} 
+              <input
+                type="number"
+                placeholder="Giá từ (đ)"
+                value={filters.minPrice}
+                onChange={(e) => setFilter("minPrice", e.target.value)}
               />
-              <input 
-                type="number" 
-                placeholder="Đến (đ)" 
-                value={filters.maxPrice} 
-                onChange={(e) => setFilter('maxPrice', e.target.value)} 
+              <input
+                type="number"
+                placeholder="Đến (đ)"
+                value={filters.maxPrice}
+                onChange={(e) => setFilter("maxPrice", e.target.value)}
               />
             </div>
           </div>
@@ -689,17 +726,17 @@ export default function PackageList() {
           {/* Toolbar */}
           <div className="premium-toolbar">
             <div className="premium-search-box">
-              <input 
-                type="text" 
-                value={filters.search} 
-                onChange={(e) => setFilter('search', e.target.value)} 
-                placeholder="Tìm kiếm liệu trình, combo trị liệu..." 
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => setFilter("search", e.target.value)}
+                placeholder="Tìm kiếm liệu trình, combo trị liệu..."
               />
             </div>
-            <select 
-              className="premium-sort-select" 
-              value={filters.sort} 
-              onChange={(e) => setFilter('sort', e.target.value)}
+            <select
+              className="premium-sort-select"
+              value={filters.sort}
+              onChange={(e) => setFilter("sort", e.target.value)}
             >
               <option value="newest">Mới nhất</option>
               <option value="priceAsc">Giá: Thấp đến Cao</option>
@@ -708,17 +745,33 @@ export default function PackageList() {
             </select>
           </div>
 
-          {message && <div className="alert error" style={{ borderRadius: '20px', marginBottom: '24px' }}>{message}</div>}
-          
+          {message && (
+            <div
+              className="alert error"
+              style={{ borderRadius: "20px", marginBottom: "24px" }}
+            >
+              {message}
+            </div>
+          )}
+
           {loading ? (
-            <p className="muted" style={{ textAlign: 'center', padding: '40px 0' }}>Đang tải liệu trình...</p>
+            <p
+              className="muted"
+              style={{ textAlign: "center", padding: "40px 0" }}
+            >
+              Đang tải liệu trình...
+            </p>
           ) : (
             <div className="premium-combo-grid">
               {packages.map((p) => {
                 const origPrice = Number(p.Price || 0);
                 const salePrice = Number(p.FinalPrice || p.SalePrice || 0);
                 const hasDiscount = origPrice > salePrice;
-                const discPercent = p.DiscountPercent || (origPrice > 0 ? Math.round(((origPrice - salePrice) / origPrice) * 100) : 0);
+                const discPercent =
+                  p.DiscountPercent ||
+                  (origPrice > 0
+                    ? Math.round(((origPrice - salePrice) / origPrice) * 100)
+                    : 0);
                 const saveAmount = origPrice - salePrice;
 
                 return (
@@ -729,7 +782,10 @@ export default function PackageList() {
                           -{discPercent}%
                         </span>
                       )}
-                      <img src={resolveFileUrl(p.ImageUrl) || '/vite.svg'} alt={p.PackageName} />
+                      <img
+                        src={resolveFileUrl(p.ImageUrl) || "/vite.svg"}
+                        alt={p.PackageName}
+                      />
                     </div>
 
                     <div className="premium-combo-card-body">
@@ -738,17 +794,26 @@ export default function PackageList() {
                       <p className="desc">{p.Description}</p>
 
                       <div className="premium-combo-meta-badges">
-                        <span className="premium-meta-badge">🕘 {p.TotalSessions || 1} buổi</span>
-                        <span className="premium-meta-badge">📅 {p.ValidityDays || 30} ngày</span>
+                        <span className="premium-meta-badge">
+                          🕘 {p.TotalSessions || 1} buổi
+                        </span>
+                        <span className="premium-meta-badge">
+                          📅 {p.ValidityDays || 30} ngày
+                        </span>
                       </div>
 
                       {/* Display sub-services nicely parsed from p.ServiceNames */}
                       {p.ServiceNames && (
                         <div className="premium-services-list">
-                          <div className="premium-services-title">Dịch vụ đi kèm</div>
+                          <div className="premium-services-title">
+                            Dịch vụ đi kèm
+                          </div>
                           <div className="premium-services-tags-grid">
-                            {p.ServiceNames.split(',').map((s, idx) => (
-                              <span className="premium-service-tag-item" key={idx}>
+                            {p.ServiceNames.split(",").map((s, idx) => (
+                              <span
+                                className="premium-service-tag-item"
+                                key={idx}
+                              >
                                 {s.trim()}
                               </span>
                             ))}
@@ -759,8 +824,14 @@ export default function PackageList() {
                       {/* Price box with clear savings */}
                       <div className="premium-combo-price-block">
                         <div className="premium-price-row-main">
-                          <span className="premium-price-final">{money(salePrice)}</span>
-                          {hasDiscount && <span className="premium-price-original">{money(origPrice)}</span>}
+                          <span className="premium-price-final">
+                            {money(salePrice)}
+                          </span>
+                          {hasDiscount && (
+                            <span className="premium-price-original">
+                              {money(origPrice)}
+                            </span>
+                          )}
                         </div>
                         {saveAmount > 0 && (
                           <span className="premium-price-save-badge">
@@ -770,10 +841,16 @@ export default function PackageList() {
                       </div>
 
                       <div className="premium-combo-actions">
-                        <Link className="premium-btn-action secondary" to={`/packages/${p.PackageId}`}>
+                        <Link
+                          className="premium-btn-action secondary"
+                          to={`/packages/${p.PackageId}`}
+                        >
                           Chi tiết
                         </Link>
-                        <button className="premium-btn-action primary" onClick={() => buyNow(p.PackageId)}>
+                        <button
+                          className="premium-btn-action primary"
+                          onClick={() => buyNow(p.PackageId)}
+                        >
                           Mua ngay
                         </button>
                       </div>

@@ -9,31 +9,30 @@ export default function PromotionsPage() {
     let mounted = true;
     const token = localStorage.getItem("token");
 
-    const promises = [
-      axiosClient.get("/vouchers")
-    ];
+    const promises = [axiosClient.get("/vouchers")];
 
     if (token) {
       promises.push(axiosClient.get("/vouchers/my"));
     }
 
-    Promise.allSettled(promises)
-      .then(([vouchersRes, myRes]) => {
-        if (!mounted) return;
+    Promise.allSettled(promises).then(([vouchersRes, myRes]) => {
+      if (!mounted) return;
 
-        if (vouchersRes.status === "fulfilled") {
-          setVouchers(vouchersRes.value.data.data || vouchersRes.value.data || []);
-        }
+      if (vouchersRes.status === "fulfilled") {
+        setVouchers(
+          vouchersRes.value.data.data || vouchersRes.value.data || [],
+        );
+      }
 
-        if (token && myRes && myRes.status === "fulfilled") {
-          const mySavedVouchers = myRes.value.data.data || myRes.value.data || [];
-          const savedStatuses = {};
-          mySavedVouchers.forEach((item) => {
-            savedStatuses[item.VoucherId] = "saved";
-          });
-          setVoucherStatus(savedStatuses);
-        }
-      });
+      if (token && myRes && myRes.status === "fulfilled") {
+        const mySavedVouchers = myRes.value.data.data || myRes.value.data || [];
+        const savedStatuses = {};
+        mySavedVouchers.forEach((item) => {
+          savedStatuses[item.VoucherId] = "saved";
+        });
+        setVoucherStatus(savedStatuses);
+      }
+    });
 
     return () => {
       mounted = false;
@@ -63,7 +62,9 @@ export default function PromotionsPage() {
       alert("🎉 Đã lưu voucher thành công vào ví của bạn!");
     } catch (err) {
       setVoucherStatus((prev) => ({ ...prev, [voucherId]: "error" }));
-      const errMsg = err.response?.data?.message || "Lưu voucher thất bại hoặc bạn đã lưu voucher này rồi.";
+      const errMsg =
+        err.response?.data?.message ||
+        "Lưu voucher thất bại hoặc bạn đã lưu voucher này rồi.";
       alert(`❌ ${errMsg}`);
     }
   };
@@ -87,11 +88,13 @@ export default function PromotionsPage() {
 
         {vouchers.map((item) => {
           const value = Number(item.DiscountValue || 0);
-          const isPercent = String(item.DiscountType || "").toUpperCase() === "PERCENT";
+          const isPercent =
+            String(item.DiscountType || "").toUpperCase() === "PERCENT";
           const discountNumStr = value.toLocaleString("vi-VN");
-          const minOrderText = item.MinOrderAmount > 0 
-            ? `Đơn từ ${formatMoney(item.MinOrderAmount)}` 
-            : "Mọi đơn hàng";
+          const minOrderText =
+            item.MinOrderAmount > 0
+              ? `Đơn từ ${formatMoney(item.MinOrderAmount)}`
+              : "Mọi đơn hàng";
 
           return (
             <div className="luxury-voucher-card-wrapper" key={item.VoucherId}>
@@ -100,7 +103,11 @@ export default function PromotionsPage() {
                 <div className="voucher-left">
                   <span className="voucher-percent">
                     {discountNumStr}
-                    {isPercent ? <span className="currency-symbol">%</span> : <span className="currency-symbol">đ</span>}
+                    {isPercent ? (
+                      <span className="currency-symbol">%</span>
+                    ) : (
+                      <span className="currency-symbol">đ</span>
+                    )}
                   </span>
                   <span className="voucher-off">GIẢM GIÁ</span>
                 </div>
@@ -118,19 +125,26 @@ export default function PromotionsPage() {
                     <span className="voucher-code-label">MÃ VOUCHER</span>
                     <strong className="voucher-code-text">{item.Code}</strong>
                     <p className="voucher-terms">
-                      Điều kiện: {minOrderText} 
-                      {item.MaxDiscountAmount > 0 && ` | Giảm tối đa ${formatMoney(item.MaxDiscountAmount)}`}
+                      Điều kiện: {minOrderText}
+                      {item.MaxDiscountAmount > 0 &&
+                        ` | Giảm tối đa ${formatMoney(item.MaxDiscountAmount)}`}
                     </p>
-                    <p className="voucher-expiry">Hạn dùng: {formatDate(item.EndDate)}</p>
+                    <p className="voucher-expiry">
+                      Hạn dùng: {formatDate(item.EndDate)}
+                    </p>
                   </div>
 
                   <div className="voucher-right-bottom">
-                    <button 
+                    <button
                       className={`btn-voucher-action ${voucherStatus[item.VoucherId] || ""}`}
                       onClick={() => handleSaveVoucher(item.VoucherId)}
-                      disabled={voucherStatus[item.VoucherId] === "saving" || voucherStatus[item.VoucherId] === "saved"}
+                      disabled={
+                        voucherStatus[item.VoucherId] === "saving" ||
+                        voucherStatus[item.VoucherId] === "saved"
+                      }
                     >
-                      {voucherStatus[item.VoucherId] === "saving" && "Đang lưu..."}
+                      {voucherStatus[item.VoucherId] === "saving" &&
+                        "Đang lưu..."}
                       {voucherStatus[item.VoucherId] === "saved" && "Đã lưu ✓"}
                       {!voucherStatus[item.VoucherId] && "Lưu mã ngay"}
                     </button>
