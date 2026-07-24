@@ -162,8 +162,14 @@ export default function PaymentPage() {
       if (createdAt) {
         const dateWithZ = new Date(createdAt);
         // Nếu dateWithZ lớn hơn thời gian hiện tại nhiều hơn thời gian tự hủy (do lệch múi giờ UTC vs Local)
-        if (dateWithZ.getTime() - Date.now() > AUTO_CANCEL_MINUTES * 60 * 1000) {
-          const cleanStr = typeof createdAt === "string" ? createdAt.replace(/Z$/, "") : createdAt;
+        if (
+          dateWithZ.getTime() - Date.now() >
+          AUTO_CANCEL_MINUTES * 60 * 1000
+        ) {
+          const cleanStr =
+            typeof createdAt === "string"
+              ? createdAt.replace(/Z$/, "")
+              : createdAt;
           createdMs = new Date(cleanStr).getTime();
         } else {
           createdMs = dateWithZ.getTime();
@@ -172,7 +178,6 @@ export default function PaymentPage() {
         createdMs = Date.now();
       }
     }
-
 
     const deadline = createdMs + AUTO_CANCEL_MINUTES * 60 * 1000;
 
@@ -204,12 +209,12 @@ export default function PaymentPage() {
   // Khôi phục voucher và điểm thưởng đã lưu trên hóa đơn lịch hẹn hoặc truyền từ URL đặt lịch
   useEffect(() => {
     if (!appointment) return;
-    
+
     // Reward Points
     const usedPoints = Number(appointment.RewardPointsUsed || 0);
     const usedPointsDiscount = Number(appointment.RewardDiscountAmount || 0);
     setRewardPoints(usedPoints);
-    
+
     // Voucher
     const savedVoucherId = appointment.VoucherId;
     const urlVoucherId = searchParams.get("voucherId");
@@ -218,24 +223,28 @@ export default function PaymentPage() {
 
     if (targetVoucherId) {
       setVoucherId(targetVoucherId);
-      
+
       if (savedVoucherId) {
         setVoucherCode(appointment.VoucherCode || "");
         const totalDiscount = Number(appointment.DiscountAmount || 0);
         const membershipPercent = Number(membership?.DiscountPercent || 0);
         const membershipDiscount = Math.min(
           Math.round((subtotal * membershipPercent) / 100),
-          subtotal
+          subtotal,
         );
-        
+
         // Pure voucher discount is the remaining discount after points and membership
-        const pureVoucherDiscount = Math.max(totalDiscount - usedPointsDiscount - membershipDiscount, 0);
+        const pureVoucherDiscount = Math.max(
+          totalDiscount - usedPointsDiscount - membershipDiscount,
+          0,
+        );
         setDiscount(pureVoucherDiscount);
       } else {
         setDiscount(urlDiscount);
         if (myVouchers.length > 0) {
           const found = myVouchers.find(
-            (v) => String(v.VoucherId || v.voucherId) === String(targetVoucherId)
+            (v) =>
+              String(v.VoucherId || v.voucherId) === String(targetVoucherId),
           );
           if (found) {
             setVoucherCode(found.Code || found.code || "");
@@ -243,10 +252,10 @@ export default function PaymentPage() {
           }
         }
       }
-      
+
       if (myVouchers.length > 0) {
         const found = myVouchers.find(
-          (v) => String(v.VoucherId || v.voucherId) === String(targetVoucherId)
+          (v) => String(v.VoucherId || v.voucherId) === String(targetVoucherId),
         );
         if (found) setSelectedVoucher(found);
       }
@@ -309,9 +318,10 @@ export default function PaymentPage() {
   const voucherBaseAmount = Math.max(subtotal - calc.membershipDiscount, 0);
 
   const availableVouchers = useMemo(() => {
-    const serviceName = appointment?.ServiceName || appointment?.ServiceNames || "";
+    const serviceName =
+      appointment?.ServiceName || appointment?.ServiceNames || "";
     const currentVid = voucherId ? String(voucherId) : null;
-    
+
     return myVouchers
       .map((voucher) => {
         const vid = String(voucher.VoucherId || voucher.voucherId);
@@ -321,7 +331,9 @@ export default function PaymentPage() {
         return {
           ...voucher,
           QuickDiscountAmount: discountAmount,
-          IsUsableNow: isCurrentlyApplied || isVoucherUsable(voucher, voucherBaseAmount, serviceName),
+          IsUsableNow:
+            isCurrentlyApplied ||
+            isVoucherUsable(voucher, voucherBaseAmount, serviceName),
           IsCurrentlyApplied: isCurrentlyApplied,
         };
       })
@@ -346,7 +358,7 @@ export default function PaymentPage() {
         {
           voucherId,
           rewardPoints: Number(points || 0),
-        }
+        },
       );
     } catch (err) {
       setError(err.response?.data?.message || "Không thể áp dụng điểm thưởng");
@@ -365,15 +377,15 @@ export default function PaymentPage() {
       setError("");
       setMessage("");
       const vid = voucher.VoucherId || voucher.voucherId;
-      
+
       await axiosClient.post(
         `/payments/appointment/${appointmentId}/apply-voucher`,
         {
           voucherId: vid,
           rewardPoints: Number(rewardPoints || 0),
-        }
+        },
       );
-      
+
       setVoucherId(vid);
       setVoucherCode(voucher.Code || voucher.code || "");
       setDiscount(discountAmount);
@@ -388,15 +400,15 @@ export default function PaymentPage() {
     try {
       setError("");
       setMessage("");
-      
+
       await axiosClient.post(
         `/payments/appointment/${appointmentId}/apply-voucher`,
         {
           voucherId: null,
           rewardPoints: Number(rewardPoints || 0),
-        }
+        },
       );
-      
+
       setVoucherId(null);
       setVoucherCode("");
       setDiscount(0);
@@ -427,18 +439,21 @@ export default function PaymentPage() {
         {
           voucherId: vid,
           rewardPoints: Number(rewardPoints || 0),
-        }
+        },
       );
 
       const foundVoucher =
         myVouchers.find(
           (v) =>
             String(v.VoucherId || v.voucherId) === String(vid) ||
-            String(v.Code || v.code).toUpperCase() === String(voucherCode).toUpperCase(),
+            String(v.Code || v.code).toUpperCase() ===
+              String(voucherCode).toUpperCase(),
         ) || dataVal;
 
       setVoucherId(vid);
-      setDiscount(Number(dataVal.discountAmount || dataVal.DiscountAmount || 0));
+      setDiscount(
+        Number(dataVal.discountAmount || dataVal.DiscountAmount || 0),
+      );
       setSelectedVoucher(foundVoucher);
       setMessage(`Đã áp dụng voucher ${dataVal.Code || voucherCode}`);
     } catch (err) {
@@ -546,8 +561,8 @@ export default function PaymentPage() {
               background: expired
                 ? "linear-gradient(135deg, #ef4444, #dc2626)"
                 : secondsLeft <= 120
-                ? "linear-gradient(135deg, #f97316, #ea580c)"
-                : "linear-gradient(135deg, #ef4f83, #ff5ea8)",
+                  ? "linear-gradient(135deg, #f97316, #ea580c)"
+                  : "linear-gradient(135deg, #ef4f83, #ff5ea8)",
               color: "#fff",
               fontWeight: 700,
               boxShadow: expired
@@ -559,8 +574,12 @@ export default function PaymentPage() {
             <div style={{ flex: 1 }}>
               {expired ? (
                 <>
-                  <div style={{ fontSize: "1rem" }}>Lịch hẹn đã hết thời gian thanh toán!</div>
-                  <div style={{ fontSize: "0.82rem", opacity: 0.9, marginTop: 3 }}>
+                  <div style={{ fontSize: "1rem" }}>
+                    Lịch hẹn đã hết thời gian thanh toán!
+                  </div>
+                  <div
+                    style={{ fontSize: "0.82rem", opacity: 0.9, marginTop: 3 }}
+                  >
                     Hệ thống đã tự động hủy lịch. Vui lòng đặt lịch lại.
                   </div>
                 </>
@@ -569,12 +588,16 @@ export default function PaymentPage() {
                   <div style={{ fontSize: "1rem" }}>
                     ⚡ Vui lòng thanh toán trong&nbsp;
                     <strong style={{ fontSize: "1.2rem" }}>
-                      {String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:{String(secondsLeft % 60).padStart(2, "0")}
+                      {String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:
+                      {String(secondsLeft % 60).padStart(2, "0")}
                     </strong>
                     &nbsp;— Lịch hẹn sẽ bị hủy tự động nếu chưa thanh toán!
                   </div>
-                  <div style={{ fontSize: "0.82rem", opacity: 0.85, marginTop: 3 }}>
-                    Lịch hẹn được giữ tối đa {AUTO_CANCEL_MINUTES} phút sau khi đặt.
+                  <div
+                    style={{ fontSize: "0.82rem", opacity: 0.85, marginTop: 3 }}
+                  >
+                    Lịch hẹn được giữ tối đa {AUTO_CANCEL_MINUTES} phút sau khi
+                    đặt.
                   </div>
                 </>
               )}
@@ -592,7 +615,8 @@ export default function PaymentPage() {
                   textAlign: "center",
                 }}
               >
-                {String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:{String(secondsLeft % 60).padStart(2, "0")}
+                {String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:
+                {String(secondsLeft % 60).padStart(2, "0")}
               </div>
             )}
           </div>
@@ -702,17 +726,39 @@ export default function PaymentPage() {
                               Đơn tối thiểu {money(minOrder)} · Giảm được{" "}
                               {money(voucher.QuickDiscountAmount)}
                             </small>
-                            <small style={{ display: "block", color: "#64748b", marginTop: 4 }}>
-                              Lượt dùng cá nhân: {voucher.UseCount >= 1 ? "Đã dùng hết (1/1)" : `Còn ${1 - (voucher.UseCount || 0)}/1 lần`} · Còn lại: {voucher.Quantity}
+                            <small
+                              style={{
+                                display: "block",
+                                color: "#64748b",
+                                marginTop: 4,
+                              }}
+                            >
+                              Lượt dùng cá nhân:{" "}
+                              {voucher.UseCount >= 1
+                                ? "Đã dùng hết (1/1)"
+                                : `Còn ${1 - (voucher.UseCount || 0)}/1 lần`}{" "}
+                              · Còn lại: {voucher.Quantity}
                             </small>
                           </div>
                         </div>
 
                         <button
                           type="button"
-                          disabled={voucher.IsCurrentlyApplied || !voucher.IsUsableNow}
+                          disabled={
+                            voucher.IsCurrentlyApplied || !voucher.IsUsableNow
+                          }
                           onClick={() => applyQuickVoucher(voucher)}
-                          style={voucher.IsCurrentlyApplied ? { background: "#10b981", color: "#fff", borderColor: "#10b981", opacity: 1, cursor: "default" } : undefined}
+                          style={
+                            voucher.IsCurrentlyApplied
+                              ? {
+                                  background: "#10b981",
+                                  color: "#fff",
+                                  borderColor: "#10b981",
+                                  opacity: 1,
+                                  cursor: "default",
+                                }
+                              : undefined
+                          }
                         >
                           {voucher.IsCurrentlyApplied
                             ? "✓ Đang dùng"
@@ -794,7 +840,10 @@ export default function PaymentPage() {
                   (!!error && !appointment)
                 }
                 onClick={payPayos}
-                style={{ background: "linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%)" }}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%)",
+                }}
               >
                 {paying ? "Đang chuyển sang PayOS..." : "💳 Thanh toán PayOS"}
               </button>
