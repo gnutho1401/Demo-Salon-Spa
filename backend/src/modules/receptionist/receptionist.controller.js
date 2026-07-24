@@ -276,10 +276,7 @@ async function requestInvoiceRefund(req, res) {
 
 async function createInvoiceManually(req, res) {
   try {
-    return success(
-      res,
-      await service.createInvoiceManually(req.params.id)
-    );
+    return success(res, await service.createInvoiceManually(req.params.id));
   } catch (err) {
     return error(res, err.message, 400);
   }
@@ -289,7 +286,7 @@ async function updateInvoiceDetails(req, res) {
   try {
     return success(
       res,
-      await service.updateInvoiceDetails(req.params.id, req.body)
+      await service.updateInvoiceDetails(req.params.id, req.body),
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -298,10 +295,7 @@ async function updateInvoiceDetails(req, res) {
 
 async function sendInvoiceEmail(req, res) {
   try {
-    return success(
-      res,
-      await service.sendInvoiceEmail(req.params.id)
-    );
+    return success(res, await service.sendInvoiceEmail(req.params.id));
   } catch (err) {
     return error(res, err.message, 400);
   }
@@ -346,7 +340,8 @@ async function updateWaitingList(req, res) {
 
 async function deleteWaitingList(req, res) {
   try {
-    const cancelReason = req.body?.cancelReason || req.query?.cancelReason || null;
+    const cancelReason =
+      req.body?.cancelReason || req.query?.cancelReason || null;
     return success(
       res,
       await service.deleteWaitingList(req.params.id, cancelReason),
@@ -469,7 +464,7 @@ async function checkoutAppointment(req, res) {
     return success(
       res,
       await service.checkoutAppointment(req.params.id, req.user?.userId),
-      "Check-out khách hàng thành công!"
+      "Check-out khách hàng thành công!",
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -481,7 +476,7 @@ async function getTechnicianWorkload(req, res) {
     const { date } = req.query;
     return success(
       res,
-      await service.getTechnicianWorkload(req.params.id, date)
+      await service.getTechnicianWorkload(req.params.id, date),
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -497,9 +492,9 @@ async function assignTechnician(req, res) {
         req.params.id,
         technicianId,
         overrideOverload,
-        req.user?.userId
+        req.user?.userId,
       ),
-      "Điều phối kỹ thuật viên thành công!"
+      "Điều phối kỹ thuật viên thành công!",
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -508,7 +503,8 @@ async function assignTechnician(req, res) {
 
 async function transferAppointments(req, res) {
   try {
-    const { fromTechnicianId, toTechnicianId, date, overrideConflict } = req.body;
+    const { fromTechnicianId, toTechnicianId, date, overrideConflict } =
+      req.body;
     return success(
       res,
       await service.transferAppointments(
@@ -516,9 +512,9 @@ async function transferAppointments(req, res) {
         toTechnicianId,
         date,
         overrideConflict,
-        req.user?.userId
+        req.user?.userId,
       ),
-      "Chuyển giao lịch làm việc thành công!"
+      "Chuyển giao lịch làm việc thành công!",
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -527,7 +523,13 @@ async function transferAppointments(req, res) {
 
 async function getSmartBookingSuggestions(req, res) {
   try {
-    const { customerId, serviceId, branchId, appointmentDate, preferredStartTime } = req.query;
+    const {
+      customerId,
+      serviceId,
+      branchId,
+      appointmentDate,
+      preferredStartTime,
+    } = req.query;
     if (!serviceId) throw new Error("Vui lòng chọn dịch vụ");
     if (!branchId) throw new Error("Vui lòng chọn chi nhánh");
     if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn");
@@ -537,7 +539,7 @@ async function getSmartBookingSuggestions(req, res) {
       serviceId: Number(serviceId),
       branchId: Number(branchId),
       appointmentDate,
-      preferredStartTime: preferredStartTime || null
+      preferredStartTime: preferredStartTime || null,
     });
     return success(res, data, "Lấy đề xuất đặt lịch thành công");
   } catch (err) {
@@ -552,12 +554,16 @@ async function changeTechnician(req, res) {
     const { newEmployeeId, appointmentServiceId } = req.body;
     return success(
       res,
-      await appointmentsService.changeTechnician(req.user.userId, appointmentId, {
-        newEmployeeId,
-        appointmentServiceId,
-        isReceptionist: true
-      }),
-      "Đổi Kỹ thuật viên thành công"
+      await appointmentsService.changeTechnician(
+        req.user.userId,
+        appointmentId,
+        {
+          newEmployeeId,
+          appointmentServiceId,
+          isReceptionist: true,
+        },
+      ),
+      "Đổi Kỹ thuật viên thành công",
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -620,7 +626,10 @@ module.exports = {
   transferAppointments,
   updateAppointmentServiceStatus: async (req, res) => {
     try {
-      const data = await service.updateAppointmentServiceStatus(req.params.id, req.body.status);
+      const data = await service.updateAppointmentServiceStatus(
+        req.params.id,
+        req.body.status,
+      );
       return success(res, data, "Cập nhật trạng thái bước dịch vụ thành công");
     } catch (err) {
       return error(res, err.message, 400);
@@ -628,5 +637,3 @@ module.exports = {
   },
   changeTechnician,
 };
-
-

@@ -54,7 +54,10 @@ router.post("/invoices/:id/mark-paid", controller.markInvoicePaid);
 router.post("/invoices/:id/refund", controller.requestInvoiceRefund);
 router.put("/invoices/:id/update-details", controller.updateInvoiceDetails);
 router.post("/invoices/:id/send-email", controller.sendInvoiceEmail);
-router.post("/appointments/:id/create-invoice", controller.createInvoiceManually);
+router.post(
+  "/appointments/:id/create-invoice",
+  controller.createInvoiceManually,
+);
 
 router.put("/appointments/:id/confirm", controller.confirmAppointment);
 router.put("/appointments/:id/check-in", controller.checkInAppointment);
@@ -63,12 +66,17 @@ router.put("/appointments/:id/complete", controller.completeAppointment);
 router.post("/appointments/:id/checkout", controller.checkoutAppointment);
 router.get("/technicians/:id/workload", controller.getTechnicianWorkload);
 router.put("/appointments/:id/assign-technician", controller.assignTechnician);
-router.post("/technicians/transfer-appointments", controller.transferAppointments);
+router.post(
+  "/technicians/transfer-appointments",
+  controller.transferAppointments,
+);
 router.put("/appointments/:id/cancel", controller.cancelAppointment);
 router.put("/appointments/:id/reschedule", controller.rescheduleAppointment);
 router.put("/appointments/:id/no-show", controller.noShowAppointment);
-router.put("/appointment-services/:id/status", controller.updateAppointmentServiceStatus);
-
+router.put(
+  "/appointment-services/:id/status",
+  controller.updateAppointmentServiceStatus,
+);
 
 router.get("/waiting-list", controller.getWaitingList);
 router.post("/waiting-list", controller.createWaitingList);
@@ -94,7 +102,9 @@ router.get("/settings", controller.getSettings);
 router.put("/settings", controller.updateSettings);
 router.put("/avatar", uploadAvatar.single("avatar"), controller.updateAvatar);
 
-router.patch("/appointments/:id/change-technician", controller.changeTechnician);
+router.patch(
+  "/appointments/:id/change-technician",
+  controller.changeTechnician,
+);
 
 module.exports = router;
-
