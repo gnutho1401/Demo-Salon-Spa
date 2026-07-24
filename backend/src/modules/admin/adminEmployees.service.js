@@ -321,8 +321,7 @@ async function update(id, data) {
       ? toInt(data.yearsOfExperience, 0)
       : current.YearsOfExperience;
   const bio = data.bio !== undefined ? nullable(data.bio) : current.Bio;
-  const newPassword =
-    data.password !== undefined ? text(data.password) : "";
+  const newPassword = data.password !== undefined ? text(data.password) : "";
 
   if (!fullName) throw new Error("Họ tên không được để trống");
   if (!email) throw new Error("Email không được để trống");
@@ -344,9 +343,7 @@ async function update(id, data) {
 
   if (existed.recordset[0]) throw new Error("Email đã tồn tại");
 
-  const passwordHash = newPassword
-    ? await bcrypt.hash(newPassword, 10)
-    : null;
+  const passwordHash = newPassword ? await bcrypt.hash(newPassword, 10) : null;
   const transaction = new sql.Transaction(pool);
 
   try {
@@ -449,7 +446,9 @@ async function changeStatus(id, data) {
 
 async function getAssignedServices(employeeId) {
   const pool = await connectDB();
-  const result = await pool.request().input("EmployeeId", sql.Int, Number(employeeId)).query(`
+  const result = await pool
+    .request()
+    .input("EmployeeId", sql.Int, Number(employeeId)).query(`
     SELECT
       s.ServiceId,
       s.ServiceName,
@@ -479,7 +478,9 @@ async function updateAssignedServices(employeeId, serviceIds = []) {
         await new sql.Request(transaction)
           .input("EmployeeId", sql.Int, Number(employeeId))
           .input("ServiceId", sql.Int, Number(serviceId))
-          .query("INSERT INTO EmployeeServices (EmployeeId, ServiceId) VALUES (@EmployeeId, @ServiceId)");
+          .query(
+            "INSERT INTO EmployeeServices (EmployeeId, ServiceId) VALUES (@EmployeeId, @ServiceId)",
+          );
       }
     }
 
