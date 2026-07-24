@@ -113,14 +113,18 @@ export default function PaymentResult() {
             <div className="result-info-item">
               <span>Trạng thái lịch</span>
               <strong>
-                {STATUS_MAP[appointment?.Status] || appointment?.Status || "Đang kiểm tra"}
+                {STATUS_MAP[appointment?.Status] ||
+                  appointment?.Status ||
+                  "Đang kiểm tra"}
               </strong>
             </div>
 
             <div className="result-info-item">
               <span>Trạng thái thanh toán</span>
               <strong>
-                {PAYMENT_MAP[appointment?.PaymentStatus] || appointment?.PaymentStatus || "Chưa thanh toán"}
+                {PAYMENT_MAP[appointment?.PaymentStatus] ||
+                  appointment?.PaymentStatus ||
+                  "Chưa thanh toán"}
               </strong>
             </div>
 

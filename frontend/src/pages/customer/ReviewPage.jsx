@@ -55,7 +55,13 @@ function renderStarsDisplay(value) {
   return (
     <span className="rev-score-stars">
       {[1, 2, 3, 4, 5].map((star) => (
-        <span key={star} style={{ color: star <= rating ? "var(--rev-star-active)" : "#e5dada", marginRight: "2px" }}>
+        <span
+          key={star}
+          style={{
+            color: star <= rating ? "var(--rev-star-active)" : "#e5dada",
+            marginRight: "2px",
+          }}
+        >
           ★
         </span>
       ))}
@@ -66,9 +72,13 @@ function renderStarsDisplay(value) {
 export default function ReviewPage() {
   const [searchParams] = useSearchParams();
 
-  const initialTabParam = (searchParams.get("type") || searchParams.get("tab") || "").toLowerCase();
+  const initialTabParam = (
+    searchParams.get("type") ||
+    searchParams.get("tab") ||
+    ""
+  ).toLowerCase();
   const [activeReviewTab, setActiveReviewTab] = useState(
-    ["combo", "package"].includes(initialTabParam) ? "combo" : "retail"
+    ["combo", "package"].includes(initialTabParam) ? "combo" : "retail",
   );
 
   const [reviews, setReviews] = useState([]);
@@ -147,7 +157,9 @@ export default function ReviewPage() {
 
   // Group reviewables by type
   const retailReviewables = useMemo(() => {
-    return reviewableServices.filter((item) => !item.CustomerPackageId && !item.PackageName);
+    return reviewableServices.filter(
+      (item) => !item.CustomerPackageId && !item.PackageName,
+    );
   }, [reviewableServices]);
 
   const comboReviewables = useMemo(() => {
@@ -160,7 +172,7 @@ export default function ReviewPage() {
             appointmentDate: item.AppointmentDate,
             packageName: item.PackageName || "Gói Combo Spa",
             customerPackageId: item.CustomerPackageId,
-            services: []
+            services: [],
           });
         }
         map.get(item.AppointmentId).services.push(item);
@@ -201,24 +213,28 @@ export default function ReviewPage() {
           if (matched.CustomerPackageId || matched.PackageName) {
             setActiveReviewTab("combo");
             // Auto select combo appointment
-            const comboAppt = reviewableItems.filter(x => String(x.AppointmentId) === String(appointmentId));
+            const comboAppt = reviewableItems.filter(
+              (x) => String(x.AppointmentId) === String(appointmentId),
+            );
             const initialSteps = {};
-            comboAppt.forEach(s => {
+            comboAppt.forEach((s) => {
               initialSteps[s.ServiceId] = {
                 serviceId: s.ServiceId,
                 employeeId: s.StepEmployeeId || s.EmployeeId,
                 serviceName: s.ServiceName,
-                technicianName: s.StepTechnicianName || s.EmployeeName || "KTV Salon",
-                technicianAvatar: s.StepTechnicianAvatar || s.EmployeeImageUrl || "",
+                technicianName:
+                  s.StepTechnicianName || s.EmployeeName || "KTV Salon",
+                technicianAvatar:
+                  s.StepTechnicianAvatar || s.EmployeeImageUrl || "",
                 rating: 5,
-                comment: ""
+                comment: "",
               };
             });
             setComboForm({
               appointmentId: String(appointmentId),
               overallRating: 5,
               overallComment: "",
-              stepRatings: initialSteps
+              stepRatings: initialSteps,
             });
           } else {
             setActiveReviewTab("retail");
@@ -259,11 +275,17 @@ export default function ReviewPage() {
 
   const selectedComboAppt = useMemo(() => {
     if (!comboForm.appointmentId) return null;
-    return comboReviewables.find(c => String(c.appointmentId) === String(comboForm.appointmentId)) || null;
+    return (
+      comboReviewables.find(
+        (c) => String(c.appointmentId) === String(comboForm.appointmentId),
+      ) || null
+    );
   }, [comboReviewables, comboForm.appointmentId]);
 
   const handleSelectComboAppt = (apptId) => {
-    const group = comboReviewables.find(g => String(g.appointmentId) === String(apptId));
+    const group = comboReviewables.find(
+      (g) => String(g.appointmentId) === String(apptId),
+    );
     if (!group) return;
     const initialSteps = {};
     group.services.forEach((s) => {
@@ -274,14 +296,14 @@ export default function ReviewPage() {
         technicianName: s.StepTechnicianName || s.EmployeeName || "KTV Salon",
         technicianAvatar: s.StepTechnicianAvatar || s.EmployeeImageUrl || "",
         rating: 5,
-        comment: ""
+        comment: "",
       };
     });
     setComboForm({
       appointmentId: String(apptId),
       overallRating: 5,
       overallComment: "",
-      stepRatings: initialSteps
+      stepRatings: initialSteps,
     });
   };
 
@@ -361,7 +383,7 @@ export default function ReviewPage() {
             Rating: item.Rating,
             Comment: item.Comment,
             Images: item.Images || [],
-            steps: []
+            steps: [],
           });
         }
         comboMap.get(item.AppointmentId).steps.push(item);
@@ -372,7 +394,7 @@ export default function ReviewPage() {
 
     return {
       retail: retailItems,
-      combo: Array.from(comboMap.values())
+      combo: Array.from(comboMap.values()),
     };
   }, [filteredReviews]);
 
@@ -396,7 +418,9 @@ export default function ReviewPage() {
   }
 
   function removeFile(indexToRemove) {
-    setFiles((prevFiles) => prevFiles.filter((_, idx) => idx !== indexToRemove));
+    setFiles((prevFiles) =>
+      prevFiles.filter((_, idx) => idx !== indexToRemove),
+    );
     setPreviews((prevPreviews) => {
       URL.revokeObjectURL(prevPreviews[indexToRemove]);
       return prevPreviews.filter((_, idx) => idx !== indexToRemove);
@@ -511,11 +535,15 @@ export default function ReviewPage() {
             <span className="rev-kicker">Trải nghiệm dịch vụ</span>
             <h1>Đánh giá chất lượng dịch vụ</h1>
             <p>
-              Ý kiến của bạn là động lực giúp salon nâng cao chất lượng dịch vụ mỗi ngày. 
-              Hãy chấm sao dịch vụ, kỹ thuật viên phụ trách và gửi hình ảnh thực tế từ lịch hẹn đã hoàn thành của bạn.
+              Ý kiến của bạn là động lực giúp salon nâng cao chất lượng dịch vụ
+              mỗi ngày. Hãy chấm sao dịch vụ, kỹ thuật viên phụ trách và gửi
+              hình ảnh thực tế từ lịch hẹn đã hoàn thành của bạn.
             </p>
             <div className="rev-hero-actions">
-              <Link to="/customer/feedback" className="rev-btn rev-btn-secondary">
+              <Link
+                to="/customer/feedback"
+                className="rev-btn rev-btn-secondary"
+              >
                 💬 Gửi phản hồi / khiếu nại
               </Link>
               <button
@@ -607,7 +635,16 @@ export default function ReviewPage() {
             </div>
 
             {/* MAIN REVIEW TABS */}
-            <div style={{ display: "flex", gap: 10, marginBottom: 20, borderBottom: "2px solid #fce7f3", paddingBottom: 14, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                marginBottom: 20,
+                borderBottom: "2px solid #fce7f3",
+                paddingBottom: 14,
+                flexWrap: "wrap",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setActiveReviewTab("retail")}
@@ -618,9 +655,15 @@ export default function ReviewPage() {
                   fontSize: 13,
                   cursor: "pointer",
                   border: "none",
-                  background: activeReviewTab === "retail" ? "linear-gradient(135deg, #ec4899, #db2777)" : "#f1f5f9",
+                  background:
+                    activeReviewTab === "retail"
+                      ? "linear-gradient(135deg, #ec4899, #db2777)"
+                      : "#f1f5f9",
                   color: activeReviewTab === "retail" ? "#ffffff" : "#475569",
-                  boxShadow: activeReviewTab === "retail" ? "0 4px 12px rgba(236,72,153,0.3)" : "none"
+                  boxShadow:
+                    activeReviewTab === "retail"
+                      ? "0 4px 12px rgba(236,72,153,0.3)"
+                      : "none",
                 }}
               >
                 💇 Đánh Giá Dịch Vụ Lẻ ({retailReviewables.length})
@@ -635,9 +678,15 @@ export default function ReviewPage() {
                   fontSize: 13,
                   cursor: "pointer",
                   border: "none",
-                  background: activeReviewTab === "combo" ? "linear-gradient(135deg, #ec4899, #db2777)" : "#f1f5f9",
+                  background:
+                    activeReviewTab === "combo"
+                      ? "linear-gradient(135deg, #ec4899, #db2777)"
+                      : "#f1f5f9",
                   color: activeReviewTab === "combo" ? "#ffffff" : "#475569",
-                  boxShadow: activeReviewTab === "combo" ? "0 4px 12px rgba(236,72,153,0.3)" : "none"
+                  boxShadow:
+                    activeReviewTab === "combo"
+                      ? "0 4px 12px rgba(236,72,153,0.3)"
+                      : "none",
                 }}
               >
                 📦 Đánh Giá Gói Combo & KTV ({comboReviewables.length})
@@ -657,7 +706,8 @@ export default function ReviewPage() {
                         : ""
                     }
                     onChange={(e) => {
-                      const [appointmentId, serviceId] = e.target.value.split("|");
+                      const [appointmentId, serviceId] =
+                        e.target.value.split("|");
                       setForm({ ...form, appointmentId, serviceId });
                     }}
                   >
@@ -667,7 +717,8 @@ export default function ReviewPage() {
                         key={`${item.AppointmentId}-${item.ServiceId}`}
                         value={`${item.AppointmentId}|${item.ServiceId}`}
                       >
-                        💇 #{item.AppointmentId} - {item.ServiceName} ({formatDate(item.AppointmentDate)})
+                        💇 #{item.AppointmentId} - {item.ServiceName} (
+                        {formatDate(item.AppointmentDate)})
                       </option>
                     ))}
                   </select>
@@ -690,15 +741,27 @@ export default function ReviewPage() {
                     <div className="rev-context-info">
                       <h3>{selectedService.ServiceName}</h3>
                       <p className="rev-context-desc">
-                        {selectedService.ServiceDescription || "Dịch vụ làm đẹp cao cấp từ chuyên gia chăm sóc sắc đẹp."}
+                        {selectedService.ServiceDescription ||
+                          "Dịch vụ làm đẹp cao cấp từ chuyên gia chăm sóc sắc đẹp."}
                       </p>
                       <div className="rev-context-tags">
-                        <span className="rev-badge">Mã #{selectedService.AppointmentId}</span>
-                        <span className="rev-badge">{formatDate(selectedService.AppointmentDate)}</span>
-                        <span className="rev-badge">{selectedService.StartTime} - {selectedService.EndTime}</span>
-                        <span className="rev-badge rev-badge-price">{money(selectedService.Price)}</span>
+                        <span className="rev-badge">
+                          Mã #{selectedService.AppointmentId}
+                        </span>
+                        <span className="rev-badge">
+                          {formatDate(selectedService.AppointmentDate)}
+                        </span>
+                        <span className="rev-badge">
+                          {selectedService.StartTime} -{" "}
+                          {selectedService.EndTime}
+                        </span>
+                        <span className="rev-badge rev-badge-price">
+                          {money(selectedService.Price)}
+                        </span>
                         {selectedService.EmployeeName && (
-                          <span className="rev-badge rev-badge-tech">💇 KTV: {selectedService.EmployeeName}</span>
+                          <span className="rev-badge rev-badge-tech">
+                            💇 KTV: {selectedService.EmployeeName}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -712,15 +775,21 @@ export default function ReviewPage() {
                     {renderNewStars(form.serviceRating, (value) =>
                       setForm({ ...form, serviceRating: value }),
                     )}
-                    <span className="rev-rating-hint">{form.serviceRating} / 5 sao</span>
+                    <span className="rev-rating-hint">
+                      {form.serviceRating} / 5 sao
+                    </span>
                   </div>
 
                   <div className="rev-rating-box">
-                    <span className="rev-rating-title">Kỹ thuật viên phụ trách</span>
+                    <span className="rev-rating-title">
+                      Kỹ thuật viên phụ trách
+                    </span>
                     {renderNewStars(form.technicianRating, (value) =>
                       setForm({ ...form, technicianRating: value }),
                     )}
-                    <span className="rev-rating-hint">{form.technicianRating} / 5 sao</span>
+                    <span className="rev-rating-hint">
+                      {form.technicianRating} / 5 sao
+                    </span>
                   </div>
                 </div>
 
@@ -730,18 +799,26 @@ export default function ReviewPage() {
                     className="rev-textarea"
                     rows="4"
                     value={form.comment}
-                    onChange={(e) => setForm({ ...form, comment: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, comment: e.target.value })
+                    }
                     placeholder="Hài lòng của bạn là gì? Thái độ phục vụ của nhân viên ra sao? Chia sẻ trải nghiệm thực tế để salon hoàn thiện hơn nhé..."
                   />
-                  <span className="rev-input-limit">{form.comment.length} / 500 ký tự</span>
+                  <span className="rev-input-limit">
+                    {form.comment.length} / 500 ký tự
+                  </span>
                 </label>
 
                 <label className="rev-label">
                   Đăng tải hình ảnh thực tế
                   <div className="rev-upload-zone">
                     <span className="rev-upload-icon">📸</span>
-                    <span className="rev-upload-title">Nhấp để tải ảnh lên</span>
-                    <span className="rev-upload-subtitle">Định dạng JPG, PNG, WEBP. Chọn tối đa 6 hình ảnh thực tế.</span>
+                    <span className="rev-upload-title">
+                      Nhấp để tải ảnh lên
+                    </span>
+                    <span className="rev-upload-subtitle">
+                      Định dạng JPG, PNG, WEBP. Chọn tối đa 6 hình ảnh thực tế.
+                    </span>
                     <input
                       type="file"
                       multiple
@@ -769,8 +846,14 @@ export default function ReviewPage() {
                   </div>
                 )}
 
-                <button className="rev-btn rev-btn-primary" style={{ width: "100%", height: "50px", marginTop: "10px" }} disabled={submitting}>
-                  {submitting ? "Đang gửi đánh giá của bạn..." : "Gửi Đánh Giá Dịch Vụ Lẻ"}
+                <button
+                  className="rev-btn rev-btn-primary"
+                  style={{ width: "100%", height: "50px", marginTop: "10px" }}
+                  disabled={submitting}
+                >
+                  {submitting
+                    ? "Đang gửi đánh giá của bạn..."
+                    : "Gửi Đánh Giá Dịch Vụ Lẻ"}
                 </button>
               </form>
             ) : (
@@ -786,47 +869,114 @@ export default function ReviewPage() {
                     <option value="">Chọn ca hẹn Combo hoàn thành...</option>
                     {comboReviewables.map((c) => (
                       <option key={c.appointmentId} value={c.appointmentId}>
-                        📦 Combo #{c.appointmentId} - {c.packageName} ({formatDate(c.appointmentDate)})
+                        📦 Combo #{c.appointmentId} - {c.packageName} (
+                        {formatDate(c.appointmentDate)})
                       </option>
                     ))}
                   </select>
                 </label>
 
                 {selectedComboAppt && (
-                  <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", borderRadius: 14, padding: 14, margin: "10px 0" }}>
-                    <b style={{ color: "#be185d", fontSize: 13, display: "block", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  <div
+                    style={{
+                      background: "#fdf2f8",
+                      border: "1px solid #fbcfe8",
+                      borderRadius: 14,
+                      padding: 14,
+                      margin: "10px 0",
+                    }}
+                  >
+                    <b
+                      style={{
+                        color: "#be185d",
+                        fontSize: 13,
+                        display: "block",
+                        marginBottom: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                      }}
+                    >
                       ✂️ CHẤM SAO VÀ NHẬN XÉT TAY NGHỀ TỪNG KỸ THUẬT VIÊN:
                     </b>
                     {selectedComboAppt.services.map((s, idx) => {
                       const stepInfo = comboForm.stepRatings[s.ServiceId] || {};
                       const ratingVal = stepInfo.rating || 5;
                       const commentVal = stepInfo.comment || "";
-                      const techName = s.StepTechnicianName || s.EmployeeName || "KTV Salon";
-                      const techAvatar = s.StepTechnicianAvatar || s.EmployeeImageUrl || "";
+                      const techName =
+                        s.StepTechnicianName || s.EmployeeName || "KTV Salon";
+                      const techAvatar =
+                        s.StepTechnicianAvatar || s.EmployeeImageUrl || "";
 
                       return (
-                        <div key={idx} style={{ background: "#ffffff", padding: 12, borderRadius: 12, border: "1px solid #fbcfe8", marginBottom: 10 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                            <b style={{ color: "#831843", fontSize: 13 }}>{idx + 1}. {s.ServiceName}</b>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fdf2f8", padding: "3px 10px", borderRadius: 12, border: "1px solid #fbcfe8" }}>
+                        <div
+                          key={idx}
+                          style={{
+                            background: "#ffffff",
+                            padding: 12,
+                            borderRadius: 12,
+                            border: "1px solid #fbcfe8",
+                            marginBottom: 10,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginBottom: 6,
+                            }}
+                          >
+                            <b style={{ color: "#831843", fontSize: 13 }}>
+                              {idx + 1}. {s.ServiceName}
+                            </b>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                background: "#fdf2f8",
+                                padding: "3px 10px",
+                                borderRadius: 12,
+                                border: "1px solid #fbcfe8",
+                              }}
+                            >
                               <img
                                 src={imageUrl(techAvatar)}
                                 alt={techName}
-                                style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }}
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                }}
                               />
-                              <b style={{ fontSize: 11, color: "#be185d" }}>KTV: {techName}</b>
+                              <b style={{ fontSize: 11, color: "#be185d" }}>
+                                KTV: {techName}
+                              </b>
                             </div>
                           </div>
 
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                            <span style={{ fontSize: 12, color: "#64748b" }}>Chấm tay nghề:</span>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              marginBottom: 8,
+                            }}
+                          >
+                            <span style={{ fontSize: 12, color: "#64748b" }}>
+                              Chấm tay nghề:
+                            </span>
                             {renderNewStars(ratingVal, (val) => {
                               setComboForm((f) => ({
                                 ...f,
                                 stepRatings: {
                                   ...f.stepRatings,
-                                  [s.ServiceId]: { ...f.stepRatings[s.ServiceId], rating: val }
-                                }
+                                  [s.ServiceId]: {
+                                    ...f.stepRatings[s.ServiceId],
+                                    rating: val,
+                                  },
+                                },
                               }));
                             })}
                           </div>
@@ -840,11 +990,20 @@ export default function ReviewPage() {
                                 ...f,
                                 stepRatings: {
                                   ...f.stepRatings,
-                                  [s.ServiceId]: { ...f.stepRatings[s.ServiceId], comment: e.target.value }
-                                }
+                                  [s.ServiceId]: {
+                                    ...f.stepRatings[s.ServiceId],
+                                    comment: e.target.value,
+                                  },
+                                },
                               }));
                             }}
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12 }}
+                            style={{
+                              width: "100%",
+                              padding: "8px 12px",
+                              borderRadius: 8,
+                              border: "1px solid #cbd5e1",
+                              fontSize: 12,
+                            }}
                           />
                         </div>
                       );
@@ -853,12 +1012,19 @@ export default function ReviewPage() {
                 )}
 
                 <div className="rev-rating-grid">
-                  <div className="rev-rating-box" style={{ gridColumn: "1 / -1" }}>
-                    <span className="rev-rating-title">Chấm sao tổng thể trải nghiệm Ca hẹn Combo này</span>
+                  <div
+                    className="rev-rating-box"
+                    style={{ gridColumn: "1 / -1" }}
+                  >
+                    <span className="rev-rating-title">
+                      Chấm sao tổng thể trải nghiệm Ca hẹn Combo này
+                    </span>
                     {renderNewStars(comboForm.overallRating, (value) =>
                       setComboForm({ ...comboForm, overallRating: value }),
                     )}
-                    <span className="rev-rating-hint">{comboForm.overallRating} / 5 sao</span>
+                    <span className="rev-rating-hint">
+                      {comboForm.overallRating} / 5 sao
+                    </span>
                   </div>
                 </div>
 
@@ -868,7 +1034,12 @@ export default function ReviewPage() {
                     className="rev-textarea"
                     rows="4"
                     value={comboForm.overallComment}
-                    onChange={(e) => setComboForm({ ...comboForm, overallComment: e.target.value })}
+                    onChange={(e) =>
+                      setComboForm({
+                        ...comboForm,
+                        overallComment: e.target.value,
+                      })
+                    }
                     placeholder="Chia sẻ trải nghiệm tổng thể khi làm gói Combo tại salon..."
                   />
                 </label>
@@ -877,8 +1048,12 @@ export default function ReviewPage() {
                   Đăng tải hình ảnh thực tế
                   <div className="rev-upload-zone">
                     <span className="rev-upload-icon">📸</span>
-                    <span className="rev-upload-title">Nhấp để tải ảnh thực tế lên</span>
-                    <span className="rev-upload-subtitle">Định dạng JPG, PNG, WEBP. Chọn tối đa 6 hình ảnh thực tế.</span>
+                    <span className="rev-upload-title">
+                      Nhấp để tải ảnh thực tế lên
+                    </span>
+                    <span className="rev-upload-subtitle">
+                      Định dạng JPG, PNG, WEBP. Chọn tối đa 6 hình ảnh thực tế.
+                    </span>
                     <input
                       type="file"
                       multiple
@@ -907,10 +1082,18 @@ export default function ReviewPage() {
 
                 <button
                   className="rev-btn rev-btn-primary"
-                  style={{ width: "100%", height: "50px", marginTop: "10px", background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)" }}
+                  style={{
+                    width: "100%",
+                    height: "50px",
+                    marginTop: "10px",
+                    background:
+                      "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+                  }}
                   disabled={submitting}
                 >
-                  {submitting ? "Đang gửi đánh giá..." : "🚀 Gửi Đánh Giá Gói Combo & KTV"}
+                  {submitting
+                    ? "Đang gửi đánh giá..."
+                    : "🚀 Gửi Đánh Giá Gói Combo & KTV"}
                 </button>
               </form>
             )}
@@ -918,7 +1101,11 @@ export default function ReviewPage() {
 
           {/* Sidebar Waiting Reviews */}
           <aside className="rev-glass-panel rev-sidebar">
-            <h3>{activeReviewTab === "combo" ? "Ca hẹn Combo chờ đánh giá" : "Dịch vụ lẻ chờ đánh giá"}</h3>
+            <h3>
+              {activeReviewTab === "combo"
+                ? "Ca hẹn Combo chờ đánh giá"
+                : "Dịch vụ lẻ chờ đánh giá"}
+            </h3>
 
             {activeReviewTab === "retail" ? (
               retailReviewables.length === 0 ? (
@@ -930,59 +1117,123 @@ export default function ReviewPage() {
               ) : (
                 <div className="rev-waiting-scroller">
                   {retailReviewables.map((item) => (
-                    <div className="rev-waiting-card" key={`${item.AppointmentId}-${item.ServiceId}`}>
+                    <div
+                      className="rev-waiting-card"
+                      key={`${item.AppointmentId}-${item.ServiceId}`}
+                    >
                       <div className="rev-waiting-header">
-                        <span className="rev-waiting-id">Ca hẹn #{item.AppointmentId}</span>
-                        <span className="rev-waiting-date">{formatDate(item.AppointmentDate)}</span>
+                        <span className="rev-waiting-id">
+                          Ca hẹn #{item.AppointmentId}
+                        </span>
+                        <span className="rev-waiting-date">
+                          {formatDate(item.AppointmentDate)}
+                        </span>
                       </div>
                       <div className="rev-waiting-list-services">
                         <button
                           type="button"
                           className="rev-waiting-btn"
-                          onClick={() => chooseReviewable(item.AppointmentId, item.ServiceId)}
+                          onClick={() =>
+                            chooseReviewable(item.AppointmentId, item.ServiceId)
+                          }
                         >
-                          <span className="rev-waiting-btn-name">{item.ServiceName}</span>
-                          <span className="rev-waiting-btn-action">Đánh giá</span>
+                          <span className="rev-waiting-btn-name">
+                            {item.ServiceName}
+                          </span>
+                          <span className="rev-waiting-btn-action">
+                            Đánh giá
+                          </span>
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
               )
+            ) : comboReviewables.length === 0 ? (
+              <div className="rev-empty" style={{ padding: "40px 20px" }}>
+                <span className="rev-empty-icon">✨</span>
+                <h4>Tuyệt vời!</h4>
+                <p>Bạn đã hoàn thành việc đánh giá tất cả các ca hẹn Combo.</p>
+              </div>
             ) : (
-              comboReviewables.length === 0 ? (
-                <div className="rev-empty" style={{ padding: "40px 20px" }}>
-                  <span className="rev-empty-icon">✨</span>
-                  <h4>Tuyệt vời!</h4>
-                  <p>Bạn đã hoàn thành việc đánh giá tất cả các ca hẹn Combo.</p>
-                </div>
-              ) : (
-                <div className="rev-waiting-scroller">
-                  {comboReviewables.map((c) => (
-                    <div className="rev-waiting-card combo-waiting-card" key={c.appointmentId} style={{ background: "linear-gradient(135deg, #fff5f8 0%, #fdf2f8 100%)", border: "1.5px solid #fbcfe8", borderRadius: 14, padding: "12px 14px", marginBottom: 12 }}>
-                      <div className="rev-waiting-header" style={{ marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
-                        <span className="rev-waiting-id" style={{ color: "#db2777", fontWeight: 800 }}>📦 Combo #{c.appointmentId}</span>
-                        <span className="rev-waiting-date">{formatDate(c.appointmentDate)}</span>
-                      </div>
-                      <b style={{ color: "#831843", fontSize: 13, display: "block", marginBottom: 4 }}>{c.packageName}</b>
-                      <span style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 8 }}>
-                        gồm {c.services.length} bước dịch vụ & KTV phụ trách
-                      </span>
-                      <button
-                        type="button"
-                        className="btn-review-combo-direct"
-                        style={{ width: "100%", background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)", color: "#ffffff", border: "none", borderRadius: 10, padding: "8px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", boxShadow: "0 4px 10px rgba(236,72,153,0.25)" }}
-                        onClick={() => {
-                          handleSelectComboAppt(c.appointmentId);
-                          window.scrollTo({ top: 380, behavior: "smooth" });
-                        }}
+              <div className="rev-waiting-scroller">
+                {comboReviewables.map((c) => (
+                  <div
+                    className="rev-waiting-card combo-waiting-card"
+                    key={c.appointmentId}
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #fff5f8 0%, #fdf2f8 100%)",
+                      border: "1.5px solid #fbcfe8",
+                      borderRadius: 14,
+                      padding: "12px 14px",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div
+                      className="rev-waiting-header"
+                      style={{
+                        marginBottom: 6,
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span
+                        className="rev-waiting-id"
+                        style={{ color: "#db2777", fontWeight: 800 }}
                       >
-                        ⭐ Đánh Giá Combo Này →
-                      </button>
+                        📦 Combo #{c.appointmentId}
+                      </span>
+                      <span className="rev-waiting-date">
+                        {formatDate(c.appointmentDate)}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )
+                    <b
+                      style={{
+                        color: "#831843",
+                        fontSize: 13,
+                        display: "block",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {c.packageName}
+                    </b>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "#64748b",
+                        display: "block",
+                        marginBottom: 8,
+                      }}
+                    >
+                      gồm {c.services.length} bước dịch vụ & KTV phụ trách
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-review-combo-direct"
+                      style={{
+                        width: "100%",
+                        background:
+                          "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: 10,
+                        padding: "8px 12px",
+                        fontWeight: 700,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        boxShadow: "0 4px 10px rgba(236,72,153,0.25)",
+                      }}
+                      onClick={() => {
+                        handleSelectComboAppt(c.appointmentId);
+                        window.scrollTo({ top: 380, behavior: "smooth" });
+                      }}
+                    >
+                      ⭐ Đánh Giá Combo Này →
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </aside>
         </section>
@@ -1049,20 +1300,34 @@ export default function ReviewPage() {
             <div className="rev-empty">
               <span className="rev-empty-icon">⏳</span>
               <h4>Đang tải dữ liệu</h4>
-              <p>Vui lòng chờ giây lát trong khi chúng tôi chuẩn bị lịch sử đánh giá của bạn.</p>
+              <p>
+                Vui lòng chờ giây lát trong khi chúng tôi chuẩn bị lịch sử đánh
+                giá của bạn.
+              </p>
             </div>
-          ) : (groupedHistoryReviews.retail.length === 0 && groupedHistoryReviews.combo.length === 0) ? (
+          ) : groupedHistoryReviews.retail.length === 0 &&
+            groupedHistoryReviews.combo.length === 0 ? (
             <div className="rev-empty">
               <span className="rev-empty-icon">📭</span>
               <h4>Không tìm thấy kết quả</h4>
-              <p>Chưa có lịch sử đánh giá nào phù hợp với bộ lọc tìm kiếm của bạn.</p>
+              <p>
+                Chưa có lịch sử đánh giá nào phù hợp với bộ lọc tìm kiếm của
+                bạn.
+              </p>
             </div>
           ) : (
             <div className="rev-review-list">
               {/* COMBO HISTORY CARDS */}
               {(categoryFilter === "ALL" || categoryFilter === "COMBO") &&
                 groupedHistoryReviews.combo.map((cGroup) => (
-                  <article className="rev-card combo-history-card" key={`combo-${cGroup.AppointmentId}`} style={{ border: "1.5px solid #fbcfe8", background: "#fffdfd" }}>
+                  <article
+                    className="rev-card combo-history-card"
+                    key={`combo-${cGroup.AppointmentId}`}
+                    style={{
+                      border: "1.5px solid #fbcfe8",
+                      background: "#fffdfd",
+                    }}
+                  >
                     <div className="rev-card-service">
                       <div className="rev-card-service-top">
                         <div className="rev-card-service-img">
@@ -1072,18 +1337,37 @@ export default function ReviewPage() {
                           />
                         </div>
                         <div className="rev-card-service-meta">
-                          <span style={{ fontSize: 10, fontWeight: 800, color: "#be185d", background: "#fdf2f8", padding: "2px 8px", borderRadius: 10, display: "inline-block", marginBottom: 4 }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              color: "#be185d",
+                              background: "#fdf2f8",
+                              padding: "2px 8px",
+                              borderRadius: 10,
+                              display: "inline-block",
+                              marginBottom: 4,
+                            }}
+                          >
                             📦 GÓI COMBO SPA
                           </span>
-                          <h4 style={{ color: "#831843" }}>{cGroup.PackageName}</h4>
-                          <span className="rev-card-service-id">Mã ca hẹn #{cGroup.AppointmentId}</span>
+                          <h4 style={{ color: "#831843" }}>
+                            {cGroup.PackageName}
+                          </h4>
+                          <span className="rev-card-service-id">
+                            Mã ca hẹn #{cGroup.AppointmentId}
+                          </span>
                         </div>
                       </div>
 
                       <div className="rev-meta-list">
                         <div className="rev-meta-item">
                           <span className="rev-meta-icon">📅</span>
-                          <span>{formatDate(cGroup.AppointmentDate || cGroup.CreatedAt)}</span>
+                          <span>
+                            {formatDate(
+                              cGroup.AppointmentDate || cGroup.CreatedAt,
+                            )}
+                          </span>
                         </div>
                         <div className="rev-meta-item">
                           <span className="rev-meta-icon">✂️</span>
@@ -1100,23 +1384,81 @@ export default function ReviewPage() {
                             {renderStarsDisplay(cGroup.Rating)}
                           </div>
                         </div>
-                        <span className={`rev-status-pill ${String(cGroup.Status || "approved").toLowerCase()}`}>
-                          {cGroup.Status === "APPROVED" ? "Đã duyệt" : cGroup.Status === "PENDING" ? "Đang chờ" : "Đã ẩn"}
+                        <span
+                          className={`rev-status-pill ${String(cGroup.Status || "approved").toLowerCase()}`}
+                        >
+                          {cGroup.Status === "APPROVED"
+                            ? "Đã duyệt"
+                            : cGroup.Status === "PENDING"
+                              ? "Đang chờ"
+                              : "Đã ẩn"}
                         </span>
                       </div>
 
                       {/* STEP BREAKDOWN & TECHNICIAN RATINGS */}
-                      <div style={{ background: "#fdf2f8", borderRadius: 12, padding: "10px 14px", margin: "10px 0", border: "1px solid #fbcfe8" }}>
-                        <b style={{ fontSize: 11, color: "#be185d", textTransform: "uppercase", display: "block", marginBottom: 8 }}>
+                      <div
+                        style={{
+                          background: "#fdf2f8",
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          margin: "10px 0",
+                          border: "1px solid #fbcfe8",
+                        }}
+                      >
+                        <b
+                          style={{
+                            fontSize: 11,
+                            color: "#be185d",
+                            textTransform: "uppercase",
+                            display: "block",
+                            marginBottom: 8,
+                          }}
+                        >
                           ✂️ ĐÁNH GIÁ TAY NGHỀ KTV THEO TỪNG BƯỚC:
                         </b>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fill, minmax(220px, 1fr))",
+                            gap: 8,
+                          }}
+                        >
                           {cGroup.steps.map((st, sIdx) => (
-                            <div key={sIdx} style={{ background: "#ffffff", padding: "8px 10px", borderRadius: 8, border: "1px solid #fbcfe8" }}>
-                              <b style={{ fontSize: 12, color: "#831843", display: "block" }}>{sIdx + 1}. {st.ServiceName}</b>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                                <span style={{ fontSize: 11, color: "#64748b" }}>👤 {st.EmployeeName || "KTV Salon"}</span>
-                                {renderStarsDisplay(st.TechnicianRating || st.Rating)}
+                            <div
+                              key={sIdx}
+                              style={{
+                                background: "#ffffff",
+                                padding: "8px 10px",
+                                borderRadius: 8,
+                                border: "1px solid #fbcfe8",
+                              }}
+                            >
+                              <b
+                                style={{
+                                  fontSize: 12,
+                                  color: "#831843",
+                                  display: "block",
+                                }}
+                              >
+                                {sIdx + 1}. {st.ServiceName}
+                              </b>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  marginTop: 4,
+                                }}
+                              >
+                                <span
+                                  style={{ fontSize: 11, color: "#64748b" }}
+                                >
+                                  👤 {st.EmployeeName || "KTV Salon"}
+                                </span>
+                                {renderStarsDisplay(
+                                  st.TechnicianRating || st.Rating,
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1133,9 +1475,14 @@ export default function ReviewPage() {
                             <div
                               className="rev-gallery-thumbnail"
                               key={img.ReviewImageId || img.ImageUrl}
-                              onClick={() => openLightbox(cGroup.Images, imgIndex)}
+                              onClick={() =>
+                                openLightbox(cGroup.Images, imgIndex)
+                              }
                             >
-                              <img src={imageUrl(img.ImageUrl)} alt="Real review" />
+                              <img
+                                src={imageUrl(img.ImageUrl)}
+                                alt="Real review"
+                              />
                             </div>
                           ))}
                         </div>
@@ -1151,7 +1498,9 @@ export default function ReviewPage() {
                       )}
 
                       <div className="rev-card-footer">
-                        <span>Thời gian gửi: {formatDateTime(cGroup.CreatedAt)}</span>
+                        <span>
+                          Thời gian gửi: {formatDateTime(cGroup.CreatedAt)}
+                        </span>
                       </div>
                     </div>
                   </article>
@@ -1175,7 +1524,9 @@ export default function ReviewPage() {
                         </div>
                         <div className="rev-card-service-meta">
                           <h4>{review.ServiceName || "Dịch vụ"}</h4>
-                          <span className="rev-card-service-id">Mã đánh giá #{review.ReviewId}</span>
+                          <span className="rev-card-service-id">
+                            Mã đánh giá #{review.ReviewId}
+                          </span>
                         </div>
                       </div>
 
@@ -1186,13 +1537,27 @@ export default function ReviewPage() {
                         </div>
                         <div className="rev-meta-item">
                           <span className="rev-meta-icon">📅</span>
-                          <span>{formatDate(review.AppointmentDate || review.CreatedAt)}</span>
+                          <span>
+                            {formatDate(
+                              review.AppointmentDate || review.CreatedAt,
+                            )}
+                          </span>
                         </div>
                         <div className="rev-meta-item">
                           <span className="rev-meta-icon">🕒</span>
-                          <span>{review.StartTime ? `${review.StartTime} - ${review.EndTime}` : "Thời gian làm"}</span>
+                          <span>
+                            {review.StartTime
+                              ? `${review.StartTime} - ${review.EndTime}`
+                              : "Thời gian làm"}
+                          </span>
                         </div>
-                        <div className="rev-meta-item" style={{ fontWeight: "700", color: "var(--rev-primary)" }}>
+                        <div
+                          className="rev-meta-item"
+                          style={{
+                            fontWeight: "700",
+                            color: "var(--rev-primary)",
+                          }}
+                        >
                           <span className="rev-meta-icon">💰</span>
                           <span>{money(review.Price)}</span>
                         </div>
@@ -1201,14 +1566,19 @@ export default function ReviewPage() {
                       <div className="rev-card-tech">
                         <div className="rev-tech-avatar">
                           {review.EmployeeImageUrl ? (
-                            <img src={imageUrl(review.EmployeeImageUrl)} alt={review.EmployeeName} />
+                            <img
+                              src={imageUrl(review.EmployeeImageUrl)}
+                              alt={review.EmployeeName}
+                            />
                           ) : (
                             <span>💇</span>
                           )}
                         </div>
                         <div className="rev-tech-details">
                           <span className="rev-tech-label">Kỹ thuật viên</span>
-                          <span className="rev-tech-name">{review.EmployeeName || "Chưa phân công"}</span>
+                          <span className="rev-tech-name">
+                            {review.EmployeeName || "Chưa phân công"}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1221,13 +1591,23 @@ export default function ReviewPage() {
                             {renderStarsDisplay(review.Rating)}
                           </div>
                           <div className="rev-card-score-item">
-                            <span className="rev-score-title">Kỹ thuật viên:</span>
-                            {renderStarsDisplay(review.TechnicianRating || review.Rating)}
+                            <span className="rev-score-title">
+                              Kỹ thuật viên:
+                            </span>
+                            {renderStarsDisplay(
+                              review.TechnicianRating || review.Rating,
+                            )}
                           </div>
                         </div>
 
-                        <span className={`rev-status-pill ${String(review.Status || "approved").toLowerCase()}`}>
-                          {review.Status === "APPROVED" ? "Đã duyệt" : review.Status === "PENDING" ? "Đang chờ" : "Đã ẩn"}
+                        <span
+                          className={`rev-status-pill ${String(review.Status || "approved").toLowerCase()}`}
+                        >
+                          {review.Status === "APPROVED"
+                            ? "Đã duyệt"
+                            : review.Status === "PENDING"
+                              ? "Đang chờ"
+                              : "Đã ẩn"}
                         </span>
                       </div>
 
@@ -1241,9 +1621,14 @@ export default function ReviewPage() {
                             <div
                               className="rev-gallery-thumbnail"
                               key={img.ReviewImageId || img.ImageUrl}
-                              onClick={() => openLightbox(review.Images, imgIndex)}
+                              onClick={() =>
+                                openLightbox(review.Images, imgIndex)
+                              }
                             >
-                              <img src={imageUrl(img.ImageUrl)} alt="Real review" />
+                              <img
+                                src={imageUrl(img.ImageUrl)}
+                                alt="Real review"
+                              />
                             </div>
                           ))}
                         </div>
@@ -1259,7 +1644,9 @@ export default function ReviewPage() {
                       )}
 
                       <div className="rev-card-footer">
-                        <span>Thời gian gửi: {formatDateTime(review.CreatedAt)}</span>
+                        <span>
+                          Thời gian gửi: {formatDateTime(review.CreatedAt)}
+                        </span>
                         <button
                           type="button"
                           className="rev-footer-btn"
@@ -1277,10 +1664,17 @@ export default function ReviewPage() {
 
         {/* Item Detail Modal overlay */}
         {detail && (
-          <div className="rev-lightbox-backdrop" onClick={() => setDetail(null)}>
+          <div
+            className="rev-lightbox-backdrop"
+            onClick={() => setDetail(null)}
+          >
             <div
               className="rev-glass-panel"
-              style={{ width: "min(600px, 100%)", maxHeight: "90vh", overflowY: "auto" }}
+              style={{
+                width: "min(600px, 100%)",
+                maxHeight: "90vh",
+                overflowY: "auto",
+              }}
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -1291,21 +1685,37 @@ export default function ReviewPage() {
                 ×
               </button>
 
-              <h2 style={{ fontSize: "22px", fontWeight: "900", color: "var(--rev-primary)", marginBottom: "20px" }}>
+              <h2
+                style={{
+                  fontSize: "22px",
+                  fontWeight: "900",
+                  color: "var(--rev-primary)",
+                  marginBottom: "20px",
+                }}
+              >
                 Chi tiết đánh giá
               </h2>
 
-              <div className="rev-context-card" style={{ marginBottom: "20px" }}>
+              <div
+                className="rev-context-card"
+                style={{ marginBottom: "20px" }}
+              >
                 <div className="rev-context-thumb">
                   {detail.ServiceImageUrl ? (
-                    <img src={imageUrl(detail.ServiceImageUrl)} alt={detail.ServiceName} />
+                    <img
+                      src={imageUrl(detail.ServiceImageUrl)}
+                      alt={detail.ServiceName}
+                    />
                   ) : (
                     <span>💆</span>
                   )}
                 </div>
                 <div className="rev-context-info">
                   <h3>{detail.ServiceName}</h3>
-                  <p className="rev-context-desc">{detail.ServiceDescription || "Dịch vụ làm đẹp cao cấp từ chuyên gia chăm sóc sắc đẹp."}</p>
+                  <p className="rev-context-desc">
+                    {detail.ServiceDescription ||
+                      "Dịch vụ làm đẹp cao cấp từ chuyên gia chăm sóc sắc đẹp."}
+                  </p>
                 </div>
               </div>
 
@@ -1318,40 +1728,136 @@ export default function ReviewPage() {
                 <div className="rev-rating-box">
                   <span className="rev-rating-title">Kỹ thuật viên</span>
                   {renderStarsDisplay(detail.TechnicianRating || detail.Rating)}
-                  <span className="rev-rating-hint">{(detail.TechnicianRating || detail.Rating)}/5 sao</span>
+                  <span className="rev-rating-hint">
+                    {detail.TechnicianRating || detail.Rating}/5 sao
+                  </span>
                 </div>
               </div>
 
-              <div className="rev-form-fields" style={{ display: "grid", gap: "12px", marginBottom: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed rgba(138, 91, 112, 0.12)", paddingBottom: "8px" }}>
-                  <span style={{ fontWeight: "700", color: "var(--rev-text-muted)" }}>Mã lịch hẹn:</span>
-                  <span style={{ fontWeight: "800" }}>#{detail.AppointmentId}</span>
+              <div
+                className="rev-form-fields"
+                style={{ display: "grid", gap: "12px", marginBottom: "20px" }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: "1px dashed rgba(138, 91, 112, 0.12)",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontWeight: "700",
+                      color: "var(--rev-text-muted)",
+                    }}
+                  >
+                    Mã lịch hẹn:
+                  </span>
+                  <span style={{ fontWeight: "800" }}>
+                    #{detail.AppointmentId}
+                  </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed rgba(138, 91, 112, 0.12)", paddingBottom: "8px" }}>
-                  <span style={{ fontWeight: "700", color: "var(--rev-text-muted)" }}>Ngày thực hiện:</span>
-                  <span style={{ fontWeight: "800" }}>{formatDate(detail.AppointmentDate)}</span>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: "1px dashed rgba(138, 91, 112, 0.12)",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontWeight: "700",
+                      color: "var(--rev-text-muted)",
+                    }}
+                  >
+                    Ngày thực hiện:
+                  </span>
+                  <span style={{ fontWeight: "800" }}>
+                    {formatDate(detail.AppointmentDate)}
+                  </span>
                 </div>
                 {detail.EmployeeName && (
-                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed rgba(138, 91, 112, 0.12)", paddingBottom: "8px" }}>
-                    <span style={{ fontWeight: "700", color: "var(--rev-text-muted)" }}>Kỹ thuật viên:</span>
-                    <span style={{ fontWeight: "800", color: "var(--rev-secondary)" }}>{detail.EmployeeName}</span>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      borderBottom: "1px dashed rgba(138, 91, 112, 0.12)",
+                      paddingBottom: "8px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: "700",
+                        color: "var(--rev-text-muted)",
+                      }}
+                    >
+                      Kỹ thuật viên:
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: "800",
+                        color: "var(--rev-secondary)",
+                      }}
+                    >
+                      {detail.EmployeeName}
+                    </span>
                   </div>
                 )}
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed rgba(138, 91, 112, 0.12)", paddingBottom: "8px" }}>
-                  <span style={{ fontWeight: "700", color: "var(--rev-text-muted)" }}>Thời gian gửi:</span>
-                  <span style={{ fontWeight: "800" }}>{formatDateTime(detail.CreatedAt)}</span>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: "1px dashed rgba(138, 91, 112, 0.12)",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontWeight: "700",
+                      color: "var(--rev-text-muted)",
+                    }}
+                  >
+                    Thời gian gửi:
+                  </span>
+                  <span style={{ fontWeight: "800" }}>
+                    {formatDateTime(detail.CreatedAt)}
+                  </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px dashed rgba(138, 91, 112, 0.12)", paddingBottom: "8px" }}>
-                  <span style={{ fontWeight: "700", color: "var(--rev-text-muted)" }}>Trạng thái:</span>
-                  <span className={`rev-status-pill ${String(detail.Status || "APPROVED").toLowerCase()}`}>
-                    {detail.Status === "APPROVED" ? "Đã duyệt" : detail.Status === "PENDING" ? "Đang chờ" : "Đã ẩn"}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: "1px dashed rgba(138, 91, 112, 0.12)",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontWeight: "700",
+                      color: "var(--rev-text-muted)",
+                    }}
+                  >
+                    Trạng thái:
+                  </span>
+                  <span
+                    className={`rev-status-pill ${String(detail.Status || "APPROVED").toLowerCase()}`}
+                  >
+                    {detail.Status === "APPROVED"
+                      ? "Đã duyệt"
+                      : detail.Status === "PENDING"
+                        ? "Đang chờ"
+                        : "Đã ẩn"}
                   </span>
                 </div>
               </div>
 
               {detail.Comment && (
                 <div style={{ marginBottom: "20px" }}>
-                  <label className="rev-label" style={{ marginBottom: "8px" }}>Nhận xét khách hàng</label>
+                  <label className="rev-label" style={{ marginBottom: "8px" }}>
+                    Nhận xét khách hàng
+                  </label>
                   <p className="rev-comment-text">{detail.Comment}</p>
                 </div>
               )}
@@ -1371,7 +1877,10 @@ export default function ReviewPage() {
         {/* Real-Images Lightbox slider modal */}
         {lightbox.isOpen && lightbox.images.length > 0 && (
           <div className="rev-lightbox-backdrop" onClick={closeLightbox}>
-            <div className="rev-lightbox-container" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="rev-lightbox-container"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button className="rev-lightbox-close" onClick={closeLightbox}>
                 ×
               </button>
@@ -1379,7 +1888,10 @@ export default function ReviewPage() {
               <div className="rev-lightbox-img-wrapper">
                 {/* Navigation arrows (if multiple images) */}
                 {lightbox.images.length > 1 && (
-                  <button className="rev-lightbox-nav rev-lightbox-prev" onClick={prevLightboxImage}>
+                  <button
+                    className="rev-lightbox-nav rev-lightbox-prev"
+                    onClick={prevLightboxImage}
+                  >
                     ‹
                   </button>
                 )}
@@ -1391,7 +1903,10 @@ export default function ReviewPage() {
                 />
 
                 {lightbox.images.length > 1 && (
-                  <button className="rev-lightbox-nav rev-lightbox-next" onClick={nextLightboxImage}>
+                  <button
+                    className="rev-lightbox-nav rev-lightbox-next"
+                    onClick={nextLightboxImage}
+                  >
                     ›
                   </button>
                 )}
@@ -1404,9 +1919,14 @@ export default function ReviewPage() {
                     <div
                       key={img.ReviewImageId || img.ImageUrl}
                       className={`rev-lightbox-dot ${dotIdx === lightbox.index ? "active" : ""}`}
-                      onClick={() => setLightbox((prev) => ({ ...prev, index: dotIdx }))}
+                      onClick={() =>
+                        setLightbox((prev) => ({ ...prev, index: dotIdx }))
+                      }
                     >
-                      <img src={imageUrl(img.ImageUrl)} alt={`Thumbnail ${dotIdx + 1}`} />
+                      <img
+                        src={imageUrl(img.ImageUrl)}
+                        alt={`Thumbnail ${dotIdx + 1}`}
+                      />
                     </div>
                   ))}
                 </div>

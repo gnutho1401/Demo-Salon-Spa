@@ -35,14 +35,18 @@ export default function SkinAnalyzerPage() {
     setData(null);
     setImageUrl("");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+      });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
       console.error("Camera access error:", err);
-      setError("Không thể truy cập camera. Vui lòng cấp quyền hoặc tải lên tệp ảnh.");
+      setError(
+        "Không thể truy cập camera. Vui lòng cấp quyền hoặc tải lên tệp ảnh.",
+      );
       setCameraActive(false);
     }
   };
@@ -62,7 +66,7 @@ export default function SkinAnalyzerPage() {
 
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     setCameraActive(false);
@@ -95,12 +99,15 @@ export default function SkinAnalyzerPage() {
 
     try {
       const res = await axiosClient.post("/ai/skin/analyze", {
-        imageUrl: imageUrl
+        imageUrl: imageUrl,
       });
-      
+
       const analysisResult = res.data?.data || res.data || {};
       if (analysisResult.is_face === false) {
-        setError(analysisResult.error || "Không nhận diện được khuôn mặt. Vui lòng chụp rõ mặt hơn!");
+        setError(
+          analysisResult.error ||
+            "Không nhận diện được khuôn mặt. Vui lòng chụp rõ mặt hơn!",
+        );
       } else {
         setData(analysisResult);
         fetchHistory(); // Refresh history list
@@ -109,8 +116,8 @@ export default function SkinAnalyzerPage() {
       console.error("Skin analysis failed:", err);
       setError(
         err?.response?.data?.message ||
-        err?.message ||
-        "Gặp lỗi khi kết nối máy chủ phân tích hình ảnh."
+          err?.message ||
+          "Gặp lỗi khi kết nối máy chủ phân tích hình ảnh.",
       );
     } finally {
       setLoading(false);
@@ -136,7 +143,7 @@ export default function SkinAnalyzerPage() {
       skin_score: item.SkinScore,
       summary: item.Summary,
       routine_suggestion: item.RoutineSuggestion,
-      recommended_services: [] 
+      recommended_services: [],
     });
     setError("");
   };
@@ -152,19 +159,22 @@ export default function SkinAnalyzerPage() {
   return (
     <CustomerLayout>
       <div className="skin-analyzer-container">
-        
         {/* Header section */}
         <div className="analyzer-header">
           <h1>✨ AI Skin Analyzer</h1>
-          <p>Phân tích tình trạng da thông minh qua ảnh chân dung hoặc ảnh chụp cận cảnh làn da & gợi ý liệu trình spa phù hợp</p>
+          <p>
+            Phân tích tình trạng da thông minh qua ảnh chân dung hoặc ảnh chụp
+            cận cảnh làn da & gợi ý liệu trình spa phù hợp
+          </p>
         </div>
 
         {/* Core grid */}
         <div className="analyzer-dashboard-grid">
-          
           {/* Left panel: Upload & Capture */}
           <div className="upload-panel">
-            <div className={`scan-zone-wrapper ${imageUrl || cameraActive ? "has-image" : ""}`}>
+            <div
+              className={`scan-zone-wrapper ${imageUrl || cameraActive ? "has-image" : ""}`}
+            >
               {cameraActive ? (
                 <video
                   ref={videoRef}
@@ -173,11 +183,17 @@ export default function SkinAnalyzerPage() {
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
               ) : imageUrl ? (
-                <img src={imageUrl} alt="Skin to analyze" className="image-preview" />
+                <img
+                  src={imageUrl}
+                  alt="Skin to analyze"
+                  className="image-preview"
+                />
               ) : (
                 <div className="placeholder-content">
                   <span className="placeholder-icon">📸</span>
-                  <p style={{ color: "#777", fontSize: "0.95rem" }}>Chưa có hình ảnh</p>
+                  <p style={{ color: "#777", fontSize: "0.95rem" }}>
+                    Chưa có hình ảnh
+                  </p>
                 </div>
               )}
 
@@ -188,20 +204,32 @@ export default function SkinAnalyzerPage() {
             {/* Controller buttons */}
             <div className="upload-btn-group">
               {cameraActive ? (
-                <button type="button" className="custom-file-upload" onClick={capturePhoto}>
+                <button
+                  type="button"
+                  className="custom-file-upload"
+                  onClick={capturePhoto}
+                >
                   📸 Chụp hình
                 </button>
               ) : (
-                <button type="button" className="custom-file-upload" onClick={startCamera}>
+                <button
+                  type="button"
+                  className="custom-file-upload"
+                  onClick={startCamera}
+                >
                   📹 Mở Camera
                 </button>
               )}
-              
+
               {cameraActive && (
                 <button
                   type="button"
                   className="custom-file-upload"
-                  style={{ background: "#f3e8ff", color: "#6b21a8", borderColor: "#c084fc" }}
+                  style={{
+                    background: "#f3e8ff",
+                    color: "#6b21a8",
+                    borderColor: "#c084fc",
+                  }}
                   onClick={stopCamera}
                 >
                   Dừng Camera
@@ -220,7 +248,15 @@ export default function SkinAnalyzerPage() {
             </div>
 
             {error && (
-              <div style={{ color: "#ef4444", fontSize: "0.88rem", marginBottom: "15px", textAlign: "center", padding: "0 10px" }}>
+              <div
+                style={{
+                  color: "#ef4444",
+                  fontSize: "0.88rem",
+                  marginBottom: "15px",
+                  textAlign: "center",
+                  padding: "0 10px",
+                }}
+              >
                 ⚠️ {error}
               </div>
             )}
@@ -238,11 +274,32 @@ export default function SkinAnalyzerPage() {
           {/* Right panel: Results */}
           <div className="results-panel">
             {loading ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: "300px" }}>
-                <div className="placeholder-icon" style={{ fontSize: "3rem" }}>🧬</div>
-                <h3 style={{ marginTop: "15px", color: "var(--pink)" }}>Trí tuệ nhân tạo đang phân tích...</h3>
-                <p style={{ color: "#777", fontSize: "0.9rem", textAlign: "center", marginTop: "8px" }}>
-                  AI đang quét bề mặt da, phát hiện các vùng mụn, thâm sạm và đo lường nếp nhăn. Vui lòng chờ trong giây lát.
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  minHeight: "300px",
+                }}
+              >
+                <div className="placeholder-icon" style={{ fontSize: "3rem" }}>
+                  🧬
+                </div>
+                <h3 style={{ marginTop: "15px", color: "var(--pink)" }}>
+                  Trí tuệ nhân tạo đang phân tích...
+                </h3>
+                <p
+                  style={{
+                    color: "#777",
+                    fontSize: "0.9rem",
+                    textAlign: "center",
+                    marginTop: "8px",
+                  }}
+                >
+                  AI đang quét bề mặt da, phát hiện các vùng mụn, thâm sạm và đo
+                  lường nếp nhăn. Vui lòng chờ trong giây lát.
                 </p>
               </div>
             ) : data ? (
@@ -256,7 +313,9 @@ export default function SkinAnalyzerPage() {
                   <div className="score-text">
                     <h3>
                       Làn da:{" "}
-                      <span style={{ color: getScoreRating(data.skin_score).color }}>
+                      <span
+                        style={{ color: getScoreRating(data.skin_score).color }}
+                      >
                         {getScoreRating(data.skin_score).label}
                       </span>
                     </h3>
@@ -288,27 +347,39 @@ export default function SkinAnalyzerPage() {
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Lỗ chân lông</span>
-                    <span className="metric-value">{data.pores || "Bình thường"}</span>
+                    <span className="metric-value">
+                      {data.pores || "Bình thường"}
+                    </span>
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Độ cấp ẩm</span>
-                    <span className="metric-value">{data.hydration || "Đủ ẩm"}</span>
+                    <span className="metric-value">
+                      {data.hydration || "Đủ ẩm"}
+                    </span>
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Độ tiết dầu</span>
-                    <span className="metric-value">{data.sebum || "Bình thường"}</span>
+                    <span className="metric-value">
+                      {data.sebum || "Bình thường"}
+                    </span>
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Hàng rào bảo vệ</span>
-                    <span className="metric-value">{data.skin_barrier || "Khỏe mạnh"}</span>
+                    <span className="metric-value">
+                      {data.skin_barrier || "Khỏe mạnh"}
+                    </span>
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Độ đàn hồi / Lão hóa</span>
-                    <span className="metric-value">{data.elasticity || "Tốt"}</span>
+                    <span className="metric-value">
+                      {data.elasticity || "Tốt"}
+                    </span>
                   </div>
                   <div className="metric-card" style={{ gridColumn: "span 2" }}>
                     <span className="metric-title">Quầng thâm mắt</span>
-                    <span className="metric-value">{data.dark_circles || "Không có"}</span>
+                    <span className="metric-value">
+                      {data.dark_circles || "Không có"}
+                    </span>
                   </div>
                 </div>
 
@@ -319,11 +390,33 @@ export default function SkinAnalyzerPage() {
                 </div>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: "350px", textAlign: "center", color: "#8c7b74" }}>
-                <span style={{ fontSize: "3.5rem", marginBottom: "15px" }}>💆‍♀️</span>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  minHeight: "350px",
+                  textAlign: "center",
+                  color: "#8c7b74",
+                }}
+              >
+                <span style={{ fontSize: "3.5rem", marginBottom: "15px" }}>
+                  💆‍♀️
+                </span>
                 <h3>Chưa có kết quả phân tích</h3>
-                <p style={{ fontSize: "0.92rem", color: "#777", maxWidth: "330px", marginTop: "8px" }}>
-                  Vui lòng tải lên ảnh selfie cận mặt hoặc ảnh chụp cận cảnh một vùng da cụ thể (như vùng má, trán, cằm, da tay...) rồi nhấn "Bắt Đầu Phân Tích".
+                <p
+                  style={{
+                    fontSize: "0.92rem",
+                    color: "#777",
+                    maxWidth: "330px",
+                    marginTop: "8px",
+                  }}
+                >
+                  Vui lòng tải lên ảnh selfie cận mặt hoặc ảnh chụp cận cảnh một
+                  vùng da cụ thể (như vùng má, trán, cằm, da tay...) rồi nhấn
+                  "Bắt Đầu Phân Tích".
                 </p>
               </div>
             )}
@@ -331,29 +424,35 @@ export default function SkinAnalyzerPage() {
         </div>
 
         {/* Recommended Services Section */}
-        {data && data.recommended_services && data.recommended_services.length > 0 && (
-          <div className="skincare-recommendations">
-            <h2>🏥 Liệu trình khuyên dùng tại Salon:</h2>
-            <div className="rec-services-grid">
-              {data.recommended_services.map((service, index) => (
-                <div className="rec-service-card" key={index}>
-                  <h3>{service.service_name}</h3>
-                  <p className="rec-service-reason">💡 {service.reason}</p>
-                  <div className="rec-service-footer">
-                    <span className="rec-service-price">Chuyên sâu</span>
-                    <button
-                      type="button"
-                      className="book-now-btn"
-                      onClick={() => navigate(`/customer/booking?serviceId=${service.service_id}`)}
-                    >
-                      Đặt lịch ngay ➔
-                    </button>
+        {data &&
+          data.recommended_services &&
+          data.recommended_services.length > 0 && (
+            <div className="skincare-recommendations">
+              <h2>🏥 Liệu trình khuyên dùng tại Salon:</h2>
+              <div className="rec-services-grid">
+                {data.recommended_services.map((service, index) => (
+                  <div className="rec-service-card" key={index}>
+                    <h3>{service.service_name}</h3>
+                    <p className="rec-service-reason">💡 {service.reason}</p>
+                    <div className="rec-service-footer">
+                      <span className="rec-service-price">Chuyên sâu</span>
+                      <button
+                        type="button"
+                        className="book-now-btn"
+                        onClick={() =>
+                          navigate(
+                            `/customer/booking?serviceId=${service.service_id}`,
+                          )
+                        }
+                      >
+                        Đặt lịch ngay ➔
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Skin Journey Section (Lịch sử) */}
         {history && history.length > 0 && (
@@ -367,13 +466,24 @@ export default function SkinAnalyzerPage() {
                     {new Date(item.CreatedAt).toLocaleDateString("vi-VN", {
                       year: "numeric",
                       month: "short",
-                      day: "numeric"
+                      day: "numeric",
                     })}
                   </div>
-                  <div className="timeline-card" onClick={() => handleLoadHistoryItem(item)} style={{ cursor: "pointer" }}>
+                  <div
+                    className="timeline-card"
+                    onClick={() => handleLoadHistoryItem(item)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <div className="timeline-info">
                       <h4>Làn da {item.SkinType}</h4>
-                      <p style={{ display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      <p
+                        style={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 1,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
                         {item.Summary}
                       </p>
                     </div>
@@ -384,7 +494,6 @@ export default function SkinAnalyzerPage() {
             </div>
           </div>
         )}
-
       </div>
     </CustomerLayout>
   );

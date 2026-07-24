@@ -56,7 +56,6 @@ export default function RescheduleAppointment() {
   const [slots, setSlots] = useState([]);
   const [alternatives, setAlternatives] = useState([]);
 
-
   const [loading, setLoading] = useState(true);
   const [slotLoading, setSlotLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -80,14 +79,16 @@ export default function RescheduleAppointment() {
   };
 
   // Lịch tái khám thì minDate phải từ ngày tái khám được đề xuất trở về sau
-  const minDate = isPendingFollowUp && appointment?.suggestedDate
-    ? appointment.suggestedDate
-    : getLocalToday();
-
+  const minDate =
+    isPendingFollowUp && appointment?.suggestedDate
+      ? appointment.suggestedDate
+      : getLocalToday();
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
-      return !selectedBranchId || String(emp.BranchId) === String(selectedBranchId);
+      return (
+        !selectedBranchId || String(emp.BranchId) === String(selectedBranchId)
+      );
     });
   }, [employees, selectedBranchId]);
 
@@ -99,7 +100,9 @@ export default function RescheduleAppointment() {
 
   const selectedSlot = useMemo(() => {
     return slots.find(
-      (slot) => formatTime(slot.startTime) === formatTime(form.startTime) && slot.available !== false,
+      (slot) =>
+        formatTime(slot.startTime) === formatTime(form.startTime) &&
+        slot.available !== false,
     );
   }, [slots, form.startTime]);
 
@@ -126,9 +129,11 @@ export default function RescheduleAppointment() {
 
       const [res, branchRes] = await Promise.all([
         axiosClient.get(`/appointments/${id}/reschedule`),
-        axiosClient.get("/employees/branches").catch(() => ({ data: { data: [] } })),
+        axiosClient
+          .get("/employees/branches")
+          .catch(() => ({ data: { data: [] } })),
       ]);
-      
+
       const data = res.data.data || res.data;
       const branchList = branchRes.data.data || branchRes.data || [];
 
@@ -138,13 +143,15 @@ export default function RescheduleAppointment() {
       setBranches(branchList);
 
       // For PENDING follow-up: use suggested date, otherwise use current appointment date
-      const initialDate = data.isPendingFollowUp && data.suggestedDate
-        ? data.suggestedDate
-        : getFormattedDate(data.AppointmentDate);
+      const initialDate =
+        data.isPendingFollowUp && data.suggestedDate
+          ? data.suggestedDate
+          : getFormattedDate(data.AppointmentDate);
 
-      const initialTime = data.isPendingFollowUp && data.suggestedStartTime
-        ? formatTime(data.suggestedStartTime)
-        : formatTime(data.StartTime);
+      const initialTime =
+        data.isPendingFollowUp && data.suggestedStartTime
+          ? formatTime(data.suggestedStartTime)
+          : formatTime(data.StartTime);
 
       setForm({
         appointmentDate: initialDate,
@@ -156,7 +163,9 @@ export default function RescheduleAppointment() {
       // Auto-select branch of the current employee
       const currentEmpId = String(data.EmployeeId || "");
       if (currentEmpId) {
-        const found = availableEmps.find(e => String(e.EmployeeId) === currentEmpId);
+        const found = availableEmps.find(
+          (e) => String(e.EmployeeId) === currentEmpId,
+        );
         if (found && found.BranchId) {
           setSelectedBranchId(found.BranchId);
         }
@@ -208,7 +217,6 @@ export default function RescheduleAppointment() {
           setSlots(data || []);
           setAlternatives([]);
         }
-
       } catch (err) {
         setSlots([]);
         setError(err.response?.data?.message || "Không tải được slot trống");
@@ -228,9 +236,11 @@ export default function RescheduleAppointment() {
 
     if (!form.appointmentDate) return setError("Vui lòng chọn ngày mới");
     if (form.appointmentDate < minDate) {
-      return setError(isPendingFollowUp 
-        ? `Ngày đổi lịch không được trước ngày đề xuất tái khám (${formatDate(minDate)})` 
-        : "Không được đổi lịch về ngày trong quá khứ");
+      return setError(
+        isPendingFollowUp
+          ? `Ngày đổi lịch không được trước ngày đề xuất tái khám (${formatDate(minDate)})`
+          : "Không được đổi lịch về ngày trong quá khứ",
+      );
     }
 
     if (!form.employeeId) return setError("Vui lòng chọn kỹ thuật viên");
@@ -318,21 +328,33 @@ export default function RescheduleAppointment() {
 
               {/* Banner for PENDING follow-up */}
               {isPendingFollowUp && (
-                <div style={{
-                  background: "linear-gradient(135deg, #f0fdf4, #ecfdf5)",
-                  border: "1.5px solid #86efac",
-                  borderRadius: 12,
-                  padding: "14px 18px",
-                  marginBottom: 20,
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "flex-start"
-                }}>
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #f0fdf4, #ecfdf5)",
+                    border: "1.5px solid #86efac",
+                    borderRadius: 12,
+                    padding: "14px 18px",
+                    marginBottom: 20,
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "flex-start",
+                  }}
+                >
                   <span style={{ fontSize: 22 }}>📋</span>
                   <div>
-                    <b style={{ color: "#15803d", fontSize: 14 }}>Đề xuất lịch tái khám từ Kỹ thuật viên</b>
-                    <p style={{ color: "#166534", fontSize: 13, margin: "4px 0 0" }}>
-                      Kỹ thuật viên <b>{appointment.EmployeeName}</b> đã đề xuất lịch tái khám này cho bạn. Bạn có thể tự do thay đổi ngày hẹn, kỹ thuật viên hoặc khung giờ mong muốn phía dưới.
+                    <b style={{ color: "#15803d", fontSize: 14 }}>
+                      Đề xuất lịch tái khám từ Kỹ thuật viên
+                    </b>
+                    <p
+                      style={{
+                        color: "#166534",
+                        fontSize: 13,
+                        margin: "4px 0 0",
+                      }}
+                    >
+                      Kỹ thuật viên <b>{appointment.EmployeeName}</b> đã đề xuất
+                      lịch tái khám này cho bạn. Bạn có thể tự do thay đổi ngày
+                      hẹn, kỹ thuật viên hoặc khung giờ mong muốn phía dưới.
                     </p>
                   </div>
                 </div>
@@ -354,9 +376,11 @@ export default function RescheduleAppointment() {
                   onChange={(e) => {
                     const selectedVal = e.target.value;
                     if (selectedVal && selectedVal < minDate) {
-                      setError(isPendingFollowUp
-                        ? `Ngày hẹn tái khám không thể trước ngày đề xuất tái khám (${formatDate(minDate)})!`
-                        : "Ngày hẹn không thể là ngày trong quá khứ!");
+                      setError(
+                        isPendingFollowUp
+                          ? `Ngày hẹn tái khám không thể trước ngày đề xuất tái khám (${formatDate(minDate)})!`
+                          : "Ngày hẹn không thể là ngày trong quá khứ!",
+                      );
                       return;
                     }
                     setError("");
@@ -366,7 +390,6 @@ export default function RescheduleAppointment() {
                       startTime: "",
                     }));
                   }}
-
                 />
               </section>
 
@@ -378,25 +401,37 @@ export default function RescheduleAppointment() {
                   </div>
                 </div>
 
-                <div className="reschedule-branch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '14px', marginTop: '12px' }}>
+                <div
+                  className="reschedule-branch-grid"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(230px, 1fr))",
+                    gap: "14px",
+                    marginTop: "12px",
+                  }}
+                >
                   {branches.map((b) => {
-                    const isSelected = String(selectedBranchId) === String(b.BranchId);
+                    const isSelected =
+                      String(selectedBranchId) === String(b.BranchId);
                     return (
                       <button
                         type="button"
                         key={b.BranchId}
                         style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-start',
-                          padding: '16px',
-                          border: isSelected ? '2px solid #ef4f83' : '1px solid #e5e7eb',
-                          borderRadius: '12px',
-                          backgroundColor: isSelected ? '#fff0f5' : '#ffffff',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          transition: 'all 0.2s',
-                          width: '100%'
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          padding: "16px",
+                          border: isSelected
+                            ? "2px solid #ef4f83"
+                            : "1px solid #e5e7eb",
+                          borderRadius: "12px",
+                          backgroundColor: isSelected ? "#fff0f5" : "#ffffff",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.2s",
+                          width: "100%",
                         }}
                         onClick={() => {
                           setSelectedBranchId(b.BranchId);
@@ -407,10 +442,23 @@ export default function RescheduleAppointment() {
                           }));
                         }}
                       >
-                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: isSelected ? '#ef4f83' : '#374151', marginBottom: '4px' }}>
+                        <span
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                            color: isSelected ? "#ef4f83" : "#374151",
+                            marginBottom: "4px",
+                          }}
+                        >
                           🏢 {b.BranchName}
                         </span>
-                        <span style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.3' }}>
+                        <span
+                          style={{
+                            fontSize: "12px",
+                            color: "#6b7280",
+                            lineHeight: "1.3",
+                          }}
+                        >
                           📍 {b.Address}
                         </span>
                       </button>
@@ -469,7 +517,14 @@ export default function RescheduleAppointment() {
                       </button>
                     ))
                   ) : (
-                    <p style={{ gridColumn: '1 / -1', color: '#94a3b8', textAlign: 'center', padding: '16px' }}>
+                    <p
+                      style={{
+                        gridColumn: "1 / -1",
+                        color: "#94a3b8",
+                        textAlign: "center",
+                        padding: "16px",
+                      }}
+                    >
                       Không có kỹ thuật viên phù hợp tại chi nhánh đã chọn.
                     </p>
                   )}
@@ -496,12 +551,20 @@ export default function RescheduleAppointment() {
                   </div>
                 ) : slots.length > 0 ? (
                   <div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginBottom: 12,
+                      }}
+                    >
                       {slots.map((slot) => {
                         const isSlotAvailable = slot.available !== false;
                         const formattedStart = formatTime(slot.startTime);
                         const formattedEnd = formatTime(slot.endTime);
-                        const isActive = formatTime(form.startTime) === formattedStart;
+                        const isActive =
+                          formatTime(form.startTime) === formattedStart;
 
                         return (
                           <button
@@ -518,12 +581,16 @@ export default function RescheduleAppointment() {
                             style={{
                               padding: "8px 12px",
                               borderRadius: 8,
-                              border: isActive ? "2.5px solid #2d6a4f" : "1.5px solid #e5e7eb",
+                              border: isActive
+                                ? "2.5px solid #2d6a4f"
+                                : "1.5px solid #e5e7eb",
                               background: isActive ? "#2d6a4f" : "#fff",
                               color: isActive ? "#fff" : "#374151",
                               fontWeight: isActive ? 700 : 500,
                               fontSize: "0.82rem",
-                              cursor: isSlotAvailable ? "pointer" : "not-allowed",
+                              cursor: isSlotAvailable
+                                ? "pointer"
+                                : "not-allowed",
                               opacity: isSlotAvailable ? 1 : 0.45,
                               transition: "all 0.15s",
                               display: "flex",
@@ -533,9 +600,26 @@ export default function RescheduleAppointment() {
                               minWidth: 90,
                             }}
                           >
-                            <span style={{ fontWeight: 700 }}>{formattedStart}</span>
-                            <span style={{ fontSize: "0.68rem", opacity: 0.85 }}>- {formattedEnd}</span>
-                            {!isSlotAvailable && <span style={{ fontSize: "0.68rem", color: "#ef4444", fontWeight: 700, marginTop: 2 }}>Bận</span>}
+                            <span style={{ fontWeight: 700 }}>
+                              {formattedStart}
+                            </span>
+                            <span
+                              style={{ fontSize: "0.68rem", opacity: 0.85 }}
+                            >
+                              - {formattedEnd}
+                            </span>
+                            {!isSlotAvailable && (
+                              <span
+                                style={{
+                                  fontSize: "0.68rem",
+                                  color: "#ef4444",
+                                  fontWeight: 700,
+                                  marginTop: 2,
+                                }}
+                              >
+                                Bận
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -543,11 +627,29 @@ export default function RescheduleAppointment() {
 
                     {/* Alternatives suggestions if any */}
                     {alternatives.length > 0 && (
-                      <div style={{ marginTop: 12, padding: "12px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10 }}>
-                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#0369a1", display: "block", marginBottom: 6 }}>
+                      <div
+                        style={{
+                          marginTop: 12,
+                          padding: "12px 14px",
+                          background: "#f0f9ff",
+                          border: "1px solid #bae6fd",
+                          borderRadius: 10,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "0.82rem",
+                            fontWeight: 700,
+                            color: "#0369a1",
+                            display: "block",
+                            marginBottom: 6,
+                          }}
+                        >
                           💡 Kỹ thuật viên khác đang rảnh vào giờ này:
                         </span>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <div
+                          style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+                        >
                           {alternatives.map((alt) => (
                             <button
                               key={`${alt.employeeId}-${alt.startTime}`}
@@ -571,7 +673,8 @@ export default function RescheduleAppointment() {
                                 transition: "all 0.15s",
                               }}
                             >
-                              👤 {alt.employeeName} ({formatTime(alt.startTime)})
+                              👤 {alt.employeeName} ({formatTime(alt.startTime)}
+                              )
                             </button>
                           ))}
                         </div>
@@ -579,11 +682,16 @@ export default function RescheduleAppointment() {
                     )}
                   </div>
                 ) : (
-                  <p style={{ fontSize: "0.85rem", color: "#6b7280", margin: "10px 0" }}>
+                  <p
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#6b7280",
+                      margin: "10px 0",
+                    }}
+                  >
                     💡 Vui lòng chọn kỹ thuật viên và ngày để xem khung giờ.
                   </p>
                 )}
-
               </section>
 
               <section className="reschedule-panel-pro">
@@ -692,7 +800,15 @@ export default function RescheduleAppointment() {
                     <div>
                       <span>Chi nhánh mới</span>
                       <b>{selectedEmployee.BranchName || "Chi nhánh chính"}</b>
-                      <span style={{ fontSize: "0.78rem", color: "#6b7280", fontWeight: 400, display: "block", marginTop: "2px" }}>
+                      <span
+                        style={{
+                          fontSize: "0.78rem",
+                          color: "#6b7280",
+                          fontWeight: 400,
+                          display: "block",
+                          marginTop: "2px",
+                        }}
+                      >
                         📍 {selectedEmployee.BranchAddress}
                       </span>
                     </div>
@@ -715,7 +831,15 @@ export default function RescheduleAppointment() {
               </section>
 
               {selectedEmployee?.BranchAddress && (
-                <section className="reschedule-summary-card" style={{ padding: "0", borderRadius: "14px", overflow: "hidden", border: "1px solid #efd8e1" }}>
+                <section
+                  className="reschedule-summary-card"
+                  style={{
+                    padding: "0",
+                    borderRadius: "14px",
+                    overflow: "hidden",
+                    border: "1px solid #efd8e1",
+                  }}
+                >
                   <iframe
                     title="Google Maps Reschedule Branch Locator"
                     src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedEmployee.BranchAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
