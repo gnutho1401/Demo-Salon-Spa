@@ -11,8 +11,7 @@ async function getCustomerDiscountPercent(customerId) {
 
   // Expire temporary VIP status if it has exceeded its lifetime (skip in unit test mocks)
   if (process.env.NODE_ENV !== "test") {
-    await pool.request().input("CustomerId", sql.Int, customerId)
-      .query(`
+    await pool.request().input("CustomerId", sql.Int, customerId).query(`
         UPDATE c
         SET 
           c.MembershipLevelId = lv.MembershipLevelId,

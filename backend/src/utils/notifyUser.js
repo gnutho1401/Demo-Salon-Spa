@@ -20,7 +20,9 @@ async function notifyUser(userId, { title, content, type = "SYSTEM" }) {
 
 async function getUserIdByCustomerId(customerId) {
   const pool = await connectDB();
-  const result = await pool.request().input("CustomerId", sql.Int, customerId)
+  const result = await pool
+    .request()
+    .input("CustomerId", sql.Int, customerId)
     .query(`SELECT UserId FROM Customers WHERE CustomerId = @CustomerId`);
   return result.recordset[0]?.UserId || null;
 }
