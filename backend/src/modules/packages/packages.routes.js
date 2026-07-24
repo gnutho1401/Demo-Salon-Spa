@@ -40,11 +40,17 @@ router.post(
 
 const upload = require("../../middlewares/upload.middleware");
 
-router.get("/my/combo-history", authMiddleware, controller.getComboHistoryAndReviews);
-router.post("/my/combo-review", authMiddleware, upload.array("images", 6), controller.submitComboReview);
-
-
-
+router.get(
+  "/my/combo-history",
+  authMiddleware,
+  controller.getComboHistoryAndReviews,
+);
+router.post(
+  "/my/combo-review",
+  authMiddleware,
+  upload.array("images", 6),
+  controller.submitComboReview,
+);
 
 // Enterprise: Gia hạn / Đóng băng / Hủy đóng băng (Đã bãi bỏ)
 /*

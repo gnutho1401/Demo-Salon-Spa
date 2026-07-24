@@ -1,8 +1,8 @@
-const { sql, connectDB } = require('../../config/db');
+const { sql, connectDB } = require("../../config/db");
 
 const REMINDER_TYPES = {
-  H24: 'APPOINTMENT_REMINDER_24H',
-  H2: 'APPOINTMENT_REMINDER_2H',
+  H24: "APPOINTMENT_REMINDER_24H",
+  H2: "APPOINTMENT_REMINDER_2H",
 };
 
 async function getAll() {
@@ -18,7 +18,7 @@ async function getAll() {
 
 async function getMine(userId) {
   const pool = await connectDB();
-  const result = await pool.request().input('UserId', sql.Int, userId).query(`
+  const result = await pool.request().input("UserId", sql.Int, userId).query(`
     SELECT NotificationId, Title, Content, Type, IsRead, CreatedAt
     FROM Notifications
     WHERE UserId = @UserId
@@ -29,7 +29,10 @@ async function getMine(userId) {
 
 async function markRead(userId, id) {
   const pool = await connectDB();
-  await pool.request().input('UserId', sql.Int, userId).input('NotificationId', sql.Int, id).query(`
+  await pool
+    .request()
+    .input("UserId", sql.Int, userId)
+    .input("NotificationId", sql.Int, id).query(`
     UPDATE Notifications SET IsRead = 1 WHERE NotificationId = @NotificationId AND UserId = @UserId
   `);
   return getById(id);
@@ -37,24 +40,32 @@ async function markRead(userId, id) {
 
 async function markAllRead(userId) {
   const pool = await connectDB();
-  await pool.request().input('UserId', sql.Int, userId).query(`UPDATE Notifications SET IsRead = 1 WHERE UserId = @UserId`);
+  await pool
+    .request()
+    .input("UserId", sql.Int, userId)
+    .query(`UPDATE Notifications SET IsRead = 1 WHERE UserId = @UserId`);
   return { success: true };
 }
 
 async function getById(id) {
   const pool = await connectDB();
-  const result = await pool.request().input('NotificationId', sql.Int, id).query(`SELECT * FROM Notifications WHERE NotificationId = @NotificationId`);
+  const result = await pool
+    .request()
+    .input("NotificationId", sql.Int, id)
+    .query(
+      `SELECT * FROM Notifications WHERE NotificationId = @NotificationId`,
+    );
   return result.recordset[0];
 }
 
 async function create(data) {
   const pool = await connectDB();
-  const result = await pool.request()
-    .input('UserId', sql.Int, data.userId || data.UserId)
-    .input('Title', sql.NVarChar, data.title || data.Title)
-    .input('Content', sql.NVarChar, data.content || data.Content || null)
-    .input('Type', sql.NVarChar, data.type || data.Type || 'SYSTEM')
-    .query(`
+  const result = await pool
+    .request()
+    .input("UserId", sql.Int, data.userId || data.UserId)
+    .input("Title", sql.NVarChar, data.title || data.Title)
+    .input("Content", sql.NVarChar, data.content || data.Content || null)
+    .input("Type", sql.NVarChar, data.type || data.Type || "SYSTEM").query(`
       INSERT INTO Notifications (UserId, Title, Content, Type)
       OUTPUT INSERTED.*
       VALUES (@UserId, @Title, @Content, @Type)
@@ -63,21 +74,26 @@ async function create(data) {
 }
 
 function getReminderWindowBounds(windowType) {
-  return windowType === '2H'
+  return windowType === "2H"
     ? { minMinutes: 110, maxMinutes: 130, type: REMINDER_TYPES.H2 }
     : { minMinutes: 23 * 60, maxMinutes: 25 * 60, type: REMINDER_TYPES.H24 };
 }
 
 function toAppointmentDateTime(row) {
-  const dateText = row.AppointmentDate instanceof Date
-    ? row.AppointmentDate.toISOString().slice(0, 10)
-    : String(row.AppointmentDate).slice(0, 10);
-  const timeText = String(row.StartTime || '').slice(0, 8) || '00:00:00';
+  const dateText =
+    row.AppointmentDate instanceof Date
+      ? row.AppointmentDate.toISOString().slice(0, 10)
+      : String(row.AppointmentDate).slice(0, 10);
+  const timeText = String(row.StartTime || "").slice(0, 8) || "00:00:00";
   return new Date(`${dateText}T${timeText}`);
 }
 
 async function createAppointmentReminderForWindow(windowType) {
-  const { minMinutes, maxMinutes, type: reminderType } = getReminderWindowBounds(windowType);
+  const {
+    minMinutes,
+    maxMinutes,
+    type: reminderType,
+  } = getReminderWindowBounds(windowType);
   const pool = await connectDB();
 
   const result = await pool.request().query(`
@@ -101,18 +117,20 @@ async function createAppointmentReminderForWindow(windowType) {
 
   const now = Date.now();
   const rows = (result.recordset || []).filter((row) => {
-    const diffMinutes = Math.round((toAppointmentDateTime(row).getTime() - now) / 60000);
+    const diffMinutes = Math.round(
+      (toAppointmentDateTime(row).getTime() - now) / 60000,
+    );
     return diffMinutes >= minMinutes && diffMinutes <= maxMinutes;
   });
 
   const created = [];
 
   for (const row of rows) {
-    const exists = await pool.request()
-      .input('UserId', sql.Int, row.CustomerId)
-      .input('Type', sql.NVarChar, reminderType)
-      .input('AppointmentId', sql.Int, row.AppointmentId)
-      .query(`
+    const exists = await pool
+      .request()
+      .input("UserId", sql.Int, row.CustomerId)
+      .input("Type", sql.NVarChar, reminderType)
+      .input("AppointmentId", sql.Int, row.AppointmentId).query(`
         SELECT TOP 1 NotificationId
         FROM Notifications
         WHERE UserId = @UserId
@@ -122,10 +140,11 @@ async function createAppointmentReminderForWindow(windowType) {
 
     if (exists.recordset[0]) continue;
 
-    const title = reminderType === REMINDER_TYPES.H2
-      ? 'Nhắc lịch hẹn sắp diễn ra trong 2 giờ'
-      : 'Nhắc lịch hẹn sắp diễn ra trong 24 giờ';
-    const content = `Lịch hẹn #${row.AppointmentId} với ${row.EmployeeName || 'kỹ thuật viên'} và dịch vụ ${row.ServiceNames || 'dịch vụ'} sẽ diễn ra vào ${String(row.AppointmentDate).slice(0, 10)} ${String(row.StartTime || '').slice(0, 5)}.`;
+    const title =
+      reminderType === REMINDER_TYPES.H2
+        ? "Nhắc lịch hẹn sắp diễn ra trong 2 giờ"
+        : "Nhắc lịch hẹn sắp diễn ra trong 24 giờ";
+    const content = `Lịch hẹn #${row.AppointmentId} với ${row.EmployeeName || "kỹ thuật viên"} và dịch vụ ${row.ServiceNames || "dịch vụ"} sẽ diễn ra vào ${String(row.AppointmentDate).slice(0, 10)} ${String(row.StartTime || "").slice(0, 5)}.`;
 
     const inserted = await create({
       userId: row.CustomerId,
@@ -141,8 +160,8 @@ async function createAppointmentReminderForWindow(windowType) {
 
 async function runAppointmentReminderJobs() {
   const [reminders24h, reminders2h] = await Promise.all([
-    createAppointmentReminderForWindow('24H'),
-    createAppointmentReminderForWindow('2H'),
+    createAppointmentReminderForWindow("24H"),
+    createAppointmentReminderForWindow("2H"),
   ]);
 
   return {
@@ -161,7 +180,7 @@ function startAppointmentReminderScheduler(intervalMs = 15 * 60 * 1000) {
           `(24h: ${result.created24h}, 2h: ${result.created2h})`,
       );
     } catch (err) {
-      console.error('Appointment reminder job failed:', err.message);
+      console.error("Appointment reminder job failed:", err.message);
     }
   };
 
@@ -172,16 +191,22 @@ function startAppointmentReminderScheduler(intervalMs = 15 * 60 * 1000) {
 
 async function update(id, data) {
   const pool = await connectDB();
-  await pool.request()
-    .input('NotificationId', sql.Int, id)
-    .input('IsRead', sql.Bit, data.isRead ?? data.IsRead ?? null)
-    .query(`UPDATE Notifications SET IsRead = COALESCE(@IsRead, IsRead) WHERE NotificationId = @NotificationId`);
+  await pool
+    .request()
+    .input("NotificationId", sql.Int, id)
+    .input("IsRead", sql.Bit, data.isRead ?? data.IsRead ?? null)
+    .query(
+      `UPDATE Notifications SET IsRead = COALESCE(@IsRead, IsRead) WHERE NotificationId = @NotificationId`,
+    );
   return getById(id);
 }
 
 async function remove(id) {
   const pool = await connectDB();
-  await pool.request().input('NotificationId', sql.Int, id).query('DELETE FROM Notifications WHERE NotificationId = @NotificationId');
+  await pool
+    .request()
+    .input("NotificationId", sql.Int, id)
+    .query("DELETE FROM Notifications WHERE NotificationId = @NotificationId");
   return { NotificationId: Number(id) };
 }
 

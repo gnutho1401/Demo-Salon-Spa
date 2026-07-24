@@ -20,7 +20,10 @@ async function getMine(req, res) {
     let userId = req.user.userId;
     let customerId = null;
     const userRole = String(req.user?.role || "").toUpperCase();
-    if (["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) && req.query.customerId) {
+    if (
+      ["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) &&
+      req.query.customerId
+    ) {
       customerId = Number(req.query.customerId);
     }
     return success(res, await service.getMine(userId, customerId));
@@ -265,7 +268,10 @@ async function getMyPackageDetail(req, res) {
     let userId = req.user.userId;
     let customerId = null;
     const userRole = String(req.user?.role || "").toUpperCase();
-    if (["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) && req.query.customerId) {
+    if (
+      ["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) &&
+      req.query.customerId
+    ) {
       customerId = Number(req.query.customerId);
     }
     return success(
@@ -384,7 +390,8 @@ async function getComboHistoryAndReviews(req, res) {
   try {
     const { connectDB, sql } = require("../../config/db");
     const pool = await connectDB();
-    const custRes = await pool.request()
+    const custRes = await pool
+      .request()
       .input("UserId", sql.Int, req.user.userId)
       .query(`SELECT CustomerId FROM Customers WHERE UserId = @UserId`);
     const customerId = custRes.recordset[0]?.CustomerId;
@@ -402,7 +409,7 @@ async function bookCustomerPackage(req, res) {
     const data = await service.bookCustomerPackage(
       req.user.userId,
       req.params.customerPackageId,
-      req.body
+      req.body,
     );
     return success(res, data, "Đặt lịch hẹn sử dụng Combo thành công", 201);
   } catch (err) {
@@ -415,7 +422,7 @@ async function rescheduleCustomerPackageAppointment(req, res) {
     const data = await service.rescheduleCustomerPackageAppointment(
       req.user.userId,
       req.params.customerPackageId,
-      req.body
+      req.body,
     );
     return success(res, data, "Đổi lịch hẹn Combo thành công", 200);
   } catch (err) {
@@ -427,13 +434,16 @@ async function submitComboReview(req, res) {
   try {
     const { connectDB, sql } = require("../../config/db");
     const pool = await connectDB();
-    const custRes = await pool.request()
+    const custRes = await pool
+      .request()
       .input("UserId", sql.Int, req.user.userId)
       .query(`SELECT CustomerId FROM Customers WHERE UserId = @UserId`);
     const customerId = custRes.recordset[0]?.CustomerId;
     if (!customerId) throw new Error("Không tìm thấy thông tin khách hàng");
 
-    const imageUrls = (req.files || []).map((file) => file.path || file.filename);
+    const imageUrls = (req.files || []).map(
+      (file) => file.path || file.filename,
+    );
     let stepReviews = req.body.stepReviews;
     if (typeof stepReviews === "string") {
       try {
@@ -447,7 +457,7 @@ async function submitComboReview(req, res) {
       overallRating: req.body.overallRating,
       overallComment: req.body.overallComment,
       stepReviews,
-      imageUrls
+      imageUrls,
     });
     return success(res, data, "Gửi đánh giá Combo thành công", 201);
   } catch (err) {
@@ -472,7 +482,6 @@ async function cancelCustomerPackageAppointment(req, res) {
 }
 
 module.exports = {
-
   getAll,
   getCategories,
   getMine,
@@ -503,10 +512,5 @@ module.exports = {
   rescheduleCustomerPackageAppointment,
   cancelCustomerPackageAppointment,
   getComboHistoryAndReviews,
-  submitComboReview
+  submitComboReview,
 };
-
-
-
-
-
