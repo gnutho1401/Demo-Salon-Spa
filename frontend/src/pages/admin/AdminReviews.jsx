@@ -43,7 +43,14 @@ function renderAvatar(item, size = 42) {
   const url = item?.AvatarUrl ? resolveFileUrl(item.AvatarUrl) : "";
   if (url) {
     return (
-      <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <div
+        style={{
+          position: "relative",
+          width: size,
+          height: size,
+          flexShrink: 0,
+        }}
+      >
         <img
           src={url}
           alt={item?.FullName || "Customer"}
@@ -53,7 +60,7 @@ function renderAvatar(item, size = 42) {
             borderRadius: "50%",
             objectFit: "cover",
             border: "2px solid #d6b57e",
-            boxShadow: "0 2px 8px rgba(120,80,40,0.15)"
+            boxShadow: "0 2px 8px rgba(120,80,40,0.15)",
           }}
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -75,7 +82,10 @@ function renderAvatar(item, size = 42) {
             fontSize: size * 0.42,
           }}
         >
-          {String(item?.FullName || "?").trim().charAt(0).toUpperCase()}
+          {String(item?.FullName || "?")
+            .trim()
+            .charAt(0)
+            .toUpperCase()}
         </div>
       </div>
     );
@@ -91,7 +101,10 @@ function renderAvatar(item, size = 42) {
   ];
   const charCode = item?.FullName ? item.FullName.charCodeAt(0) : 65;
   const background = gradients[charCode % gradients.length];
-  const letter = String(item?.FullName || "?").trim().charAt(0).toUpperCase();
+  const letter = String(item?.FullName || "?")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <div
@@ -109,7 +122,7 @@ function renderAvatar(item, size = 42) {
         boxShadow: "0 3px 10px rgba(120,80,40,0.12)",
         border: "2px solid #ffffff",
         textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-        flexShrink: 0
+        flexShrink: 0,
       }}
     >
       {letter}
@@ -144,11 +157,12 @@ export default function AdminReviews() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -157,11 +171,12 @@ export default function AdminReviews() {
     setTimeout(() => {
       const element = document.getElementById(`review-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -240,7 +255,11 @@ export default function AdminReviews() {
   };
 
   const handleClearFilters = () => {
-    const wasEmpty = filters.rating === "" && filters.status === "" && filters.fromDate === "" && filters.toDate === "";
+    const wasEmpty =
+      filters.rating === "" &&
+      filters.status === "" &&
+      filters.fromDate === "" &&
+      filters.toDate === "";
     setFilters({
       keyword: "",
       rating: "",
@@ -292,7 +311,9 @@ export default function AdminReviews() {
         Status: nextStatus,
       });
 
-      setSuccessMsg(`Đã đổi trạng thái review #${item.ReviewId} thành ${nextStatus}!`);
+      setSuccessMsg(
+        `Đã đổi trạng thái review #${item.ReviewId} thành ${nextStatus}!`,
+      );
       await load();
       scrollToItem(item.ReviewId);
       setTimeout(() => setSuccessMsg(""), 4000);
@@ -1078,7 +1099,8 @@ export default function AdminReviews() {
           <div className="admin-eyebrow">Reviews Management</div>
           <h1>Quản lý đánh giá khách hàng</h1>
           <p>
-            Kiểm tra và kiểm duyệt nội dung nhận xét dịch vụ, chấm điểm chuyên viên Spa, đính kèm phản hồi chính thức từ quản trị viên.
+            Kiểm tra và kiểm duyệt nội dung nhận xét dịch vụ, chấm điểm chuyên
+            viên Spa, đính kèm phản hồi chính thức từ quản trị viên.
           </p>
         </div>
         <button className="admin-refresh-btn" onClick={load}>
@@ -1166,25 +1188,51 @@ export default function AdminReviews() {
       </div>
 
       {/* Alerts */}
-      {error && <div className="admin-error-card" style={{ marginBottom: 20 }}>{error}</div>}
+      {error && (
+        <div className="admin-error-card" style={{ marginBottom: 20 }}>
+          {error}
+        </div>
+      )}
       {successMsg && (
-        <div className="admin-loading-card" style={{ marginBottom: 20, color: "#107c41", borderColor: "rgba(16, 124, 65, 0.2)", background: "#e8f7ec" }}>
+        <div
+          className="admin-loading-card"
+          style={{
+            marginBottom: 20,
+            color: "#107c41",
+            borderColor: "rgba(16, 124, 65, 0.2)",
+            background: "#e8f7ec",
+          }}
+        >
           {successMsg}
         </div>
       )}
 
       {loading ? (
-        <div className="admin-loading-card">Đang tải danh sách review & rating...</div>
+        <div className="admin-loading-card">
+          Đang tải danh sách review & rating...
+        </div>
       ) : (
         <div ref={gridRef} className="admin-reviews-grid">
           {items.map((item) => (
-            <div key={item.ReviewId} id={`review-card-${item.ReviewId}`} className="luxury-review-card">
+            <div
+              key={item.ReviewId}
+              id={`review-card-${item.ReviewId}`}
+              className="luxury-review-card"
+            >
               <div className="review-card-head">
                 <div className="customer-meta">
-                  {renderAvatar({ AvatarUrl: item.CustomerAvatar, FullName: item.CustomerName }, 48)}
+                  {renderAvatar(
+                    {
+                      AvatarUrl: item.CustomerAvatar,
+                      FullName: item.CustomerName,
+                    },
+                    48,
+                  )}
                   <div className="customer-meta-text">
                     <h4>{item.CustomerName}</h4>
-                    <span>{item.CustomerEmail} • {dateText(item.CreatedAt)}</span>
+                    <span>
+                      {item.CustomerEmail} • {dateText(item.CreatedAt)}
+                    </span>
                   </div>
                 </div>
 
@@ -1205,7 +1253,9 @@ export default function AdminReviews() {
 
               <div className="review-body">
                 <p className="review-body-text">
-                  "{item.Comment || "Khách hàng không để lại nhận xét chi tiết."}"
+                  "
+                  {item.Comment || "Khách hàng không để lại nhận xét chi tiết."}
+                  "
                 </p>
 
                 {item.ReviewImages && item.ReviewImages.length > 0 ? (
@@ -1214,9 +1264,14 @@ export default function AdminReviews() {
                       <div
                         key={img.ReviewImageId}
                         className="review-photo-wrapper"
-                        onClick={() => setLightboxPhoto(resolveFileUrl(img.ImageUrl))}
+                        onClick={() =>
+                          setLightboxPhoto(resolveFileUrl(img.ImageUrl))
+                        }
                       >
-                        <img src={resolveFileUrl(img.ImageUrl)} alt="Customer Upload" />
+                        <img
+                          src={resolveFileUrl(img.ImageUrl)}
+                          alt="Customer Upload"
+                        />
                       </div>
                     ))}
                   </div>
@@ -1225,12 +1280,16 @@ export default function AdminReviews() {
                 <div className="review-connections">
                   <div className="connection-chip">
                     <img src={serviceImage(item.ServiceImage)} alt="service" />
-                    <span>Dịch vụ: <strong>{item.ServiceName}</strong></span>
+                    <span>
+                      Dịch vụ: <strong>{item.ServiceName}</strong>
+                    </span>
                   </div>
                   {item.EmployeeName ? (
                     <div className="connection-chip">
                       <img src={avatar(item.EmployeeAvatar)} alt="tech" />
-                      <span>Chuyên viên: <strong>{item.EmployeeName}</strong></span>
+                      <span>
+                        Chuyên viên: <strong>{item.EmployeeName}</strong>
+                      </span>
                     </div>
                   ) : null}
                 </div>
@@ -1247,17 +1306,29 @@ export default function AdminReviews() {
               </div>
 
               <div className="review-card-footer">
-                <button className="card-btn primary" onClick={() => openResponse(item)}>
+                <button
+                  className="card-btn primary"
+                  onClick={() => openResponse(item)}
+                >
                   Phản hồi 💬
                 </button>
-                <button className="card-btn" onClick={() => changeStatus(item, "APPROVED")}>
+                <button
+                  className="card-btn"
+                  onClick={() => changeStatus(item, "APPROVED")}
+                >
                   Duyệt hiển thị ✓
                 </button>
-                <button className="card-btn danger" onClick={() => changeStatus(item, "REJECTED")}>
+                <button
+                  className="card-btn danger"
+                  onClick={() => changeStatus(item, "REJECTED")}
+                >
                   Từ chối duyệt ✖
                 </button>
                 {item.AdminResponse ? (
-                  <button className="card-btn danger" onClick={() => removeResponse(item)}>
+                  <button
+                    className="card-btn danger"
+                    onClick={() => removeResponse(item)}
+                  >
                     Xóa Reply
                   </button>
                 ) : null}
@@ -1275,11 +1346,27 @@ export default function AdminReviews() {
 
       {/* RESPONSE MODAL */}
       {responseModal && (
-        <div className="admin-modal-backdrop" onClick={() => setResponseModal(null)}>
-          <div className="admin-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header" style={{ background: "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)", color: "#fff" }}>
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setResponseModal(null)}
+        >
+          <div
+            className="admin-modal-wrapper"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="admin-modal-header"
+              style={{
+                background: "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)",
+                color: "#fff",
+              }}
+            >
               <h3>Phản hồi đánh giá #{responseModal.ReviewId}</h3>
-              <button className="admin-modal-close" onClick={() => setResponseModal(null)} style={{ color: "#fff" }}>
+              <button
+                className="admin-modal-close"
+                onClick={() => setResponseModal(null)}
+                style={{ color: "#fff" }}
+              >
                 &times;
               </button>
             </div>
@@ -1290,7 +1377,12 @@ export default function AdminReviews() {
                   <textarea
                     rows={6}
                     value={responseForm.AdminResponse}
-                    onChange={(e) => setResponseForm({ ...responseForm, AdminResponse: e.target.value })}
+                    onChange={(e) =>
+                      setResponseForm({
+                        ...responseForm,
+                        AdminResponse: e.target.value,
+                      })
+                    }
                     placeholder="Cảm ơn quý khách đã tin tưởng và sử dụng dịch vụ của spa..."
                     required
                   />
@@ -1300,10 +1392,17 @@ export default function AdminReviews() {
                   Trạng thái kiểm duyệt review
                   <select
                     value={responseForm.Status}
-                    onChange={(e) => setResponseForm({ ...responseForm, Status: e.target.value })}
+                    onChange={(e) =>
+                      setResponseForm({
+                        ...responseForm,
+                        Status: e.target.value,
+                      })
+                    }
                   >
                     <option value="PENDING">PENDING</option>
-                    <option value="APPROVED">APPROVED (Hiển thị công khai)</option>
+                    <option value="APPROVED">
+                      APPROVED (Hiển thị công khai)
+                    </option>
                     <option value="REJECTED">REJECTED (Bị từ chối)</option>
                     <option value="HIDDEN">HIDDEN (Ẩn tạm thời)</option>
                   </select>
@@ -1315,47 +1414,88 @@ export default function AdminReviews() {
                 <span className="admin-preview-title">Xem trước hiển thị</span>
                 <div
                   className="luxury-review-card"
-                  style={{ width: "100%", maxWidth: 320, transform: "none", boxShadow: "none" }}
+                  style={{
+                    width: "100%",
+                    maxWidth: 320,
+                    transform: "none",
+                    boxShadow: "none",
+                  }}
                 >
-                  <div className="review-card-head" style={{ paddingBottom: 10, marginBottom: 10 }}>
+                  <div
+                    className="review-card-head"
+                    style={{ paddingBottom: 10, marginBottom: 10 }}
+                  >
                     <div className="customer-meta">
-                      {renderAvatar({ AvatarUrl: responseModal.CustomerAvatar, FullName: responseModal.CustomerName }, 40)}
+                      {renderAvatar(
+                        {
+                          AvatarUrl: responseModal.CustomerAvatar,
+                          FullName: responseModal.CustomerName,
+                        },
+                        40,
+                      )}
                       <div className="customer-meta-text">
-                        <h4 style={{ fontSize: "14.5px" }}>{responseModal.CustomerName}</h4>
-                        <span style={{ fontSize: "11.5px" }}>{dateText(responseModal.CreatedAt)}</span>
+                        <h4 style={{ fontSize: "14.5px" }}>
+                          {responseModal.CustomerName}
+                        </h4>
+                        <span style={{ fontSize: "11.5px" }}>
+                          {dateText(responseModal.CreatedAt)}
+                        </span>
                       </div>
                     </div>
                   </div>
                   <div className="review-body">
-                    <div className="review-rating-stars" style={{ marginBottom: 6 }}>
+                    <div
+                      className="review-rating-stars"
+                      style={{ marginBottom: 6 }}
+                    >
                       {stars(responseModal.Rating)}
                     </div>
-                    <p className="review-body-text" style={{ fontSize: "13px", marginBottom: 12 }}>
+                    <p
+                      className="review-body-text"
+                      style={{ fontSize: "13px", marginBottom: 12 }}
+                    >
                       "{responseModal.Comment || "Không bình luận"}"
                     </p>
 
-                    {responseModal.ReviewImages && responseModal.ReviewImages.length > 0 ? (
-                      <div className="review-customer-photos" style={{ gap: 6, marginBottom: 10 }}>
+                    {responseModal.ReviewImages &&
+                    responseModal.ReviewImages.length > 0 ? (
+                      <div
+                        className="review-customer-photos"
+                        style={{ gap: 6, marginBottom: 10 }}
+                      >
                         {responseModal.ReviewImages.map((img) => (
                           <div
                             key={img.ReviewImageId}
                             className="review-photo-wrapper"
                             style={{ width: 50, height: 50, borderRadius: 8 }}
-                            onClick={() => setLightboxPhoto(resolveFileUrl(img.ImageUrl))}
+                            onClick={() =>
+                              setLightboxPhoto(resolveFileUrl(img.ImageUrl))
+                            }
                           >
-                            <img src={resolveFileUrl(img.ImageUrl)} alt="Customer Upload" />
+                            <img
+                              src={resolveFileUrl(img.ImageUrl)}
+                              alt="Customer Upload"
+                            />
                           </div>
                         ))}
                       </div>
                     ) : null}
 
                     {responseForm.AdminResponse.trim() ? (
-                      <div className="admin-reply-box" style={{ padding: 12, marginTop: 4 }}>
-                        <div className="admin-reply-header" style={{ marginBottom: 4 }}>
+                      <div
+                        className="admin-reply-box"
+                        style={{ padding: 12, marginTop: 4 }}
+                      >
+                        <div
+                          className="admin-reply-header"
+                          style={{ marginBottom: 4 }}
+                        >
                           <strong>ADMIN REPLY</strong>
                           <span>Bây giờ</span>
                         </div>
-                        <p style={{ fontSize: "12.5px" }}>{responseForm.AdminResponse.trim()}</p>
+                        <p style={{ fontSize: "12.5px" }}>
+                          {responseForm.AdminResponse.trim()}
+                        </p>
                       </div>
                     ) : null}
                   </div>
@@ -1363,10 +1503,19 @@ export default function AdminReviews() {
               </div>
             </div>
             <div className="admin-modal-footer">
-              <button className="card-btn" type="button" onClick={() => setResponseModal(null)}>
+              <button
+                className="card-btn"
+                type="button"
+                onClick={() => setResponseModal(null)}
+              >
                 Hủy
               </button>
-              <button className="card-btn primary" type="button" onClick={submitResponse} disabled={saving}>
+              <button
+                className="card-btn primary"
+                type="button"
+                onClick={submitResponse}
+                disabled={saving}
+              >
                 {saving ? "Đang lưu..." : "Lưu phản hồi & Phê duyệt"}
               </button>
             </div>
@@ -1376,7 +1525,11 @@ export default function AdminReviews() {
 
       <AdminConfirmDialog
         open={Boolean(confirmAction)}
-        title={confirmAction?.type === "remove-response" ? "Xóa phản hồi của Admin?" : "Cập nhật trạng thái đánh giá?"}
+        title={
+          confirmAction?.type === "remove-response"
+            ? "Xóa phản hồi của Admin?"
+            : "Cập nhật trạng thái đánh giá?"
+        }
         description={
           confirmAction?.type === "remove-response"
             ? "Nội dung phản hồi hiện tại của Admin sẽ bị xóa khỏi đánh giá này."
@@ -1386,13 +1539,28 @@ export default function AdminReviews() {
           confirmAction ? (
             <>
               <strong>Đánh giá #{confirmAction.item.ReviewId}</strong>
-              <span> · {confirmAction.item.CustomerName || "Khách hàng"} · {Number(confirmAction.item.Rating || 0)}/5 sao</span>
-              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+              <span>
+                {" "}
+                · {confirmAction.item.CustomerName || "Khách hàng"} ·{" "}
+                {Number(confirmAction.item.Rating || 0)}/5 sao
+              </span>
+              {confirmAction.type === "status" ? (
+                <span> · Trạng thái mới: {confirmAction.nextStatus}</span>
+              ) : null}
             </>
           ) : null
         }
-        confirmLabel={confirmAction?.type === "remove-response" ? "Xóa phản hồi" : "Cập nhật trạng thái"}
-        tone={confirmAction?.type === "remove-response" || confirmAction?.nextStatus === "REJECTED" ? "danger" : "warning"}
+        confirmLabel={
+          confirmAction?.type === "remove-response"
+            ? "Xóa phản hồi"
+            : "Cập nhật trạng thái"
+        }
+        tone={
+          confirmAction?.type === "remove-response" ||
+          confirmAction?.nextStatus === "REJECTED"
+            ? "danger"
+            : "warning"
+        }
         busy={confirmBusy}
         onCancel={() => setConfirmAction(null)}
         onConfirm={handleConfirmedAction}
@@ -1400,12 +1568,25 @@ export default function AdminReviews() {
 
       {/* LIGHTBOX MODAL */}
       {lightboxPhoto && (
-        <div className="lightbox-backdrop" onClick={() => setLightboxPhoto(null)}>
-          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <button className="lightbox-close" onClick={() => setLightboxPhoto(null)}>
+        <div
+          className="lightbox-backdrop"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <div
+            className="lightbox-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="lightbox-close"
+              onClick={() => setLightboxPhoto(null)}
+            >
               &times;
             </button>
-            <img className="lightbox-img" src={lightboxPhoto} alt="Review Fullsize" />
+            <img
+              className="lightbox-img"
+              src={lightboxPhoto}
+              alt="Review Fullsize"
+            />
           </div>
         </div>
       )}

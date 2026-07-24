@@ -11,7 +11,7 @@ export default function AdminSystemLogs() {
   // Available filter options loaded from backend
   const [filterOptions, setFilterOptions] = useState({
     users: [],
-    actionTypes: []
+    actionTypes: [],
   });
 
   const [filters, setFilters] = useState({
@@ -20,12 +20,12 @@ export default function AdminSystemLogs() {
     userId: "",
     module: "",
     fromDate: "",
-    toDate: ""
+    toDate: "",
   });
 
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 15
+    limit: 15,
   });
 
   const modulesList = [
@@ -39,25 +39,30 @@ export default function AdminSystemLogs() {
     { value: "WorkShift", label: "Ca làm việc" },
     { value: "Appointment", label: "Lịch hẹn" },
     { value: "Feedback", label: "Ý kiến phản hồi" },
-    { value: "Review", label: "Đánh giá" }
+    { value: "Review", label: "Đánh giá" },
   ];
 
   const loadFilterOptions = async () => {
     try {
       const res = await axiosClient.get("/admin/system-logs/filters");
-      setFilterOptions(res.data.data || res.data || { users: [], actionTypes: [] });
+      setFilterOptions(
+        res.data.data || res.data || { users: [], actionTypes: [] },
+      );
     } catch (err) {
       console.error("Error loading log filters", err);
     }
   };
 
-  const loadLogs = async (currentPage = pagination.page, currentLimit = pagination.limit) => {
+  const loadLogs = async (
+    currentPage = pagination.page,
+    currentLimit = pagination.limit,
+  ) => {
     setLoading(true);
     try {
       const params = {
         ...filters,
         page: currentPage,
-        limit: currentLimit
+        limit: currentLimit,
       };
       const res = await axiosClient.get("/admin/system-logs", { params });
       const resData = res.data.data || res.data || {};
@@ -87,7 +92,7 @@ export default function AdminSystemLogs() {
   };
 
   const handleApply = () => {
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setPagination((prev) => ({ ...prev, page: 1 }));
     loadLogs(1, pagination.limit);
     setTimeout(scrollToTable, 100);
   };
@@ -99,26 +104,27 @@ export default function AdminSystemLogs() {
       userId: "",
       module: "",
       fromDate: "",
-      toDate: ""
+      toDate: "",
     };
     setFilters(defaultFilters);
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setPagination((prev) => ({ ...prev, page: 1 }));
     setLoading(true);
-    axiosClient.get("/admin/system-logs", {
-      params: { ...defaultFilters, page: 1, limit: pagination.limit }
-    })
-      .then(res => {
+    axiosClient
+      .get("/admin/system-logs", {
+        params: { ...defaultFilters, page: 1, limit: pagination.limit },
+      })
+      .then((res) => {
         const resData = res.data.data || res.data || {};
         setLogs(resData.logs || []);
         setTotalCount(resData.totalCount || 0);
         setTimeout(scrollToTable, 100);
       })
-      .catch(err => console.error(err))
+      .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   };
 
   const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+    setPagination((prev) => ({ ...prev, page: newPage }));
     loadLogs(newPage, pagination.limit);
     setTimeout(scrollToTable, 100);
   };
@@ -148,7 +154,7 @@ export default function AdminSystemLogs() {
       const params = {
         ...filters,
         page: 1,
-        limit: 100000
+        limit: 100000,
       };
       const res = await axiosClient.get("/admin/system-logs", { params });
       const resData = res.data.data || res.data || {};
@@ -170,30 +176,35 @@ export default function AdminSystemLogs() {
         "Địa Chỉ IP",
         "Thời Gian Tạo",
         "Dữ Liệu Cũ (Old Value)",
-        "Dữ Liệu Mới (New Value)"
+        "Dữ Liệu Mới (New Value)",
       ];
 
-      const rows = allLogs.map(item => [
+      const rows = allLogs.map((item) => [
         item.LogId,
-        `"${item.UserName || 'Hệ thống'}"`,
-        `"${item.Email || ''}"`,
-        `"${item.RoleName || ''}"`,
-        `"${item.ActionName || ''}"`,
+        `"${item.UserName || "Hệ thống"}"`,
+        `"${item.Email || ""}"`,
+        `"${item.RoleName || ""}"`,
+        `"${item.ActionName || ""}"`,
         item.ActionType || "",
-        `"${(item.Description || '').replace(/"/g, '""')}"`,
+        `"${(item.Description || "").replace(/"/g, '""')}"`,
         item.IpAddress || "",
         item.CreatedAt ? new Date(item.CreatedAt).toLocaleString("vi-VN") : "",
-        `"${(item.OldValue || '').replace(/"/g, '""')}"`,
-        `"${(item.NewValue || '').replace(/"/g, '""')}"`
+        `"${(item.OldValue || "").replace(/"/g, '""')}"`,
+        `"${(item.NewValue || "").replace(/"/g, '""')}"`,
       ]);
 
       // Add BOM to make Excel render UTF-8 Vietnamese chars correctly
-      const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+      const csvContent =
+        "\uFEFF" +
+        [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `Nhat_ky_he_thong_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute(
+        "download",
+        `Nhat_ky_he_thong_${new Date().toISOString().slice(0, 10)}.csv`,
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -448,13 +459,30 @@ export default function AdminSystemLogs() {
 
       <div className="header-container">
         <div>
-          <div className="eyebrow" style={{ color: "#a0573a", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: "11px", marginBottom: "4px" }}>
+          <div
+            className="eyebrow"
+            style={{
+              color: "#a0573a",
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              fontSize: "11px",
+              marginBottom: "4px",
+            }}
+          >
             Giám sát & Bảo mật
           </div>
           <h2 className="dashboard-title">Nhật Ký Hoạt Động Hệ Thống</h2>
         </div>
-        <button className="btn-primary" style={{ display: "flex", alignItems: "center", gap: "8px" }} onClick={exportToCSV}>
-          <svg style={{ width: "16px", height: "16px", fill: "currentColor" }} viewBox="0 0 24 24">
+        <button
+          className="btn-primary"
+          style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          onClick={exportToCSV}
+        >
+          <svg
+            style={{ width: "16px", height: "16px", fill: "currentColor" }}
+            viewBox="0 0 24 24"
+          >
             <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z" />
           </svg>
           Xuất Nhật Ký CSV
@@ -462,7 +490,11 @@ export default function AdminSystemLogs() {
       </div>
 
       {notice ? (
-        <div className="admin-error-card" role="alert" style={{ marginBottom: 20 }}>
+        <div
+          className="admin-error-card"
+          role="alert"
+          style={{ marginBottom: 20 }}
+        >
           {notice}
         </div>
       ) : null}
@@ -476,7 +508,9 @@ export default function AdminSystemLogs() {
               type="text"
               className="filter-input"
               value={filters.keyword}
-              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, keyword: e.target.value })
+              }
               placeholder="Hành động, nội dung, IP..."
             />
           </div>
@@ -485,11 +519,15 @@ export default function AdminSystemLogs() {
             <select
               className="filter-input"
               value={filters.userId}
-              onChange={(e) => setFilters({ ...filters, userId: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, userId: e.target.value })
+              }
             >
               <option value="">Tất cả quản trị viên</option>
               {filterOptions.users.map((u) => (
-                <option key={u.UserId} value={u.UserId}>{u.UserName}</option>
+                <option key={u.UserId} value={u.UserId}>
+                  {u.UserName}
+                </option>
               ))}
             </select>
           </div>
@@ -498,11 +536,15 @@ export default function AdminSystemLogs() {
             <select
               className="filter-input"
               value={filters.module}
-              onChange={(e) => setFilters({ ...filters, module: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, module: e.target.value })
+              }
             >
               <option value="">Tất cả phân hệ</option>
               {modulesList.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
               ))}
             </select>
           </div>
@@ -511,11 +553,15 @@ export default function AdminSystemLogs() {
             <select
               className="filter-input"
               value={filters.actionType}
-              onChange={(e) => setFilters({ ...filters, actionType: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, actionType: e.target.value })
+              }
             >
               <option value="">Tất cả thao tác</option>
               {filterOptions.actionTypes.map((type) => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type}>
+                  {type}
+                </option>
               ))}
             </select>
           </div>
@@ -525,7 +571,9 @@ export default function AdminSystemLogs() {
               type="date"
               className="filter-input"
               value={filters.fromDate}
-              onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, fromDate: e.target.value })
+              }
             />
           </div>
           <div className="filter-item">
@@ -534,25 +582,43 @@ export default function AdminSystemLogs() {
               type="date"
               className="filter-input"
               value={filters.toDate}
-              onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, toDate: e.target.value })
+              }
             />
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-          <button className="btn-outline" onClick={handleReset}>Đặt lại</button>
-          <button className="btn-primary" onClick={handleApply}>Lọc danh sách</button>
+        <div
+          style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}
+        >
+          <button className="btn-outline" onClick={handleReset}>
+            Đặt lại
+          </button>
+          <button className="btn-primary" onClick={handleApply}>
+            Lọc danh sách
+          </button>
         </div>
       </div>
 
       {/* Log list card */}
       <div className="logs-card" id="logs-card-section">
         {loading ? (
-          <div style={{ padding: "60px", textAlign: "center", color: "#64748b" }}>
+          <div
+            style={{ padding: "60px", textAlign: "center", color: "#64748b" }}
+          >
             Đang tải dữ liệu lịch sử nhật ký...
           </div>
         ) : (
           <>
-            <div id="logs-table-wrapper" style={{ overflowX: "auto", maxHeight: "550px", overflowY: "auto", position: "relative" }}>
+            <div
+              id="logs-table-wrapper"
+              style={{
+                overflowX: "auto",
+                maxHeight: "550px",
+                overflowY: "auto",
+                position: "relative",
+              }}
+            >
               <table className="logs-table">
                 <thead>
                   <tr>
@@ -563,32 +629,58 @@ export default function AdminSystemLogs() {
                     <th>Mô tả hoạt động</th>
                     <th style={{ width: "120px" }}>IP Address</th>
                     <th style={{ width: "160px" }}>Thời gian</th>
-                    <th style={{ width: "80px", textAlign: "center" }}>Chi tiết</th>
+                    <th style={{ width: "80px", textAlign: "center" }}>
+                      Chi tiết
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((item) => (
                     <tr key={item.LogId}>
-                      <td style={{ fontWeight: 600, color: "#64748b" }}>#{item.LogId}</td>
-                      <td>
-                        <div style={{ fontWeight: 700, color: "#1e293b" }}>{item.UserName || "Hệ thống"}</div>
-                        <div style={{ fontSize: "11px", color: "#64748b" }}>{item.RoleName}</div>
+                      <td style={{ fontWeight: 600, color: "#64748b" }}>
+                        #{item.LogId}
                       </td>
                       <td>
-                        <span className={`action-type-badge badge-${(item.ActionType || '').toLowerCase()}`}>
+                        <div style={{ fontWeight: 700, color: "#1e293b" }}>
+                          {item.UserName || "Hệ thống"}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#64748b" }}>
+                          {item.RoleName}
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`action-type-badge badge-${(item.ActionType || "").toLowerCase()}`}
+                        >
                           {item.ActionType}
                         </span>
                       </td>
                       <td style={{ fontWeight: 600 }}>{item.ActionName}</td>
-                      <td style={{ color: "#475569", fontSize: "13px" }}>{item.Description}</td>
-                      <td style={{ fontFamily: "monospace", fontSize: "12px", color: "#64748b" }}>{item.IpAddress || "localhost"}</td>
+                      <td style={{ color: "#475569", fontSize: "13px" }}>
+                        {item.Description}
+                      </td>
+                      <td
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: "12px",
+                          color: "#64748b",
+                        }}
+                      >
+                        {item.IpAddress || "localhost"}
+                      </td>
                       <td style={{ fontSize: "13px", color: "#64748b" }}>
-                        {item.CreatedAt ? new Date(item.CreatedAt).toLocaleString("vi-VN") : ""}
+                        {item.CreatedAt
+                          ? new Date(item.CreatedAt).toLocaleString("vi-VN")
+                          : ""}
                       </td>
                       <td style={{ textAlign: "center" }}>
                         <button
                           className="btn-outline"
-                          style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "6px" }}
+                          style={{
+                            padding: "4px 10px",
+                            fontSize: "12px",
+                            borderRadius: "6px",
+                          }}
                           onClick={() => openDetail(item)}
                         >
                           Xem
@@ -598,7 +690,14 @@ export default function AdminSystemLogs() {
                   ))}
                   {logs.length === 0 && (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: "center", color: "#94a3b8", padding: "40px" }}>
+                      <td
+                        colSpan="8"
+                        style={{
+                          textAlign: "center",
+                          color: "#94a3b8",
+                          padding: "40px",
+                        }}
+                      >
                         Không có dữ liệu nhật ký phù hợp bộ lọc
                       </td>
                     </tr>
@@ -609,13 +708,21 @@ export default function AdminSystemLogs() {
 
             {/* Pagination controls */}
             <div className="pagination-bar">
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+              >
                 <span style={{ fontSize: "13px", color: "#64748b" }}>
-                  Tổng cộng: <strong>{totalCount}</strong> dòng nhật ký • Hiển thị
+                  Tổng cộng: <strong>{totalCount}</strong> dòng nhật ký • Hiển
+                  thị
                 </span>
                 <select
                   className="filter-input"
-                  style={{ padding: "4px 8px", fontSize: "13px", borderRadius: "6px", background: "#ffffff" }}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "13px",
+                    borderRadius: "6px",
+                    background: "#ffffff",
+                  }}
                   value={pagination.limit}
                   onChange={(e) => handleLimitChange(Number(e.target.value))}
                 >
@@ -627,7 +734,9 @@ export default function AdminSystemLogs() {
               </div>
 
               {totalPages > 1 && (
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <div
+                  style={{ display: "flex", gap: "8px", alignItems: "center" }}
+                >
                   <button
                     className="page-btn"
                     disabled={pagination.page === 1}
@@ -635,7 +744,13 @@ export default function AdminSystemLogs() {
                   >
                     Trước
                   </button>
-                  <span style={{ fontSize: "13px", color: "#475569", fontWeight: 600 }}>
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      color: "#475569",
+                      fontWeight: 600,
+                    }}
+                  >
                     Trang {pagination.page} / {totalPages}
                   </span>
                   <button
@@ -658,41 +773,88 @@ export default function AdminSystemLogs() {
           <div className="log-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <span className={`action-type-badge badge-${(selected.ActionType || '').toLowerCase()}`} style={{ marginRight: "10px" }}>
+                <span
+                  className={`action-type-badge badge-${(selected.ActionType || "").toLowerCase()}`}
+                  style={{ marginRight: "10px" }}
+                >
                   {selected.ActionType}
                 </span>
-                <strong style={{ fontSize: "16px", color: "#1e293b" }}>{selected.ActionName}</strong>
+                <strong style={{ fontSize: "16px", color: "#1e293b" }}>
+                  {selected.ActionName}
+                </strong>
               </div>
               <button
                 onClick={() => setSelected(null)}
-                style={{ background: "transparent", border: "none", fontSize: "20px", color: "#94a3b8", cursor: "pointer" }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  fontSize: "20px",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                }}
               >
                 &times;
               </button>
             </div>
             <div className="modal-body">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px", fontSize: "13px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "16px",
+                  marginBottom: "16px",
+                  fontSize: "13px",
+                }}
+              >
                 <div>
                   <div style={{ color: "#64748b" }}>Người thực hiện:</div>
-                  <strong style={{ color: "#334155" }}>{selected.UserName || "Hệ thống"} ({selected.RoleName})</strong>
+                  <strong style={{ color: "#334155" }}>
+                    {selected.UserName || "Hệ thống"} ({selected.RoleName})
+                  </strong>
                 </div>
                 <div>
                   <div style={{ color: "#64748b" }}>Địa chỉ IP:</div>
-                  <strong style={{ color: "#334155" }}>{selected.IpAddress || "N/A"}</strong>
+                  <strong style={{ color: "#334155" }}>
+                    {selected.IpAddress || "N/A"}
+                  </strong>
                 </div>
                 <div>
                   <div style={{ color: "#64748b" }}>Thời gian thực hiện:</div>
-                  <strong style={{ color: "#334155" }}>{selected.CreatedAt ? new Date(selected.CreatedAt).toLocaleString("vi-VN") : ""}</strong>
+                  <strong style={{ color: "#334155" }}>
+                    {selected.CreatedAt
+                      ? new Date(selected.CreatedAt).toLocaleString("vi-VN")
+                      : ""}
+                  </strong>
                 </div>
                 <div>
                   <div style={{ color: "#64748b" }}>Email:</div>
-                  <strong style={{ color: "#334155" }}>{selected.Email || "N/A"}</strong>
+                  <strong style={{ color: "#334155" }}>
+                    {selected.Email || "N/A"}
+                  </strong>
                 </div>
               </div>
 
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
-                <div style={{ color: "#64748b", fontSize: "13px", marginBottom: "4px" }}>Mô tả chi tiết:</div>
-                <div style={{ padding: "12px", background: "#f8fafc", borderRadius: "8px", fontSize: "14px", color: "#334155" }}>
+              <div
+                style={{ borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}
+              >
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: "13px",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Mô tả chi tiết:
+                </div>
+                <div
+                  style={{
+                    padding: "12px",
+                    background: "#f8fafc",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    color: "#334155",
+                  }}
+                >
                   {selected.Description}
                 </div>
               </div>
@@ -700,7 +862,15 @@ export default function AdminSystemLogs() {
               {/* Data Diff container */}
               <div className="diff-container">
                 <div>
-                  <div style={{ color: "#ef4444", fontSize: "12px", fontWeight: 700, marginBottom: "6px", textTransform: "uppercase" }}>
+                  <div
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      marginBottom: "6px",
+                      textTransform: "uppercase",
+                    }}
+                  >
                     Dữ liệu trước (Old Value)
                   </div>
                   <div className="diff-box">
@@ -708,7 +878,15 @@ export default function AdminSystemLogs() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: "#10b981", fontSize: "12px", fontWeight: 700, marginBottom: "6px", textTransform: "uppercase" }}>
+                  <div
+                    style={{
+                      color: "#10b981",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      marginBottom: "6px",
+                      textTransform: "uppercase",
+                    }}
+                  >
                     Dữ liệu mới (New Value)
                   </div>
                   <div className="diff-box">

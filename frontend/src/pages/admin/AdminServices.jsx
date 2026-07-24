@@ -63,11 +63,12 @@ export default function AdminServices() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -76,11 +77,12 @@ export default function AdminServices() {
     setTimeout(() => {
       const element = document.getElementById(`${type}-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -1073,7 +1075,7 @@ export default function AdminServices() {
       {error ? <div className="admin-error-card">{error}</div> : null}
 
       <div className="admin-stat-grid">
-        <article 
+        <article
           className={`admin-stat-card ${statusTab === "ALL" ? "active" : ""}`}
           style={{ cursor: "pointer" }}
           onClick={() => handleTabChange("ALL")}
@@ -1086,7 +1088,7 @@ export default function AdminServices() {
           </div>
         </article>
 
-        <article 
+        <article
           className={`admin-stat-card ${statusTab === "AVAILABLE" ? "active" : ""}`}
           style={{ cursor: "pointer" }}
           onClick={() => handleTabChange("AVAILABLE")}
@@ -1099,10 +1101,12 @@ export default function AdminServices() {
           </div>
         </article>
 
-        <article 
+        <article
           className={`admin-stat-card ${statusTab === "INACTIVE" || statusTab === "HIDDEN" ? "active" : ""}`}
           style={{ cursor: "pointer" }}
-          onClick={() => handleTabChange(statusTab === "INACTIVE" ? "HIDDEN" : "INACTIVE")}
+          onClick={() =>
+            handleTabChange(statusTab === "INACTIVE" ? "HIDDEN" : "INACTIVE")
+          }
         >
           <div className="admin-stat-icon">⏸</div>
           <div>
@@ -1155,28 +1159,28 @@ export default function AdminServices() {
 
       {/* Tabs Phân loại trạng thái */}
       <div className="refund-tabs" style={{ display: "flex", gap: "8px" }}>
-        <button 
+        <button
           className={`refund-tab-btn ${statusTab === "ALL" ? "active" : ""}`}
           onClick={() => handleTabChange("ALL")}
           type="button"
         >
           Tất cả ({stats.total})
         </button>
-        <button 
+        <button
           className={`refund-tab-btn ${statusTab === "AVAILABLE" ? "active" : ""}`}
           onClick={() => handleTabChange("AVAILABLE")}
           type="button"
         >
           Đang bán AVAILABLE ({stats.available})
         </button>
-        <button 
+        <button
           className={`refund-tab-btn ${statusTab === "INACTIVE" ? "active" : ""}`}
           onClick={() => handleTabChange("INACTIVE")}
           type="button"
         >
           Tạm ngưng INACTIVE ({stats.inactive})
         </button>
-        <button 
+        <button
           className={`refund-tab-btn ${statusTab === "HIDDEN" ? "active" : ""}`}
           onClick={() => handleTabChange("HIDDEN")}
           type="button"
@@ -1186,13 +1190,23 @@ export default function AdminServices() {
       </div>
 
       {loading ? (
-        <div className="admin-loading-card" style={{ marginTop: "20px" }}>Đang tải danh sách dịch vụ...</div>
+        <div className="admin-loading-card" style={{ marginTop: "20px" }}>
+          Đang tải danh sách dịch vụ...
+        </div>
       ) : null}
 
       {!loading ? (
-        <div ref={gridRef} className="admin-services-grid" style={{ marginTop: "20px" }}>
+        <div
+          ref={gridRef}
+          className="admin-services-grid"
+          style={{ marginTop: "20px" }}
+        >
           {filteredItems.map((item) => (
-            <article className="admin-service-card" id={`service-card-${item.ServiceId}`} key={item.ServiceId}>
+            <article
+              className="admin-service-card"
+              id={`service-card-${item.ServiceId}`}
+              key={item.ServiceId}
+            >
               <div className="admin-service-image">
                 <img src={image(item.ImageUrl)} alt={item.ServiceName} />
                 <span className={statusClass(item.Status)}>{item.Status}</span>
@@ -1230,10 +1244,7 @@ export default function AdminServices() {
                 </div>
 
                 <div className="admin-card-actions">
-                  <button
-                    className="card-btn"
-                    onClick={() => openDetail(item)}
-                  >
+                  <button className="card-btn" onClick={() => openDetail(item)}>
                     Chi tiết
                   </button>
 
@@ -1318,7 +1329,8 @@ export default function AdminServices() {
                 <strong>Thời lượng:</strong> {selected.DurationMinutes} phút
               </p>
               <p>
-                <strong>Tổng lịch hẹn:</strong> {selected.AppointmentCount || 0} ca
+                <strong>Tổng lịch hẹn:</strong> {selected.AppointmentCount || 0}{" "}
+                ca
               </p>
               <p>
                 <strong>Hoàn thành:</strong> {selected.CompletedCount || 0} ca
@@ -1327,11 +1339,12 @@ export default function AdminServices() {
                 <strong>Đánh giá:</strong> {selected.ReviewCount || 0} lượt
               </p>
               <p>
-                <strong>Rating TB:</strong>{" "}
-                ⭐ {Number(selected.AvgRating || 0).toFixed(1)} / 5
+                <strong>Rating TB:</strong> ⭐{" "}
+                {Number(selected.AvgRating || 0).toFixed(1)} / 5
               </p>
               <p>
-                <strong>Kỹ thuật viên:</strong> {selected.TechnicianCount || 0} người
+                <strong>Kỹ thuật viên:</strong> {selected.TechnicianCount || 0}{" "}
+                người
               </p>
               <p>
                 <strong>Trạng thái danh mục:</strong>{" "}
@@ -1339,21 +1352,69 @@ export default function AdminServices() {
               </p>
             </div>
 
-            <div className="admin-detail-technicians" style={{ padding: "0 24px 24px 24px", borderTop: "1px solid #f3f4f6", paddingTop: "16px" }}>
-              <h4 style={{ margin: "0 0 10px 0", fontSize: "13.5px", fontWeight: "700", color: "#2b1c12" }}>Nhân viên kỹ thuật phụ trách:</h4>
+            <div
+              className="admin-detail-technicians"
+              style={{
+                padding: "0 24px 24px 24px",
+                borderTop: "1px solid #f3f4f6",
+                paddingTop: "16px",
+              }}
+            >
+              <h4
+                style={{
+                  margin: "0 0 10px 0",
+                  fontSize: "13.5px",
+                  fontWeight: "700",
+                  color: "#2b1c12",
+                }}
+              >
+                Nhân viên kỹ thuật phụ trách:
+              </h4>
               {loadingDetailTech ? (
-                <span style={{ fontSize: "12px", color: "#64748b" }}>Đang tải danh sách nhân viên...</span>
+                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  Đang tải danh sách nhân viên...
+                </span>
               ) : detailTechnicians.length > 0 ? (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {detailTechnicians.map((t) => (
-                    <div key={t.EmployeeId} style={{ display: "flex", alignItems: "center", gap: "6px", background: "#f8fafc", padding: "4px 8px", borderRadius: "16px", border: "1px solid #e2e8f0" }}>
-                      <img src={image(t.ImageUrl || t.AvatarUrl)} alt={t.FullName} style={{ width: "20px", height: "20px", borderRadius: "50%", objectFit: "cover" }} />
-                      <span style={{ fontSize: "11px", fontWeight: "600", color: "#334155" }}>{t.FullName} ({t.Specialization || t.Position || "KTV"})</span>
+                    <div
+                      key={t.EmployeeId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "#f8fafc",
+                        padding: "4px 8px",
+                        borderRadius: "16px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <img
+                        src={image(t.ImageUrl || t.AvatarUrl)}
+                        alt={t.FullName}
+                        style={{
+                          width: "20px",
+                          height: "20px",
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          color: "#334155",
+                        }}
+                      >
+                        {t.FullName} ({t.Specialization || t.Position || "KTV"})
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>Chưa phân bổ nhân viên kỹ thuật nào.</span>
+                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                  Chưa phân bổ nhân viên kỹ thuật nào.
+                </span>
               )}
             </div>
           </div>
@@ -1557,7 +1618,9 @@ export default function AdminServices() {
             </>
           ) : null
         }
-        confirmLabel={confirmAction?.type === "delete" ? "Xóa dịch vụ" : "Cập nhật"}
+        confirmLabel={
+          confirmAction?.type === "delete" ? "Xóa dịch vụ" : "Cập nhật"
+        }
         tone={confirmAction?.type === "delete" ? "danger" : "warning"}
         busy={confirmBusy}
         onCancel={() => setConfirmAction(null)}

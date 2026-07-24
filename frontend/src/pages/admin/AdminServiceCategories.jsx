@@ -44,11 +44,12 @@ export default function AdminServiceCategories() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -57,11 +58,12 @@ export default function AdminServiceCategories() {
     setTimeout(() => {
       const element = document.getElementById(`category-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -160,10 +162,7 @@ export default function AdminServiceCategories() {
       total: items.length,
       active: items.filter((x) => x.Status === "ACTIVE").length,
       inactive: items.filter((x) => x.Status === "INACTIVE").length,
-      services: items.reduce(
-        (sum, x) => sum + Number(x.ServiceCount || 0),
-        0,
-      ),
+      services: items.reduce((sum, x) => sum + Number(x.ServiceCount || 0), 0),
     };
   }, [items]);
 
@@ -210,11 +209,17 @@ export default function AdminServiceCategories() {
       let catId = editingId;
 
       if (editingId) {
-        const res = await axiosClient.put(`/admin/service-categories/${editingId}`, payload);
+        const res = await axiosClient.put(
+          `/admin/service-categories/${editingId}`,
+          payload,
+        );
         const updated = res.data.data || res.data;
         catId = updated?.CategoryId || editingId;
       } else {
-        const res = await axiosClient.post("/admin/service-categories", payload);
+        const res = await axiosClient.post(
+          "/admin/service-categories",
+          payload,
+        );
         const created = res.data.data || res.data;
         catId = created?.CategoryId || created?.id;
       }
@@ -238,7 +243,9 @@ export default function AdminServiceCategories() {
   async function toggleStatus(item) {
     try {
       setError("");
-      await axiosClient.patch(`/admin/service-categories/${item.CategoryId}/toggle-active`);
+      await axiosClient.patch(
+        `/admin/service-categories/${item.CategoryId}/toggle-active`,
+      );
       await load();
       scrollToItem(item.CategoryId);
     } catch (err) {
@@ -833,7 +840,8 @@ export default function AdminServiceCategories() {
           <div className="admin-eyebrow">Services Categories</div>
           <h1>Quản lý Danh mục Dịch vụ</h1>
           <p>
-            Tạo lập và thiết kế các danh mục trị liệu, chăm sóc da mặt, cơ thể giúp khách hàng dễ dàng tìm kiếm dịch vụ spa của bạn.
+            Tạo lập và thiết kế các danh mục trị liệu, chăm sóc da mặt, cơ thể
+            giúp khách hàng dễ dàng tìm kiếm dịch vụ spa của bạn.
           </p>
         </div>
         <button className="admin-refresh-btn" onClick={openCreate}>
@@ -898,10 +906,16 @@ export default function AdminServiceCategories() {
       </div>
 
       {/* Error & Loading cards */}
-      {error && <div className="admin-error-card" style={{ marginBottom: 20 }}>{error}</div>}
+      {error && (
+        <div className="admin-error-card" style={{ marginBottom: 20 }}>
+          {error}
+        </div>
+      )}
 
       {loading ? (
-        <div className="admin-loading-card">Đang tải danh mục dịch vụ spa...</div>
+        <div className="admin-loading-card">
+          Đang tải danh mục dịch vụ spa...
+        </div>
       ) : (
         <div ref={gridRef} className="admin-category-grid">
           {items.map((item) => (
@@ -916,23 +930,32 @@ export default function AdminServiceCategories() {
                   src={image(item.ImageUrl)}
                   alt={item.CategoryName}
                 />
-                <span className="admin-category-badge">{item.ServiceCount} dịch vụ</span>
-                <span className={statusClass(item.Status)}>
-                  {item.Status}
+                <span className="admin-category-badge">
+                  {item.ServiceCount} dịch vụ
                 </span>
+                <span className={statusClass(item.Status)}>{item.Status}</span>
               </div>
               <div className="admin-category-body">
                 <h4>{item.CategoryName}</h4>
-                <p>{item.Description || "Chưa có mô tả chi tiết cho danh mục dịch vụ spa này."}</p>
+                <p>
+                  {item.Description ||
+                    "Chưa có mô tả chi tiết cho danh mục dịch vụ spa này."}
+                </p>
               </div>
               <div className="admin-category-footer">
-                <button className="card-btn primary" onClick={() => openEdit(item)}>
+                <button
+                  className="card-btn primary"
+                  onClick={() => openEdit(item)}
+                >
                   Sửa
                 </button>
                 <button className="card-btn" onClick={() => toggleStatus(item)}>
                   Bật/Tắt
                 </button>
-                <button className="card-btn danger" onClick={() => remove(item)}>
+                <button
+                  className="card-btn danger"
+                  onClick={() => remove(item)}
+                >
                   Xóa
                 </button>
               </div>
@@ -949,11 +972,20 @@ export default function AdminServiceCategories() {
 
       {/* Editor Modal */}
       {showModal ? (
-        <div className="admin-modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="admin-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="admin-modal-wrapper"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="admin-modal-header">
               <h3>{editingId ? "Cập nhật Danh mục" : "Tạo Danh mục mới"}</h3>
-              <button className="admin-modal-close" onClick={() => setShowModal(false)}>
+              <button
+                className="admin-modal-close"
+                onClick={() => setShowModal(false)}
+              >
                 &times;
               </button>
             </div>
@@ -963,7 +995,9 @@ export default function AdminServiceCategories() {
                   Tên danh mục *
                   <input
                     value={form.CategoryName}
-                    onChange={(e) => setForm({ ...form, CategoryName: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, CategoryName: e.target.value })
+                    }
                     placeholder="Massage mặt chuyên sâu"
                     required
                   />
@@ -972,7 +1006,9 @@ export default function AdminServiceCategories() {
                   Đường dẫn ảnh (ImageUrl)
                   <input
                     value={form.ImageUrl}
-                    onChange={(e) => setForm({ ...form, ImageUrl: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, ImageUrl: e.target.value })
+                    }
                     placeholder="/images/services/facial.png"
                   />
                 </label>
@@ -980,7 +1016,9 @@ export default function AdminServiceCategories() {
                   Trạng thái hoạt động
                   <select
                     value={form.Status}
-                    onChange={(e) => setForm({ ...form, Status: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, Status: e.target.value })
+                    }
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="INACTIVE">INACTIVE</option>
@@ -991,7 +1029,9 @@ export default function AdminServiceCategories() {
                   <textarea
                     rows={4}
                     value={form.Description}
-                    onChange={(e) => setForm({ ...form, Description: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, Description: e.target.value })
+                    }
                     placeholder="Giới thiệu về gói dịch vụ spa..."
                   />
                 </label>
@@ -999,10 +1039,18 @@ export default function AdminServiceCategories() {
 
               {/* Real-time Live Preview */}
               <div className="admin-preview-section">
-                <span className="admin-preview-title">Xem trước thẻ hiển thị</span>
+                <span className="admin-preview-title">
+                  Xem trước thẻ hiển thị
+                </span>
                 <div
                   className="admin-category-card"
-                  style={{ width: "100%", maxWidth: 300, minHeight: 360, transform: "none", boxShadow: "none" }}
+                  style={{
+                    width: "100%",
+                    maxWidth: 300,
+                    minHeight: 360,
+                    transform: "none",
+                    boxShadow: "none",
+                  }}
                 >
                   <div className="admin-category-img-container">
                     <img
@@ -1012,7 +1060,8 @@ export default function AdminServiceCategories() {
                     />
                     <span className="admin-category-badge">
                       {editingId
-                        ? items.find((x) => x.CategoryId === editingId)?.ServiceCount || 0
+                        ? items.find((x) => x.CategoryId === editingId)
+                            ?.ServiceCount || 0
                         : 0}{" "}
                       dịch vụ
                     </span>
@@ -1022,16 +1071,28 @@ export default function AdminServiceCategories() {
                   </div>
                   <div className="admin-category-body">
                     <h4>{form.CategoryName || "Tên danh mục hiển thị"}</h4>
-                    <p>{form.Description || "Mô tả chi tiết về danh mục spa này sẽ được cập nhật tại đây khi bạn nhập văn bản..."}</p>
+                    <p>
+                      {form.Description ||
+                        "Mô tả chi tiết về danh mục spa này sẽ được cập nhật tại đây khi bạn nhập văn bản..."}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="admin-modal-footer">
-              <button className="card-btn" type="button" onClick={() => setShowModal(false)}>
+              <button
+                className="card-btn"
+                type="button"
+                onClick={() => setShowModal(false)}
+              >
                 Hủy
               </button>
-              <button className="card-btn primary" type="button" onClick={submit} disabled={saving}>
+              <button
+                className="card-btn primary"
+                type="button"
+                onClick={submit}
+                disabled={saving}
+              >
                 {saving ? "Đang lưu..." : editingId ? "Cập nhật" : "Tạo mới"}
               </button>
             </div>
@@ -1043,7 +1104,11 @@ export default function AdminServiceCategories() {
         open={Boolean(confirmAction)}
         title="Xóa danh mục dịch vụ?"
         description="Chỉ có thể xóa danh mục trống. Nếu danh mục đang chứa dịch vụ, hệ thống sẽ từ chối để bảo vệ dữ liệu liên quan."
-        details={confirmAction ? <strong>{confirmAction.item.CategoryName}</strong> : null}
+        details={
+          confirmAction ? (
+            <strong>{confirmAction.item.CategoryName}</strong>
+          ) : null
+        }
         confirmLabel="Xóa danh mục"
         tone="danger"
         busy={confirmBusy}

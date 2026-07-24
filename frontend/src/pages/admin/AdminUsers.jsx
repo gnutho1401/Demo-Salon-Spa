@@ -33,7 +33,14 @@ function renderAvatar(item, size = 42) {
   const url = item?.AvatarUrl ? resolveFileUrl(item.AvatarUrl) : "";
   if (url) {
     return (
-      <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <div
+        style={{
+          position: "relative",
+          width: size,
+          height: size,
+          flexShrink: 0,
+        }}
+      >
         <img
           src={url}
           alt={item?.FullName || "User"}
@@ -43,7 +50,7 @@ function renderAvatar(item, size = 42) {
             borderRadius: "50%",
             objectFit: "cover",
             border: "2px solid #d6b57e",
-            boxShadow: "0 2px 8px rgba(120,80,40,0.15)"
+            boxShadow: "0 2px 8px rgba(120,80,40,0.15)",
           }}
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -65,7 +72,10 @@ function renderAvatar(item, size = 42) {
             fontSize: size * 0.42,
           }}
         >
-          {String(item?.FullName || "?").trim().charAt(0).toUpperCase()}
+          {String(item?.FullName || "?")
+            .trim()
+            .charAt(0)
+            .toUpperCase()}
         </div>
       </div>
     );
@@ -82,7 +92,10 @@ function renderAvatar(item, size = 42) {
   ];
   const charCode = item?.FullName ? item.FullName.charCodeAt(0) : 65;
   const background = gradients[charCode % gradients.length];
-  const letter = String(item?.FullName || "?").trim().charAt(0).toUpperCase();
+  const letter = String(item?.FullName || "?")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <div
@@ -100,7 +113,7 @@ function renderAvatar(item, size = 42) {
         boxShadow: "0 3px 10px rgba(120,80,40,0.12)",
         border: "2px solid #ffffff",
         textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-        flexShrink: 0
+        flexShrink: 0,
       }}
     >
       {letter}
@@ -171,11 +184,12 @@ export default function AdminUsers() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -184,11 +198,12 @@ export default function AdminUsers() {
     setTimeout(() => {
       const element = document.getElementById(`user-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -274,7 +289,10 @@ export default function AdminUsers() {
   };
 
   const handleClearFilters = () => {
-    const wasEmpty = filters.roleId === "" && filters.status === "" && filters.isVerified === "";
+    const wasEmpty =
+      filters.roleId === "" &&
+      filters.status === "" &&
+      filters.isVerified === "";
     setFilters({
       keyword: "",
       roleId: "",
@@ -329,7 +347,9 @@ export default function AdminUsers() {
       DateOfBirth: item.DateOfBirth ? item.DateOfBirth.slice(0, 10) : "",
       Address: item.Address || "",
       LoyaltyPoints: item.LoyaltyPoints || 0,
-      MembershipLevelId: item.MembershipLevelId ? String(item.MembershipLevelId) : "",
+      MembershipLevelId: item.MembershipLevelId
+        ? String(item.MembershipLevelId)
+        : "",
       // Employee
       BranchId: item.BranchId ? String(item.BranchId) : "",
       Position: item.Position || "",
@@ -363,7 +383,9 @@ export default function AdminUsers() {
       setError("");
       setSuccessMsg("");
 
-      const selectedRole = roles.find((r) => String(r.RoleId) === String(form.RoleId));
+      const selectedRole = roles.find(
+        (r) => String(r.RoleId) === String(form.RoleId),
+      );
       const roleName = selectedRole?.RoleName;
 
       const payload = {
@@ -385,7 +407,9 @@ export default function AdminUsers() {
         payload.DateOfBirth = form.DateOfBirth || null;
         payload.Address = form.Address.trim() || null;
         payload.LoyaltyPoints = Number(form.LoyaltyPoints || 0);
-        payload.MembershipLevelId = form.MembershipLevelId ? Number(form.MembershipLevelId) : null;
+        payload.MembershipLevelId = form.MembershipLevelId
+          ? Number(form.MembershipLevelId)
+          : null;
       } else {
         payload.BranchId = form.BranchId ? Number(form.BranchId) : null;
         payload.Position = form.Position.trim() || null;
@@ -417,7 +441,9 @@ export default function AdminUsers() {
       }
     } catch (err) {
       setError(
-        err?.response?.data?.message || err?.message || "Lưu tài khoản thất bại",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Lưu tài khoản thất bại",
       );
     } finally {
       setSaving(false);
@@ -429,12 +455,16 @@ export default function AdminUsers() {
       setError("");
       setSuccessMsg("");
       const next = item.Status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-      await axiosClient.patch(`/admin/users/${item.UserId}/status`, { status: next });
+      await axiosClient.patch(`/admin/users/${item.UserId}/status`, {
+        status: next,
+      });
       await load();
       scrollToItem(item.UserId);
     } catch (err) {
       setError(
-        err?.response?.data?.message || err?.message || "Đổi trạng thái thất bại",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Đổi trạng thái thất bại",
       );
     }
   }
@@ -462,7 +492,9 @@ export default function AdminUsers() {
       scrollToItem(passwordModal.UserId);
     } catch (err) {
       setError(
-        err?.response?.data?.message || err?.message || "Đặt lại mật khẩu thất bại",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Đặt lại mật khẩu thất bại",
       );
     } finally {
       setSaving(false);
@@ -475,7 +507,9 @@ export default function AdminUsers() {
   }, [roles, form.RoleId]);
 
   const selectedRoleObject = useMemo(() => {
-    const selectedRole = roles.find((r) => String(r.RoleId) === String(form.RoleId));
+    const selectedRole = roles.find(
+      (r) => String(r.RoleId) === String(form.RoleId),
+    );
     return selectedRole;
   }, [roles, form.RoleId]);
 
@@ -1021,7 +1055,8 @@ export default function AdminUsers() {
           <div className="admin-eyebrow">User Accounts</div>
           <h1>Quản lý Tài khoản & Phân quyền</h1>
           <p>
-            Quản trị và thiết lập thông tin đăng nhập, phân vai trò Khách hàng, Nhân viên, Kỹ thuật viên Spa cùng các cơ chế bảo mật hệ thống.
+            Quản trị và thiết lập thông tin đăng nhập, phân vai trò Khách hàng,
+            Nhân viên, Kỹ thuật viên Spa cùng các cơ chế bảo mật hệ thống.
           </p>
         </div>
         <button className="admin-refresh-btn" onClick={openCreate}>
@@ -1091,7 +1126,9 @@ export default function AdminUsers() {
         </select>
         <select
           value={filters.isVerified}
-          onChange={(e) => setFilters({ ...filters, isVerified: e.target.value })}
+          onChange={(e) =>
+            setFilters({ ...filters, isVerified: e.target.value })
+          }
         >
           <option value="">Trạng thái xác minh</option>
           <option value="1">Đã xác minh</option>
@@ -1106,15 +1143,29 @@ export default function AdminUsers() {
       </div>
 
       {/* Success/Error Alerts */}
-      {error && <div className="admin-error-card" style={{ marginBottom: 20 }}>{error}</div>}
+      {error && (
+        <div className="admin-error-card" style={{ marginBottom: 20 }}>
+          {error}
+        </div>
+      )}
       {successMsg && (
-        <div className="admin-loading-card" style={{ marginBottom: 20, color: "#107c41", borderColor: "rgba(16, 124, 65, 0.2)", background: "#e8f7ec" }}>
+        <div
+          className="admin-loading-card"
+          style={{
+            marginBottom: 20,
+            color: "#107c41",
+            borderColor: "rgba(16, 124, 65, 0.2)",
+            background: "#e8f7ec",
+          }}
+        >
           {successMsg}
         </div>
       )}
 
       {loading ? (
-        <div className="admin-loading-card">Đang tải danh sách tài khoản spa...</div>
+        <div className="admin-loading-card">
+          Đang tải danh sách tài khoản spa...
+        </div>
       ) : (
         <div ref={gridRef} className="admin-user-grid">
           {items.map((item) => {
@@ -1122,14 +1173,22 @@ export default function AdminUsers() {
             const cardClass = `admin-user-card ${isCustomer ? "customer-vip-gold" : "employee-staff"}`;
 
             return (
-              <div key={item.UserId} id={`user-card-${item.UserId}`} className={cardClass}>
+              <div
+                key={item.UserId}
+                id={`user-card-${item.UserId}`}
+                className={cardClass}
+              >
                 <div className="admin-user-card-header">
                   {renderAvatar(item, 56)}
                   <div className="admin-user-info">
                     <h4>{item.FullName}</h4>
                     <span>{item.Email}</span>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <span className={`admin-role-badge ${isCustomer ? "role-customer" : "role-staff"}`}>
+                    <div
+                      style={{ display: "flex", gap: 6, alignItems: "center" }}
+                    >
+                      <span
+                        className={`admin-role-badge ${isCustomer ? "role-customer" : "role-staff"}`}
+                      >
                         {item.RoleName}
                       </span>
                       <span className={statusClass(item.Status)}>
@@ -1142,32 +1201,67 @@ export default function AdminUsers() {
                 <div className="admin-user-card-body">
                   {isCustomer ? (
                     <>
-                      <InfoRow label="Hạng thành viên" value={item.MembershipLevelName || "Standard"} valueColor="#b8860b" />
-                      <InfoRow label="Điểm tích lũy" value={`${item.LoyaltyPoints || 0} điểm`} />
-                      <InfoRow label="Tổng chi tiêu" value={money(item.TotalPaid)} valueColor="#107c41" />
-                      <InfoRow label="Lịch hẹn tham gia" value={`${item.AppointmentCount || 0} cuộc`} />
+                      <InfoRow
+                        label="Hạng thành viên"
+                        value={item.MembershipLevelName || "Standard"}
+                        valueColor="#b8860b"
+                      />
+                      <InfoRow
+                        label="Điểm tích lũy"
+                        value={`${item.LoyaltyPoints || 0} điểm`}
+                      />
+                      <InfoRow
+                        label="Tổng chi tiêu"
+                        value={money(item.TotalPaid)}
+                        valueColor="#107c41"
+                      />
+                      <InfoRow
+                        label="Lịch hẹn tham gia"
+                        value={`${item.AppointmentCount || 0} cuộc`}
+                      />
                     </>
                   ) : (
                     <>
-                      <InfoRow label="Chức vụ" value={item.Position || "Nhân viên Spa"} />
-                      <InfoRow label="Chi nhánh" value={item.BranchName || "Chưa phân công"} />
-                      <InfoRow label="Kinh nghiệm" value={`${item.YearsOfExperience || 0} năm`} />
-                      <InfoRow label="Lịch hẹn trị liệu" value={`${item.AppointmentCount || 0} ca`} />
+                      <InfoRow
+                        label="Chức vụ"
+                        value={item.Position || "Nhân viên Spa"}
+                      />
+                      <InfoRow
+                        label="Chi nhánh"
+                        value={item.BranchName || "Chưa phân công"}
+                      />
+                      <InfoRow
+                        label="Kinh nghiệm"
+                        value={`${item.YearsOfExperience || 0} năm`}
+                      />
+                      <InfoRow
+                        label="Lịch hẹn trị liệu"
+                        value={`${item.AppointmentCount || 0} ca`}
+                      />
                     </>
                   )}
                 </div>
 
                 <div className="admin-user-card-footer">
-                  <button className="card-btn primary" onClick={() => setSelected(item)}>
+                  <button
+                    className="card-btn primary"
+                    onClick={() => setSelected(item)}
+                  >
                     Hồ sơ
                   </button>
                   <button className="card-btn" onClick={() => openEdit(item)}>
                     Sửa
                   </button>
-                  <button className="card-btn" onClick={() => setPasswordModal(item)}>
+                  <button
+                    className="card-btn"
+                    onClick={() => setPasswordModal(item)}
+                  >
                     Pass 🔑
                   </button>
-                  <button className="card-btn danger" onClick={() => toggleStatus(item)}>
+                  <button
+                    className="card-btn danger"
+                    onClick={() => toggleStatus(item)}
+                  >
                     Khóa/Mở
                   </button>
                 </div>
@@ -1184,457 +1278,874 @@ export default function AdminUsers() {
       )}
 
       {/* DETAIL MODAL (React Portal) */}
-      {selected && createPortal(
-        <div className="admin-modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="admin-modal-wrapper admin-user-detail-modal" style={{ maxWidth: 750 }} onClick={(e) => e.stopPropagation()}>
-            <div className="admin-profile-header">
-              {renderAvatar(selected, 64)}
-              <div>
-                <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1.5px", color: "#d6b57e", fontWeight: "700" }}>
-                  Chi tiết tài khoản #{selected.UserId}
-                </span>
-                <h3>{selected.FullName}</h3>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
-                  <span style={{ fontSize: "13.5px", opacity: 0.85 }}>{selected.Email}</span>
-                  <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#d6b57e" }}></span>
-                  <span className={`admin-role-badge ${selected.RoleName === "CUSTOMER" ? "role-customer" : "role-staff"}`}>
-                    {selected.RoleName}
-                  </span>
-                  <span className={statusClass(selected.Status)}>
-                    {selected.Status}
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="admin-modal-close"
-                onClick={() => setSelected(null)}
-                style={{ position: "absolute", top: 20, right: 20, color: "#fff" }}
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="admin-profile-body">
-              <div className="admin-profile-section">
-                <h4>👤 Thông tin tài khoản</h4>
-                <InfoRow label="Số điện thoại" value={selected.Phone || "Chưa cập nhật"} />
-                <InfoRow
-                  label="Xác minh email"
-                  value={selected.IsVerified ? "Đã xác minh ✓" : "Chưa xác minh ✖"}
-                  valueColor={selected.IsVerified ? "#107c41" : "#a80000"}
-                />
-                <InfoRow label="Đăng nhập Google" value={selected.GoogleId ? "Có" : "Không"} />
-                <InfoRow label="Ngày tạo tài khoản" value={dateText(selected.CreatedAt)} />
-                <InfoRow label="Lần cập nhật cuối" value={dateTimeText(selected.UpdatedAt)} />
-              </div>
-
-              <div className="admin-profile-section">
-                {selected.RoleName === "CUSTOMER" ? (
-                  <>
-                    <h4>💎 Chi tiết khách hàng</h4>
-                    <InfoRow label="Mã khách hàng" value={`#${selected.CustomerId}`} />
-                    <InfoRow label="Hạng thành viên" value={selected.MembershipLevelName || "Standard"} valueColor="#b8860b" />
-                    <InfoRow label="Điểm tích lũy" value={`${selected.LoyaltyPoints || 0} điểm`} />
-                    <InfoRow label="Tổng tiền đã trả" value={money(selected.TotalPaid)} valueColor="#107c41" />
-                    <InfoRow label="Giới tính" value={selected.Gender || "Khác"} />
-                    <InfoRow label="Ngày sinh nhật" value={dateText(selected.DateOfBirth)} />
-                    <div style={{ fontSize: "13px", color: "#8c7e74", borderTop: "1px solid #ebdcc5", paddingTop: 10, marginTop: 4 }}>
-                      <strong>Địa chỉ:</strong> {selected.Address || "Chưa thiết lập"}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <h4>💼 Chi tiết nhân viên</h4>
-                    <InfoRow label="Mã nhân viên" value={`#${selected.EmployeeId}`} />
-                    <InfoRow label="Vị trí đảm nhiệm" value={selected.Position || "Nhân viên"} />
-                    <InfoRow label="Chi nhánh phân công" value={selected.BranchName || "Chưa phân công"} />
-                    <InfoRow label="Kinh nghiệm thực tế" value={`${selected.YearsOfExperience || 0} năm`} />
-                    <InfoRow label="Mức lương cơ bản" value={selected.Salary ? money(selected.Salary) : "Chưa thiết lập"} valueColor="#107c41" />
-                    <InfoRow label="Chuyên môn" value={selected.Specialization || "Chưa cập nhật"} />
-                    <InfoRow label="Ngày gia nhập spa" value={dateText(selected.HireDate)} />
-                    <div style={{ fontSize: "13px", color: "#8c7e74", borderTop: "1px solid #ebdcc5", paddingTop: 10, marginTop: 4 }}>
-                      <strong>Bio giới thiệu:</strong>
-                      <p style={{ margin: "4px 0 0 0", lineHeight: 1.5, fontStyle: "italic" }}>
-                        {selected.Bio || "Không có bio mô tả."}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div style={{ padding: "16px 32px", background: "#faf8f5", borderTop: "1px solid #ebdcc5", display: "flex", justifyContent: "flex-end" }}>
-              <button className="card-btn primary" style={{ maxWidth: 120 }} onClick={() => setSelected(null)}>
-                Đóng hồ sơ
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* CREATE/EDIT MODAL (React Portal) */}
-      {showModal && createPortal(
-        <div className="admin-modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="admin-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header" style={{ background: "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)", color: "#fff" }}>
-              <div>
-                <span style={{ color: "#d6b57e", textTransform: "uppercase", fontSize: "11px", fontWeight: "700", letterSpacing: "1px" }}>
-                  {editingId ? "Cấu hình tài khoản" : "Tài khoản mới"}
-                </span>
-                <h3 style={{ color: "#ffffff", marginTop: 4 }}>{editingId ? "Chỉnh sửa tài khoản" : "Tạo tài khoản mới"}</h3>
-              </div>
-              <button className="admin-modal-close" onClick={() => setShowModal(false)} style={{ color: "#fff" }}>
-                &times;
-              </button>
-            </div>
-
-            <div className="admin-modal-body user-editor">
-              <form className="admin-modal-form" onSubmit={submit}>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ background: "#3f2817", color: "#f2d9a6", width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "800", fontSize: "12px" }}>
-                    1
-                  </span>
-                  <h4 style={{ margin: 0, fontWeight: "800", color: "#3f2817", fontSize: "14.5px" }}>Thông tin tài khoản chung</h4>
-                </div>
-
-                <label>
-                  Họ và tên *
-                  <input
-                    value={form.FullName}
-                    onChange={(e) => setForm({ ...form, FullName: e.target.value })}
-                    placeholder="Nguyễn Văn A"
-                    required
-                  />
-                </label>
-                <label>
-                  Email đăng nhập *
-                  <input
-                    type="email"
-                    value={form.Email}
-                    onChange={(e) => setForm({ ...form, Email: e.target.value })}
-                    placeholder="nguyenvana@gmail.com"
-                    required
-                  />
-                </label>
-                <label>
-                  Số điện thoại
-                  <input
-                    value={form.Phone}
-                    onChange={(e) => setForm({ ...form, Phone: e.target.value })}
-                    placeholder="0912345678"
-                  />
-                </label>
-                <label>
-                  Vai trò tài khoản *
-                  <select
-                    value={form.RoleId}
-                    onChange={(e) => setForm({ ...form, RoleId: e.target.value })}
-                    required
+      {selected &&
+        createPortal(
+          <div
+            className="admin-modal-backdrop"
+            onClick={() => setSelected(null)}
+          >
+            <div
+              className="admin-modal-wrapper admin-user-detail-modal"
+              style={{ maxWidth: 750 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="admin-profile-header">
+                {renderAvatar(selected, 64)}
+                <div>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      letterSpacing: "1.5px",
+                      color: "#d6b57e",
+                      fontWeight: "700",
+                    }}
                   >
-                    <option value="">Chọn vai trò</option>
-                    {roles.map((r) => (
-                      <option key={r.RoleId} value={r.RoleId}>
-                        {r.RoleName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Trạng thái
-                  <select
-                    value={form.Status}
-                    onChange={(e) => setForm({ ...form, Status: e.target.value })}
+                    Chi tiết tài khoản #{selected.UserId}
+                  </span>
+                  <h3>{selected.FullName}</h3>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center",
+                      marginTop: 4,
+                    }}
                   >
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="INACTIVE">INACTIVE</option>
-                    <option value="BANNED">BANNED</option>
-                  </select>
-                </label>
-                <label>
-                  Xác minh Email
-                  <select
-                    value={form.IsVerified ? "1" : "0"}
-                    onChange={(e) => setForm({ ...form, IsVerified: e.target.value === "1" })}
-                  >
-                    <option value="1">Đã xác minh</option>
-                    <option value="0">Chưa xác minh</option>
-                  </select>
-                </label>
-                {!editingId ? (
-                  <label>
-                    Mật khẩu khởi tạo *
-                    <input
-                      type="password"
-                      value={form.Password}
-                      onChange={(e) => setForm({ ...form, Password: e.target.value })}
-                      placeholder="Mật khẩu từ 6 ký tự trở lên"
-                      required
-                    />
-                  </label>
-                ) : null}
-                <label>
-                  Đường dẫn avatar
-                  <input
-                    value={form.AvatarUrl}
-                    onChange={(e) => setForm({ ...form, AvatarUrl: e.target.value })}
-                    placeholder="/uploads/avatars/user-1.png"
-                  />
-                </label>
-
-                {/* Sub-form fields */}
-                {currentRoleName === "CUSTOMER" ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 12, borderTop: "2px solid #ecd8b8", paddingTop: 18 }}>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}>
-                      <span style={{ background: "#3f2817", color: "#f2d9a6", width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "800", fontSize: "12px" }}>
-                        2
-                      </span>
-                      <h4 style={{ margin: 0, fontWeight: "800", color: "#3f2817", fontSize: "14.5px" }}>Chi tiết thông tin khách hàng</h4>
-                    </div>
-                    <label>
-                      Giới tính
-                      <select value={form.Gender} onChange={(e) => setForm({ ...form, Gender: e.target.value })}>
-                        <option value="Nam">Nam</option>
-                        <option value="Nữ">Nữ</option>
-                        <option value="Khác">Khác</option>
-                      </select>
-                    </label>
-                    <label>
-                      Ngày sinh
-                      <input
-                        type="date"
-                        value={form.DateOfBirth}
-                        onChange={(e) => setForm({ ...form, DateOfBirth: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Địa chỉ liên hệ
-                      <input
-                        value={form.Address}
-                        onChange={(e) => setForm({ ...form, Address: e.target.value })}
-                        placeholder="Số 12, Đường số 5, Q.7, TP.HCM"
-                      />
-                    </label>
-                    <label>
-                      Điểm tích lũy loyalty
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.LoyaltyPoints}
-                        onChange={(e) => setForm({ ...form, LoyaltyPoints: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Hạng thành viên
-                      <select
-                        value={form.MembershipLevelId}
-                        onChange={(e) => setForm({ ...form, MembershipLevelId: e.target.value })}
-                      >
-                        <option value="">Mặc định hệ thống</option>
-                        {membershipLevels.map((ml) => (
-                          <option key={ml.MembershipLevelId} value={ml.MembershipLevelId}>
-                            {ml.LevelName} (từ {ml.MinPoints}đ)
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <span style={{ fontSize: "13.5px", opacity: 0.85 }}>
+                      {selected.Email}
+                    </span>
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: "#d6b57e",
+                      }}
+                    ></span>
+                    <span
+                      className={`admin-role-badge ${selected.RoleName === "CUSTOMER" ? "role-customer" : "role-staff"}`}
+                    >
+                      {selected.RoleName}
+                    </span>
+                    <span className={statusClass(selected.Status)}>
+                      {selected.Status}
+                    </span>
                   </div>
-                ) : currentRoleName !== "" ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 12, borderTop: "2px solid #ecd8b8", paddingTop: 18 }}>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}>
-                      <span style={{ background: "#3f2817", color: "#f2d9a6", width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: "800", fontSize: "12px" }}>
-                        2
-                      </span>
-                      <h4 style={{ margin: 0, fontWeight: "800", color: "#3f2817", fontSize: "14.5px" }}>Chi tiết thông tin nhân sự</h4>
-                    </div>
-                    <label>
-                      Chi nhánh làm việc
-                      <select
-                        value={form.BranchId}
-                        onChange={(e) => setForm({ ...form, BranchId: e.target.value })}
-                      >
-                        <option value="">Chọn chi nhánh</option>
-                        {branches.map((b) => (
-                          <option key={b.BranchId} value={b.BranchId}>
-                            {b.BranchName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Chức danh công việc
-                      <input
-                        value={form.Position}
-                        onChange={(e) => setForm({ ...form, Position: e.target.value })}
-                        placeholder="Kỹ thuật viên chăm sóc da"
-                      />
-                    </label>
-                    <label>
-                      Lĩnh vực chuyên môn
-                      <input
-                        value={form.Specialization}
-                        onChange={(e) => setForm({ ...form, Specialization: e.target.value })}
-                        placeholder="Trị mụn chuyên sâu, Massage đá nóng"
-                      />
-                    </label>
-                    <label>
-                      Mức lương cơ bản (VND)
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.Salary}
-                        onChange={(e) => setForm({ ...form, Salary: e.target.value })}
-                        placeholder="8000000"
-                      />
-                    </label>
-                    <label>
-                      Ngày vào làm việc
-                      <input
-                        type="date"
-                        value={form.HireDate}
-                        onChange={(e) => setForm({ ...form, HireDate: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Số năm kinh nghiệm
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.YearsOfExperience}
-                        onChange={(e) => setForm({ ...form, YearsOfExperience: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Bio giới thiệu bản thân
-                      <textarea
-                        rows={3}
-                        value={form.Bio}
-                        onChange={(e) => setForm({ ...form, Bio: e.target.value })}
-                        placeholder="Mô tả kỹ năng, thái độ phục vụ khách hàng..."
-                      />
-                    </label>
-                  </div>
-                ) : null}
-              </form>
-
-              {/* Real-time Profile Live Preview */}
-              <div className="admin-editor-preview-column">
-                <span className="admin-preview-title">Xem trước hồ sơ thẻ</span>
-                <div
-                  className={`admin-category-card admin-user-card ${
-                    currentRoleName === "CUSTOMER" ? "customer-vip-gold" : "employee-staff"
-                  }`}
-                  style={{ width: "100%", maxWidth: 300, minHeight: 320, transform: "none", boxShadow: "none" }}
+                </div>
+                <button
+                  type="button"
+                  className="admin-modal-close"
+                  onClick={() => setSelected(null)}
+                  style={{
+                    position: "absolute",
+                    top: 20,
+                    right: 20,
+                    color: "#fff",
+                  }}
                 >
-                  <div className="admin-user-card-header">
-                    {renderAvatar(form, 52)}
-                    <div className="admin-user-info">
-                      <h4>{form.FullName || "Tên hiển thị"}</h4>
-                      <span>{form.Email || "email@example.com"}</span>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <span
-                          className={`admin-role-badge ${
-                            currentRoleName === "CUSTOMER" ? "role-customer" : "role-staff"
-                          }`}
-                        >
-                          {selectedRoleObject?.RoleName || "CHƯA CHỌN"}
-                        </span>
-                        <span className={statusClass(form.Status)}>
-                          {form.Status}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="admin-user-card-body">
-                    {currentRoleName === "CUSTOMER" ? (
-                      <>
-                        <InfoRow
-                          label="Hạng thành viên"
-                          value={
-                            membershipLevels.find((ml) => String(ml.MembershipLevelId) === String(form.MembershipLevelId))
-                              ?.LevelName || "Standard"
-                          }
-                          valueColor="#b8860b"
-                        />
-                        <InfoRow label="Điểm tích lũy" value={`${form.LoyaltyPoints || 0} điểm`} />
-                        <InfoRow label="Tổng chi tiêu" value={money(0)} valueColor="#107c41" />
-                        <InfoRow label="Lịch hẹn tham gia" value="0 cuộc" />
-                      </>
-                    ) : (
-                      <>
-                        <InfoRow label="Chức vụ" value={form.Position || "Nhân viên Spa"} />
-                        <InfoRow
-                          label="Chi nhánh"
-                          value={
-                            branches.find((b) => String(b.BranchId) === String(form.BranchId))?.BranchName || "Chưa phân công"
-                          }
-                        />
-                        <InfoRow label="Kinh nghiệm" value={`${form.YearsOfExperience || 0} năm`} />
-                        <InfoRow label="Lịch hẹn trị liệu" value="0 ca" />
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="admin-modal-footer">
-              <button className="card-btn" type="button" onClick={() => setShowModal(false)}>
-                Hủy
-              </button>
-              <button className="card-btn primary" type="button" onClick={submit} disabled={saving}>
-                {saving ? "Đang lưu..." : editingId ? "Cập nhật tài khoản" : "Tạo tài khoản"}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* RESET PASSWORD MODAL (React Portal) */}
-      {passwordModal && createPortal(
-        <div className="admin-modal-backdrop" onClick={() => setPasswordModal(null)}>
-          <div className="admin-modal-wrapper" style={{ maxWidth: 450 }} onClick={(e) => e.stopPropagation()}>
-            <form onSubmit={handleResetPassword}>
-              <div className="admin-modal-header" style={{ background: "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)", color: "#fff" }}>
-                <h3>Đặt lại mật khẩu</h3>
-                <button type="button" className="admin-modal-close" onClick={() => setPasswordModal(null)} style={{ color: "#fff" }}>
                   &times;
                 </button>
               </div>
 
-              <div style={{ padding: "24px 32px" }}>
-                <p style={{ margin: "0 0 16px 0", fontSize: "14px", color: "#8c7e74" }}>
-                  Bạn đang đổi mật khẩu cho tài khoản <strong>{passwordModal.Email}</strong>. Nhập mật khẩu mới bên dưới.
-                </p>
-                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "13.5px", fontWeight: "700", color: "#5c4a3c" }}>
-                  Mật khẩu mới *
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Nhập tối thiểu 6 ký tự..."
-                    required
-                    style={{ padding: "12px 16px", border: "1px solid #ebdcc5", borderRadius: 12, outline: "none", fontSize: "14px" }}
+              <div className="admin-profile-body">
+                <div className="admin-profile-section">
+                  <h4>👤 Thông tin tài khoản</h4>
+                  <InfoRow
+                    label="Số điện thoại"
+                    value={selected.Phone || "Chưa cập nhật"}
                   />
-                </label>
+                  <InfoRow
+                    label="Xác minh email"
+                    value={
+                      selected.IsVerified ? "Đã xác minh ✓" : "Chưa xác minh ✖"
+                    }
+                    valueColor={selected.IsVerified ? "#107c41" : "#a80000"}
+                  />
+                  <InfoRow
+                    label="Đăng nhập Google"
+                    value={selected.GoogleId ? "Có" : "Không"}
+                  />
+                  <InfoRow
+                    label="Ngày tạo tài khoản"
+                    value={dateText(selected.CreatedAt)}
+                  />
+                  <InfoRow
+                    label="Lần cập nhật cuối"
+                    value={dateTimeText(selected.UpdatedAt)}
+                  />
+                </div>
+
+                <div className="admin-profile-section">
+                  {selected.RoleName === "CUSTOMER" ? (
+                    <>
+                      <h4>💎 Chi tiết khách hàng</h4>
+                      <InfoRow
+                        label="Mã khách hàng"
+                        value={`#${selected.CustomerId}`}
+                      />
+                      <InfoRow
+                        label="Hạng thành viên"
+                        value={selected.MembershipLevelName || "Standard"}
+                        valueColor="#b8860b"
+                      />
+                      <InfoRow
+                        label="Điểm tích lũy"
+                        value={`${selected.LoyaltyPoints || 0} điểm`}
+                      />
+                      <InfoRow
+                        label="Tổng tiền đã trả"
+                        value={money(selected.TotalPaid)}
+                        valueColor="#107c41"
+                      />
+                      <InfoRow
+                        label="Giới tính"
+                        value={selected.Gender || "Khác"}
+                      />
+                      <InfoRow
+                        label="Ngày sinh nhật"
+                        value={dateText(selected.DateOfBirth)}
+                      />
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          color: "#8c7e74",
+                          borderTop: "1px solid #ebdcc5",
+                          paddingTop: 10,
+                          marginTop: 4,
+                        }}
+                      >
+                        <strong>Địa chỉ:</strong>{" "}
+                        {selected.Address || "Chưa thiết lập"}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h4>💼 Chi tiết nhân viên</h4>
+                      <InfoRow
+                        label="Mã nhân viên"
+                        value={`#${selected.EmployeeId}`}
+                      />
+                      <InfoRow
+                        label="Vị trí đảm nhiệm"
+                        value={selected.Position || "Nhân viên"}
+                      />
+                      <InfoRow
+                        label="Chi nhánh phân công"
+                        value={selected.BranchName || "Chưa phân công"}
+                      />
+                      <InfoRow
+                        label="Kinh nghiệm thực tế"
+                        value={`${selected.YearsOfExperience || 0} năm`}
+                      />
+                      <InfoRow
+                        label="Mức lương cơ bản"
+                        value={
+                          selected.Salary
+                            ? money(selected.Salary)
+                            : "Chưa thiết lập"
+                        }
+                        valueColor="#107c41"
+                      />
+                      <InfoRow
+                        label="Chuyên môn"
+                        value={selected.Specialization || "Chưa cập nhật"}
+                      />
+                      <InfoRow
+                        label="Ngày gia nhập spa"
+                        value={dateText(selected.HireDate)}
+                      />
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          color: "#8c7e74",
+                          borderTop: "1px solid #ebdcc5",
+                          paddingTop: 10,
+                          marginTop: 4,
+                        }}
+                      >
+                        <strong>Bio giới thiệu:</strong>
+                        <p
+                          style={{
+                            margin: "4px 0 0 0",
+                            lineHeight: 1.5,
+                            fontStyle: "italic",
+                          }}
+                        >
+                          {selected.Bio || "Không có bio mô tả."}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "16px 32px",
+                  background: "#faf8f5",
+                  borderTop: "1px solid #ebdcc5",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  className="card-btn primary"
+                  style={{ maxWidth: 120 }}
+                  onClick={() => setSelected(null)}
+                >
+                  Đóng hồ sơ
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* CREATE/EDIT MODAL (React Portal) */}
+      {showModal &&
+        createPortal(
+          <div
+            className="admin-modal-backdrop"
+            onClick={() => setShowModal(false)}
+          >
+            <div
+              className="admin-modal-wrapper"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="admin-modal-header"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)",
+                  color: "#fff",
+                }}
+              >
+                <div>
+                  <span
+                    style={{
+                      color: "#d6b57e",
+                      textTransform: "uppercase",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      letterSpacing: "1px",
+                    }}
+                  >
+                    {editingId ? "Cấu hình tài khoản" : "Tài khoản mới"}
+                  </span>
+                  <h3 style={{ color: "#ffffff", marginTop: 4 }}>
+                    {editingId ? "Chỉnh sửa tài khoản" : "Tạo tài khoản mới"}
+                  </h3>
+                </div>
+                <button
+                  className="admin-modal-close"
+                  onClick={() => setShowModal(false)}
+                  style={{ color: "#fff" }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="admin-modal-body user-editor">
+                <form className="admin-modal-form" onSubmit={submit}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        background: "#3f2817",
+                        color: "#f2d9a6",
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        display: "grid",
+                        placeItems: "center",
+                        fontWeight: "800",
+                        fontSize: "12px",
+                      }}
+                    >
+                      1
+                    </span>
+                    <h4
+                      style={{
+                        margin: 0,
+                        fontWeight: "800",
+                        color: "#3f2817",
+                        fontSize: "14.5px",
+                      }}
+                    >
+                      Thông tin tài khoản chung
+                    </h4>
+                  </div>
+
+                  <label>
+                    Họ và tên *
+                    <input
+                      value={form.FullName}
+                      onChange={(e) =>
+                        setForm({ ...form, FullName: e.target.value })
+                      }
+                      placeholder="Nguyễn Văn A"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Email đăng nhập *
+                    <input
+                      type="email"
+                      value={form.Email}
+                      onChange={(e) =>
+                        setForm({ ...form, Email: e.target.value })
+                      }
+                      placeholder="nguyenvana@gmail.com"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Số điện thoại
+                    <input
+                      value={form.Phone}
+                      onChange={(e) =>
+                        setForm({ ...form, Phone: e.target.value })
+                      }
+                      placeholder="0912345678"
+                    />
+                  </label>
+                  <label>
+                    Vai trò tài khoản *
+                    <select
+                      value={form.RoleId}
+                      onChange={(e) =>
+                        setForm({ ...form, RoleId: e.target.value })
+                      }
+                      required
+                    >
+                      <option value="">Chọn vai trò</option>
+                      {roles.map((r) => (
+                        <option key={r.RoleId} value={r.RoleId}>
+                          {r.RoleName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Trạng thái
+                    <select
+                      value={form.Status}
+                      onChange={(e) =>
+                        setForm({ ...form, Status: e.target.value })
+                      }
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="INACTIVE">INACTIVE</option>
+                      <option value="BANNED">BANNED</option>
+                    </select>
+                  </label>
+                  <label>
+                    Xác minh Email
+                    <select
+                      value={form.IsVerified ? "1" : "0"}
+                      onChange={(e) =>
+                        setForm({ ...form, IsVerified: e.target.value === "1" })
+                      }
+                    >
+                      <option value="1">Đã xác minh</option>
+                      <option value="0">Chưa xác minh</option>
+                    </select>
+                  </label>
+                  {!editingId ? (
+                    <label>
+                      Mật khẩu khởi tạo *
+                      <input
+                        type="password"
+                        value={form.Password}
+                        onChange={(e) =>
+                          setForm({ ...form, Password: e.target.value })
+                        }
+                        placeholder="Mật khẩu từ 6 ký tự trở lên"
+                        required
+                      />
+                    </label>
+                  ) : null}
+                  <label>
+                    Đường dẫn avatar
+                    <input
+                      value={form.AvatarUrl}
+                      onChange={(e) =>
+                        setForm({ ...form, AvatarUrl: e.target.value })
+                      }
+                      placeholder="/uploads/avatars/user-1.png"
+                    />
+                  </label>
+
+                  {/* Sub-form fields */}
+                  {currentRoleName === "CUSTOMER" ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 18,
+                        marginTop: 12,
+                        borderTop: "2px solid #ecd8b8",
+                        paddingTop: 18,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "center",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            background: "#3f2817",
+                            color: "#f2d9a6",
+                            width: 24,
+                            height: 24,
+                            borderRadius: "50%",
+                            display: "grid",
+                            placeItems: "center",
+                            fontWeight: "800",
+                            fontSize: "12px",
+                          }}
+                        >
+                          2
+                        </span>
+                        <h4
+                          style={{
+                            margin: 0,
+                            fontWeight: "800",
+                            color: "#3f2817",
+                            fontSize: "14.5px",
+                          }}
+                        >
+                          Chi tiết thông tin khách hàng
+                        </h4>
+                      </div>
+                      <label>
+                        Giới tính
+                        <select
+                          value={form.Gender}
+                          onChange={(e) =>
+                            setForm({ ...form, Gender: e.target.value })
+                          }
+                        >
+                          <option value="Nam">Nam</option>
+                          <option value="Nữ">Nữ</option>
+                          <option value="Khác">Khác</option>
+                        </select>
+                      </label>
+                      <label>
+                        Ngày sinh
+                        <input
+                          type="date"
+                          value={form.DateOfBirth}
+                          onChange={(e) =>
+                            setForm({ ...form, DateOfBirth: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Địa chỉ liên hệ
+                        <input
+                          value={form.Address}
+                          onChange={(e) =>
+                            setForm({ ...form, Address: e.target.value })
+                          }
+                          placeholder="Số 12, Đường số 5, Q.7, TP.HCM"
+                        />
+                      </label>
+                      <label>
+                        Điểm tích lũy loyalty
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.LoyaltyPoints}
+                          onChange={(e) =>
+                            setForm({ ...form, LoyaltyPoints: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Hạng thành viên
+                        <select
+                          value={form.MembershipLevelId}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              MembershipLevelId: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">Mặc định hệ thống</option>
+                          {membershipLevels.map((ml) => (
+                            <option
+                              key={ml.MembershipLevelId}
+                              value={ml.MembershipLevelId}
+                            >
+                              {ml.LevelName} (từ {ml.MinPoints}đ)
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  ) : currentRoleName !== "" ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 18,
+                        marginTop: 12,
+                        borderTop: "2px solid #ecd8b8",
+                        paddingTop: 18,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "center",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            background: "#3f2817",
+                            color: "#f2d9a6",
+                            width: 24,
+                            height: 24,
+                            borderRadius: "50%",
+                            display: "grid",
+                            placeItems: "center",
+                            fontWeight: "800",
+                            fontSize: "12px",
+                          }}
+                        >
+                          2
+                        </span>
+                        <h4
+                          style={{
+                            margin: 0,
+                            fontWeight: "800",
+                            color: "#3f2817",
+                            fontSize: "14.5px",
+                          }}
+                        >
+                          Chi tiết thông tin nhân sự
+                        </h4>
+                      </div>
+                      <label>
+                        Chi nhánh làm việc
+                        <select
+                          value={form.BranchId}
+                          onChange={(e) =>
+                            setForm({ ...form, BranchId: e.target.value })
+                          }
+                        >
+                          <option value="">Chọn chi nhánh</option>
+                          {branches.map((b) => (
+                            <option key={b.BranchId} value={b.BranchId}>
+                              {b.BranchName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Chức danh công việc
+                        <input
+                          value={form.Position}
+                          onChange={(e) =>
+                            setForm({ ...form, Position: e.target.value })
+                          }
+                          placeholder="Kỹ thuật viên chăm sóc da"
+                        />
+                      </label>
+                      <label>
+                        Lĩnh vực chuyên môn
+                        <input
+                          value={form.Specialization}
+                          onChange={(e) =>
+                            setForm({ ...form, Specialization: e.target.value })
+                          }
+                          placeholder="Trị mụn chuyên sâu, Massage đá nóng"
+                        />
+                      </label>
+                      <label>
+                        Mức lương cơ bản (VND)
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.Salary}
+                          onChange={(e) =>
+                            setForm({ ...form, Salary: e.target.value })
+                          }
+                          placeholder="8000000"
+                        />
+                      </label>
+                      <label>
+                        Ngày vào làm việc
+                        <input
+                          type="date"
+                          value={form.HireDate}
+                          onChange={(e) =>
+                            setForm({ ...form, HireDate: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Số năm kinh nghiệm
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.YearsOfExperience}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              YearsOfExperience: e.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Bio giới thiệu bản thân
+                        <textarea
+                          rows={3}
+                          value={form.Bio}
+                          onChange={(e) =>
+                            setForm({ ...form, Bio: e.target.value })
+                          }
+                          placeholder="Mô tả kỹ năng, thái độ phục vụ khách hàng..."
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                </form>
+
+                {/* Real-time Profile Live Preview */}
+                <div className="admin-editor-preview-column">
+                  <span className="admin-preview-title">
+                    Xem trước hồ sơ thẻ
+                  </span>
+                  <div
+                    className={`admin-category-card admin-user-card ${
+                      currentRoleName === "CUSTOMER"
+                        ? "customer-vip-gold"
+                        : "employee-staff"
+                    }`}
+                    style={{
+                      width: "100%",
+                      maxWidth: 300,
+                      minHeight: 320,
+                      transform: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <div className="admin-user-card-header">
+                      {renderAvatar(form, 52)}
+                      <div className="admin-user-info">
+                        <h4>{form.FullName || "Tên hiển thị"}</h4>
+                        <span>{form.Email || "email@example.com"}</span>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            alignItems: "center",
+                          }}
+                        >
+                          <span
+                            className={`admin-role-badge ${
+                              currentRoleName === "CUSTOMER"
+                                ? "role-customer"
+                                : "role-staff"
+                            }`}
+                          >
+                            {selectedRoleObject?.RoleName || "CHƯA CHỌN"}
+                          </span>
+                          <span className={statusClass(form.Status)}>
+                            {form.Status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="admin-user-card-body">
+                      {currentRoleName === "CUSTOMER" ? (
+                        <>
+                          <InfoRow
+                            label="Hạng thành viên"
+                            value={
+                              membershipLevels.find(
+                                (ml) =>
+                                  String(ml.MembershipLevelId) ===
+                                  String(form.MembershipLevelId),
+                              )?.LevelName || "Standard"
+                            }
+                            valueColor="#b8860b"
+                          />
+                          <InfoRow
+                            label="Điểm tích lũy"
+                            value={`${form.LoyaltyPoints || 0} điểm`}
+                          />
+                          <InfoRow
+                            label="Tổng chi tiêu"
+                            value={money(0)}
+                            valueColor="#107c41"
+                          />
+                          <InfoRow label="Lịch hẹn tham gia" value="0 cuộc" />
+                        </>
+                      ) : (
+                        <>
+                          <InfoRow
+                            label="Chức vụ"
+                            value={form.Position || "Nhân viên Spa"}
+                          />
+                          <InfoRow
+                            label="Chi nhánh"
+                            value={
+                              branches.find(
+                                (b) =>
+                                  String(b.BranchId) === String(form.BranchId),
+                              )?.BranchName || "Chưa phân công"
+                            }
+                          />
+                          <InfoRow
+                            label="Kinh nghiệm"
+                            value={`${form.YearsOfExperience || 0} năm`}
+                          />
+                          <InfoRow label="Lịch hẹn trị liệu" value="0 ca" />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="admin-modal-footer">
-                <button className="card-btn" type="button" onClick={() => setPasswordModal(null)}>
+                <button
+                  className="card-btn"
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                >
                   Hủy
                 </button>
-                <button className="card-btn primary" type="submit" disabled={saving}>
-                  {saving ? "Đang đặt lại..." : "Xác nhận đặt lại"}
+                <button
+                  className="card-btn primary"
+                  type="button"
+                  onClick={submit}
+                  disabled={saving}
+                >
+                  {saving
+                    ? "Đang lưu..."
+                    : editingId
+                      ? "Cập nhật tài khoản"
+                      : "Tạo tài khoản"}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* RESET PASSWORD MODAL (React Portal) */}
+      {passwordModal &&
+        createPortal(
+          <div
+            className="admin-modal-backdrop"
+            onClick={() => setPasswordModal(null)}
+          >
+            <div
+              className="admin-modal-wrapper"
+              style={{ maxWidth: 450 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <form onSubmit={handleResetPassword}>
+                <div
+                  className="admin-modal-header"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)",
+                    color: "#fff",
+                  }}
+                >
+                  <h3>Đặt lại mật khẩu</h3>
+                  <button
+                    type="button"
+                    className="admin-modal-close"
+                    onClick={() => setPasswordModal(null)}
+                    style={{ color: "#fff" }}
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div style={{ padding: "24px 32px" }}>
+                  <p
+                    style={{
+                      margin: "0 0 16px 0",
+                      fontSize: "14px",
+                      color: "#8c7e74",
+                    }}
+                  >
+                    Bạn đang đổi mật khẩu cho tài khoản{" "}
+                    <strong>{passwordModal.Email}</strong>. Nhập mật khẩu mới
+                    bên dưới.
+                  </p>
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                      fontSize: "13.5px",
+                      fontWeight: "700",
+                      color: "#5c4a3c",
+                    }}
+                  >
+                    Mật khẩu mới *
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Nhập tối thiểu 6 ký tự..."
+                      required
+                      style={{
+                        padding: "12px 16px",
+                        border: "1px solid #ebdcc5",
+                        borderRadius: 12,
+                        outline: "none",
+                        fontSize: "14px",
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div className="admin-modal-footer">
+                  <button
+                    className="card-btn"
+                    type="button"
+                    onClick={() => setPasswordModal(null)}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    className="card-btn primary"
+                    type="submit"
+                    disabled={saving}
+                  >
+                    {saving ? "Đang đặt lại..." : "Xác nhận đặt lại"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }
