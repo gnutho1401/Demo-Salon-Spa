@@ -65,11 +65,12 @@ export default function AdminVouchers() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -78,11 +79,12 @@ export default function AdminVouchers() {
     setTimeout(() => {
       const element = document.getElementById(`${type}-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -161,7 +163,11 @@ export default function AdminVouchers() {
   };
 
   const handleClearFilters = () => {
-    const wasEmpty = filters.status === "" && filters.discountType === "" && filters.fromDate === "" && filters.toDate === "";
+    const wasEmpty =
+      filters.status === "" &&
+      filters.discountType === "" &&
+      filters.fromDate === "" &&
+      filters.toDate === "";
     setFilters({
       keyword: "",
       discountType: "",
@@ -1370,9 +1376,9 @@ export default function AdminVouchers() {
       {!loading ? (
         <div className="admin-vouchers-grid" ref={gridRef}>
           {items.map((item) => (
-            <article 
-              className="admin-voucher-card" 
-              id={`voucher-card-${item.VoucherId}`} 
+            <article
+              className="admin-voucher-card"
+              id={`voucher-card-${item.VoucherId}`}
               key={item.VoucherId}
             >
               <div className="voucher-ticket-left">
@@ -1391,19 +1397,25 @@ export default function AdminVouchers() {
                 <div className="voucher-ticket-discount">
                   {item.DiscountType === "PERCENT" ? (
                     <>
-                      <span className="value">{Number(item.DiscountValue || 0)}</span>
+                      <span className="value">
+                        {Number(item.DiscountValue || 0)}
+                      </span>
                       <span className="unit">% OFF</span>
                     </>
                   ) : (
                     <>
-                      <span className="value">{Number(item.DiscountValue || 0) / 1000}</span>
+                      <span className="value">
+                        {Number(item.DiscountValue || 0) / 1000}
+                      </span>
                       <span className="unit">K OFF</span>
                     </>
                   )}
                 </div>
 
                 <div className="voucher-status-badge-container">
-                  <span className={statusClass(item.RuntimeStatus || item.Status)}>
+                  <span
+                    className={statusClass(item.RuntimeStatus || item.Status)}
+                  >
                     {item.RuntimeStatus || item.Status}
                   </span>
                   <span className={statusClass(item.Status)}>
@@ -1412,23 +1424,42 @@ export default function AdminVouchers() {
                 </div>
 
                 <div className="voucher-limits">
-                  <span>Đơn tối thiểu: <strong>{money(item.MinOrderAmount)}</strong></span>
-                  <span>Giảm tối đa: <strong>{item.MaxDiscountAmount === null ? "Không giới hạn" : money(item.MaxDiscountAmount)}</strong></span>
+                  <span>
+                    Đơn tối thiểu: <strong>{money(item.MinOrderAmount)}</strong>
+                  </span>
+                  <span>
+                    Giảm tối đa:{" "}
+                    <strong>
+                      {item.MaxDiscountAmount === null
+                        ? "Không giới hạn"
+                        : money(item.MaxDiscountAmount)}
+                    </strong>
+                  </span>
                 </div>
 
                 <div className="voucher-duration">
-                  Hạn dùng: {dateText(item.StartDate)} → {dateText(item.EndDate)}
+                  Hạn dùng: {dateText(item.StartDate)} →{" "}
+                  {dateText(item.EndDate)}
                 </div>
 
                 <div className="voucher-progress">
                   <div className="progress-labels">
-                    <span>Đã dùng: <strong>{item.UsedCount || 0}</strong></span>
-                    <span>Còn lại: <strong>{item.RemainingQuantity || 0} / {item.Quantity || 0}</strong></span>
+                    <span>
+                      Đã dùng: <strong>{item.UsedCount || 0}</strong>
+                    </span>
+                    <span>
+                      Còn lại:{" "}
+                      <strong>
+                        {item.RemainingQuantity || 0} / {item.Quantity || 0}
+                      </strong>
+                    </span>
                   </div>
                   <div className="progress-bar-bg">
-                    <div 
-                      className="progress-bar-fill" 
-                      style={{ width: `${Math.min(100, ((item.UsedCount || 0) / (item.Quantity || 1)) * 100)}%` }}
+                    <div
+                      className="progress-bar-fill"
+                      style={{
+                        width: `${Math.min(100, ((item.UsedCount || 0) / (item.Quantity || 1)) * 100)}%`,
+                      }}
                     ></div>
                   </div>
                 </div>
@@ -1585,7 +1616,9 @@ export default function AdminVouchers() {
 
               <div className="voucher-preview-container">
                 <div className="voucher-preview-label">LIVE PREVIEW</div>
-                <div className={`voucher-ticket-preview ${form.Status === "INACTIVE" ? "inactive" : ""}`}>
+                <div
+                  className={`voucher-ticket-preview ${form.Status === "INACTIVE" ? "inactive" : ""}`}
+                >
                   <div className="preview-left">
                     <div className="preview-badge">🎟️</div>
                     <div className="preview-code">{form.Code || "SPA20"}</div>
@@ -1600,20 +1633,35 @@ export default function AdminVouchers() {
                     <div className="preview-discount">
                       {form.DiscountType === "PERCENT" ? (
                         <>
-                          <span className="value">{form.DiscountValue || "20"}</span>
+                          <span className="value">
+                            {form.DiscountValue || "20"}
+                          </span>
                           <span className="unit">% OFF</span>
                         </>
                       ) : (
                         <>
-                          <span className="value">{(Number(form.DiscountValue || 50000) / 1000).toFixed(0)}</span>
+                          <span className="value">
+                            {(
+                              Number(form.DiscountValue || 50000) / 1000
+                            ).toFixed(0)}
+                          </span>
                           <span className="unit">K OFF</span>
                         </>
                       )}
                     </div>
                     <div className="preview-details">
-                      <div>Hạn: {form.StartDate ? dateText(form.StartDate) : "Ngày đi"} → {form.EndDate ? dateText(form.EndDate) : "Hạn cuối"}</div>
+                      <div>
+                        Hạn:{" "}
+                        {form.StartDate ? dateText(form.StartDate) : "Ngày đi"}{" "}
+                        → {form.EndDate ? dateText(form.EndDate) : "Hạn cuối"}
+                      </div>
                       <div>Tối thiểu: {money(form.MinOrderAmount || 0)}</div>
-                      <div>Giảm tối đa: {form.MaxDiscountAmount ? money(form.MaxDiscountAmount) : "Không giới hạn"}</div>
+                      <div>
+                        Giảm tối đa:{" "}
+                        {form.MaxDiscountAmount
+                          ? money(form.MaxDiscountAmount)
+                          : "Không giới hạn"}
+                      </div>
                       <div>Số lượng: {form.Quantity || 0} vé</div>
                     </div>
                   </div>
@@ -1797,7 +1845,8 @@ export default function AdminVouchers() {
                 <div className="voucher-summary-card">
                   <span>Giảm giá tối đa</span>
                   <strong>
-                    {form.MaxDiscountAmount === "" || form.MaxDiscountAmount === null
+                    {form.MaxDiscountAmount === "" ||
+                    form.MaxDiscountAmount === null
                       ? "Không giới hạn"
                       : money(form.MaxDiscountAmount || 0)}
                   </strong>
@@ -1844,7 +1893,11 @@ export default function AdminVouchers() {
 
       <AdminConfirmDialog
         open={Boolean(confirmAction)}
-        title={confirmAction?.type === "delete" ? "Xóa voucher?" : "Cập nhật trạng thái voucher?"}
+        title={
+          confirmAction?.type === "delete"
+            ? "Xóa voucher?"
+            : "Cập nhật trạng thái voucher?"
+        }
         description={
           confirmAction?.type === "delete"
             ? "Voucher sẽ bị xóa khỏi hệ thống và không thể tiếp tục được khách hàng sử dụng."
@@ -1855,11 +1908,17 @@ export default function AdminVouchers() {
             <>
               <strong>{confirmAction.item.Code}</strong>
               <span> · Giá trị {discountText(confirmAction.item)}</span>
-              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+              {confirmAction.type === "status" ? (
+                <span> · Trạng thái mới: {confirmAction.nextStatus}</span>
+              ) : null}
             </>
           ) : null
         }
-        confirmLabel={confirmAction?.type === "delete" ? "Xóa voucher" : "Cập nhật trạng thái"}
+        confirmLabel={
+          confirmAction?.type === "delete"
+            ? "Xóa voucher"
+            : "Cập nhật trạng thái"
+        }
         tone={confirmAction?.type === "delete" ? "danger" : "warning"}
         busy={confirmBusy}
         onCancel={() => setConfirmAction(null)}

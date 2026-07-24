@@ -93,11 +93,12 @@ export default function AdminWorkShifts() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -106,11 +107,12 @@ export default function AdminWorkShifts() {
     setTimeout(() => {
       const element = document.getElementById(`${type}-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -760,7 +762,8 @@ export default function AdminWorkShifts() {
           <div className="admin-eyebrow">Work Shifts Management</div>
           <h1>Quản lý ca làm</h1>
           <p>
-            Tạo, sửa, lọc và quản lý lịch làm việc/ngày nghỉ cho nhân viên Spa. Hệ thống tự động kiểm tra trùng ca làm.
+            Tạo, sửa, lọc và quản lý lịch làm việc/ngày nghỉ cho nhân viên Spa.
+            Hệ thống tự động kiểm tra trùng ca làm.
           </p>
         </div>
 
@@ -866,18 +869,34 @@ export default function AdminWorkShifts() {
           <option value="DAY_OFF">DAY_OFF</option>
         </select>
 
-        <button className="admin-refresh-btn" style={{ padding: "10px 20px" }} onClick={handleFilter}>
+        <button
+          className="admin-refresh-btn"
+          style={{ padding: "10px 20px" }}
+          onClick={handleFilter}
+        >
           Lọc
         </button>
 
-        <button className="card-btn-action btn-secondary" onClick={clearFilters}>
+        <button
+          className="card-btn-action btn-secondary"
+          onClick={clearFilters}
+        >
           Xóa lọc
         </button>
       </div>
 
       <div ref={gridRef}>
         {loading ? (
-          <div style={{ padding: "60px", textAlign: "center", color: "#64748b", background: "#ffffff", borderRadius: "16px", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)" }}>
+          <div
+            style={{
+              padding: "60px",
+              textAlign: "center",
+              color: "#64748b",
+              background: "#ffffff",
+              borderRadius: "16px",
+              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
+            }}
+          >
             Đang tải danh sách ca làm...
           </div>
         ) : (
@@ -897,8 +916,12 @@ export default function AdminWorkShifts() {
 
                     <div className="admin-workshift-top-info">
                       <h3>{item.EmployeeName}</h3>
-                      <p>{item.Specialization || item.Position || "Employee"}</p>
-                      <span className={`status-badge status-badge-${item.IsDayOff ? "day-off" : "working"}`}>
+                      <p>
+                        {item.Specialization || item.Position || "Employee"}
+                      </p>
+                      <span
+                        className={`status-badge status-badge-${item.IsDayOff ? "day-off" : "working"}`}
+                      >
                         {item.IsDayOff ? "DAY_OFF" : "WORKING"}
                       </span>
                     </div>
@@ -937,7 +960,11 @@ export default function AdminWorkShifts() {
                   </p>
 
                   <div className="admin-card-actions">
-                    <button className="card-btn-action btn-secondary" style={{ flexGrow: 1 }} onClick={() => setSelected(item)}>
+                    <button
+                      className="card-btn-action btn-secondary"
+                      style={{ flexGrow: 1 }}
+                      onClick={() => setSelected(item)}
+                    >
                       Chi tiết
                     </button>
                     <button
@@ -959,7 +986,9 @@ export default function AdminWorkShifts() {
             ))}
 
             {!items.length ? (
-              <div className="admin-empty">Không tìm thấy ca làm phù hợp bộ lọc.</div>
+              <div className="admin-empty">
+                Không tìm thấy ca làm phù hợp bộ lọc.
+              </div>
             ) : null}
           </div>
         )}
@@ -968,8 +997,17 @@ export default function AdminWorkShifts() {
       {/* Detail Modal */}
       {selected ? (
         <div className="modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "550px" }}>
-            <button className="admin-modal-close" onClick={() => setSelected(null)}>×</button>
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "550px" }}
+          >
+            <button
+              className="admin-modal-close"
+              onClick={() => setSelected(null)}
+            >
+              ×
+            </button>
             <h3 className="modal-title">Chi tiết ca làm việc</h3>
 
             <div className="modal-body">
@@ -981,38 +1019,86 @@ export default function AdminWorkShifts() {
                 <div className="detail-header-info">
                   <h2>{selected.EmployeeName}</h2>
                   <p>{selected.Email}</p>
-                  <span className={`status-badge status-badge-${selected.IsDayOff ? "day-off" : "working"}`}>
+                  <span
+                    className={`status-badge status-badge-${selected.IsDayOff ? "day-off" : "working"}`}
+                  >
                     {selected.IsDayOff ? "DAY_OFF" : "WORKING"}
                   </span>
                 </div>
               </div>
 
               <div className="detail-grid">
-                <p><strong>Ngày trực:</strong> {dateText(selected.ShiftDate)}</p>
+                <p>
+                  <strong>Ngày trực:</strong> {dateText(selected.ShiftDate)}
+                </p>
                 <p>
                   <strong>Thời gian ca:</strong>{" "}
                   {selected.IsDayOff
                     ? "Nghỉ phép cả ngày"
                     : `${timeText(selected.StartTime)} - ${timeText(selected.EndTime)}`}
                 </p>
-                <p><strong>Loại ca làm:</strong> {selected.ShiftType || "NORMAL"}</p>
-                <p><strong>Cơ sở trực:</strong> {selected.BranchName || "Chưa có"}</p>
-                <p><strong>Vị trí công tác:</strong> {selected.Position || "Chưa có"}</p>
-                <p><strong>Lĩnh vực:</strong> {selected.Specialization || "Chưa có"}</p>
-                <p><strong>Liên hệ (SĐT):</strong> {selected.Phone || "Chưa có"}</p>
-                <p><strong>Lịch hẹn phụ trách:</strong> {selected.AppointmentCount || 0} ca</p>
+                <p>
+                  <strong>Loại ca làm:</strong> {selected.ShiftType || "NORMAL"}
+                </p>
+                <p>
+                  <strong>Cơ sở trực:</strong>{" "}
+                  {selected.BranchName || "Chưa có"}
+                </p>
+                <p>
+                  <strong>Vị trí công tác:</strong>{" "}
+                  {selected.Position || "Chưa có"}
+                </p>
+                <p>
+                  <strong>Lĩnh vực:</strong>{" "}
+                  {selected.Specialization || "Chưa có"}
+                </p>
+                <p>
+                  <strong>Liên hệ (SĐT):</strong> {selected.Phone || "Chưa có"}
+                </p>
+                <p>
+                  <strong>Lịch hẹn phụ trách:</strong>{" "}
+                  {selected.AppointmentCount || 0} ca
+                </p>
               </div>
 
-              <div style={{ marginTop: "16px", background: "#f8fafc", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-                <strong style={{ display: "block", color: "#475569", marginBottom: "6px", fontSize: "14px" }}>Ghi chú ca làm</strong>
-                <p style={{ margin: 0, padding: 0, fontSize: "13.5px", lineHeight: "1.6", color: "#334155" }}>
+              <div
+                style={{
+                  marginTop: "16px",
+                  background: "#f8fafc",
+                  padding: "16px",
+                  borderRadius: "12px",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <strong
+                  style={{
+                    display: "block",
+                    color: "#475569",
+                    marginBottom: "6px",
+                    fontSize: "14px",
+                  }}
+                >
+                  Ghi chú ca làm
+                </strong>
+                <p
+                  style={{
+                    margin: 0,
+                    padding: 0,
+                    fontSize: "13.5px",
+                    lineHeight: "1.6",
+                    color: "#334155",
+                  }}
+                >
                   {selected.Notes || "Không có ghi chú nào."}
                 </p>
               </div>
             </div>
 
             <div className="modal-footer">
-              <button className="card-btn-action btn-secondary" onClick={() => setSelected(null)}>
+              <button
+                className="card-btn-action btn-secondary"
+                onClick={() => setSelected(null)}
+              >
                 Đóng
               </button>
             </div>
@@ -1029,8 +1115,16 @@ export default function AdminWorkShifts() {
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: "550px" }}
           >
-            <button type="button" className="admin-modal-close" onClick={() => setShowModal(false)}>×</button>
-            <h3 className="modal-title">{editingId ? "Cập nhật ca làm việc" : "Thêm ca làm việc mới"}</h3>
+            <button
+              type="button"
+              className="admin-modal-close"
+              onClick={() => setShowModal(false)}
+            >
+              ×
+            </button>
+            <h3 className="modal-title">
+              {editingId ? "Cập nhật ca làm việc" : "Thêm ca làm việc mới"}
+            </h3>
 
             <div className="modal-body">
               <div className="admin-form-grid">
@@ -1038,13 +1132,16 @@ export default function AdminWorkShifts() {
                   Kỹ thuật viên phụ trách *
                   <select
                     value={form.employeeId}
-                    onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, employeeId: e.target.value })
+                    }
                     required
                   >
                     <option value="">Chọn nhân viên</option>
                     {technicians.map((t) => (
                       <option key={t.EmployeeId} value={t.EmployeeId}>
-                        {t.FullName} - {t.Specialization || t.Position || "Kỹ thuật viên"}
+                        {t.FullName} -{" "}
+                        {t.Specialization || t.Position || "Kỹ thuật viên"}
                       </option>
                     ))}
                   </select>
@@ -1055,7 +1152,9 @@ export default function AdminWorkShifts() {
                   <input
                     type="date"
                     value={form.shiftDate}
-                    onChange={(e) => setForm({ ...form, shiftDate: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, shiftDate: e.target.value })
+                    }
                     required
                   />
                 </label>
@@ -1066,7 +1165,9 @@ export default function AdminWorkShifts() {
                     type="time"
                     value={form.startTime}
                     disabled={form.isDayOff}
-                    onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, startTime: e.target.value })
+                    }
                   />
                 </label>
 
@@ -1076,7 +1177,9 @@ export default function AdminWorkShifts() {
                     type="time"
                     value={form.endTime}
                     disabled={form.isDayOff}
-                    onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, endTime: e.target.value })
+                    }
                   />
                 </label>
 
@@ -1085,7 +1188,9 @@ export default function AdminWorkShifts() {
                   <select
                     value={form.shiftType}
                     disabled={form.isDayOff}
-                    onChange={(e) => setForm({ ...form, shiftType: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, shiftType: e.target.value })
+                    }
                   >
                     <option value="NORMAL">NORMAL (Ca thường)</option>
                     <option value="MORNING">MORNING (Ca sáng)</option>
@@ -1114,7 +1219,9 @@ export default function AdminWorkShifts() {
                   Ghi chú ca trực
                   <textarea
                     value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, notes: e.target.value })
+                    }
                     rows={3}
                     placeholder="Ví dụ: nghỉ phép, đổi ca, làm thêm..."
                   />
@@ -1123,10 +1230,18 @@ export default function AdminWorkShifts() {
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="card-btn-action btn-secondary" onClick={() => setShowModal(false)}>
+              <button
+                type="button"
+                className="card-btn-action btn-secondary"
+                onClick={() => setShowModal(false)}
+              >
                 Hủy bỏ
               </button>
-              <button className="card-btn-action btn-primary" type="submit" disabled={saving}>
+              <button
+                className="card-btn-action btn-primary"
+                type="submit"
+                disabled={saving}
+              >
                 {saving ? "Đang lưu..." : "Lưu ca làm"}
               </button>
             </div>

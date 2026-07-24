@@ -90,9 +90,7 @@ export default function Login() {
       login(res.data);
       handleRedirectAfterLogin(res.data);
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Email hoặc mật khẩu chưa đúng.",
-      );
+      setError(err.response?.data?.message || "Email hoặc mật khẩu chưa đúng.");
     } finally {
       setSubmitting(false);
     }
