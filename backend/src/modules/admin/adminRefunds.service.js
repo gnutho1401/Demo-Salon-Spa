@@ -3,14 +3,14 @@ const { getPayOSPayout } = require("../../config/payos.config");
 
 async function getAllRefunds(query) {
   const pool = await connectDB();
-  
+
   const status = query.status || "";
   const keyword = query.keyword || "";
 
-  const result = await pool.request()
+  const result = await pool
+    .request()
     .input("Status", sql.NVarChar, status || null)
-    .input("Keyword", sql.NVarChar, `%${keyword}%`)
-    .query(`
+    .input("Keyword", sql.NVarChar, `%${keyword}%`).query(`
       SELECT 
         r.RefundId,
         r.PaymentId,
@@ -53,9 +53,11 @@ async function processRefund(refundId, adminId, manual = false) {
   await transaction.begin();
 
   try {
-    const refundQuery = await new sql.Request(transaction)
-      .input("RefundId", sql.Int, refundId)
-      .query(`
+    const refundQuery = await new sql.Request(transaction).input(
+      "RefundId",
+      sql.Int,
+      refundId,
+    ).query(`
         SELECT r.RefundId, r.PaymentId, r.Status, r.RefundAmount, r.BankCode, r.AccountNumber, r.AccountName, 
                p.InvoiceId, p.PaymentMethod, i.AppointmentId, a.AppointmentDate, a.StartTime, a.EndTime, a.EmployeeId, a.BranchId
         FROM Refunds r
@@ -71,43 +73,49 @@ async function processRefund(refundId, adminId, manual = false) {
       throw new Error("Không tìm thấy yêu cầu hoàn tiền");
     }
 
-    if (refund.Status !== 'PENDING') {
+    if (refund.Status !== "PENDING") {
       throw new Error("Yêu cầu này đã được xử lý");
     }
 
     // Call payOS Payout API if payment method is PAYOS and NOT manual
-    if (String(refund.PaymentMethod).toUpperCase() === 'PAYOS' && !manual) {
+    if (String(refund.PaymentMethod).toUpperCase() === "PAYOS" && !manual) {
       if (!refund.BankCode || !refund.AccountNumber) {
-        throw new Error("Không thể hoàn tiền tự động: Yêu cầu thiếu thông tin tài khoản ngân hàng của khách");
+        throw new Error(
+          "Không thể hoàn tiền tự động: Yêu cầu thiếu thông tin tài khoản ngân hàng của khách",
+        );
       }
-      
+
       const payos = getPayOSPayout();
       try {
         const payoutResult = await payos.payouts.create({
           amount: Number(refund.RefundAmount),
-          description: `Hoan tien AP${String(refund.AppointmentId).padStart(5, '0')}`,
+          description: `Hoan tien AP${String(refund.AppointmentId).padStart(5, "0")}`,
           toBin: refund.BankCode,
           toAccountNumber: refund.AccountNumber,
-          referenceId: `REF_${refund.RefundId}_${Date.now()}`
+          referenceId: `REF_${refund.RefundId}_${Date.now()}`,
         });
 
         // 1. Cập nhật bảng Refunds kèm PayosPayoutId
         await new sql.Request(transaction)
           .input("RefundId", sql.Int, refundId)
-          .input("PayosPayoutId", sql.NVarChar, payoutResult.id || payoutResult.referenceId || null)
-          .query(`
+          .input(
+            "PayosPayoutId",
+            sql.NVarChar,
+            payoutResult.id || payoutResult.referenceId || null,
+          ).query(`
             UPDATE Refunds
             SET Status = 'COMPLETED', RefundedAt = GETDATE(), PayosPayoutId = @PayosPayoutId
             WHERE RefundId = @RefundId
           `);
       } catch (payosError) {
         console.error("PayOS Payout error:", payosError);
-        throw new Error(`Lỗi từ cổng thanh toán PayOS: ${payosError.message || payosError}`);
+        throw new Error(
+          `Lỗi từ cổng thanh toán PayOS: ${payosError.message || payosError}`,
+        );
       }
     } else {
       // 1. Cập nhật bảng Refunds (cho các phương thức khác thì duyệt thủ công bình thường)
-      await new sql.Request(transaction)
-        .input("RefundId", sql.Int, refundId)
+      await new sql.Request(transaction).input("RefundId", sql.Int, refundId)
         .query(`
           UPDATE Refunds
           SET Status = 'COMPLETED', RefundedAt = GETDATE()
@@ -116,27 +124,33 @@ async function processRefund(refundId, adminId, manual = false) {
     }
 
     // 2. Cập nhật bảng Payments
-    await new sql.Request(transaction)
-      .input("PaymentId", sql.Int, refund.PaymentId)
-      .query(`
+    await new sql.Request(transaction).input(
+      "PaymentId",
+      sql.Int,
+      refund.PaymentId,
+    ).query(`
         UPDATE Payments
         SET Status = 'REFUNDED'
         WHERE PaymentId = @PaymentId
       `);
 
     // 3. Cập nhật bảng Invoices
-    await new sql.Request(transaction)
-      .input("InvoiceId", sql.Int, refund.InvoiceId)
-      .query(`
+    await new sql.Request(transaction).input(
+      "InvoiceId",
+      sql.Int,
+      refund.InvoiceId,
+    ).query(`
         UPDATE Invoices
         SET Status = 'REFUNDED'
         WHERE InvoiceId = @InvoiceId
       `);
 
     // 4. Cập nhật bảng Appointments
-    await new sql.Request(transaction)
-      .input("AppointmentId", sql.Int, refund.AppointmentId)
-      .query(`
+    await new sql.Request(transaction).input(
+      "AppointmentId",
+      sql.Int,
+      refund.AppointmentId,
+    ).query(`
         UPDATE Appointments
         SET Status = 'CANCELLED', UpdatedAt = GETDATE()
         WHERE AppointmentId = @AppointmentId
@@ -146,18 +160,29 @@ async function processRefund(refundId, adminId, manual = false) {
 
     if (refund.AppointmentDate) {
       try {
-        const { runAutoMatch } = require("../waiting-list/waiting-list.service");
-        const dateStr = refund.AppointmentDate instanceof Date
-          ? refund.AppointmentDate.toISOString().slice(0, 10)
-          : String(refund.AppointmentDate).slice(0, 10);
+        const {
+          runAutoMatch,
+        } = require("../waiting-list/waiting-list.service");
+        const dateStr =
+          refund.AppointmentDate instanceof Date
+            ? refund.AppointmentDate.toISOString().slice(0, 10)
+            : String(refund.AppointmentDate).slice(0, 10);
         runAutoMatch(dateStr, {
           startTime: refund.StartTime,
           endTime: refund.EndTime,
           employeeId: refund.EmployeeId,
-          branchId: refund.BranchId
-        }).catch(err => console.error("Auto match failed after admin refund complete:", err.message));
+          branchId: refund.BranchId,
+        }).catch((err) =>
+          console.error(
+            "Auto match failed after admin refund complete:",
+            err.message,
+          ),
+        );
       } catch (err) {
-        console.error("Auto match trigger failed after admin refund complete:", err.message);
+        console.error(
+          "Auto match trigger failed after admin refund complete:",
+          err.message,
+        );
       }
     }
 
@@ -175,9 +200,11 @@ async function rejectRefund(refundId, reason, adminId) {
   await transaction.begin();
 
   try {
-    const refundQuery = await new sql.Request(transaction)
-      .input("RefundId", sql.Int, refundId)
-      .query(`
+    const refundQuery = await new sql.Request(transaction).input(
+      "RefundId",
+      sql.Int,
+      refundId,
+    ).query(`
         SELECT r.RefundId, r.PaymentId, r.Status, p.InvoiceId, i.AppointmentId
         FROM Refunds r
         JOIN Payments p ON r.PaymentId = p.PaymentId
@@ -191,42 +218,47 @@ async function rejectRefund(refundId, reason, adminId) {
       throw new Error("Không tìm thấy yêu cầu hoàn tiền");
     }
 
-    if (refund.Status !== 'PENDING') {
+    if (refund.Status !== "PENDING") {
       throw new Error("Yêu cầu này đã được xử lý");
     }
 
     // 1. Cập nhật bảng Refunds
     await new sql.Request(transaction)
       .input("RefundId", sql.Int, refundId)
-      .input("Reason", sql.NVarChar, reason || 'Từ chối hoàn tiền')
-      .query(`
+      .input("Reason", sql.NVarChar, reason || "Từ chối hoàn tiền").query(`
         UPDATE Refunds
         SET Status = 'REJECTED', Reason = @Reason, RefundedAt = GETDATE()
         WHERE RefundId = @RefundId
       `);
 
     // 2. Cập nhật bảng Payments
-    await new sql.Request(transaction)
-      .input("PaymentId", sql.Int, refund.PaymentId)
-      .query(`
+    await new sql.Request(transaction).input(
+      "PaymentId",
+      sql.Int,
+      refund.PaymentId,
+    ).query(`
         UPDATE Payments
         SET Status = 'PAID'
         WHERE PaymentId = @PaymentId
       `);
 
     // 3. Cập nhật bảng Invoices
-    await new sql.Request(transaction)
-      .input("InvoiceId", sql.Int, refund.InvoiceId)
-      .query(`
+    await new sql.Request(transaction).input(
+      "InvoiceId",
+      sql.Int,
+      refund.InvoiceId,
+    ).query(`
         UPDATE Invoices
         SET Status = 'PAID'
         WHERE InvoiceId = @InvoiceId
       `);
 
     // 4. Cập nhật bảng Appointments
-    await new sql.Request(transaction)
-      .input("AppointmentId", sql.Int, refund.AppointmentId)
-      .query(`
+    await new sql.Request(transaction).input(
+      "AppointmentId",
+      sql.Int,
+      refund.AppointmentId,
+    ).query(`
         UPDATE Appointments
         SET Status = 'CONFIRMED', CancelReason = NULL, UpdatedAt = GETDATE()
         WHERE AppointmentId = @AppointmentId
@@ -243,5 +275,5 @@ async function rejectRefund(refundId, reason, adminId) {
 module.exports = {
   getAllRefunds,
   processRefund,
-  rejectRefund
+  rejectRefund,
 };
