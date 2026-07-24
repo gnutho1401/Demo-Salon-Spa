@@ -19,7 +19,9 @@ function CountdownBanner({ appointment }) {
   const [secondsLeft, setSecondsLeft] = useState(null);
   const [expired, setExpired] = useState(false);
 
-  const status = String(appointment?.Status || appointment?.status || "").toUpperCase();
+  const status = String(
+    appointment?.Status || appointment?.status || "",
+  ).toUpperCase();
   const isPending = status === "PENDING_PAYMENT";
 
   useEffect(() => {
@@ -38,8 +40,14 @@ function CountdownBanner({ appointment }) {
       if (createdAt) {
         const dateWithZ = new Date(createdAt);
         // Nếu dateWithZ lớn hơn thời gian hiện tại nhiều hơn thời gian tự hủy (do lệch múi giờ UTC vs Local)
-        if (dateWithZ.getTime() - Date.now() > AUTO_CANCEL_MINUTES * 60 * 1000) {
-          const cleanStr = typeof createdAt === "string" ? createdAt.replace(/Z$/, "") : createdAt;
+        if (
+          dateWithZ.getTime() - Date.now() >
+          AUTO_CANCEL_MINUTES * 60 * 1000
+        ) {
+          const cleanStr =
+            typeof createdAt === "string"
+              ? createdAt.replace(/Z$/, "")
+              : createdAt;
           createdMs = new Date(cleanStr).getTime();
         } else {
           createdMs = dateWithZ.getTime();
@@ -67,10 +75,10 @@ function CountdownBanner({ appointment }) {
     return () => clearInterval(timer);
   }, [appointment, isPending]);
 
-
   if (!isPending || secondsLeft === null) return null;
 
-  const id = appointment?.AppointmentId || appointment?.appointmentId || appointment?.id;
+  const id =
+    appointment?.AppointmentId || appointment?.appointmentId || appointment?.id;
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");
 
@@ -86,8 +94,8 @@ function CountdownBanner({ appointment }) {
         background: expired
           ? "linear-gradient(135deg, #ef4444, #dc2626)"
           : secondsLeft <= 120
-          ? "linear-gradient(135deg, #f97316, #ea580c)"
-          : "linear-gradient(135deg, #ef4f83, #ff5ea8)",
+            ? "linear-gradient(135deg, #f97316, #ea580c)"
+            : "linear-gradient(135deg, #ef4f83, #ff5ea8)",
         color: "#fff",
         fontWeight: 700,
         boxShadow: expired
@@ -100,16 +108,21 @@ function CountdownBanner({ appointment }) {
       <div style={{ flex: 1 }}>
         {expired ? (
           <>
-            <div style={{ fontSize: "1.05rem" }}>Lịch hẹn đã hết thời gian thanh toán!</div>
+            <div style={{ fontSize: "1.05rem" }}>
+              Lịch hẹn đã hết thời gian thanh toán!
+            </div>
             <div style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: 4 }}>
-              Hệ thống đã tự động hủy lịch hẹn này. Bạn có thể đặt lịch lại ngay.
+              Hệ thống đã tự động hủy lịch hẹn này. Bạn có thể đặt lịch lại
+              ngay.
             </div>
           </>
         ) : (
           <>
             <div style={{ fontSize: "1.05rem" }}>
               ⚡ Vui lòng thanh toán trong&nbsp;
-              <strong style={{ fontSize: "1.3rem" }}>{mm}:{ss}</strong>
+              <strong style={{ fontSize: "1.3rem" }}>
+                {mm}:{ss}
+              </strong>
               &nbsp;— Lịch sẽ bị hủy tự động nếu chưa thanh toán!
             </div>
             <div style={{ fontSize: "0.85rem", opacity: 0.85, marginTop: 4 }}>
@@ -203,7 +216,9 @@ export default function AppointmentSuccess() {
     appointment.AppointmentId || appointment.appointmentId || appointment.id;
 
   const appointmentCode = `AP${String(id).padStart(5, "0")}`;
-  const isPending = String(appointment?.Status || appointment?.status || "").toUpperCase() === "PENDING_PAYMENT";
+  const isPending =
+    String(appointment?.Status || appointment?.status || "").toUpperCase() ===
+    "PENDING_PAYMENT";
 
   return (
     <CustomerLayout>
