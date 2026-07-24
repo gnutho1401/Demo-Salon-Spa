@@ -44,7 +44,8 @@ async function getById(id) {
   const service = result.recordset[0];
   if (!service) return null;
 
-  const reviewsResult = await pool.request().input("ServiceId", sql.Int, id).query(`
+  const reviewsResult = await pool.request().input("ServiceId", sql.Int, id)
+    .query(`
       SELECT 
         r.ReviewId,
         r.Rating,
@@ -78,4 +79,3 @@ async function remove(id) {
 }
 
 module.exports = { getAll, getById, create, update, remove };
-

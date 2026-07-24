@@ -29,7 +29,6 @@ async function getEmployeeIdByUserId(userId) {
   return tech ? tech.EmployeeId : null;
 }
 
-
 async function getDashboard(userId) {
   const pool = await connectDB();
   const tech = await getTechnicianByUserId(userId);
@@ -119,8 +118,6 @@ async function getDashboard(userId) {
     ORDER BY StartTime
   `);
 
-
-
   const appointmentStatus = await pool
     .request()
     .input("EmployeeId", sql.Int, employeeId).query(`
@@ -148,8 +145,7 @@ async function getDashboard(userId) {
 
   const monthlyEarnings = await pool
     .request()
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT
         YEAR(a.AppointmentDate) AS [Year],
         MONTH(a.AppointmentDate) AS [MonthNumber],
@@ -248,8 +244,7 @@ async function getDashboard(userId) {
     .request()
     .input("EmployeeId", sql.Int, employeeId)
     .input("StartOfWeek", sql.Date, startOfWeekStr)
-    .input("EndOfWeek", sql.Date, endOfWeekStr)
-    .query(`
+    .input("EndOfWeek", sql.Date, endOfWeekStr).query(`
       SELECT 
         ws.ShiftDate,
         CONVERT(VARCHAR(5), ws.StartTime, 108) AS StartTime,
@@ -274,8 +269,7 @@ async function getDashboard(userId) {
 
   const todayAttendance = await pool
     .request()
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT TOP 1
         AttendanceId,
         CONVERT(VARCHAR(5), CheckInTime, 108) AS CheckInTime,
@@ -451,8 +445,6 @@ async function getSchedule(userId, query) {
       ORDER BY AppointmentDate, StartTime;
     `);
 
-
-
   const services = await pool.request().input("EmployeeId", sql.Int, employeeId)
     .query(`
       SELECT DISTINCT s.ServiceId, s.ServiceName, s.DurationMinutes AS Duration
@@ -619,7 +611,7 @@ async function getAvailableSlotsForTechnician(userId, query = {}) {
     const d = new Date();
     d.setHours(h, m, 0, 0);
     d.setMinutes(d.getMinutes() + mins);
-    const pad = n => String(n).padStart(2, '0');
+    const pad = (n) => String(n).padStart(2, "0");
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
   };
 
@@ -659,9 +651,9 @@ async function startAppointment(userId, appointmentId, targetStepId = null) {
   const pool = await connectDB();
   const employeeId = await getEmployeeIdByUserId(userId);
 
-  const currentResult = await pool.request()
-    .input("AppointmentId", sql.Int, Number(appointmentId))
-    .query(`
+  const currentResult = await pool
+    .request()
+    .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
       SELECT Status, AppointmentDate, StartTime, CustomerPackageId
       FROM Appointments
       WHERE AppointmentId = @AppointmentId
@@ -674,12 +666,14 @@ async function startAppointment(userId, appointmentId, targetStepId = null) {
 
   const apptStatusUpper = String(current.Status || "").toUpperCase();
   if (!["CHECKED_IN", "IN_PROGRESS"].includes(apptStatusUpper)) {
-    throw new Error("Khách hàng chưa Check-in tại Salon. Vui lòng chờ Lễ tân Check-in trước khi bắt đầu thực hiện dịch vụ!");
+    throw new Error(
+      "Khách hàng chưa Check-in tại Salon. Vui lòng chờ Lễ tân Check-in trước khi bắt đầu thực hiện dịch vụ!",
+    );
   }
 
-  const stepsRes = await pool.request()
-    .input("AppointmentId", sql.Int, Number(appointmentId))
-    .query(`
+  const stepsRes = await pool
+    .request()
+    .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
       SELECT aps.AppointmentServiceId, aps.ServiceId, aps.EmployeeId, aps.Status, s.ServiceName
       FROM AppointmentServices aps
       JOIN Services s ON aps.ServiceId = s.ServiceId
@@ -692,74 +686,107 @@ async function startAppointment(userId, appointmentId, targetStepId = null) {
   if (current.CustomerPackageId && steps.length > 0) {
     let targetStep = null;
     if (targetStepId) {
-      targetStep = steps.find(s => Number(s.AppointmentServiceId) === Number(targetStepId) || Number(s.ServiceId) === Number(targetStepId));
+      targetStep = steps.find(
+        (s) =>
+          Number(s.AppointmentServiceId) === Number(targetStepId) ||
+          Number(s.ServiceId) === Number(targetStepId),
+      );
     }
     if (!targetStep) {
-      targetStep = steps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status !== 'COMPLETED') || steps[0];
+      targetStep =
+        steps.find(
+          (s) =>
+            Number(s.EmployeeId) === Number(employeeId) &&
+            s.Status !== "COMPLETED",
+        ) || steps[0];
     }
 
     if (targetStep) {
       // Validate sequential step completion: previous steps must be COMPLETED
-      const targetIdx = steps.findIndex(s => s.AppointmentServiceId === targetStep.AppointmentServiceId);
+      const targetIdx = steps.findIndex(
+        (s) => s.AppointmentServiceId === targetStep.AppointmentServiceId,
+      );
       if (targetIdx > 0) {
         const prevSteps = steps.slice(0, targetIdx);
-        const uncompletedPrev = prevSteps.filter(s => String(s.Status || "").toUpperCase() !== 'COMPLETED');
+        const uncompletedPrev = prevSteps.filter(
+          (s) => String(s.Status || "").toUpperCase() !== "COMPLETED",
+        );
         if (uncompletedPrev.length > 0) {
-          throw new Error(`Không thể bắt đầu dịch vụ "${targetStep.ServiceName}". Vui lòng chờ dịch vụ trước đó (${uncompletedPrev[0].ServiceName}) hoàn thành!`);
+          throw new Error(
+            `Không thể bắt đầu dịch vụ "${targetStep.ServiceName}". Vui lòng chờ dịch vụ trước đó (${uncompletedPrev[0].ServiceName}) hoàn thành!`,
+          );
         }
       }
 
-      await pool.request()
+      await pool
+        .request()
         .input("AppointmentServiceId", sql.Int, targetStep.AppointmentServiceId)
-        .query(`UPDATE AppointmentServices SET Status = 'IN_PROGRESS' WHERE AppointmentServiceId = @AppointmentServiceId`);
+        .query(
+          `UPDATE AppointmentServices SET Status = 'IN_PROGRESS' WHERE AppointmentServiceId = @AppointmentServiceId`,
+        );
     }
 
-    if (current.Status !== 'IN_PROGRESS') {
-      await pool.request()
+    if (current.Status !== "IN_PROGRESS") {
+      await pool
+        .request()
         .input("AppointmentId", sql.Int, Number(appointmentId))
-        .query(`UPDATE Appointments SET Status = 'IN_PROGRESS', UpdatedAt = GETDATE() WHERE AppointmentId = @AppointmentId`);
+        .query(
+          `UPDATE Appointments SET Status = 'IN_PROGRESS', UpdatedAt = GETDATE() WHERE AppointmentId = @AppointmentId`,
+        );
 
-      await pool.request()
+      await pool
+        .request()
         .input("AppointmentId", sql.Int, Number(appointmentId))
         .input("OldStatus", sql.VarChar, current.Status)
-        .input("UserId", sql.Int, userId)
-        .query(`
+        .input("UserId", sql.Int, userId).query(`
           INSERT INTO AppointmentStatusHistory (AppointmentId, OldStatus, NewStatus, ChangedBy, Reason, ChangedAt)
           VALUES (@AppointmentId, @OldStatus, 'IN_PROGRESS', @UserId, N'KTV bắt đầu bước Combo: ${targetStep?.ServiceName || ""}', GETDATE())
         `);
     }
 
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input("AppointmentId", sql.Int, Number(appointmentId))
       .query(`SELECT * FROM Appointments WHERE AppointmentId = @AppointmentId`);
 
     return { ...result.recordset[0], startedStep: targetStep?.ServiceName };
-
   } else {
-
     // === Lịch thường: logic cũ ===
-    const myStepIndex = steps.findIndex(s => Number(s.EmployeeId) === Number(employeeId));
+    const myStepIndex = steps.findIndex(
+      (s) => Number(s.EmployeeId) === Number(employeeId),
+    );
 
     if (myStepIndex >= 0) {
-      await pool.request()
-        .input("AppointmentServiceId", sql.Int, steps[myStepIndex].AppointmentServiceId)
-        .query(`UPDATE AppointmentServices SET Status = 'IN_PROGRESS' WHERE AppointmentServiceId = @AppointmentServiceId`);
+      await pool
+        .request()
+        .input(
+          "AppointmentServiceId",
+          sql.Int,
+          steps[myStepIndex].AppointmentServiceId,
+        )
+        .query(
+          `UPDATE AppointmentServices SET Status = 'IN_PROGRESS' WHERE AppointmentServiceId = @AppointmentServiceId`,
+        );
     }
 
-    await pool.request()
+    await pool
+      .request()
       .input("AppointmentId", sql.Int, Number(appointmentId))
-      .query(`UPDATE Appointments SET Status = 'IN_PROGRESS', UpdatedAt = GETDATE() WHERE AppointmentId = @AppointmentId`);
+      .query(
+        `UPDATE Appointments SET Status = 'IN_PROGRESS', UpdatedAt = GETDATE() WHERE AppointmentId = @AppointmentId`,
+      );
 
-    await pool.request()
+    await pool
+      .request()
       .input("AppointmentId", sql.Int, Number(appointmentId))
       .input("OldStatus", sql.VarChar, current.Status)
-      .input("UserId", sql.Int, userId)
-      .query(`
+      .input("UserId", sql.Int, userId).query(`
         INSERT INTO AppointmentStatusHistory (AppointmentId, OldStatus, NewStatus, ChangedBy, Reason, ChangedAt)
         VALUES (@AppointmentId, @OldStatus, 'IN_PROGRESS', @UserId, N'Technician bắt đầu dịch vụ', GETDATE())
       `);
 
-    const result = await pool.request()
+    const result = await pool
+      .request()
       .input("AppointmentId", sql.Int, Number(appointmentId))
       .query(`SELECT * FROM Appointments WHERE AppointmentId = @AppointmentId`);
 
@@ -775,9 +802,9 @@ async function completeMyStep(userId, appointmentId, targetStepId = null) {
   const pool = await connectDB();
   const employeeId = await getEmployeeIdByUserId(userId);
 
-  const stepsRes = await pool.request()
-    .input("AppointmentId", sql.Int, Number(appointmentId))
-    .query(`
+  const stepsRes = await pool
+    .request()
+    .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
       SELECT aps.AppointmentServiceId, aps.ServiceId, aps.Status, aps.EmployeeId, s.ServiceName,
              a.CustomerPackageId
       FROM AppointmentServices aps
@@ -790,33 +817,51 @@ async function completeMyStep(userId, appointmentId, targetStepId = null) {
   const allSteps = stepsRes.recordset || [];
 
   if (allSteps.length === 0) {
-    return await receptionistService.completeAppointment(Number(appointmentId), userId);
+    return await receptionistService.completeAppointment(
+      Number(appointmentId),
+      userId,
+    );
   }
 
   let stepToComplete = null;
   if (targetStepId) {
     stepToComplete = allSteps.find(
-      s => Number(s.AppointmentServiceId) === Number(targetStepId) || Number(s.ServiceId) === Number(targetStepId)
+      (s) =>
+        Number(s.AppointmentServiceId) === Number(targetStepId) ||
+        Number(s.ServiceId) === Number(targetStepId),
     );
   }
 
   if (!stepToComplete) {
-    stepToComplete = allSteps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status === 'IN_PROGRESS');
+    stepToComplete = allSteps.find(
+      (s) =>
+        Number(s.EmployeeId) === Number(employeeId) &&
+        s.Status === "IN_PROGRESS",
+    );
   }
 
   if (!stepToComplete) {
-    stepToComplete = allSteps.find(s => Number(s.EmployeeId) === Number(employeeId) && s.Status !== 'COMPLETED');
+    stepToComplete = allSteps.find(
+      (s) =>
+        Number(s.EmployeeId) === Number(employeeId) && s.Status !== "COMPLETED",
+    );
   }
 
   if (!stepToComplete) {
-    stepToComplete = allSteps.find(s => s.Status !== 'COMPLETED');
+    stepToComplete = allSteps.find((s) => s.Status !== "COMPLETED");
   }
 
   if (!stepToComplete) {
-    return await receptionistService.completeAppointment(Number(appointmentId), userId);
+    return await receptionistService.completeAppointment(
+      Number(appointmentId),
+      userId,
+    );
   }
 
-  const result = await receptionistService.updateAppointmentServiceStatus(stepToComplete.AppointmentServiceId, 'COMPLETED');
+  const result = await receptionistService.updateAppointmentServiceStatus(
+    stepToComplete.AppointmentServiceId,
+    "COMPLETED",
+  );
 
   return {
     success: true,
@@ -826,8 +871,6 @@ async function completeMyStep(userId, appointmentId, targetStepId = null) {
     completedStep: stepToComplete.ServiceName,
   };
 }
-
-
 
 async function getAppointmentByIdInternal(pool, id) {
   const result = await pool.request().input("AppointmentId", sql.Int, id)
@@ -861,9 +904,7 @@ async function finalizeCheckoutInternal(pool, id, userId = null) {
   if (!current) return;
   if (current.CheckedOutAt) return; // Already checked out, skip sending email again
 
-  await pool.request()
-    .input("AppointmentId", sql.Int, id)
-    .query(`
+  await pool.request().input("AppointmentId", sql.Int, id).query(`
       UPDATE Appointments
       SET CheckedOutAt = COALESCE(CheckedOutAt, CURRENT_TIMESTAMP),
           CompletedAt = COALESCE(CompletedAt, CURRENT_TIMESTAMP),
@@ -872,35 +913,43 @@ async function finalizeCheckoutInternal(pool, id, userId = null) {
       WHERE AppointmentId = @AppointmentId
     `);
 
-  const servicesResult = await pool.request()
+  const servicesResult = await pool
+    .request()
     .input("AppointmentId", sql.Int, id)
-    .query(`SELECT ServiceId, Price FROM AppointmentServices WHERE AppointmentId = @AppointmentId`);
+    .query(
+      `SELECT ServiceId, Price FROM AppointmentServices WHERE AppointmentId = @AppointmentId`,
+    );
   const apptServices = servicesResult.recordset || [];
 
   if (current.CustomerEmail) {
     try {
       const { sendMail } = require("../../utils/sendMail");
-      
+
       let servicesListHtml = "";
       if (apptServices.length > 0) {
-        servicesListHtml = apptServices.map(s => `<li>Dịch vụ giá: ${Number(s.Price).toLocaleString('vi-VN')}đ</li>`).join("");
+        servicesListHtml = apptServices
+          .map(
+            (s) =>
+              `<li>Dịch vụ giá: ${Number(s.Price).toLocaleString("vi-VN")}đ</li>`,
+          )
+          .join("");
       }
 
       const emailHtml = `
         <div style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #333;">
           <h2 style="color: #d91f68; border-bottom: 2px solid #fce7f3; padding-bottom: 8px;">Cảm ơn quý khách đã đồng hành cùng BeautyMS!</h2>
           <p>Chào <strong>${current.CustomerName}</strong>,</p>
-          <p>Chúng tôi xin gửi lời cảm ơn chân thành nhất vì quý khách đã tin tưởng và sử dụng dịch vụ tại salon của chúng tôi vào ngày <strong>${new Date(current.AppointmentDate).toLocaleDateString('vi-VN')}</strong>.</p>
+          <p>Chúng tôi xin gửi lời cảm ơn chân thành nhất vì quý khách đã tin tưởng và sử dụng dịch vụ tại salon của chúng tôi vào ngày <strong>${new Date(current.AppointmentDate).toLocaleDateString("vi-VN")}</strong>.</p>
           
           <div style="background: #fafafa; border: 1px solid #eaeaea; border-radius: 8px; padding: 15px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #555;">Tóm tắt dịch vụ đã thực hiện:</h3>
             <ul>
-              ${servicesListHtml || '<li>Dịch vụ chăm sóc sắc đẹp</li>'}
+              ${servicesListHtml || "<li>Dịch vụ chăm sóc sắc đẹp</li>"}
             </ul>
-            <p style="margin-bottom: 0;">Tổng số tiền thanh toán: <strong>${Number(current.FinalAmount).toLocaleString('vi-VN')}đ</strong></p>
+            <p style="margin-bottom: 0;">Tổng số tiền thanh toán: <strong>${Number(current.FinalAmount).toLocaleString("vi-VN")}đ</strong></p>
           </div>
           
-          <p>Mọi góp ý hoặc phản hồi của quý khách về dịch vụ và tay nghề Kỹ thuật viên <strong>${current.TechnicianName || 'Chuyên viên'}</strong> sẽ giúp chúng tôi hoàn thiện chất lượng phục vụ ngày một tốt hơn.</p>
+          <p>Mọi góp ý hoặc phản hồi của quý khách về dịch vụ và tay nghề Kỹ thuật viên <strong>${current.TechnicianName || "Chuyên viên"}</strong> sẽ giúp chúng tôi hoàn thiện chất lượng phục vụ ngày một tốt hơn.</p>
           <p>Quý khách có thể đánh giá dịch vụ trực tuyến tại đây: 
             <a href="http://localhost:3000/customer/reviews" style="display: inline-block; background: #d91f68; color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; margin-top: 5px;">Viết Đánh Giá Ngay</a>
           </p>
@@ -913,18 +962,26 @@ async function finalizeCheckoutInternal(pool, id, userId = null) {
       await sendMail({
         to: current.CustomerEmail,
         subject: "[BeautyMS] Cảm ơn quý khách đã sử dụng dịch vụ",
-        html: emailHtml
+        html: emailHtml,
       });
-      console.log(`[Checkout] Thank-you email sent successfully to ${current.CustomerEmail}`);
+      console.log(
+        `[Checkout] Thank-you email sent successfully to ${current.CustomerEmail}`,
+      );
     } catch (mailErr) {
-      console.error(`[Checkout] Failed to send check-out email to ${current.CustomerEmail}:`, mailErr.message);
+      console.error(
+        `[Checkout] Failed to send check-out email to ${current.CustomerEmail}:`,
+        mailErr.message,
+      );
     }
   }
 
   if (current.CustomerId) {
     try {
-      const { create: createNotification } = require("../notifications/notifications.service");
-      const custUserRes = await pool.request()
+      const {
+        create: createNotification,
+      } = require("../notifications/notifications.service");
+      const custUserRes = await pool
+        .request()
         .input("CustomerId", sql.Int, current.CustomerId)
         .query(`SELECT UserId FROM Customers WHERE CustomerId = @CustomerId`);
       const custUserId = custUserRes.recordset[0]?.UserId;
@@ -933,19 +990,24 @@ async function finalizeCheckoutInternal(pool, id, userId = null) {
         await createNotification({
           userId: custUserId,
           title: `🧾 Hóa đơn thanh toán dịch vụ #${current.InvoiceId || id}`,
-          content: `Dịch vụ làm đẹp cho lịch hẹn #${id} đã hoàn tất check-out. Tổng tiền thanh toán: ${Number(current.FinalAmount || 0).toLocaleString('vi-VN')}đ. Hóa đơn chi tiết đã được gửi tới email ${current.CustomerEmail || ''}. Cảm ơn quý khách!`,
-          type: "INVOICE"
+          content: `Dịch vụ làm đẹp cho lịch hẹn #${id} đã hoàn tất check-out. Tổng tiền thanh toán: ${Number(current.FinalAmount || 0).toLocaleString("vi-VN")}đ. Hóa đơn chi tiết đã được gửi tới email ${current.CustomerEmail || ""}. Cảm ơn quý khách!`,
+          type: "INVOICE",
         });
-        console.log(`[Checkout] In-app invoice notification created for UserId ${custUserId}`);
+        console.log(
+          `[Checkout] In-app invoice notification created for UserId ${custUserId}`,
+        );
       }
     } catch (notifErr) {
-      console.error(`[Checkout] Failed to create in-app invoice notification:`, notifErr.message);
+      console.error(
+        `[Checkout] Failed to create in-app invoice notification:`,
+        notifErr.message,
+      );
     }
   }
 
   eventBusService.publish("APPOINTMENT_CHECKED_OUT", {
     appointmentId: Number(id),
-    userId
+    userId,
   });
 }
 
@@ -1005,9 +1067,11 @@ async function completeAppointment(userId, appointmentId) {
       `);
 
     // Calculate commission breakdown and total commission using ServiceCommissions rules
-    const apptServicesResult = await new sql.Request(transaction)
-      .input("AppointmentId", sql.Int, Number(appointmentId))
-      .query(`
+    const apptServicesResult = await new sql.Request(transaction).input(
+      "AppointmentId",
+      sql.Int,
+      Number(appointmentId),
+    ).query(`
         SELECT aps.ServiceId, aps.Price, COALESCE(sc.CommissionRate, 0.15) AS CommissionRate
         FROM AppointmentServices aps
         LEFT JOIN ServiceCommissions sc ON aps.ServiceId = sc.ServiceId
@@ -1019,7 +1083,9 @@ async function completeAppointment(userId, appointmentId) {
     // Clear any existing earnings for this appointment to ensure idempotency
     await new sql.Request(transaction)
       .input("AppointmentId", sql.Int, Number(appointmentId))
-      .query("DELETE FROM TechnicianServiceEarnings WHERE AppointmentId = @AppointmentId");
+      .query(
+        "DELETE FROM TechnicianServiceEarnings WHERE AppointmentId = @AppointmentId",
+      );
 
     let totalCommissionAmount = 0;
 
@@ -1035,8 +1101,7 @@ async function completeAppointment(userId, appointmentId) {
         .input("ServiceId", sql.Int, svc.ServiceId)
         .input("ServicePrice", sql.Decimal(18, 2), price)
         .input("CommissionRate", sql.Decimal(5, 2), rate)
-        .input("EarningAmount", sql.Decimal(18, 2), earningAmount)
-        .query(`
+        .input("EarningAmount", sql.Decimal(18, 2), earningAmount).query(`
           INSERT INTO TechnicianServiceEarnings
           (AppointmentId, EmployeeId, ServiceId, ServicePrice, CommissionRate, EarningAmount, CreatedAt)
           VALUES
@@ -1045,9 +1110,11 @@ async function completeAppointment(userId, appointmentId) {
     }
 
     // Update invoice & earnings if invoice exists
-    const invoiceResult = await new sql.Request(transaction)
-      .input("AppointmentId", sql.Int, Number(appointmentId))
-      .query(`
+    const invoiceResult = await new sql.Request(transaction).input(
+      "AppointmentId",
+      sql.Int,
+      Number(appointmentId),
+    ).query(`
         SELECT InvoiceId
         FROM Invoices
         WHERE AppointmentId = @AppointmentId
@@ -1070,8 +1137,7 @@ async function completeAppointment(userId, appointmentId) {
       // Update or insert technician payout ledger record for earnings
       const ledgerCheck = await new sql.Request(transaction)
         .input("EmployeeId", sql.Int, employeeId)
-        .input("AppointmentId", sql.Int, Number(appointmentId))
-        .query(`
+        .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
           SELECT LedgerId
           FROM TechnicianPayoutLedger
           WHERE EmployeeId = @EmployeeId
@@ -1082,8 +1148,7 @@ async function completeAppointment(userId, appointmentId) {
       if (ledgerCheck.recordset[0]) {
         await new sql.Request(transaction)
           .input("LedgerId", sql.Int, ledgerCheck.recordset[0].LedgerId)
-          .input("Amount", sql.Decimal(18, 2), totalCommissionAmount)
-          .query(`
+          .input("Amount", sql.Decimal(18, 2), totalCommissionAmount).query(`
             UPDATE TechnicianPayoutLedger
             SET Amount = @Amount,
                 CreatedAt = GETDATE()
@@ -1093,8 +1158,7 @@ async function completeAppointment(userId, appointmentId) {
         await new sql.Request(transaction)
           .input("EmployeeId", sql.Int, employeeId)
           .input("AppointmentId", sql.Int, Number(appointmentId))
-          .input("Amount", sql.Decimal(18, 2), totalCommissionAmount)
-          .query(`
+          .input("Amount", sql.Decimal(18, 2), totalCommissionAmount).query(`
             INSERT INTO TechnicianPayoutLedger
             (EmployeeId, ReferenceType, ReferenceId, Amount, EntryType, Description, CreatedAt)
             VALUES
@@ -1152,7 +1216,9 @@ async function completeAppointment(userId, appointmentId) {
           throw new Error("Combo không còn đủ số buổi để hoàn thành lịch này");
         }
         if (cp.UsedCount >= cp.MaxSessions) {
-          throw new Error(`Dịch vụ này đã dùng hết số buổi quy định trong combo (Tối đa ${cp.MaxSessions} buổi)`);
+          throw new Error(
+            `Dịch vụ này đã dùng hết số buổi quy định trong combo (Tối đa ${cp.MaxSessions} buổi)`,
+          );
         }
 
         await new sql.Request(transaction)
@@ -1194,7 +1260,7 @@ async function completeAppointment(userId, appointmentId) {
     // Event-driven publish for completed appointment
     eventBusService.publish("APPOINTMENT_COMPLETED", {
       appointmentId: Number(appointmentId),
-      userId
+      userId,
     });
 
     // Always finalize checkout and send email upon completion of service
@@ -1204,7 +1270,7 @@ async function completeAppointment(userId, appointmentId) {
   } catch (err) {
     try {
       await transaction.rollback();
-    } catch (_) { }
+    } catch (_) {}
     throw err;
   }
 }
@@ -1300,8 +1366,7 @@ async function getAppointmentDetail(userId, appointmentId) {
 
   const services = await pool
     .request()
-    .input("AppointmentId", sql.Int, Number(appointmentId))
-    .query(`
+    .input("AppointmentId", sql.Int, Number(appointmentId)).query(`
       SELECT
         aps.AppointmentServiceId,
         s.ServiceId,
@@ -1326,8 +1391,6 @@ async function getAppointmentDetail(userId, appointmentId) {
       WHERE aps.AppointmentId = @AppointmentId
       ORDER BY aps.AppointmentServiceId ASC
     `);
-
-
 
   const history = await pool
     .request()
@@ -1402,10 +1465,10 @@ async function markNoShow(userId, appointmentId) {
   const employeeId = await getEmployeeIdByUserId(userId);
 
   // Lấy thông tin lịch hẹn hiện tại để validate
-  const currentResult = await pool.request()
+  const currentResult = await pool
+    .request()
     .input("AppointmentId", sql.Int, Number(appointmentId))
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT Status, AppointmentDate, EndTime, CustomerPackageId
       FROM Appointments
       WHERE AppointmentId = @AppointmentId
@@ -1417,19 +1480,23 @@ async function markNoShow(userId, appointmentId) {
     throw new Error("Không tìm thấy lịch hẹn của kỹ thuật viên này");
   }
 
-  if (!['CONFIRMED', 'PAID', 'CHECKED_IN'].includes(current.Status)) {
-    throw new Error("Chỉ lịch đã xác nhận hoặc đã thanh toán mới được đánh dấu No Show");
+  if (!["CONFIRMED", "PAID", "CHECKED_IN"].includes(current.Status)) {
+    throw new Error(
+      "Chỉ lịch đã xác nhận hoặc đã thanh toán mới được đánh dấu No Show",
+    );
   }
 
   // Kiểm tra lịch đã quá giờ kết thúc
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
-  const apptDate = current.AppointmentDate instanceof Date
-    ? current.AppointmentDate.toISOString().slice(0, 10)
-    : String(current.AppointmentDate).slice(0, 10);
+  const apptDate =
+    current.AppointmentDate instanceof Date
+      ? current.AppointmentDate.toISOString().slice(0, 10)
+      : String(current.AppointmentDate).slice(0, 10);
   const nowTimeStr = now.toTimeString().slice(0, 8);
   const endTimeStr = String(current.EndTime).slice(0, 8);
-  const isPast = apptDate < todayStr || (apptDate === todayStr && nowTimeStr > endTimeStr);
+  const isPast =
+    apptDate < todayStr || (apptDate === todayStr && nowTimeStr > endTimeStr);
   if (!isPast) {
     throw new Error("Chỉ được đánh dấu No-show khi lịch đã quá giờ kết thúc");
   }
@@ -1442,8 +1509,7 @@ async function markNoShow(userId, appointmentId) {
       .input("AppointmentId", sql.Int, Number(appointmentId))
       .input("EmployeeId", sql.Int, employeeId)
       .input("UserId", sql.Int, userId)
-      .input("OldStatus", sql.NVarChar, current.Status)
-      .query(`
+      .input("OldStatus", sql.NVarChar, current.Status).query(`
         UPDATE Appointments
         SET Status = 'NO_SHOW',
             UpdatedAt = GETDATE()
@@ -1517,14 +1583,15 @@ async function upsertTreatmentNote(userId, appointmentId, body) {
     `);
 
   if (!check.recordset[0]) {
-    throw new Error("Bạn không có quyền ghi chú lịch hẹn này hoặc trạng thái lịch không hợp lệ");
+    throw new Error(
+      "Bạn không có quyền ghi chú lịch hẹn này hoặc trạng thái lịch không hợp lệ",
+    );
   }
 
   // Check if a treatment note already exists for this appointment
   const noteCheck = await pool
     .request()
-    .input("AppointmentId", sql.Int, finalAppointmentId)
-    .query(`
+    .input("AppointmentId", sql.Int, finalAppointmentId).query(`
       SELECT NoteId
       FROM TreatmentNotes
       WHERE AppointmentId = @AppointmentId
@@ -1536,7 +1603,8 @@ async function upsertTreatmentNote(userId, appointmentId, body) {
   const title = String(body.title || "Treatment Note").trim();
   const noteType = body.noteType || "General Notes";
 
-  const request = pool.request()
+  const request = pool
+    .request()
     .input("AppointmentId", sql.Int, finalAppointmentId)
     .input("EmployeeId", sql.Int, employeeId)
     .input("Title", sql.NVarChar(150), title)
@@ -1545,10 +1613,18 @@ async function upsertTreatmentNote(userId, appointmentId, body) {
     .input("ProductsUsed", sql.NVarChar(sql.MAX), body.productsUsed || null)
     .input("SkinCondition", sql.NVarChar(sql.MAX), body.skinCondition || null)
     .input("Technique", sql.NVarChar(sql.MAX), body.technique || null)
-    .input("CustomerFeedback", sql.NVarChar(sql.MAX), body.customerFeedback || null)
+    .input(
+      "CustomerFeedback",
+      sql.NVarChar(sql.MAX),
+      body.customerFeedback || null,
+    )
     .input("Recommendation", sql.NVarChar(sql.MAX), body.recommendation || null)
     .input("FollowUpDate", sql.Date, body.followUpDate || null)
-    .input("ProgressStatus", sql.NVarChar(30), body.progressStatus || "IN_PROGRESS")
+    .input(
+      "ProgressStatus",
+      sql.NVarChar(30),
+      body.progressStatus || "IN_PROGRESS",
+    )
     .input("PersonalNotes", sql.NVarChar(sql.MAX), body.personalNotes || null)
     .input("SpecialNotice", sql.NVarChar(sql.MAX), body.specialNotice || null);
 
@@ -2120,8 +2196,7 @@ async function getCustomerDetail(userId, customerId) {
   const latestNote = notesWithAttachments[0] || null;
 
   // Query latest V2 note to get real skinCondition and recommendations
-  const latestV2Result = await pool.request()
-    .input("CustomerId", sql.Int, id)
+  const latestV2Result = await pool.request().input("CustomerId", sql.Int, id)
     .query(`
       SELECT TOP 1 before_condition, products_used, recommendations
       FROM TreatmentNotesV2
@@ -2158,9 +2233,7 @@ async function getCustomerDetail(userId, customerId) {
     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
     .slice(0, 30);
 
-  const pkgsResult = await pool
-    .request()
-    .input("CustomerId", sql.Int, id)
+  const pkgsResult = await pool.request().input("CustomerId", sql.Int, id)
     .query(`
       SELECT 
         cp.CustomerPackageId,
@@ -2202,10 +2275,13 @@ async function getCustomerDetail(userId, customerId) {
     reviews: reviews.recordset,
     upcoming: upcoming.recordset,
     beautyProfile: {
-      skinCondition: latestV2Note?.before_condition || latestNote?.SkinCondition || null,
-      productsUsed: latestV2Note?.products_used || latestNote?.ProductsUsed || null,
+      skinCondition:
+        latestV2Note?.before_condition || latestNote?.SkinCondition || null,
+      productsUsed:
+        latestV2Note?.products_used || latestNote?.ProductsUsed || null,
       technique: latestNote?.Technique || null,
-      recommendation: latestV2Note?.recommendations || latestNote?.Recommendation || null,
+      recommendation:
+        latestV2Note?.recommendations || latestNote?.Recommendation || null,
       followUpDate: latestNote?.FollowUpDate || null,
       customerFeedback: latestNote?.CustomerFeedback || null,
     },
@@ -2219,9 +2295,7 @@ async function getCustomerInsights(userId, customerId) {
   const id = Number(customerId);
 
   // 1. Fetch customer profile and salon-wide stats
-  const profileResult = await pool
-    .request()
-    .input("CustomerId", sql.Int, id)
+  const profileResult = await pool.request().input("CustomerId", sql.Int, id)
     .query(`
       SELECT 
         c.CustomerId,
@@ -2283,8 +2357,7 @@ async function getCustomerInsights(userId, customerId) {
   // 3. Fetch top 3 booked services
   const topServicesResult = await pool
     .request()
-    .input("CustomerId", sql.Int, id)
-    .query(`
+    .input("CustomerId", sql.Int, id).query(`
       SELECT TOP 3 
         s.ServiceName, 
         COUNT(aps.AppointmentServiceId) AS BookedCount,
@@ -2298,9 +2371,7 @@ async function getCustomerInsights(userId, customerId) {
     `);
 
   // 4. Fetch recent treatment notes (last 3)
-  const notesResult = await pool
-    .request()
-    .input("CustomerId", sql.Int, id)
+  const notesResult = await pool.request().input("CustomerId", sql.Int, id)
     .query(`
       SELECT TOP 3 
         tn.NoteId,
@@ -2330,7 +2401,9 @@ async function getCustomerInsights(userId, customerId) {
     analytics: {
       totalVisits: visits,
       totalSpent: spent,
-      lastVisit: customer.LastVisit ? customer.LastVisit.toISOString().slice(0, 10) : null,
+      lastVisit: customer.LastVisit
+        ? customer.LastVisit.toISOString().slice(0, 10)
+        : null,
     },
     segmentation: {
       type,
@@ -2496,8 +2569,7 @@ async function getTreatmentNotesPage(userId, query = {}) {
   // 1. Fetch Customer Stats
   const statsResult = await pool
     .request()
-    .input("CustomerId", sql.Int, appointment.CustomerId)
-    .query(`
+    .input("CustomerId", sql.Int, appointment.CustomerId).query(`
       SELECT 
         (
           SELECT COUNT(DISTINCT a.AppointmentId)
@@ -2534,14 +2606,13 @@ async function getTreatmentNotesPage(userId, query = {}) {
     TotalSpent: 0,
     LoyaltyPoints: 0,
     AverageRating: 5.0,
-    FavoriteService: null
+    FavoriteService: null,
   };
 
   // 2. Fetch Active Treatment Plan (Package)
   const packageResult = await pool
     .request()
-    .input("CustomerId", sql.Int, appointment.CustomerId)
-    .query(`
+    .input("CustomerId", sql.Int, appointment.CustomerId).query(`
       SELECT TOP 1
         cp.CustomerPackageId,
         p.PackageName,
@@ -2588,8 +2659,7 @@ async function getTreatmentNotesPage(userId, query = {}) {
     // If no package, return recent appointment list
     const historyResult = await pool
       .request()
-      .input("CustomerId", sql.Int, appointment.CustomerId)
-      .query(`
+      .input("CustomerId", sql.Int, appointment.CustomerId).query(`
         SELECT TOP 10
           a.AppointmentId,
           a.AppointmentDate,
@@ -2609,19 +2679,18 @@ async function getTreatmentNotesPage(userId, query = {}) {
   // 4. Fetch Products Used previously
   const productsResult = await pool
     .request()
-    .input("CustomerId", sql.Int, appointment.CustomerId)
-    .query(`
+    .input("CustomerId", sql.Int, appointment.CustomerId).query(`
       SELECT ProductsUsed
       FROM TreatmentNotes
       WHERE AppointmentId IN (SELECT AppointmentId FROM Appointments WHERE CustomerId = @CustomerId)
         AND ProductsUsed IS NOT NULL
         AND ProductsUsed <> ''
     `);
-  
+
   const productsSet = new Set();
-  productsResult.recordset.forEach(row => {
+  productsResult.recordset.forEach((row) => {
     if (row.ProductsUsed) {
-      row.ProductsUsed.split(",").forEach(p => {
+      row.ProductsUsed.split(",").forEach((p) => {
         const cleaned = p.trim();
         if (cleaned) productsSet.add(cleaned);
       });
@@ -2641,8 +2710,6 @@ async function getTreatmentNotesPage(userId, query = {}) {
     productsUsedList,
   };
 }
-
-
 
 async function getCustomerNoteHistory(userId, appointmentId) {
   const pool = await connectDB();
@@ -2815,8 +2882,8 @@ async function getEarnings(userId, query = {}) {
     query.fromDate ||
     (range === "week"
       ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
-        .toISOString()
-        .slice(0, 10)
+          .toISOString()
+          .slice(0, 10)
       : range === "lastmonth"
         ? lastMonthStart.toISOString().slice(0, 10)
         : range === "year"
@@ -3443,14 +3510,15 @@ async function createPayoutRequest(userId, body = {}) {
   // 1. Validate minimum payout amount (e.g. 50,000 VND)
   const MIN_PAYOUT_AMOUNT = 50000;
   if (!Number.isFinite(amount) || amount < MIN_PAYOUT_AMOUNT) {
-    throw new Error(`Số tiền yêu cầu payout tối thiểu phải là ${MIN_PAYOUT_AMOUNT.toLocaleString()} VND`);
+    throw new Error(
+      `Số tiền yêu cầu payout tối thiểu phải là ${MIN_PAYOUT_AMOUNT.toLocaleString()} VND`,
+    );
   }
 
   // 2. Prevent creating request if there is already a PENDING payout request
   const pendingCheck = await pool
     .request()
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT TOP 1 PayoutRequestId
       FROM TechnicianPayoutRequests
       WHERE EmployeeId = @EmployeeId AND Status = 'PENDING'
@@ -3463,8 +3531,7 @@ async function createPayoutRequest(userId, body = {}) {
   // 3. Block duplicate requests in a short window (rate limit logic: 60 seconds)
   const lastRequestCheck = await pool
     .request()
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT TOP 1 RequestedAt
       FROM TechnicianPayoutRequests
       WHERE EmployeeId = @EmployeeId
@@ -3475,7 +3542,9 @@ async function createPayoutRequest(userId, body = {}) {
     const lastTime = new Date(lastRequestCheck.recordset[0].RequestedAt);
     const diffSeconds = (new Date() - lastTime) / 1000;
     if (diffSeconds < 60) {
-      throw new Error("Yêu cầu rút tiền quá nhanh. Vui lòng đợi 1 phút trước khi thử lại");
+      throw new Error(
+        "Yêu cầu rút tiền quá nhanh. Vui lòng đợi 1 phút trước khi thử lại",
+      );
     }
   }
 
@@ -3506,12 +3575,15 @@ async function createPayoutRequest(userId, body = {}) {
   const newRequest = created.recordset[0];
 
   // 6. Audit Logging
-  const auditMsg = `[AUDIT] [${new Date().toISOString()}] User/Tech ID: ${userId}/${employeeId} requested payout of ${amount} VND. Note: "${note || ''}". PayoutRequestId: ${newRequest.PayoutRequestId}\n`;
+  const auditMsg = `[AUDIT] [${new Date().toISOString()}] User/Tech ID: ${userId}/${employeeId} requested payout of ${amount} VND. Note: "${note || ""}". PayoutRequestId: ${newRequest.PayoutRequestId}\n`;
   console.log(auditMsg.trim());
   try {
-    const fs = require('fs');
-    const path = require('path');
-    fs.appendFileSync(path.join(__dirname, '../../../payout_audit.log'), auditMsg);
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../payout_audit.log"),
+      auditMsg,
+    );
   } catch (err) {
     console.error("Failed to write to payout audit log file:", err.message);
   }
@@ -3530,10 +3602,10 @@ async function getAvailableShifts(userId) {
 
   // --- Auto-create default shifts for dates with no shifts in next 30 days ---
   const DEFAULT_SHIFTS = [
-    { name: "Cả Ngày",  start: "08:00:00", end: "20:00:00", max: 10 },
-    { name: "Ca Sáng",  start: "08:00:00", end: "12:00:00", max: 5  },
-    { name: "Ca Chiều", start: "12:00:00", end: "18:00:00", max: 5  },
-    { name: "Ca Tối",   start: "18:00:00", end: "20:00:00", max: 5  },
+    { name: "Cả Ngày", start: "08:00:00", end: "20:00:00", max: 10 },
+    { name: "Ca Sáng", start: "08:00:00", end: "12:00:00", max: 5 },
+    { name: "Ca Chiều", start: "12:00:00", end: "18:00:00", max: 5 },
+    { name: "Ca Tối", start: "18:00:00", end: "20:00:00", max: 5 },
   ];
 
   // Get all dates in the next 30 days that already have at least 1 WorkShift
@@ -3543,7 +3615,9 @@ async function getAvailableShifts(userId) {
     WHERE ShiftDate >= CAST(GETDATE() AS DATE)
       AND ShiftDate <= CAST(DATEADD(DAY, 30, GETDATE()) AS DATE)
   `);
-  const existingDates = new Set(existingDatesRes.recordset.map(r => r.ShiftDate));
+  const existingDates = new Set(
+    existingDatesRes.recordset.map((r) => r.ShiftDate),
+  );
 
   // Build list of dates missing shifts using local date (avoid UTC offset issues)
   const toLocalDateStr = (d) => {
@@ -3556,29 +3630,38 @@ async function getAvailableShifts(userId) {
   const today = new Date();
   const missingDates = [];
   for (let i = 0; i <= 30; i++) {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+    const d = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + i,
+    );
     const dateStr = toLocalDateStr(d);
     if (!existingDates.has(dateStr)) missingDates.push(dateStr);
   }
 
   // Auto-insert default shifts for missing dates
   if (missingDates.length > 0) {
-    console.log(`[getAvailableShifts] Auto-creating default shifts for ${missingDates.length} dates...`);
+    console.log(
+      `[getAvailableShifts] Auto-creating default shifts for ${missingDates.length} dates...`,
+    );
     for (const dateStr of missingDates) {
       for (const s of DEFAULT_SHIFTS) {
         try {
-          await pool.request()
-            .input("ShiftName",      sql.NVarChar(100), s.name)
-            .input("ShiftDate",      sql.Date,          dateStr)
-            .input("StartTime",      sql.VarChar(15),   s.start)
-            .input("EndTime",        sql.VarChar(15),   s.end)
-            .input("MaxTechnicians", sql.Int,            s.max)
-            .query(`
+          await pool
+            .request()
+            .input("ShiftName", sql.NVarChar(100), s.name)
+            .input("ShiftDate", sql.Date, dateStr)
+            .input("StartTime", sql.VarChar(15), s.start)
+            .input("EndTime", sql.VarChar(15), s.end)
+            .input("MaxTechnicians", sql.Int, s.max).query(`
               INSERT INTO WorkShifts (ShiftName, ShiftDate, StartTime, EndTime, MaxTechnicians, Status, CreatedAt)
               VALUES (@ShiftName, @ShiftDate, @StartTime, @EndTime, @MaxTechnicians, 'OPEN', GETDATE())
             `);
         } catch (insertErr) {
-          console.error(`[getAvailableShifts] Failed to insert shift "${s.name}" for ${dateStr}:`, insertErr.message);
+          console.error(
+            `[getAvailableShifts] Failed to insert shift "${s.name}" for ${dateStr}:`,
+            insertErr.message,
+          );
         }
       }
     }
@@ -3586,10 +3669,9 @@ async function getAvailableShifts(userId) {
   }
   // -------------------------------------------------------------------------
 
-
-  const result = await pool.request()
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+  const result = await pool
+    .request()
+    .input("TechnicianId", sql.Int, technicianId).query(`
       SELECT 
         ws.ShiftId,
         ws.ShiftName,
@@ -3615,9 +3697,9 @@ async function getAvailableShifts(userId) {
       ORDER BY ws.ShiftDate ASC, ws.StartTime ASC
     `);
 
-  const capableServicesRes = await pool.request()
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+  const capableServicesRes = await pool
+    .request()
+    .input("TechnicianId", sql.Int, technicianId).query(`
       SELECT s.ServiceId, s.ServiceName
       FROM EmployeeServices es
       JOIN Services s ON es.ServiceId = s.ServiceId
@@ -3627,28 +3709,31 @@ async function getAvailableShifts(userId) {
 
   return {
     shifts: result.recordset,
-    capableServices: capableServicesRes.recordset
+    capableServices: capableServicesRes.recordset,
   };
 }
-
 
 async function registerShift(userId, shiftId, serviceIds = []) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
 
   // 1. Get shift details
-  const shiftRes = await pool.request()
+  const shiftRes = await pool
+    .request()
     .input("ShiftId", sql.Int, shiftId)
     .query("SELECT * FROM WorkShifts WHERE ShiftId = @ShiftId");
-  
+
   const shift = shiftRes.recordset[0];
   if (!shift) throw new Error("Ca làm không tồn tại");
-  if (shift.Status === 'CLOSED') throw new Error("Ca làm đã đóng, không thể đăng ký");
+  if (shift.Status === "CLOSED")
+    throw new Error("Ca làm đã đóng, không thể đăng ký");
 
   // 2. Check if shift date has passed
   const now = new Date();
   const shiftDateStr = shift.ShiftDate.toISOString().slice(0, 10);
-  const startStr = shift.StartTime.toISOString ? shift.StartTime.toISOString().slice(11, 19) : String(shift.StartTime);
+  const startStr = shift.StartTime.toISOString
+    ? shift.StartTime.toISOString().slice(11, 19)
+    : String(shift.StartTime);
   const shiftDateTime = new Date(`${shiftDateStr}T${startStr}`);
   if (shiftDateTime < now) {
     throw new Error("Không thể đăng ký ca làm trong quá khứ");
@@ -3657,12 +3742,12 @@ async function registerShift(userId, shiftId, serviceIds = []) {
   // 3. Check current registered count (Bypassed per request)
 
   // 4. Check overlapping shift registrations
-  const overlapRes = await pool.request()
+  const overlapRes = await pool
+    .request()
     .input("TechnicianId", sql.Int, technicianId)
     .input("ShiftDate", sql.Date, shift.ShiftDate)
     .input("StartTime", sql.Time, shift.StartTime)
-    .input("EndTime", sql.Time, shift.EndTime)
-    .query(`
+    .input("EndTime", sql.Time, shift.EndTime).query(`
       SELECT sr.RegistrationId 
       FROM ShiftRegistrations sr
       JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
@@ -3671,16 +3756,18 @@ async function registerShift(userId, shiftId, serviceIds = []) {
         AND sr.Status = 'APPROVED'
         AND (@StartTime < ws.EndTime AND @EndTime > ws.StartTime)
     `);
-  
+
   if (overlapRes.recordset[0]) {
-    throw new Error("Bạn đã đăng ký một ca trực khác trùng thời gian trong ngày này");
+    throw new Error(
+      "Bạn đã đăng ký một ca trực khác trùng thời gian trong ngày này",
+    );
   }
 
   // 5. Update or insert approved registration
-  await pool.request()
+  await pool
+    .request()
     .input("ShiftId", sql.Int, shiftId)
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+    .input("TechnicianId", sql.Int, technicianId).query(`
       MERGE INTO ShiftRegistrations AS target
       USING (SELECT @ShiftId AS ShiftId, @TechnicianId AS TechnicianId) AS source
       ON (target.ShiftId = source.ShiftId AND target.TechnicianId = source.TechnicianId)
@@ -3690,10 +3777,10 @@ async function registerShift(userId, shiftId, serviceIds = []) {
         INSERT (ShiftId, TechnicianId, Status) VALUES (@ShiftId, @TechnicianId, 'APPROVED');
     `);
 
-  const regResult = await pool.request()
+  const regResult = await pool
+    .request()
     .input("ShiftId", sql.Int, shiftId)
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+    .input("TechnicianId", sql.Int, technicianId).query(`
       SELECT RegistrationId 
       FROM ShiftRegistrations 
       WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId;
@@ -3702,16 +3789,22 @@ async function registerShift(userId, shiftId, serviceIds = []) {
   const registrationId = regResult.recordset[0].RegistrationId;
 
   // Clear and save selected services
-  await pool.request()
+  await pool
+    .request()
     .input("RegistrationId", sql.Int, registrationId)
-    .query("DELETE FROM ShiftRegistrationServices WHERE RegistrationId = @RegistrationId");
+    .query(
+      "DELETE FROM ShiftRegistrationServices WHERE RegistrationId = @RegistrationId",
+    );
 
   if (Array.isArray(serviceIds) && serviceIds.length > 0) {
     for (const sId of serviceIds) {
-      await pool.request()
+      await pool
+        .request()
         .input("RegistrationId", sql.Int, registrationId)
         .input("ServiceId", sql.Int, Number(sId))
-        .query("INSERT INTO ShiftRegistrationServices (RegistrationId, ServiceId) VALUES (@RegistrationId, @ServiceId)");
+        .query(
+          "INSERT INTO ShiftRegistrationServices (RegistrationId, ServiceId) VALUES (@RegistrationId, @ServiceId)",
+        );
     }
   }
 
@@ -3723,21 +3816,26 @@ async function cancelRegistration(userId, shiftId) {
   const technicianId = await getEmployeeIdByUserId(userId);
 
   // Check if there are any booked appointments during this shift
-  const shiftRes = await pool.request()
+  const shiftRes = await pool
+    .request()
     .input("ShiftId", sql.Int, shiftId)
     .query("SELECT * FROM WorkShifts WHERE ShiftId = @ShiftId");
   const shift = shiftRes.recordset[0];
   if (shift) {
     const shiftDateStr = shift.ShiftDate.toISOString().slice(0, 10);
-    const startStr = shift.StartTime.toISOString ? shift.StartTime.toISOString().slice(11, 19) : String(shift.StartTime);
-    const endStr = shift.EndTime.toISOString ? shift.EndTime.toISOString().slice(11, 19) : String(shift.EndTime);
+    const startStr = shift.StartTime.toISOString
+      ? shift.StartTime.toISOString().slice(11, 19)
+      : String(shift.StartTime);
+    const endStr = shift.EndTime.toISOString
+      ? shift.EndTime.toISOString().slice(11, 19)
+      : String(shift.EndTime);
 
-    const apptsRes = await pool.request()
+    const apptsRes = await pool
+      .request()
       .input("TechnicianId", sql.Int, technicianId)
       .input("ShiftDate", sql.Date, shiftDateStr)
       .input("StartTime", sql.VarChar, startStr)
-      .input("EndTime", sql.VarChar, endStr)
-      .query(`
+      .input("EndTime", sql.VarChar, endStr).query(`
         SELECT TOP 1 AppointmentId
         FROM Appointments
         WHERE EmployeeId = @TechnicianId
@@ -3749,29 +3847,31 @@ async function cancelRegistration(userId, shiftId) {
             (CONVERT(VARCHAR(8), EndTime, 108) > CONVERT(VARCHAR(8), @StartTime, 108) AND CONVERT(VARCHAR(8), EndTime, 108) <= CONVERT(VARCHAR(8), @EndTime, 108))
           )
       `);
-    
+
     if (apptsRes.recordset[0]) {
-      throw new Error("Không thể huỷ ca trực này vì đã có lịch hẹn của khách hàng đặt trước. Vui lòng liên hệ Lễ tân để điều phối lịch hẹn trước khi huỷ ca.");
+      throw new Error(
+        "Không thể huỷ ca trực này vì đã có lịch hẹn của khách hàng đặt trước. Vui lòng liên hệ Lễ tân để điều phối lịch hẹn trước khi huỷ ca.",
+      );
     }
   }
 
-  const result = await pool.request()
+  const result = await pool
+    .request()
     .input("ShiftId", sql.Int, shiftId)
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+    .input("TechnicianId", sql.Int, technicianId).query(`
       UPDATE ShiftRegistrations 
       SET Status = 'CANCELLED' 
       WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId AND Status = 'APPROVED'
     `);
 
   if (result.rowsAffected[0] === 0) {
-    throw new Error("Không tìm thấy ca đã đăng ký hoặc ca trực đã bị huỷ trước đó");
+    throw new Error(
+      "Không tìm thấy ca đã đăng ký hoặc ca trực đã bị huỷ trước đó",
+    );
   }
 
   // Set shift status back to OPEN
-  await pool.request()
-    .input("ShiftId", sql.Int, shiftId)
-    .query(`
+  await pool.request().input("ShiftId", sql.Int, shiftId).query(`
       UPDATE WorkShifts 
       SET Status = 'OPEN' 
       WHERE ShiftId = @ShiftId AND Status = 'FULL'
@@ -3783,9 +3883,9 @@ async function cancelRegistration(userId, shiftId) {
 async function getMyShifts(userId) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
-  const result = await pool.request()
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+  const result = await pool
+    .request()
+    .input("TechnicianId", sql.Int, technicianId).query(`
       SELECT 
         ws.ShiftId,
         ws.ShiftName,
@@ -3819,22 +3919,25 @@ async function getMyShifts(userId) {
 
 async function getOrCreateTodayShiftForTechnician(pool, technicianId) {
   const todayStr = new Date().toISOString().slice(0, 10);
-  
+
   // Find or create default today shift in WorkShifts
-  let shiftRes = await pool.request()
+  let shiftRes = await pool
+    .request()
     .input("ShiftDate", sql.Date, todayStr)
-    .query("SELECT TOP 1 ShiftId FROM WorkShifts WHERE ShiftDate = @ShiftDate AND Status = 'OPEN'");
+    .query(
+      "SELECT TOP 1 ShiftId FROM WorkShifts WHERE ShiftDate = @ShiftDate AND Status = 'OPEN'",
+    );
 
   let shiftId;
   if (shiftRes.recordset.length > 0) {
     shiftId = shiftRes.recordset[0].ShiftId;
   } else {
-    const newShiftRes = await pool.request()
+    const newShiftRes = await pool
+      .request()
       .input("ShiftName", sql.NVarChar, "Ca Ngày (08:00 - 20:00)")
       .input("ShiftDate", sql.Date, todayStr)
       .input("StartTime", sql.NVarChar, "08:00:00")
-      .input("EndTime", sql.NVarChar, "20:00:00")
-      .query(`
+      .input("EndTime", sql.NVarChar, "20:00:00").query(`
         INSERT INTO WorkShifts (ShiftName, ShiftDate, StartTime, EndTime, MaxTechnicians, Status, CreatedAt)
         OUTPUT INSERTED.ShiftId
         VALUES (@ShiftName, @ShiftDate, @StartTime, @EndTime, 50, 'OPEN', GETDATE())
@@ -3843,10 +3946,10 @@ async function getOrCreateTodayShiftForTechnician(pool, technicianId) {
   }
 
   // Ensure technician is registered for this shift
-  await pool.request()
+  await pool
+    .request()
     .input("ShiftId", sql.Int, shiftId)
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+    .input("TechnicianId", sql.Int, technicianId).query(`
       IF NOT EXISTS (SELECT 1 FROM ShiftRegistrations WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId)
       BEGIN
         INSERT INTO ShiftRegistrations (ShiftId, TechnicianId, Status, CreatedAt)
@@ -3864,10 +3967,10 @@ async function checkIn(userId, shiftId) {
   if (!shiftId) {
     shiftId = await getOrCreateTodayShiftForTechnician(pool, technicianId);
   } else {
-    await pool.request()
+    await pool
+      .request()
       .input("ShiftId", sql.Int, shiftId)
-      .input("TechnicianId", sql.Int, technicianId)
-      .query(`
+      .input("TechnicianId", sql.Int, technicianId).query(`
         IF NOT EXISTS (SELECT 1 FROM ShiftRegistrations WHERE ShiftId = @ShiftId AND TechnicianId = @TechnicianId)
         BEGIN
           INSERT INTO ShiftRegistrations (ShiftId, TechnicianId, Status, CreatedAt)
@@ -3877,19 +3980,24 @@ async function checkIn(userId, shiftId) {
   }
 
   // Prevent duplicate active checkin
-  const attRes = await pool.request()
+  const attRes = await pool
+    .request()
     .input("TechnicianId", sql.Int, technicianId)
-    .query("SELECT TOP 1 * FROM Attendance WHERE TechnicianId = @TechnicianId AND Status = 'ACTIVE' ORDER BY AttendanceId DESC");
+    .query(
+      "SELECT TOP 1 * FROM Attendance WHERE TechnicianId = @TechnicianId AND Status = 'ACTIVE' ORDER BY AttendanceId DESC",
+    );
 
   if (attRes.recordset[0]) {
-    throw new Error("Bạn đang trong ca trực rồi. Vui lòng check-out trước khi check-in ca mới!");
+    throw new Error(
+      "Bạn đang trong ca trực rồi. Vui lòng check-out trước khi check-in ca mới!",
+    );
   }
 
   // Perform checkin
-  const insertRes = await pool.request()
+  const insertRes = await pool
+    .request()
     .input("TechnicianId", sql.Int, technicianId)
-    .input("ShiftId", sql.Int, shiftId)
-    .query(`
+    .input("ShiftId", sql.Int, shiftId).query(`
       INSERT INTO Attendance (TechnicianId, ShiftId, CheckInTime, Status)
       OUTPUT 
         INSERTED.AttendanceId,
@@ -3900,7 +4008,7 @@ async function checkIn(userId, shiftId) {
 
   return {
     message: "Check-in ca trực thành công!",
-    attendance: insertRes.recordset[0]
+    attendance: insertRes.recordset[0],
   };
 }
 
@@ -3908,7 +4016,8 @@ async function checkOut(userId, shiftId) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
 
-  let query = "SELECT TOP 1 * FROM Attendance WHERE TechnicianId = @TechnicianId AND Status = 'ACTIVE'";
+  let query =
+    "SELECT TOP 1 * FROM Attendance WHERE TechnicianId = @TechnicianId AND Status = 'ACTIVE'";
   const req = pool.request().input("TechnicianId", sql.Int, technicianId);
   if (shiftId) {
     query += " AND ShiftId = @ShiftId";
@@ -3930,10 +4039,10 @@ async function checkOut(userId, shiftId) {
   const diffMins = Math.max(0, Math.floor(diffMs / 60000));
   const totalHours = Number((diffMins / 60).toFixed(2));
 
-  const updateRes = await pool.request()
+  const updateRes = await pool
+    .request()
     .input("AttendanceId", sql.Int, att.AttendanceId)
-    .input("TotalHours", sql.Decimal(5, 2), totalHours)
-    .query(`
+    .input("TotalHours", sql.Decimal(5, 2), totalHours).query(`
       UPDATE Attendance
       SET CheckOutTime = GETDATE(),
           TotalHours = @TotalHours,
@@ -3949,16 +4058,16 @@ async function checkOut(userId, shiftId) {
 
   return {
     message: "Check-out ca trực thành công!",
-    attendance: updateRes.recordset[0]
+    attendance: updateRes.recordset[0],
   };
 }
 
 async function getMyAttendance(userId) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
-  const result = await pool.request()
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+  const result = await pool
+    .request()
+    .input("TechnicianId", sql.Int, technicianId).query(`
       SELECT 
         a.AttendanceId,
         a.ShiftId,
@@ -3981,10 +4090,10 @@ async function getMyAttendance(userId) {
 async function getAttendanceByShift(userId, shiftId) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
-  const result = await pool.request()
+  const result = await pool
+    .request()
     .input("ShiftId", sql.Int, shiftId)
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+    .input("TechnicianId", sql.Int, technicianId).query(`
       SELECT 
         a.AttendanceId,
         a.ShiftId,
@@ -4001,10 +4110,10 @@ async function getAttendanceByShift(userId, shiftId) {
 async function getWeeklyTimesheet(userId) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
-  
-  const result = await pool.request()
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+
+  const result = await pool
+    .request()
+    .input("TechnicianId", sql.Int, technicianId).query(`
       SELECT 
         ws.ShiftDate,
         SUM(ISNULL(a.TotalHours, 0)) AS TotalHours,
@@ -4024,10 +4133,10 @@ async function getWeeklyTimesheet(userId) {
 async function getMonthlyTimesheet(userId) {
   const pool = await connectDB();
   const technicianId = await getEmployeeIdByUserId(userId);
-  
-  const result = await pool.request()
-    .input("TechnicianId", sql.Int, technicianId)
-    .query(`
+
+  const result = await pool
+    .request()
+    .input("TechnicianId", sql.Int, technicianId).query(`
       SELECT 
         ws.ShiftDate,
         SUM(ISNULL(a.TotalHours, 0)) AS TotalHours,
@@ -4049,7 +4158,7 @@ async function createAppointment(userId, body) {
   const employeeId = await getEmployeeIdByUserId(userId);
   const payload = {
     ...body,
-    technicianId: employeeId
+    technicianId: employeeId,
   };
   return receptionistService.createAppointment(payload, userId);
 }
@@ -4059,7 +4168,7 @@ async function getShiftQuotas(date) {
   return {
     MORNING: { registered: 0, limit: 6 },
     AFTERNOON: { registered: 0, limit: 6 },
-    EVENING: { registered: 0, limit: 6 }
+    EVENING: { registered: 0, limit: 6 },
   };
 }
 
@@ -4079,11 +4188,11 @@ async function getAttendanceWeeklyStats(userId) {
   const endOfWeek = sunday.toISOString().slice(0, 10);
 
   // Shifts count registered this week
-  const regRes = await pool.request()
+  const regRes = await pool
+    .request()
     .input("TechnicianId", sql.Int, employeeId)
     .input("Start", sql.Date, startOfWeek)
-    .input("End", sql.Date, endOfWeek)
-    .query(`
+    .input("End", sql.Date, endOfWeek).query(`
       SELECT COUNT(*) AS RegCount 
       FROM ShiftRegistrations sr
       JOIN WorkShifts ws ON sr.ShiftId = ws.ShiftId
@@ -4093,11 +4202,11 @@ async function getAttendanceWeeklyStats(userId) {
   const registeredCount = regRes.recordset[0]?.RegCount || 0;
 
   // Completed shifts having attendance
-  const attRes = await pool.request()
+  const attRes = await pool
+    .request()
     .input("TechnicianId", sql.Int, employeeId)
     .input("Start", sql.Date, startOfWeek)
-    .input("End", sql.Date, endOfWeek)
-    .query(`
+    .input("End", sql.Date, endOfWeek).query(`
       SELECT COUNT(*) AS CompletedCount, SUM(ISNULL(a.TotalHours, 0)) AS TotalHours
       FROM Attendance a
       JOIN WorkShifts ws ON a.ShiftId = ws.ShiftId
@@ -4108,13 +4217,17 @@ async function getAttendanceWeeklyStats(userId) {
   const totalHours = attRes.recordset[0]?.TotalHours || 0;
 
   // Monthly earnings
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-  const earningsRes = await pool.request()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toISOString()
+    .slice(0, 10);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    .toISOString()
+    .slice(0, 10);
+  const earningsRes = await pool
+    .request()
     .input("EmployeeId", sql.Int, employeeId)
     .input("Start", sql.Date, startOfMonth)
-    .input("End", sql.Date, endOfMonth)
-    .query(`
+    .input("End", sql.Date, endOfMonth).query(`
       SELECT SUM(ISNULL(i.FinalAmount, sub.TotalPrice) * 0.1) AS Commission
       FROM Appointments a
       LEFT JOIN Invoices i ON a.AppointmentId = i.AppointmentId
@@ -4134,10 +4247,13 @@ async function getAttendanceWeeklyStats(userId) {
   return {
     registeredCount,
     completedCount,
-    completedPercent: registeredCount > 0 ? Math.round((completedCount / registeredCount) * 100) : 0,
+    completedPercent:
+      registeredCount > 0
+        ? Math.round((completedCount / registeredCount) * 100)
+        : 0,
     totalHours: Number(totalHours.toFixed(1)),
     overtimeHours: 0,
-    estimatedEarnings
+    estimatedEarnings,
   };
 }
 
@@ -4182,38 +4298,38 @@ async function getReviews(userId, query = {}) {
 
   const reviews = reviewsResult.recordset || [];
   if (reviews.length > 0) {
-    const reviewIds = reviews.map(r => r.ReviewId);
+    const reviewIds = reviews.map((r) => r.ReviewId);
     const imagesResult = await pool.request().query(`
       SELECT ReviewImageId, ReviewId, ImageUrl, CreatedAt
       FROM ReviewImages
       WHERE ReviewId IN (${reviewIds.join(",")})
     `);
-    
+
     const imagesMap = {};
-    (imagesResult.recordset || []).forEach(img => {
+    (imagesResult.recordset || []).forEach((img) => {
       if (!imagesMap[img.ReviewId]) {
         imagesMap[img.ReviewId] = [];
       }
       imagesMap[img.ReviewId].push(img);
     });
 
-    reviews.forEach(r => {
+    reviews.forEach((r) => {
       r.Images = imagesMap[r.ReviewId] || [];
     });
   }
 
-  const servicesResult = await pool.request()
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+  const servicesResult = await pool
+    .request()
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT DISTINCT s.ServiceId, s.ServiceName
       FROM Reviews r
       JOIN Services s ON r.ServiceId = s.ServiceId
       WHERE r.EmployeeId = @EmployeeId AND r.Status = 'APPROVED'
     `);
 
-  const statsResult = await pool.request()
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+  const statsResult = await pool
+    .request()
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT
         COUNT(*) AS TotalCount,
         AVG(CAST(r.Rating AS FLOAT)) AS AvgRating,
@@ -4226,9 +4342,9 @@ async function getReviews(userId, query = {}) {
       WHERE r.EmployeeId = @EmployeeId AND r.Status = 'APPROVED'
     `);
 
-  const monthlyStatsResult = await pool.request()
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+  const monthlyStatsResult = await pool
+    .request()
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT 
         YEAR(r.CreatedAt) AS YearVal,
         MONTH(r.CreatedAt) AS MonthVal,
@@ -4245,12 +4361,24 @@ async function getReviews(userId, query = {}) {
   return {
     reviews: reviews,
     services: servicesResult.recordset || [],
-    summary: statsResult.recordset[0] || { TotalCount: 0, AvgRating: 0, Stars5: 0, Stars4: 0, Stars3: 0, Stars2: 0, Stars1: 0 },
+    summary: statsResult.recordset[0] || {
+      TotalCount: 0,
+      AvgRating: 0,
+      Stars5: 0,
+      Stars4: 0,
+      Stars3: 0,
+      Stars2: 0,
+      Stars1: 0,
+    },
     monthlyStats: monthlyStatsResult.recordset || [],
   };
 }
 
-async function updateAppointmentDuration(userId, appointmentId, durationMinutes) {
+async function updateAppointmentDuration(
+  userId,
+  appointmentId,
+  durationMinutes,
+) {
   const pool = await connectDB();
   const employeeId = await getEmployeeIdByUserId(userId);
 
@@ -4259,40 +4387,42 @@ async function updateAppointmentDuration(userId, appointmentId, durationMinutes)
     throw new Error("Thời lượng dịch vụ phải là số lớn hơn 0");
   }
 
-  const apptRes = await pool.request()
+  const apptRes = await pool
+    .request()
     .input("AppointmentId", sql.Int, Number(appointmentId))
-    .input("EmployeeId", sql.Int, employeeId)
-    .query(`
+    .input("EmployeeId", sql.Int, employeeId).query(`
       SELECT StartTime, Status
       FROM Appointments
       WHERE AppointmentId = @AppointmentId AND EmployeeId = @EmployeeId
     `);
 
   const current = apptRes.recordset[0];
-  if (!current) throw new Error("Không tìm thấy lịch hẹn của kỹ thuật viên này");
+  if (!current)
+    throw new Error("Không tìm thấy lịch hẹn của kỹ thuật viên này");
 
   const startTimeStr = String(current.StartTime).slice(0, 8);
   const [h, m] = startTimeStr.split(":").map(Number);
   const startDate = new Date(2000, 0, 1, h, m, 0);
   startDate.setMinutes(startDate.getMinutes() + duration);
-  const pad = n => String(n).padStart(2, "0");
+  const pad = (n) => String(n).padStart(2, "0");
   const newEndTimeStr = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}:00`;
 
-  await pool.request()
+  await pool
+    .request()
     .input("AppointmentId", sql.Int, Number(appointmentId))
     .input("EmployeeId", sql.Int, employeeId)
-    .input("EndTime", sql.VarChar, newEndTimeStr)
-    .query(`
+    .input("EndTime", sql.VarChar, newEndTimeStr).query(`
       UPDATE Appointments
       SET EndTime = @EndTime, UpdatedAt = GETDATE()
       WHERE AppointmentId = @AppointmentId AND EmployeeId = @EmployeeId
     `);
 
-  return { message: "Đã cập nhật thời lượng dịch vụ thành công!", durationMinutes: duration, endTime: newEndTimeStr };
+  return {
+    message: "Đã cập nhật thời lượng dịch vụ thành công!",
+    durationMinutes: duration,
+    endTime: newEndTimeStr,
+  };
 }
-
-
-
 
 module.exports = {
   getDashboard,

@@ -29,8 +29,9 @@ function makeSafeFileName(originalname) {
     .replace(/\s+/g, "-")
     .replace(/[^a-zA-Z0-9-_]/g, "");
 
-  return `${Date.now()}-${Math.round(Math.random() * 1e9)}-${baseName || "file"
-    }${ext}`;
+  return `${Date.now()}-${Math.round(Math.random() * 1e9)}-${
+    baseName || "file"
+  }${ext}`;
 }
 
 const treatmentStorage = multer.diskStorage({

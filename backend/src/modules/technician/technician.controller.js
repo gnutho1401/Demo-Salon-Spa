@@ -37,14 +37,21 @@ async function getAvailableSlots(req, res) {
 
 async function startAppointment(req, res) {
   try {
-    const targetStepId = req.body?.appointmentServiceId || req.body?.serviceId || req.query?.serviceId || null;
-    const data = await service.startAppointment(req.user.userId, req.params.id, targetStepId);
+    const targetStepId =
+      req.body?.appointmentServiceId ||
+      req.body?.serviceId ||
+      req.query?.serviceId ||
+      null;
+    const data = await service.startAppointment(
+      req.user.userId,
+      req.params.id,
+      targetStepId,
+    );
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 }
-
 
 async function completeAppointment(req, res) {
   try {
@@ -60,14 +67,21 @@ async function completeAppointment(req, res) {
 
 async function completeMyStep(req, res) {
   try {
-    const targetStepId = req.body?.appointmentServiceId || req.body?.serviceId || req.query?.serviceId || null;
-    const data = await service.completeMyStep(req.user.userId, req.params.id, targetStepId);
+    const targetStepId =
+      req.body?.appointmentServiceId ||
+      req.body?.serviceId ||
+      req.query?.serviceId ||
+      null;
+    const data = await service.completeMyStep(
+      req.user.userId,
+      req.params.id,
+      targetStepId,
+    );
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 }
-
 
 async function getAppointmentDetail(req, res) {
   try {
@@ -180,7 +194,11 @@ async function getTreatmentNotesPage(req, res) {
 
 async function saveTreatmentNote(req, res) {
   try {
-    const data = await service.upsertTreatmentNote(req.user.userId, req.body.appointmentId, req.body);
+    const data = await service.upsertTreatmentNote(
+      req.user.userId,
+      req.body.appointmentId,
+      req.body,
+    );
     res.json({
       success: true,
       data: {
@@ -269,14 +287,16 @@ async function exportEarnings(req, res) {
       "Tên dịch vụ",
       "Giá dịch vụ (VND)",
       "Tỷ lệ hoa hồng",
-      "Hoa hồng nhận được (VND)"
+      "Hoa hồng nhận được (VND)",
     ];
 
     let csvContent = "\ufeff"; // UTF-8 BOM
     csvContent += headers.join(",") + "\n";
 
-    history.forEach(item => {
-      const dateStr = item.AppointmentDate ? new Date(item.AppointmentDate).toLocaleDateString("vi-VN") : "";
+    history.forEach((item) => {
+      const dateStr = item.AppointmentDate
+        ? new Date(item.AppointmentDate).toLocaleDateString("vi-VN")
+        : "";
       const row = [
         item.AppointmentId || "",
         `"${dateStr}"`,
@@ -285,13 +305,16 @@ async function exportEarnings(req, res) {
         `"${String(item.ServiceName || "").replaceAll('"', '""')}"`,
         item.ServicePrice || 0,
         item.CommissionRate || 0.15,
-        item.CommissionAmount || 0
+        item.CommissionAmount || 0,
       ];
       csvContent += row.join(",") + "\n";
     });
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename=doanh_thu_ktv_${new Date().toISOString().slice(0, 10)}.csv`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=doanh_thu_ktv_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
     return res.status(200).send(csvContent);
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -381,7 +404,10 @@ async function createShift(req, res) {
 
 async function getShifts(req, res) {
   try {
-    const data = await service.getShiftsByTechnician(req.user.userId, req.query);
+    const data = await service.getShiftsByTechnician(
+      req.user.userId,
+      req.query,
+    );
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -422,11 +448,21 @@ async function createAppointment(req, res) {
     // Nếu đặt tái khám PENDING/PENDING_PAYMENT từ một Treatment Note, lưu liên kết để sau khi khách xác nhận/thanh toán sẽ auto-finalize
     const appointmentId = data?.appointmentId || data?.AppointmentId;
     const { treatmentNoteId, status } = req.body;
-    if (appointmentId && treatmentNoteId && (status === "PENDING" || status === "PENDING_PAYMENT")) {
+    if (
+      appointmentId &&
+      treatmentNoteId &&
+      (status === "PENDING" || status === "PENDING_PAYMENT")
+    ) {
       try {
-        await treatmentNotesV2Service.linkFollowUpAppointment(treatmentNoteId, appointmentId);
+        await treatmentNotesV2Service.linkFollowUpAppointment(
+          treatmentNoteId,
+          appointmentId,
+        );
       } catch (linkErr) {
-        console.warn("[createAppointment] Link follow-up failed (non-critical):", linkErr.message);
+        console.warn(
+          "[createAppointment] Link follow-up failed (non-critical):",
+          linkErr.message,
+        );
       }
     }
 
@@ -475,7 +511,10 @@ async function registerShift(req, res) {
 
 async function cancelRegistration(req, res) {
   try {
-    const data = await service.cancelRegistration(req.user.userId, req.params.id);
+    const data = await service.cancelRegistration(
+      req.user.userId,
+      req.params.id,
+    );
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -502,7 +541,10 @@ async function getMyAttendance(req, res) {
 
 async function getAttendanceByShift(req, res) {
   try {
-    const data = await service.getAttendanceByShift(req.user.userId, req.params.shiftId);
+    const data = await service.getAttendanceByShift(
+      req.user.userId,
+      req.params.shiftId,
+    );
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -532,7 +574,7 @@ async function updateAppointmentDuration(req, res) {
     const data = await service.updateAppointmentDuration(
       req.user.userId,
       req.params.id,
-      req.body.durationMinutes
+      req.body.durationMinutes,
     );
     res.json({ success: true, data });
   } catch (err) {
@@ -571,7 +613,7 @@ module.exports = {
   updateAvatar,
   uploadTreatmentAttachments,
   updateTreatmentProgress,
-  
+
   createShift,
   getShifts,
   checkIn,
@@ -580,7 +622,7 @@ module.exports = {
   createAppointment,
   getShiftQuotas,
   getAttendanceWeeklyStats,
-  
+
   getAvailableShifts,
   registerShift,
   cancelRegistration,
