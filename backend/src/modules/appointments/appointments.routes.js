@@ -39,8 +39,15 @@ router.patch(
 router.delete("/:id", authMiddleware, controller.remove);
 
 // Khách hàng & Staff: Xem KTV khả dụng & Đổi KTV
-router.get("/:id/available-technicians", authMiddleware, controller.getAvailableTechniciansForStep);
-router.patch("/:id/change-technician", authMiddleware, controller.changeTechnician);
+router.get(
+  "/:id/available-technicians",
+  authMiddleware,
+  controller.getAvailableTechniciansForStep,
+);
+router.patch(
+  "/:id/change-technician",
+  authMiddleware,
+  controller.changeTechnician,
+);
 
 module.exports = router;
-

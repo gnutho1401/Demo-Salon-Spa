@@ -70,18 +70,18 @@ function parseDateTime(val) {
   if (isNaN(d.getTime())) {
     throw new Error("Ngày giờ không hợp lệ");
   }
-  const pad = n => String(n).padStart(2, '0');
-  
-  if (typeof val === 'string') {
+  const pad = (n) => String(n).padStart(2, "0");
+
+  if (typeof val === "string") {
     const parts = val.trim().split(/[\sT]+/);
     if (parts.length >= 2) {
       return { date: parts[0], time: parts[1].slice(0, 8) };
-    } else if (parts[0].includes('-')) {
+    } else if (parts[0].includes("-")) {
       return { date: parts[0], time: "00:00:00" };
     }
   }
 
-  const dateStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   return { date: dateStr, time: timeStr };
 }
@@ -90,9 +90,19 @@ function parseDateTime(val) {
  * Checks whether the technician is available for the requested time slot.
  * Returns true if available, false if busy or outside working hours.
  */
-async function checkAvailability(technicianId, startTime, endTime, excludeAppointmentId = null) {
+async function checkAvailability(
+  technicianId,
+  startTime,
+  endTime,
+  excludeAppointmentId = null,
+) {
   try {
-    await validateAvailability(technicianId, startTime, endTime, excludeAppointmentId);
+    await validateAvailability(
+      technicianId,
+      startTime,
+      endTime,
+      excludeAppointmentId,
+    );
     return true;
   } catch (err) {
     return false;
@@ -102,7 +112,12 @@ async function checkAvailability(technicianId, startTime, endTime, excludeAppoin
 /**
  * Validates technician availability. Throws errors explaining why if unavailable.
  */
-async function validateAvailability(technicianId, startTime, endTime, excludeAppointmentId = null) {
+async function validateAvailability(
+  technicianId,
+  startTime,
+  endTime,
+  excludeAppointmentId = null,
+) {
   const pool = await connectDB();
   const startParsed = parseDateTime(startTime);
   const endParsed = parseDateTime(endTime);
@@ -117,10 +132,12 @@ async function validateAvailability(technicianId, startTime, endTime, excludeApp
 
   // 1. Check salon open hours only (08:00 - 20:00)
   // Shift registration is for internal attendance management only, not for booking control.
-  const SALON_OPEN  = "08:00:00";
+  const SALON_OPEN = "08:00:00";
   const SALON_CLOSE = "20:00:00";
   if (reqStart < SALON_OPEN || reqEnd > SALON_CLOSE) {
-    throw new Error(`Thời gian hẹn nằm ngoài giờ mở cửa của salon (08:00 - 20:00)`);
+    throw new Error(
+      `Thời gian hẹn nằm ngoài giờ mở cửa của salon (08:00 - 20:00)`,
+    );
   }
 
   // 2. Check overlap in Appointments
@@ -130,8 +147,11 @@ async function validateAvailability(technicianId, startTime, endTime, excludeApp
     .input("AppointmentDate", sql.Date, date)
     .input("StartTime", sql.VarChar, reqStart)
     .input("EndTime", sql.VarChar, reqEnd)
-    .input("ExcludeAppointmentId", sql.Int, excludeAppointmentId ? Number(excludeAppointmentId) : null)
-    .query(`
+    .input(
+      "ExcludeAppointmentId",
+      sql.Int,
+      excludeAppointmentId ? Number(excludeAppointmentId) : null,
+    ).query(`
       SELECT a.AppointmentId,
              CONVERT(VARCHAR(8), a.StartTime, 108) AS StartTime,
              CONVERT(VARCHAR(8), a.EndTime, 108) AS EndTime
@@ -157,7 +177,9 @@ async function validateAvailability(technicianId, startTime, endTime, excludeApp
     `);
 
   if (overlapResult.recordset.length > 0) {
-    throw new Error("Kỹ thuật viên đã có lịch hẹn trùng lặp trong khung giờ này");
+    throw new Error(
+      "Kỹ thuật viên đã có lịch hẹn trùng lặp trong khung giờ này",
+    );
   }
 
   // 3. Check overlap in active WaitingList matching holds
@@ -166,8 +188,7 @@ async function validateAvailability(technicianId, startTime, endTime, excludeApp
     .input("EmployeeId", sql.Int, Number(technicianId))
     .input("AppointmentDate", sql.Date, date)
     .input("StartTime", sql.VarChar, reqStart)
-    .input("EndTime", sql.VarChar, reqEnd)
-    .query(`
+    .input("EndTime", sql.VarChar, reqEnd).query(`
       SELECT TOP 1 1 AS Held
       FROM WaitingList
       WHERE MatchedEmployeeId = @EmployeeId
@@ -181,7 +202,9 @@ async function validateAvailability(technicianId, startTime, endTime, excludeApp
     `);
 
   if (heldResult.recordset[0]) {
-    throw new Error("Khung giờ này đang được giữ chỗ cho khách hàng từ hàng chờ");
+    throw new Error(
+      "Khung giờ này đang được giữ chỗ cho khách hàng từ hàng chờ",
+    );
   }
 }
 
@@ -205,9 +228,16 @@ async function calculateSlotsInternal({
     .request()
     .input("EmployeeId", sql.Int, Number(employeeId))
     .input("AppointmentDate", sql.Date, appointmentDate)
-    .input("ExcludeAppointmentId", sql.Int, excludeAppointmentId ? Number(excludeAppointmentId) : null)
-    .input("ExcludeWaitingId", sql.Int, excludeWaitingId ? Number(excludeWaitingId) : null)
-    .query(`
+    .input(
+      "ExcludeAppointmentId",
+      sql.Int,
+      excludeAppointmentId ? Number(excludeAppointmentId) : null,
+    )
+    .input(
+      "ExcludeWaitingId",
+      sql.Int,
+      excludeWaitingId ? Number(excludeWaitingId) : null,
+    ).query(`
       SELECT
         CONVERT(VARCHAR(8), a.StartTime, 108) AS StartTime,
         CONVERT(VARCHAR(8), a.EndTime, 108) AS EndTime
@@ -256,25 +286,28 @@ async function calculateSlotsInternal({
     );
 
     if (slotEnd <= shiftEnd) {
-      const isInRegisteredShift = (slotStart >= "08:00:00" && slotEnd <= "20:00:00");
+      const isInRegisteredShift =
+        slotStart >= "08:00:00" && slotEnd <= "20:00:00";
 
       if (isInRegisteredShift) {
-        const isBusy = booked.some((b) => slotStart < b.end && slotEnd > b.start);
-      const dateText = normalizeDateOnly(appointmentDate);
-      const slotDateTime = new Date(
-        `${dateText}T${slotStart.slice(0, 5)}:00`,
-      );
-      const isPast = slotDateTime.getTime() <= Date.now();
-      const available = !isBusy && !isPast;
+        const isBusy = booked.some(
+          (b) => slotStart < b.end && slotEnd > b.start,
+        );
+        const dateText = normalizeDateOnly(appointmentDate);
+        const slotDateTime = new Date(
+          `${dateText}T${slotStart.slice(0, 5)}:00`,
+        );
+        const isPast = slotDateTime.getTime() <= Date.now();
+        const available = !isBusy && !isPast;
 
-      if (available || includeAllSlots) {
-        slots.push({
-          startTime: slotStart.slice(0, 5),
-          endTime: slotEnd.slice(0, 5),
-          available: available,
-        });
+        if (available || includeAllSlots) {
+          slots.push({
+            startTime: slotStart.slice(0, 5),
+            endTime: slotEnd.slice(0, 5),
+            available: available,
+          });
+        }
       }
-    }
     }
 
     current = addMinutesToTime(slotStart, 30).slice(0, 5);
@@ -284,23 +317,32 @@ async function calculateSlotsInternal({
 }
 
 // Generate slot alternatives for other technicians
-async function getSlotAlternatives(employeeId, serviceId, appointmentDate, limit = 6) {
+async function getSlotAlternatives(
+  employeeId,
+  serviceId,
+  appointmentDate,
+  limit = 6,
+) {
   const pool = await connectDB();
   const alternatives = [];
 
-  const prefEmpResult = await pool.request().input("EmployeeId", sql.Int, employeeId).query(`
+  const prefEmpResult = await pool
+    .request()
+    .input("EmployeeId", sql.Int, employeeId).query(`
     SELECT e.EmployeeId, u.FullName, COALESCE(e.ImageUrl, u.AvatarUrl) AS ImageUrl
     FROM Employees e
     INNER JOIN Users u ON e.UserId = u.UserId
     WHERE e.EmployeeId = @EmployeeId
   `);
-  const preferredEmployee = prefEmpResult.recordset[0] || { FullName: "Kỹ thuật viên" };
+  const preferredEmployee = prefEmpResult.recordset[0] || {
+    FullName: "Kỹ thuật viên",
+  };
 
   try {
-    const otherTechsResult = await pool.request()
+    const otherTechsResult = await pool
+      .request()
       .input("ServiceId", sql.Int, serviceId)
-      .input("PrefEmployeeId", sql.Int, employeeId)
-      .query(`
+      .input("PrefEmployeeId", sql.Int, employeeId).query(`
         SELECT DISTINCT e.EmployeeId, u.FullName, COALESCE(e.ImageUrl, u.AvatarUrl) AS ImageUrl
         FROM Employees e
         INNER JOIN Users u ON e.UserId = u.UserId
@@ -331,7 +373,7 @@ async function getSlotAlternatives(employeeId, serviceId, appointmentDate, limit
           if (slot.available !== false) {
             alternatives.push({
               type: 2,
-              label: `${futureDate.toLocaleDateString("vi-VN", { weekday: 'short', day: 'numeric', month: 'numeric' })} với KTV ${preferredEmployee.FullName}`,
+              label: `${futureDate.toLocaleDateString("vi-VN", { weekday: "short", day: "numeric", month: "numeric" })} với KTV ${preferredEmployee.FullName}`,
               employeeId,
               employeeName: preferredEmployee.FullName,
               imageUrl: preferredEmployee.ImageUrl,
@@ -396,7 +438,7 @@ async function getSlotAlternatives(employeeId, serviceId, appointmentDate, limit
             if (slot.available !== false) {
               alternatives.push({
                 type: 3,
-                label: `${futureDate.toLocaleDateString("vi-VN", { weekday: 'short', day: 'numeric', month: 'numeric' })} với KTV ${tech.FullName}`,
+                label: `${futureDate.toLocaleDateString("vi-VN", { weekday: "short", day: "numeric", month: "numeric" })} với KTV ${tech.FullName}`,
                 employeeId: tech.EmployeeId,
                 employeeName: tech.FullName,
                 imageUrl: tech.ImageUrl,
@@ -412,7 +454,10 @@ async function getSlotAlternatives(employeeId, serviceId, appointmentDate, limit
       }
     }
   } catch (err) {
-    console.error("[availability] Failed to get slot alternatives:", err.message);
+    console.error(
+      "[availability] Failed to get slot alternatives:",
+      err.message,
+    );
   }
 
   return alternatives;
@@ -422,7 +467,15 @@ async function getSlotAlternatives(employeeId, serviceId, appointmentDate, limit
  * Returns available slots for a day (production-grade query handling).
  */
 async function getAvailableSlots(query) {
-  const { employeeId, serviceId, appointmentDate, excludeAppointmentId, excludeWaitingId, includeAlternatives, includeAllSlots } = query || {};
+  const {
+    employeeId,
+    serviceId,
+    appointmentDate,
+    excludeAppointmentId,
+    excludeWaitingId,
+    includeAlternatives,
+    includeAllSlots,
+  } = query || {};
   if (!employeeId) throw new Error("Vui lòng chọn kỹ thuật viên");
   if (!serviceId) throw new Error("Vui lòng chọn dịch vụ");
   if (!appointmentDate) throw new Error("Vui lòng chọn ngày hẹn");
@@ -431,7 +484,9 @@ async function getAvailableSlots(query) {
     employeeId: Number(employeeId),
     serviceId: Number(serviceId),
     appointmentDate,
-    excludeAppointmentId: excludeAppointmentId ? Number(excludeAppointmentId) : null,
+    excludeAppointmentId: excludeAppointmentId
+      ? Number(excludeAppointmentId)
+      : null,
     excludeWaitingId: excludeWaitingId ? Number(excludeWaitingId) : null,
     includeAllSlots: String(includeAllSlots) === "true",
   });
@@ -450,13 +505,19 @@ async function getAvailableSlots(query) {
   return slots;
 }
 
-async function findAvailableTechnician(appointmentDate, startTime, endTime, serviceId = null) {
+async function findAvailableTechnician(
+  appointmentDate,
+  startTime,
+  endTime,
+  serviceId = null,
+) {
   const pool = await connectDB();
   const dateStr = normalizeDateOnly(appointmentDate);
   const startStr = normalizeTimeOnly(startTime);
   const endStr = normalizeTimeOnly(endTime);
 
-  const req = pool.request()
+  const req = pool
+    .request()
     .input("AppointmentDate", sql.Date, dateStr)
     .input("StartTime", sql.VarChar, startStr)
     .input("EndTime", sql.VarChar, endStr);
@@ -464,7 +525,8 @@ async function findAvailableTechnician(appointmentDate, startTime, endTime, serv
   let serviceFilter = "";
   if (serviceId) {
     req.input("ServiceId", sql.Int, Number(serviceId));
-    serviceFilter = "AND EXISTS (SELECT 1 FROM EmployeeServices es WHERE es.EmployeeId = e.EmployeeId AND es.ServiceId = @ServiceId)";
+    serviceFilter =
+      "AND EXISTS (SELECT 1 FROM EmployeeServices es WHERE es.EmployeeId = e.EmployeeId AND es.ServiceId = @ServiceId)";
   }
 
   const query = `
@@ -518,7 +580,8 @@ async function findAvailableTechnician(appointmentDate, startTime, endTime, serv
   let result = await req.query(query);
 
   if ((!result.recordset || result.recordset.length === 0) && serviceId) {
-    const fallbackReq = pool.request()
+    const fallbackReq = pool
+      .request()
       .input("AppointmentDate", sql.Date, dateStr)
       .input("StartTime", sql.VarChar, startStr)
       .input("EndTime", sql.VarChar, endStr)
@@ -594,7 +657,9 @@ async function findAvailableTechnician(appointmentDate, startTime, endTime, serv
     if (finalFallbackRes.recordset[0]) {
       return finalFallbackRes.recordset[0];
     }
-    throw new Error("Hiện tại không có kỹ thuật viên phù hợp chuyên môn rảnh vào khung giờ này. Vui lòng chọn khung giờ khác!");
+    throw new Error(
+      "Hiện tại không có kỹ thuật viên phù hợp chuyên môn rảnh vào khung giờ này. Vui lòng chọn khung giờ khác!",
+    );
   }
 
   return result.recordset[0];
@@ -608,4 +673,3 @@ module.exports = {
   getSlotAlternatives,
   findAvailableTechnician,
 };
-
