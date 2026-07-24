@@ -60,7 +60,10 @@ async function update(req, res) {
 
 async function getRescheduleInfo(req, res) {
   try {
-    return success(res, await service.getRescheduleInfo(req.params.id, req.user));
+    return success(
+      res,
+      await service.getRescheduleInfo(req.params.id, req.user),
+    );
   } catch (err) {
     return error(res, err.message, 400);
   }
@@ -118,7 +121,13 @@ async function getAvailableTechniciansForStep(req, res) {
   try {
     const appointmentId = req.params.id;
     const appointmentServiceId = req.query.appointmentServiceId || null;
-    return success(res, await service.getAvailableTechniciansForAppointmentStep(appointmentId, appointmentServiceId));
+    return success(
+      res,
+      await service.getAvailableTechniciansForAppointmentStep(
+        appointmentId,
+        appointmentServiceId,
+      ),
+    );
   } catch (err) {
     return error(res, err.message, 400);
   }
@@ -133,9 +142,9 @@ async function changeTechnician(req, res) {
       await service.changeTechnician(req.user.userId, appointmentId, {
         newEmployeeId,
         appointmentServiceId,
-        isReceptionist: false
+        isReceptionist: false,
       }),
-      "Đổi Kỹ thuật viên thành công"
+      "Đổi Kỹ thuật viên thành công",
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -157,4 +166,3 @@ module.exports = {
   getAvailableTechniciansForStep,
   changeTechnician,
 };
-

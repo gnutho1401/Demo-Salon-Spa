@@ -10,7 +10,7 @@ const AppointmentStatus = {
   PENDING_PAYMENT: "BOOKED",
   PAID: "BOOKED",
   CHECKED_IN: "CONFIRMED",
-  CHECKED_OUT: "COMPLETED"
+  CHECKED_OUT: "COMPLETED",
 };
 
 const VALID_TRANSITIONS = {
@@ -19,7 +19,7 @@ const VALID_TRANSITIONS = {
   IN_PROGRESS: ["COMPLETED", "CANCELLED"],
   COMPLETED: [],
   CANCELLED: [],
-  NO_SHOW: []
+  NO_SHOW: [],
 };
 
 /**
@@ -47,12 +47,14 @@ function validateTransition(currentStatus, targetStatus) {
   }
 
   if (!VALID_TRANSITIONS[current].includes(target)) {
-    throw new Error(`Chuyển trạng thái không hợp lệ: Không thể chuyển từ ${currentStatus} sang ${targetStatus}`);
+    throw new Error(
+      `Chuyển trạng thái không hợp lệ: Không thể chuyển từ ${currentStatus} sang ${targetStatus}`,
+    );
   }
 }
 
 module.exports = {
   AppointmentStatus,
   validateTransition,
-  mapStatus
+  mapStatus,
 };
