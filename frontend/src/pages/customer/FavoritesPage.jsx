@@ -18,7 +18,9 @@ export default function FavoritesPage() {
       setServices(serviceRes.data.data || []);
       setEmployees(employeeRes.data.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải được danh sách yêu thích");
+      setError(
+        err.response?.data?.message || "Không tải được danh sách yêu thích",
+      );
     }
   }
 
@@ -27,12 +29,16 @@ export default function FavoritesPage() {
   }, []);
 
   async function toggleService(serviceId) {
-    await axiosClient.post("/customers/me/favorites/services/toggle", { serviceId });
+    await axiosClient.post("/customers/me/favorites/services/toggle", {
+      serviceId,
+    });
     load();
   }
 
   async function toggleEmployee(employeeId) {
-    await axiosClient.post("/customers/me/favorites/employees/toggle", { employeeId });
+    await axiosClient.post("/customers/me/favorites/employees/toggle", {
+      employeeId,
+    });
     load();
   }
 
@@ -42,7 +48,9 @@ export default function FavoritesPage() {
         <div className="section-head">
           <div>
             <div className="eyebrow">Favorites</div>
-            <h2 className="section-title">Dịch vụ và kỹ thuật viên yêu thích</h2>
+            <h2 className="section-title">
+              Dịch vụ và kỹ thuật viên yêu thích
+            </h2>
           </div>
         </div>
 
@@ -62,8 +70,18 @@ export default function FavoritesPage() {
                     <h3>{s.ServiceName}</h3>
                     <p className="muted">{s.DurationMinutes} phút</p>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <Link className="card-btn" to={`/services/${s.ServiceId}`}>Xem chi tiết</Link>
-                      <button className="card-btn primary" onClick={() => toggleService(s.ServiceId)}>Bỏ yêu thích</button>
+                      <Link
+                        className="card-btn"
+                        to={`/services/${s.ServiceId}`}
+                      >
+                        Xem chi tiết
+                      </Link>
+                      <button
+                        className="card-btn primary"
+                        onClick={() => toggleService(s.ServiceId)}
+                      >
+                        Bỏ yêu thích
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -85,10 +103,23 @@ export default function FavoritesPage() {
                   </div>
                   <div className="tech-profile-body">
                     <h3>{t.FullName}</h3>
-                    <p className="muted">{t.Position || "Kỹ thuật viên"} • {t.Specialization || "Chăm sóc sắc đẹp"}</p>
+                    <p className="muted">
+                      {t.Position || "Kỹ thuật viên"} •{" "}
+                      {t.Specialization || "Chăm sóc sắc đẹp"}
+                    </p>
                     <div className="tech-actions">
-                      <Link className="card-btn" to={`/technicians/${t.EmployeeId}`}>Xem chi tiết</Link>
-                      <button className="card-btn primary" onClick={() => toggleEmployee(t.EmployeeId)}>Bỏ yêu thích</button>
+                      <Link
+                        className="card-btn"
+                        to={`/technicians/${t.EmployeeId}`}
+                      >
+                        Xem chi tiết
+                      </Link>
+                      <button
+                        className="card-btn primary"
+                        onClick={() => toggleEmployee(t.EmployeeId)}
+                      >
+                        Bỏ yêu thích
+                      </button>
                     </div>
                   </div>
                 </article>

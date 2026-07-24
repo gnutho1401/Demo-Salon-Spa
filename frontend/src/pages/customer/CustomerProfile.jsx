@@ -1,43 +1,45 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import CustomerLayout from '../../components/layout/CustomerLayout';
-import axiosClient, { resolveFileUrl } from '../../api/axiosClient';
-import { useAuth } from '../../context/AuthContext';
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import CustomerLayout from "../../components/layout/CustomerLayout";
+import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
+import { useAuth } from "../../context/AuthContext";
 
 export default function CustomerProfile() {
   const { login, updateUser } = useAuth();
   const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab');
-  
+  const tabParam = searchParams.get("tab");
+
   // Tab control: 'profile' or 'password'
-  const [activeTab, setActiveTab] = useState(tabParam === 'password' ? 'password' : 'profile');
+  const [activeTab, setActiveTab] = useState(
+    tabParam === "password" ? "password" : "profile",
+  );
 
   // Sync activeTab when query param tab changes dynamically
   useEffect(() => {
-    if (tabParam === 'password') {
-      setActiveTab('password');
+    if (tabParam === "password") {
+      setActiveTab("password");
     } else {
-      setActiveTab('profile');
+      setActiveTab("profile");
     }
   }, [tabParam]);
 
   const [form, setForm] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    avatarUrl: '',
-    gender: '',
-    dateOfBirth: '',
-    address: '',
+    fullName: "",
+    email: "",
+    phone: "",
+    avatarUrl: "",
+    gender: "",
+    dateOfBirth: "",
+    address: "",
     loyaltyPoints: 0,
-    membershipLevel: 'Normal'
+    membershipLevel: "Normal",
   });
 
   // Password change states
   const [passwordForm, setPasswordForm] = useState({
-    oldPassword: '',
-    newPassword: '',
-    confirmPassword: ''
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
 
   const [loading, setLoading] = useState(true);
@@ -45,23 +47,23 @@ export default function CustomerProfile() {
   const [uploading, setUploading] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [passwordMessage, setPasswordMessage] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
-  const formatDate = (value) => value ? value.substring(0, 10) : '';
+  const formatDate = (value) => (value ? value.substring(0, 10) : "");
 
   const mapProfileToForm = (profile) => ({
-    fullName: profile.FullName || '',
-    email: profile.Email || '',
-    phone: profile.Phone || '',
-    avatarUrl: profile.AvatarUrl || '',
-    gender: profile.Gender || '',
+    fullName: profile.FullName || "",
+    email: profile.Email || "",
+    phone: profile.Phone || "",
+    avatarUrl: profile.AvatarUrl || "",
+    gender: profile.Gender || "",
     dateOfBirth: formatDate(profile.DateOfBirth),
-    address: profile.Address || '',
+    address: profile.Address || "",
     loyaltyPoints: profile.LoyaltyPoints || 0,
-    membershipLevel: profile.MembershipLevel || 'Normal'
+    membershipLevel: profile.MembershipLevel || "Normal",
   });
 
   const syncAuthUser = (profile) => {
@@ -72,10 +74,10 @@ export default function CustomerProfile() {
       Phone: profile.Phone,
       AvatarUrl: profile.AvatarUrl,
       RoleName: profile.RoleName,
-      RoleId: profile.RoleId
+      RoleId: profile.RoleId,
     };
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) login({ token, user: newUser });
     else updateUser(newUser);
   };
@@ -84,12 +86,12 @@ export default function CustomerProfile() {
     async function fetchProfile() {
       try {
         setLoading(true);
-        setError('');
-        const res = await axiosClient.get('/customers/me/profile');
+        setError("");
+        const res = await axiosClient.get("/customers/me/profile");
         const profile = res.data.data || res.data;
         setForm(mapProfileToForm(profile));
       } catch (err) {
-        setError(err.response?.data?.message || 'Không thể tải hồ sơ cá nhân');
+        setError(err.response?.data?.message || "Không thể tải hồ sơ cá nhân");
       } finally {
         setLoading(false);
       }
@@ -99,7 +101,7 @@ export default function CustomerProfile() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAvatarChange = async (e) => {
@@ -108,20 +110,20 @@ export default function CustomerProfile() {
 
     try {
       setUploading(true);
-      setError('');
-      setMessage('');
+      setError("");
+      setMessage("");
       const data = new FormData();
-      data.append('avatar', file);
-      const res = await axiosClient.put('/customers/me/avatar', data);
+      data.append("avatar", file);
+      const res = await axiosClient.put("/customers/me/avatar", data);
       const profile = res.data.data || res.data;
       setForm(mapProfileToForm(profile));
       syncAuthUser(profile);
-      setMessage('Cập nhật ảnh đại diện thành công');
+      setMessage("Cập nhật ảnh đại diện thành công");
     } catch (err) {
-      setError(err.response?.data?.message || 'Cập nhật ảnh đại diện thất bại');
+      setError(err.response?.data?.message || "Cập nhật ảnh đại diện thất bại");
     } finally {
       setUploading(false);
-      e.target.value = '';
+      e.target.value = "";
     }
   };
 
@@ -129,23 +131,23 @@ export default function CustomerProfile() {
     e.preventDefault();
     try {
       setSaving(true);
-      setError('');
-      setMessage('');
+      setError("");
+      setMessage("");
 
-      const res = await axiosClient.put('/customers/me/profile', {
+      const res = await axiosClient.put("/customers/me/profile", {
         fullName: form.fullName,
         phone: form.phone,
         gender: form.gender,
         dateOfBirth: form.dateOfBirth || null,
-        address: form.address
+        address: form.address,
       });
 
       const updatedProfile = res.data.data || res.data;
       setForm(mapProfileToForm(updatedProfile));
       syncAuthUser(updatedProfile);
-      setMessage('Cập nhật hồ sơ thành công');
+      setMessage("Cập nhật hồ sơ thành công");
     } catch (err) {
-      setError(err.response?.data?.message || 'Cập nhật hồ sơ thất bại');
+      setError(err.response?.data?.message || "Cập nhật hồ sơ thất bại");
     } finally {
       setSaving(false);
     }
@@ -153,32 +155,34 @@ export default function CustomerProfile() {
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    setPasswordMessage('');
-    setPasswordError('');
+    setPasswordMessage("");
+    setPasswordError("");
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError('Mật khẩu xác nhận không khớp');
+      setPasswordError("Mật khẩu xác nhận không khớp");
       return;
     }
 
     try {
       setChangingPassword(true);
-      const res = await axiosClient.put('/auth/change-password', {
+      const res = await axiosClient.put("/auth/change-password", {
         oldPassword: passwordForm.oldPassword,
-        newPassword: passwordForm.newPassword
+        newPassword: passwordForm.newPassword,
       });
-      setPasswordMessage(res.data.message || 'Đổi mật khẩu thành công');
-      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setPasswordMessage(res.data.message || "Đổi mật khẩu thành công");
+      setPasswordForm({
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
     } catch (err) {
-      setPasswordError(err.response?.data?.message || 'Đổi mật khẩu thất bại');
+      setPasswordError(err.response?.data?.message || "Đổi mật khẩu thất bại");
     } finally {
       setChangingPassword(false);
     }
   };
 
-  const avatarSrc = form.avatarUrl ? resolveFileUrl(form.avatarUrl) : '';
-
-
+  const avatarSrc = form.avatarUrl ? resolveFileUrl(form.avatarUrl) : "";
 
   return (
     <CustomerLayout>
@@ -190,7 +194,16 @@ export default function CustomerProfile() {
         </div>
 
         {/* Section Title */}
-        <div className="section-head" style={{ border: 'none', padding: 0, margin: 0, position: 'relative', zIndex: 1 }}>
+        <div
+          className="section-head"
+          style={{
+            border: "none",
+            padding: 0,
+            margin: 0,
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
           <div>
             <div className="eyebrow">Quản lý tài khoản</div>
             <h2 className="section-title">Hồ sơ cá nhân</h2>
@@ -198,34 +211,69 @@ export default function CustomerProfile() {
         </div>
 
         {loading ? (
-          <div className="dashboard-card" style={{ position: 'relative', zIndex: 1, padding: '36px', textAlign: 'center' }}>
+          <div
+            className="dashboard-card"
+            style={{
+              position: "relative",
+              zIndex: 1,
+              padding: "36px",
+              textAlign: "center",
+            }}
+          >
             ⏳ Đang tải thông tin hồ sơ cá nhân...
           </div>
         ) : (
           <div className="prof-grid">
             {/* Left Panel: VIP Card, Loyalty points and tab selectors */}
             <div className="prof-left-panel">
-              <div className={`premium-member-card ${String(form.membershipLevel || "normal").toLowerCase()}`} style={{ width: '100%', maxWidth: '380px', height: '230px', margin: '0 auto 20px' }}>
+              <div
+                className={`premium-member-card ${String(form.membershipLevel || "normal").toLowerCase()}`}
+                style={{
+                  width: "100%",
+                  maxWidth: "380px",
+                  height: "230px",
+                  margin: "0 auto 20px",
+                }}
+              >
                 <div className="card-glass-shine" />
                 <div className="card-chip" />
                 <div className="card-header">
                   <span className="card-brand">🌟 PREMIUM MEMBER</span>
-                  <span className="card-vip-badge">{form.membershipLevel || "MEMBER"}</span>
+                  <span className="card-vip-badge">
+                    {form.membershipLevel || "MEMBER"}
+                  </span>
                 </div>
 
-                <div className="card-body" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '-10px 0' }}>
-                  <label className="prof-vip-avatar-container" style={{ margin: 0, position: 'relative', zIndex: 3 }}>
+                <div
+                  className="card-body"
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    margin: "-10px 0",
+                  }}
+                >
+                  <label
+                    className="prof-vip-avatar-container"
+                    style={{ margin: 0, position: "relative", zIndex: 3 }}
+                  >
                     <div className="prof-vip-avatar">
                       {avatarSrc ? (
                         <img src={avatarSrc} alt="Avatar" />
+                      ) : form.fullName ? (
+                        form.fullName.charAt(0).toUpperCase()
                       ) : (
-                        form.fullName ? form.fullName.charAt(0).toUpperCase() : 'K'
+                        "K"
                       )}
                     </div>
                     <div className="prof-avatar-overlay">
-                      {uploading ? '⏳' : '📸'}
+                      {uploading ? "⏳" : "📸"}
                     </div>
-                    <input type="file" accept="image/*" onChange={handleAvatarChange} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                    />
                   </label>
                 </div>
 
@@ -247,10 +295,12 @@ export default function CustomerProfile() {
                   <span className="prof-points-icon">👑</span>
                   <div className="prof-points-info">
                     <span className="prof-points-label">Điểm tích lũy</span>
-                    <span className="prof-points-value">{form.loyaltyPoints} PTS</span>
+                    <span className="prof-points-value">
+                      {form.loyaltyPoints} PTS
+                    </span>
                   </div>
                 </div>
-                {form.membershipLevel !== 'Normal' && (
+                {form.membershipLevel !== "Normal" && (
                   <span className="prof-discount-tag">VIP Member</span>
                 )}
               </div>
@@ -259,22 +309,22 @@ export default function CustomerProfile() {
               <div className="prof-nav-menu">
                 <button
                   type="button"
-                  className={`prof-nav-btn ${activeTab === 'profile' ? 'active' : ''}`}
+                  className={`prof-nav-btn ${activeTab === "profile" ? "active" : ""}`}
                   onClick={() => {
-                    setActiveTab('profile');
-                    setMessage('');
-                    setError('');
+                    setActiveTab("profile");
+                    setMessage("");
+                    setError("");
                   }}
                 >
                   <span>👤</span> Hồ sơ của tôi
                 </button>
                 <button
                   type="button"
-                  className={`prof-nav-btn ${activeTab === 'password' ? 'active' : ''}`}
+                  className={`prof-nav-btn ${activeTab === "password" ? "active" : ""}`}
                   onClick={() => {
-                    setActiveTab('password');
-                    setPasswordMessage('');
-                    setPasswordError('');
+                    setActiveTab("password");
+                    setPasswordMessage("");
+                    setPasswordError("");
                   }}
                 >
                   <span>🔒</span> Bảo mật tài khoản
@@ -283,16 +333,27 @@ export default function CustomerProfile() {
             </div>
 
             {/* Right Panel Workspace content */}
-            {activeTab === 'profile' ? (
+            {activeTab === "profile" ? (
               <div className="prof-right-panel">
                 <div className="prof-section-header">
                   <h2>Thông tin cá nhân</h2>
-                  <p>Quản lý thông tin cá nhân của bạn để nhận dịch vụ chăm sóc tốt nhất từ chúng tôi.</p>
+                  <p>
+                    Quản lý thông tin cá nhân của bạn để nhận dịch vụ chăm sóc
+                    tốt nhất từ chúng tôi.
+                  </p>
                 </div>
 
                 <form className="prof-form" onSubmit={handleSubmit}>
-                  {message && <div className="prof-alert prof-alert-success">✨ {message}</div>}
-                  {error && <div className="prof-alert prof-alert-error">⚠️ {error}</div>}
+                  {message && (
+                    <div className="prof-alert prof-alert-success">
+                      ✨ {message}
+                    </div>
+                  )}
+                  {error && (
+                    <div className="prof-alert prof-alert-error">
+                      ⚠️ {error}
+                    </div>
+                  )}
 
                   <div className="prof-form-row">
                     <div className="prof-form-group">
@@ -373,7 +434,7 @@ export default function CustomerProfile() {
                     className="prof-submit-btn"
                     disabled={saving}
                   >
-                    {saving ? '⏳ Đang lưu...' : '💾 Lưu thông tin'}
+                    {saving ? "⏳ Đang lưu..." : "💾 Lưu thông tin"}
                   </button>
                 </form>
               </div>
@@ -381,12 +442,23 @@ export default function CustomerProfile() {
               <div className="prof-right-panel">
                 <div className="prof-section-header">
                   <h2>Bảo mật tài khoản</h2>
-                  <p>Cập nhật mật khẩu thường xuyên để bảo vệ an toàn thông tin tài khoản.</p>
+                  <p>
+                    Cập nhật mật khẩu thường xuyên để bảo vệ an toàn thông tin
+                    tài khoản.
+                  </p>
                 </div>
 
                 <form className="prof-form" onSubmit={handlePasswordSubmit}>
-                  {passwordMessage && <div className="prof-alert prof-alert-success">✨ {passwordMessage}</div>}
-                  {passwordError && <div className="prof-alert prof-alert-error">⚠️ {passwordError}</div>}
+                  {passwordMessage && (
+                    <div className="prof-alert prof-alert-success">
+                      ✨ {passwordMessage}
+                    </div>
+                  )}
+                  {passwordError && (
+                    <div className="prof-alert prof-alert-error">
+                      ⚠️ {passwordError}
+                    </div>
+                  )}
 
                   <div className="prof-form-group">
                     <label>Mật khẩu hiện tại</label>
@@ -394,7 +466,12 @@ export default function CustomerProfile() {
                       type="password"
                       className="prof-input"
                       value={passwordForm.oldPassword}
-                      onChange={e => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                      onChange={(e) =>
+                        setPasswordForm({
+                          ...passwordForm,
+                          oldPassword: e.target.value,
+                        })
+                      }
                       placeholder="Nhập mật khẩu hiện tại đang sử dụng"
                       required
                     />
@@ -407,7 +484,12 @@ export default function CustomerProfile() {
                         type="password"
                         className="prof-input"
                         value={passwordForm.newPassword}
-                        onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                        onChange={(e) =>
+                          setPasswordForm({
+                            ...passwordForm,
+                            newPassword: e.target.value,
+                          })
+                        }
                         placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
                         required
                       />
@@ -418,7 +500,12 @@ export default function CustomerProfile() {
                         type="password"
                         className="prof-input"
                         value={passwordForm.confirmPassword}
-                        onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                        onChange={(e) =>
+                          setPasswordForm({
+                            ...passwordForm,
+                            confirmPassword: e.target.value,
+                          })
+                        }
                         placeholder="Nhập lại mật khẩu mới để xác nhận"
                         required
                       />
@@ -430,7 +517,7 @@ export default function CustomerProfile() {
                     className="prof-submit-btn"
                     disabled={changingPassword}
                   >
-                    {changingPassword ? '⏳ Đang lưu...' : '🔑 Đổi mật khẩu'}
+                    {changingPassword ? "⏳ Đang lưu..." : "🔑 Đổi mật khẩu"}
                   </button>
                 </form>
               </div>

@@ -220,26 +220,80 @@ export default function CustomerDashboard() {
             </div>
           </div>
 
-          <div className="customer-dash-member-container" style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', width: '100%', maxWidth: '380px' }}>
-            <div className={`premium-member-card ${String(profile.MembershipLevel || "normal").toLowerCase()}`} style={{ width: '100%', height: '230px' }}>
+          <div
+            className="customer-dash-member-container"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              alignItems: "center",
+              width: "100%",
+              maxWidth: "380px",
+            }}
+          >
+            <div
+              className={`premium-member-card ${String(profile.MembershipLevel || "normal").toLowerCase()}`}
+              style={{ width: "100%", height: "230px" }}
+            >
               <div className="card-glass-shine" />
               <div className="card-chip" />
               <div className="card-header">
                 <span className="card-brand">🌟 PREMIUM MEMBER</span>
-                <span className="card-vip-badge">{profile.MembershipLevel || "MEMBER"}</span>
+                <span className="card-vip-badge">
+                  {profile.MembershipLevel || "MEMBER"}
+                </span>
               </div>
 
-              <div className="card-body" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '-10px 0' }}>
-                <div className="customer-dash-avatar" style={{ margin: 0, position: 'relative', zIndex: 3, width: '75px', height: '75px', minWidth: '75px', border: '3px solid rgba(255,255,255,0.7)', borderRadius: '50%', overflow: 'hidden', boxShadow: '0 8px 20px rgba(0,0,0,0.15)' }}>
+              <div
+                className="card-body"
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  margin: "-10px 0",
+                }}
+              >
+                <div
+                  className="customer-dash-avatar"
+                  style={{
+                    margin: 0,
+                    position: "relative",
+                    zIndex: 3,
+                    width: "75px",
+                    height: "75px",
+                    minWidth: "75px",
+                    border: "3px solid rgba(255,255,255,0.7)",
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                  }}
+                >
                   {profile.AvatarUrl ? (
                     <img
                       src={resolveFileUrl(profile.AvatarUrl)}
                       alt={profile.FullName || "Avatar"}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
                     />
                   ) : (
-                    <span style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', background: '#fff', fontSize: '24px', fontWeight: 'bold', color: '#1e293b' }}>
-                      {String(profile.FullName || "K").charAt(0).toUpperCase()}
+                    <span
+                      style={{
+                        display: "grid",
+                        placeItems: "center",
+                        width: "100%",
+                        height: "100%",
+                        background: "#fff",
+                        fontSize: "24px",
+                        fontWeight: "bold",
+                        color: "#1e293b",
+                      }}
+                    >
+                      {String(profile.FullName || "K")
+                        .charAt(0)
+                        .toUpperCase()}
                     </span>
                   )}
                 </div>
@@ -258,13 +312,52 @@ export default function CustomerDashboard() {
             </div>
 
             {/* Loyalty thăng hạng progress bar đặt gọn gàng phía dưới thẻ */}
-            <div className="customer-dash-progress" style={{ width: '100%', background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(10px)', padding: '12px 18px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
-              <div style={{ background: '#e2e8f0', borderRadius: '999px', height: '8px', overflow: 'hidden', marginBottom: '8px', position: 'relative' }}>
-                <span style={{ display: 'block', background: 'linear-gradient(90deg, #10b981, #059669)', width: `${loyaltyPercent}%`, height: '100%', borderRadius: '999px', transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+            <div
+              className="customer-dash-progress"
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.65)",
+                backdropFilter: "blur(10px)",
+                padding: "12px 18px",
+                borderRadius: "16px",
+                border: "1px solid rgba(255,255,255,0.4)",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.02)",
+              }}
+            >
+              <div
+                style={{
+                  background: "#e2e8f0",
+                  borderRadius: "999px",
+                  height: "8px",
+                  overflow: "hidden",
+                  marginBottom: "8px",
+                  position: "relative",
+                }}
+              >
+                <span
+                  style={{
+                    display: "block",
+                    background: "linear-gradient(90deg, #10b981, #059669)",
+                    width: `${loyaltyPercent}%`,
+                    height: "100%",
+                    borderRadius: "999px",
+                    transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
+                />
               </div>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', fontWeight: 600, textAlign: 'center' }}>
-                {Number(profile.LoyaltyPoints || 0).toLocaleString("vi-VN")} điểm · còn{" "}
-                {Number(profile.PointsToNextLevel || 0).toLocaleString("vi-VN")} điểm để lên {profile.NextMembershipLevel || "hạng cao hơn"}
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "0.8rem",
+                  color: "#475569",
+                  fontWeight: 600,
+                  textAlign: "center",
+                }}
+              >
+                {Number(profile.LoyaltyPoints || 0).toLocaleString("vi-VN")}{" "}
+                điểm · còn{" "}
+                {Number(profile.PointsToNextLevel || 0).toLocaleString("vi-VN")}{" "}
+                điểm để lên {profile.NextMembershipLevel || "hạng cao hơn"}
               </p>
             </div>
           </div>
