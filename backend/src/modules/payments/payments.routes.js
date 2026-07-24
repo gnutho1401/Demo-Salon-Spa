@@ -31,11 +31,7 @@ router.post(
   controller.applyVoucher,
 );
 
-router.post(
-  "/:id/cancel-payos",
-  authMiddleware,
-  controller.cancelPayos,
-);
+router.post("/:id/cancel-payos", authMiddleware, controller.cancelPayos);
 
 router.post(
   "/:id/refund",
@@ -86,4 +82,3 @@ router.delete(
 );
 
 module.exports = router;
-

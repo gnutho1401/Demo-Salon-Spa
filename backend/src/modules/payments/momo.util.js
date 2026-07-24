@@ -1,14 +1,14 @@
-const crypto = require('crypto');
-const qs = require('qs');
+const crypto = require("crypto");
+const qs = require("qs");
 
 function signMoMo(params, secretKey) {
   const raw = Object.keys(params)
     .filter((key) => params[key] !== undefined && params[key] !== null)
     .sort()
     .map((key) => `${key}=${params[key]}`)
-    .join('&');
+    .join("&");
 
-  return crypto.createHmac('sha256', secretKey).update(raw).digest('hex');
+  return crypto.createHmac("sha256", secretKey).update(raw).digest("hex");
 }
 
 function buildSignedPayload(baseParams, secretKey) {

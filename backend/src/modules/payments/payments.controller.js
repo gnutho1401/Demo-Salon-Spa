@@ -257,9 +257,9 @@ async function applyVoucher(req, res) {
         req.user.userId,
         req.params.appointmentId,
         req.body,
-        isStaff
+        isStaff,
       ),
-      "Áp dụng voucher thành công"
+      "Áp dụng voucher thành công",
     );
   } catch (err) {
     return error(res, err.message, 400);
@@ -287,4 +287,3 @@ module.exports = {
   remove,
   applyVoucher,
 };
-

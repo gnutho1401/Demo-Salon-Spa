@@ -113,8 +113,7 @@ async function getPayableAppointment(
     const voucherResult = await pool
       .request()
       .input("VoucherId", sql.Int, voucherId)
-      .input("CustomerId", sql.Int, item.CustomerId)
-      .query(`
+      .input("CustomerId", sql.Int, item.CustomerId).query(`
         SELECT TOP 1
           v.VoucherId,
           v.Code,
@@ -141,10 +140,12 @@ async function getPayableAppointment(
     // Scale down voucher amounts by 10 to match website service prices
     const codeUpper = String(voucher.Code || "").toUpperCase();
     const isFree = codeUpper.startsWith("FREE");
-    
+
     const minOrder = Number(voucher.MinOrderAmount || 0) / 10;
-    const maxDiscount = voucher.MaxDiscountAmount ? Number(voucher.MaxDiscountAmount) / 10 : null;
-    
+    const maxDiscount = voucher.MaxDiscountAmount
+      ? Number(voucher.MaxDiscountAmount) / 10
+      : null;
+
     let discountValue = Number(voucher.DiscountValue || 0);
     if (!isFree && String(voucher.DiscountType).toUpperCase() === "AMOUNT") {
       discountValue = discountValue / 10;
@@ -156,12 +157,14 @@ async function getPayableAppointment(
 
     // Check minimum order limit in JS
     if (minOrder > 0 && beforeRewardAmount < minOrder) {
-      throw new Error(`Đơn hàng tối thiểu ${minOrder.toLocaleString('vi-VN')}đ để sử dụng voucher này`);
+      throw new Error(
+        `Đơn hàng tối thiểu ${minOrder.toLocaleString("vi-VN")}đ để sử dụng voucher này`,
+      );
     }
 
-    const servicesResult = await pool.request()
-      .input("AppointmentId", sql.Int, appointmentId)
-      .query(`
+    const servicesResult = await pool
+      .request()
+      .input("AppointmentId", sql.Int, appointmentId).query(`
         SELECT s.ServiceName, ISNULL(aps.Price, s.Price) AS Price
         FROM AppointmentServices aps
         LEFT JOIN Services s ON s.ServiceId = aps.ServiceId
@@ -170,23 +173,42 @@ async function getPayableAppointment(
     const appServices = servicesResult.recordset;
 
     if (codeUpper.startsWith("FREEPH")) {
-      const phucHoiService = appServices.find(s => String(s.ServiceName || "") === "Phục hồi tóc hư tổn");
+      const phucHoiService = appServices.find(
+        (s) => String(s.ServiceName || "") === "Phục hồi tóc hư tổn",
+      );
       if (!phucHoiService) {
-        throw new Error("Voucher này chỉ áp dụng cho dịch vụ Phục hồi tóc hư tổn");
+        throw new Error(
+          "Voucher này chỉ áp dụng cho dịch vụ Phục hồi tóc hư tổn",
+        );
       }
-      voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(phucHoiService.Price));
+      voucherDiscountAmount = Math.min(
+        toNumber(voucher.DiscountValue),
+        toNumber(phucHoiService.Price),
+      );
     } else if (codeUpper.startsWith("FREEMS")) {
-      const massageService = appServices.find(s => String(s.ServiceName || "") === "Massage cổ vai gáy");
+      const massageService = appServices.find(
+        (s) => String(s.ServiceName || "") === "Massage cổ vai gáy",
+      );
       if (!massageService) {
-        throw new Error("Voucher này chỉ áp dụng cho dịch vụ Massage cổ vai gáy");
+        throw new Error(
+          "Voucher này chỉ áp dụng cho dịch vụ Massage cổ vai gáy",
+        );
       }
-      voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(massageService.Price));
+      voucherDiscountAmount = Math.min(
+        toNumber(voucher.DiscountValue),
+        toNumber(massageService.Price),
+      );
     } else if (codeUpper.startsWith("FREEGD")) {
-      const goiDauService = appServices.find(s => String(s.ServiceName || "").includes("Gội đầu"));
+      const goiDauService = appServices.find((s) =>
+        String(s.ServiceName || "").includes("Gội đầu"),
+      );
       if (!goiDauService) {
         throw new Error("Voucher này chỉ áp dụng cho dịch vụ Gội đầu");
       }
-      voucherDiscountAmount = Math.min(toNumber(voucher.DiscountValue), toNumber(goiDauService.Price));
+      voucherDiscountAmount = Math.min(
+        toNumber(voucher.DiscountValue),
+        toNumber(goiDauService.Price),
+      );
     } else {
       if (String(voucher.DiscountType || "").toUpperCase() === "PERCENT") {
         voucherDiscountAmount =
@@ -391,8 +413,7 @@ async function markVoucherUsed(transaction, customerId, voucherId) {
   // 2. Đếm số lần sử dụng thành công (status = PAID) của khách hàng đối với voucher này
   const useCountResult = await req
     .input("CustomerId", sql.Int, customerId)
-    .input("VoucherId", sql.Int, voucherId)
-    .query(`
+    .input("VoucherId", sql.Int, voucherId).query(`
       SELECT COUNT(*) AS UseCount
       FROM Invoices i
       JOIN Payments p ON i.InvoiceId = p.InvoiceId
@@ -401,7 +422,7 @@ async function markVoucherUsed(transaction, customerId, voucherId) {
         AND i.VoucherId = @VoucherId
         AND p.Status = 'PAID'
     `);
-  
+
   const useCount = useCountResult.recordset[0].UseCount;
 
   // 3. Nếu dùng từ 1 lần trở lên mới chuyển trạng thái UsedStatus = 1 trong CustomerVouchers
@@ -417,18 +438,26 @@ async function markVoucherUsed(transaction, customerId, voucherId) {
   }
 }
 
-async function markAppointmentPaid(transaction, appointmentId, reason = "Thanh toán thành công") {
+async function markAppointmentPaid(
+  transaction,
+  appointmentId,
+  reason = "Thanh toán thành công",
+) {
   const appRes = await new sql.Request(transaction)
     .input("AppointmentId", sql.Int, appointmentId)
-    .query("SELECT Status FROM Appointments WHERE AppointmentId = @AppointmentId");
+    .query(
+      "SELECT Status FROM Appointments WHERE AppointmentId = @AppointmentId",
+    );
   const appointment = appRes.recordset[0];
   if (!appointment) return;
 
   const oldStatus = appointment.Status;
   if (["PENDING_PAYMENT", "PENDING", "PAID"].includes(oldStatus)) {
-    await new sql.Request(transaction)
-      .input("AppointmentId", sql.Int, appointmentId)
-      .query(`
+    await new sql.Request(transaction).input(
+      "AppointmentId",
+      sql.Int,
+      appointmentId,
+    ).query(`
         UPDATE Appointments
         SET Status = 'CONFIRMED', UpdatedAt = GETDATE()
         WHERE AppointmentId = @AppointmentId
@@ -438,8 +467,7 @@ async function markAppointmentPaid(transaction, appointmentId, reason = "Thanh t
       .input("AppointmentId", sql.Int, appointmentId)
       .input("OldStatus", sql.NVarChar, oldStatus)
       .input("NewStatus", sql.NVarChar, "CONFIRMED")
-      .input("Reason", sql.NVarChar, reason)
-      .query(`
+      .input("Reason", sql.NVarChar, reason).query(`
         INSERT INTO AppointmentStatusHistory (AppointmentId, OldStatus, NewStatus, Reason, ChangedAt)
         VALUES (@AppointmentId, @OldStatus, @NewStatus, @Reason, GETDATE())
       `);
@@ -447,9 +475,14 @@ async function markAppointmentPaid(transaction, appointmentId, reason = "Thanh t
     // Tự động finalize hồ sơ điều trị gốc liên kết với lịch tái khám này
     try {
       const treatmentNotesV2Service = require("../treatment-notes-v2/treatment-notes-v2.service");
-      await treatmentNotesV2Service.finalizeByFollowUpAppointment(Number(appointmentId));
+      await treatmentNotesV2Service.finalizeByFollowUpAppointment(
+        Number(appointmentId),
+      );
     } catch (finalizeErr) {
-      console.warn("[markAppointmentPaid] Auto-finalize treatment note failed:", finalizeErr.message);
+      console.warn(
+        "[markAppointmentPaid] Auto-finalize treatment note failed:",
+        finalizeErr.message,
+      );
     }
   }
 }
@@ -572,7 +605,11 @@ async function payAppointment(userId, appointmentId, payload = {}) {
     }
 
     await markInvoicePaid(transaction, invoiceId);
-    await markAppointmentPaid(transaction, appointmentId, 'Invoice marked paid by receptionist');
+    await markAppointmentPaid(
+      transaction,
+      appointmentId,
+      "Invoice marked paid by receptionist",
+    );
 
     const earnedPoints = await addLoyaltyPoints(
       transaction,
@@ -716,7 +753,11 @@ async function processVnpayCallback(query = {}) {
 
   const vnpParams = {};
   for (const key in query) {
-    if (key.startsWith("vnp_") && key !== "vnp_SecureHash" && key !== "vnp_SecureHashType") {
+    if (
+      key.startsWith("vnp_") &&
+      key !== "vnp_SecureHash" &&
+      key !== "vnp_SecureHashType"
+    ) {
       vnpParams[key] = query[key];
     }
   }
@@ -801,7 +842,11 @@ async function processVnpayCallback(query = {}) {
         `);
 
       await markInvoicePaid(transaction, payment.InvoiceId);
-      await markAppointmentPaid(transaction, payment.AppointmentId, 'Payment completed via VNPay');
+      await markAppointmentPaid(
+        transaction,
+        payment.AppointmentId,
+        "Payment completed via VNPay",
+      );
 
       if (payment.VoucherId) {
         await markVoucherUsed(
@@ -1038,9 +1083,11 @@ async function processPayosWebhook(webhookBody) {
 
     if (!payment) {
       // Check if it is a Package Payment
-      const pkgPaymentResult = await new sql.Request(transaction)
-        .input("TransactionCode", sql.NVarChar, orderCode)
-        .query(`
+      const pkgPaymentResult = await new sql.Request(transaction).input(
+        "TransactionCode",
+        sql.NVarChar,
+        orderCode,
+      ).query(`
           SELECT TOP 1
             pp.PackagePaymentId,
             pp.Amount,
@@ -1087,8 +1134,7 @@ async function processPayosWebhook(webhookBody) {
             "VnpTransactionNo",
             sql.NVarChar,
             String(webhookData.paymentLinkId || webhookData.reference || ""),
-          )
-          .query(`
+          ).query(`
             UPDATE PackagePayments
             SET
               Status = 'PAID',
@@ -1105,8 +1151,7 @@ async function processPayosWebhook(webhookBody) {
             "TotalSessions",
             sql.Int,
             Math.max(Number(pkgPayment.TotalSessions || 1), 1),
-          )
-          .query(`
+          ).query(`
             UPDATE CustomerPackages
             SET
               Status = 'ACTIVE',
@@ -1125,8 +1170,7 @@ async function processPayosWebhook(webhookBody) {
             "Points",
             sql.Int,
             Math.floor(Number(pkgPayment.Amount || 0) / 10000),
-          )
-          .query(`
+          ).query(`
             UPDATE Customers
             SET LoyaltyPoints = LoyaltyPoints + @Points
             WHERE CustomerId = @CustomerId
@@ -1140,9 +1184,11 @@ async function processPayosWebhook(webhookBody) {
         };
       } else {
         // Payment failed
-        await new sql.Request(transaction)
-          .input("PackagePaymentId", sql.Int, pkgPayment.PackagePaymentId)
-          .query(`
+        await new sql.Request(transaction).input(
+          "PackagePaymentId",
+          sql.Int,
+          pkgPayment.PackagePaymentId,
+        ).query(`
             UPDATE PackagePayments
             SET Status = 'FAILED'
             WHERE PackagePaymentId = @PackagePaymentId
@@ -1195,7 +1241,11 @@ async function processPayosWebhook(webhookBody) {
         `);
 
       await markInvoicePaid(transaction, payment.InvoiceId);
-      await markAppointmentPaid(transaction, payment.AppointmentId, 'Payment completed via PayOS');
+      await markAppointmentPaid(
+        transaction,
+        payment.AppointmentId,
+        "Payment completed via PayOS",
+      );
 
       if (payment.VoucherId) {
         await markVoucherUsed(
@@ -1348,7 +1398,11 @@ async function handlePayosReturn(query = {}) {
           `);
 
         await markInvoicePaid(transaction, payment.InvoiceId);
-        await markAppointmentPaid(transaction, payment.AppointmentId, 'Payment completed via PayOS');
+        await markAppointmentPaid(
+          transaction,
+          payment.AppointmentId,
+          "Payment completed via PayOS",
+        );
         await transaction.commit();
 
         return {
@@ -1422,9 +1476,7 @@ async function cancelPayosPayment(paymentId, userId) {
     console.error("PayOS cancelPaymentLink error:", err.message);
   }
 
-  await pool
-    .request()
-    .input("PaymentId", sql.Int, paymentId).query(`
+  await pool.request().input("PaymentId", sql.Int, paymentId).query(`
       UPDATE Payments
       SET Status = 'FAILED', VnpResponseCode = 'CANCELLED'
       WHERE PaymentId = @PaymentId
@@ -1495,24 +1547,30 @@ async function refundPayosPayment(paymentId, userId, reason = "") {
       `);
 
     // Cập nhật trạng thái payment
-    await new sql.Request(transaction)
-      .input("PaymentId", sql.Int, paymentId).query(`
+    await new sql.Request(transaction).input("PaymentId", sql.Int, paymentId)
+      .query(`
         UPDATE Payments
         SET Status = 'REFUND_PENDING'
         WHERE PaymentId = @PaymentId
       `);
 
     // Cập nhật trạng thái invoice
-    await new sql.Request(transaction)
-      .input("InvoiceId", sql.Int, payment.InvoiceId).query(`
+    await new sql.Request(transaction).input(
+      "InvoiceId",
+      sql.Int,
+      payment.InvoiceId,
+    ).query(`
         UPDATE Invoices
         SET Status = 'REFUND_PENDING'
         WHERE InvoiceId = @InvoiceId
       `);
 
     // Cập nhật trạng thái appointment
-    await new sql.Request(transaction)
-      .input("AppointmentId", sql.Int, payment.AppointmentId).query(`
+    await new sql.Request(transaction).input(
+      "AppointmentId",
+      sql.Int,
+      payment.AppointmentId,
+    ).query(`
         UPDATE Appointments
         SET Status = 'REFUND_PENDING', UpdatedAt = GETDATE()
         WHERE AppointmentId = @AppointmentId
@@ -1540,9 +1598,9 @@ async function applyVoucher(userId, appointmentId, body, isStaff = false) {
   const rewardPoints = Number(body.rewardPoints || 0);
 
   // 1. Lấy thông tin hóa đơn hiện tại để xem có voucher nào đang được áp dụng không
-  const oldInvoiceRes = await pool.request()
-    .input("AppointmentId", sql.Int, appointmentId)
-    .query(`
+  const oldInvoiceRes = await pool
+    .request()
+    .input("AppointmentId", sql.Int, appointmentId).query(`
       SELECT TOP 1 VoucherId
       FROM Invoices
       WHERE AppointmentId = @AppointmentId
@@ -1551,14 +1609,20 @@ async function applyVoucher(userId, appointmentId, body, isStaff = false) {
   const oldVoucherId = oldInvoiceRes.recordset[0]?.VoucherId || null;
 
   // 2. Tính toán tiền chiết khấu và thực hiện các bước kiểm định
-  const calculation = await getPayableAppointment(userId, appointmentId, voucherId, rewardPoints, isStaff);
+  const calculation = await getPayableAppointment(
+    userId,
+    appointmentId,
+    voucherId,
+    rewardPoints,
+    isStaff,
+  );
 
   // 3. Ràng buộc số lần sử dụng tối đa của voucher mới (nếu áp dụng voucher mới)
   if (voucherId && voucherId !== oldVoucherId) {
-    const countRes = await pool.request()
+    const countRes = await pool
+      .request()
       .input("CustomerId", sql.Int, calculation.CustomerId)
-      .input("VoucherId", sql.Int, voucherId)
-      .query(`
+      .input("VoucherId", sql.Int, voucherId).query(`
         SELECT COUNT(*) AS UseCount
         FROM Invoices i
         JOIN Appointments a ON i.AppointmentId = a.AppointmentId
@@ -1599,7 +1663,7 @@ async function applyVoucher(userId, appointmentId, body, isStaff = false) {
     calculation.finalAmount,
     calculation.voucherId,
     calculation.rewardPointsUsed,
-    calculation.rewardDiscountAmount
+    calculation.rewardDiscountAmount,
   );
 
   return calculation;
@@ -1608,9 +1672,9 @@ async function applyVoucher(userId, appointmentId, body, isStaff = false) {
 async function checkAndUpdatePayosStatusByAppointment(appointmentId) {
   try {
     const pool = await connectDB();
-    const paymentResult = await pool.request()
-      .input("AppointmentId", sql.Int, appointmentId)
-      .query(`
+    const paymentResult = await pool
+      .request()
+      .input("AppointmentId", sql.Int, appointmentId).query(`
         SELECT TOP 1 p.PaymentId, p.TransactionCode, p.Status, p.InvoiceId, i.CustomerId
         FROM Payments p
         INNER JOIN Invoices i ON i.InvoiceId = p.InvoiceId
@@ -1623,40 +1687,70 @@ async function checkAndUpdatePayosStatusByAppointment(appointmentId) {
     if (!payment || !payment.TransactionCode) return;
 
     const payos = getPayOS();
-    const info = await payos.paymentRequests.get(String(payment.TransactionCode));
+    const info = await payos.paymentRequests.get(
+      String(payment.TransactionCode),
+    );
     if (info && info.status === "PAID") {
       const transaction = new sql.Transaction(pool);
       await transaction.begin();
       try {
         await new sql.Request(transaction)
           .input("PaymentId", sql.Int, payment.PaymentId)
-          .input("VnpTransactionNo", sql.NVarChar, String(info.id || info.paymentLinkId || ""))
-          .query(`
+          .input(
+            "VnpTransactionNo",
+            sql.NVarChar,
+            String(info.id || info.paymentLinkId || ""),
+          ).query(`
             UPDATE Payments
             SET Status = 'PAID', VnpTransactionNo = @VnpTransactionNo, VnpResponseCode = '00', PaidAt = GETDATE()
             WHERE PaymentId = @PaymentId
           `);
         await markInvoicePaid(transaction, payment.InvoiceId);
-        await markAppointmentPaid(transaction, appointmentId, 'Payment completed via PayOS');
-        
+        await markAppointmentPaid(
+          transaction,
+          appointmentId,
+          "Payment completed via PayOS",
+        );
+
         // Load details to award points & mark voucher used
         const invRes = await new sql.Request(transaction)
           .input("InvoiceId", sql.Int, payment.InvoiceId)
-          .query("SELECT VoucherId, RewardPointsUsed, RewardDiscountAmount, Amount FROM Invoices WHERE InvoiceId = @InvoiceId");
+          .query(
+            "SELECT VoucherId, RewardPointsUsed, RewardDiscountAmount, Amount FROM Invoices WHERE InvoiceId = @InvoiceId",
+          );
         const inv = invRes.recordset[0];
         if (inv) {
           if (inv.VoucherId) {
-            await markVoucherUsed(transaction, payment.CustomerId, inv.VoucherId);
+            await markVoucherUsed(
+              transaction,
+              payment.CustomerId,
+              inv.VoucherId,
+            );
           }
           if (Number(inv.RewardPointsUsed || 0) > 0) {
-            await useLoyaltyPoints(transaction, payment.CustomerId, payment.PaymentId, appointmentId, inv.RewardPointsUsed, inv.RewardDiscountAmount);
+            await useLoyaltyPoints(
+              transaction,
+              payment.CustomerId,
+              payment.PaymentId,
+              appointmentId,
+              inv.RewardPointsUsed,
+              inv.RewardDiscountAmount,
+            );
           }
-          await addLoyaltyPoints(transaction, payment.CustomerId, payment.PaymentId, appointmentId, inv.Amount);
+          await addLoyaltyPoints(
+            transaction,
+            payment.CustomerId,
+            payment.PaymentId,
+            appointmentId,
+            inv.Amount,
+          );
           await updateCustomerMembershipLevel(transaction, payment.CustomerId);
         }
-        
+
         await transaction.commit();
-        console.log(`[Auto-Sync] Synchronized pending payment for appointment ${appointmentId} to PAID.`);
+        console.log(
+          `[Auto-Sync] Synchronized pending payment for appointment ${appointmentId} to PAID.`,
+        );
       } catch (err) {
         await transaction.rollback();
         console.error("[Auto-Sync] Sync transaction failed:", err.message);
