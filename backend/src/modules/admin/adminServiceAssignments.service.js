@@ -3,7 +3,8 @@ const { sql, connectDB } = require("../../config/db");
 async function getAssignedTechnicians(serviceId) {
   const pool = await connectDB();
 
-  const result = await pool.request().input("ServiceId", sql.Int, serviceId).query(`
+  const result = await pool.request().input("ServiceId", sql.Int, serviceId)
+    .query(`
     SELECT
       e.EmployeeId,
       u.FullName,
@@ -35,9 +36,13 @@ async function getAssignedTechnicians(serviceId) {
 
 async function updateAssignedTechnicians(serviceId, employeeIds = []) {
   const pool = await connectDB();
-  const ids = Array.from(new Set((employeeIds || []).map(Number).filter(Boolean)));
+  const ids = Array.from(
+    new Set((employeeIds || []).map(Number).filter(Boolean)),
+  );
 
-  const serviceCheck = await pool.request().input("ServiceId", sql.Int, serviceId).query(`
+  const serviceCheck = await pool
+    .request()
+    .input("ServiceId", sql.Int, serviceId).query(`
     SELECT ServiceId FROM Services WHERE ServiceId = @ServiceId
   `);
   if (!serviceCheck.recordset[0]) throw new Error("Không tìm thấy dịch vụ");
@@ -46,7 +51,8 @@ async function updateAssignedTechnicians(serviceId, employeeIds = []) {
   try {
     await transaction.begin();
 
-    await new sql.Request(transaction).input("ServiceId", sql.Int, serviceId).query(`
+    await new sql.Request(transaction).input("ServiceId", sql.Int, serviceId)
+      .query(`
       DELETE FROM EmployeeServices WHERE ServiceId = @ServiceId
     `);
 
@@ -77,7 +83,9 @@ async function updateAssignedTechnicians(serviceId, employeeIds = []) {
 
     await transaction.commit();
   } catch (err) {
-    try { await transaction.rollback(); } catch (_) {}
+    try {
+      await transaction.rollback();
+    } catch (_) {}
     throw err;
   }
 
