@@ -1,0 +1,1 @@
+{"detail":"'charmap' codec can't encode character '\\u1ea2' in position 10: character maps to <undefined>"}
