@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
 
 function getTransporter() {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -6,7 +6,7 @@ function getTransporter() {
   }
 
   return nodemailer.createTransport({
-    service: 'gmail',
+    service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -18,11 +18,14 @@ async function sendMail({ to, subject, html }) {
   const transporter = getTransporter();
 
   if (!transporter) {
-    console.log('EMAIL_USER hoặc EMAIL_PASS chưa được cấu hình. Nội dung email dev:', {
-      to,
-      subject,
-      html,
-    });
+    console.log(
+      "EMAIL_USER hoặc EMAIL_PASS chưa được cấu hình. Nội dung email dev:",
+      {
+        to,
+        subject,
+        html,
+      },
+    );
     return { skipped: true };
   }
 
@@ -35,8 +38,8 @@ async function sendMail({ to, subject, html }) {
     });
     return { skipped: false };
   } catch (err) {
-    console.error('Lỗi khi gửi email qua SMTP:', err.message);
-    console.log('Chuyển hướng in nội dung email ra console:', {
+    console.error("Lỗi khi gửi email qua SMTP:", err.message);
+    console.log("Chuyển hướng in nội dung email ra console:", {
       to,
       subject,
       html,
@@ -48,7 +51,7 @@ async function sendMail({ to, subject, html }) {
 async function sendVerifyEmail(to, code) {
   return sendMail({
     to,
-    subject: 'Xác nhận tài khoản Beauty Salon',
+    subject: "Xác nhận tài khoản Beauty Salon",
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6">
         <h2>Xác nhận tài khoản Beauty Salon</h2>
@@ -61,12 +64,12 @@ async function sendVerifyEmail(to, code) {
 }
 
 async function sendResetPasswordEmail(to, token) {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
   const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
 
   return sendMail({
     to,
-    subject: 'Đặt lại mật khẩu Beauty Salon',
+    subject: "Đặt lại mật khẩu Beauty Salon",
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6">
         <h2>Đặt lại mật khẩu</h2>

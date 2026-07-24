@@ -36,7 +36,9 @@ export default function AdminConfirmDialog({
     const handleKeyDown = (event) => {
       if (event.key === "Escape" && !busyRef.current) onCancelRef.current?.();
       if (event.key !== "Tab") return;
-      const focusable = dialogRef.current?.querySelectorAll("button:not(:disabled)");
+      const focusable = dialogRef.current?.querySelectorAll(
+        "button:not(:disabled)",
+      );
       if (!focusable?.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -81,11 +83,15 @@ export default function AdminConfirmDialog({
         </div>
         <div className="admin-confirm-copy">
           <p className="admin-confirm-kicker">
-            {tone === "danger" ? "Thao tác cần thận trọng" : "Kiểm tra trước khi tiếp tục"}
+            {tone === "danger"
+              ? "Thao tác cần thận trọng"
+              : "Kiểm tra trước khi tiếp tục"}
           </p>
           <h2 id={titleId}>{title}</h2>
           <p id={descriptionId}>{description}</p>
-          {details ? <div className="admin-confirm-details">{details}</div> : null}
+          {details ? (
+            <div className="admin-confirm-details">{details}</div>
+          ) : null}
         </div>
         <div className="admin-confirm-actions">
           <button

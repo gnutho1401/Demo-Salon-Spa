@@ -61,7 +61,9 @@ function todayInTimeZone(now = new Date(), timeZone = REPORTING_TIME_ZONE) {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(now);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
   return `${values.year}-${values.month}-${values.day}`;
 }
 
@@ -145,7 +147,9 @@ function resolveReportingRange(filters = {}, options = {}) {
 
   const spanDays = daySpan(startDate, endDate);
   if (spanDays > 366) {
-    throw new ReportingFilterError("Khoảng thời gian tối đa cho một biểu đồ là 366 ngày");
+    throw new ReportingFilterError(
+      "Khoảng thời gian tối đa cho một biểu đồ là 366 ngày",
+    );
   }
 
   return {
