@@ -228,8 +228,10 @@ async function create(data) {
   if (!fullName) throw new Error("Họ tên không được để trống");
   if (!email) throw new Error("Email không được để trống");
   if (!emailRegex.test(email)) throw new Error("Email không đúng định dạng");
-  if (phone && !phoneRegex.test(phone)) throw new Error("Số điện thoại phải từ 9 đến 15 chữ số");
-  if (!password || password.length < 6) throw new Error("Mật khẩu mới phải từ 6 ký tự");
+  if (phone && !phoneRegex.test(phone))
+    throw new Error("Số điện thoại phải từ 9 đến 15 chữ số");
+  if (!password || password.length < 6)
+    throw new Error("Mật khẩu mới phải từ 6 ký tự");
   if (!roleId) throw new Error("Vui lòng chọn role");
 
   const pool = await connectDB();
@@ -273,7 +275,10 @@ async function create(data) {
       const loyaltyPoints = toInt(data.LoyaltyPoints ?? data.loyaltyPoints, 0);
 
       // Get default membership level if not provided
-      const requestMlId = toInt(data.MembershipLevelId ?? data.membershipLevelId, null);
+      const requestMlId = toInt(
+        data.MembershipLevelId ?? data.membershipLevelId,
+        null,
+      );
       let mlId = requestMlId;
       if (mlId === null) {
         const mlRes = await new sql.Request(transaction).query(`
@@ -296,10 +301,18 @@ async function create(data) {
       // Employee roles
       const branchId = toInt(data.BranchId ?? data.branchId);
       const position = nullable(data.Position ?? data.position) || roleName;
-      const specialization = nullable(data.Specialization ?? data.specialization);
-      const salary = data.Salary !== undefined && data.Salary !== "" ? Number(data.Salary) : null;
+      const specialization = nullable(
+        data.Specialization ?? data.specialization,
+      );
+      const salary =
+        data.Salary !== undefined && data.Salary !== ""
+          ? Number(data.Salary)
+          : null;
       const hireDate = nullable(data.HireDate ?? data.hireDate) || new Date();
-      const yearsOfExperience = toInt(data.YearsOfExperience ?? data.yearsOfExperience, 0);
+      const yearsOfExperience = toInt(
+        data.YearsOfExperience ?? data.yearsOfExperience,
+        0,
+      );
       const bio = nullable(data.Bio ?? data.bio);
 
       await new sql.Request(transaction)
@@ -370,7 +383,8 @@ async function update(id, data) {
   if (!fullName) throw new Error("Họ tên không được để trống");
   if (!email) throw new Error("Email không được để trống");
   if (!emailRegex.test(email)) throw new Error("Email không đúng định dạng");
-  if (phone && !phoneRegex.test(phone)) throw new Error("Số điện thoại phải từ 9 đến 15 chữ số");
+  if (phone && !phoneRegex.test(phone))
+    throw new Error("Số điện thoại phải từ 9 đến 15 chữ số");
   if (!roleId) throw new Error("Vui lòng chọn role");
 
   if (!["ACTIVE", "INACTIVE", "BANNED"].includes(userStatus)) {
@@ -415,21 +429,38 @@ async function update(id, data) {
 
     // 2. Handle sub-tables (Customers or Employees)
     if (roleName === "CUSTOMER") {
-      const gender = data.Gender !== undefined ? defNullable(data.Gender) : current.Gender;
-      const dateOfBirth = data.DateOfBirth !== undefined ? defNullable(data.DateOfBirth) : current.DateOfBirth;
-      const address = data.Address !== undefined ? defNullable(data.Address) : current.Address;
-      const loyaltyPoints = data.LoyaltyPoints !== undefined ? toInt(data.LoyaltyPoints, 0) : toInt(current.LoyaltyPoints, 0);
-      const membershipLevelId = data.MembershipLevelId !== undefined ? toInt(data.MembershipLevelId) : current.MembershipLevelId;
+      const gender =
+        data.Gender !== undefined ? defNullable(data.Gender) : current.Gender;
+      const dateOfBirth =
+        data.DateOfBirth !== undefined
+          ? defNullable(data.DateOfBirth)
+          : current.DateOfBirth;
+      const address =
+        data.Address !== undefined
+          ? defNullable(data.Address)
+          : current.Address;
+      const loyaltyPoints =
+        data.LoyaltyPoints !== undefined
+          ? toInt(data.LoyaltyPoints, 0)
+          : toInt(current.LoyaltyPoints, 0);
+      const membershipLevelId =
+        data.MembershipLevelId !== undefined
+          ? toInt(data.MembershipLevelId)
+          : current.MembershipLevelId;
 
       // Clean up old Employee role if switching from Employee to Customer
       const empCheck = await new sql.Request(transaction)
         .input("UserId", sql.Int, Number(id))
         .query(`SELECT EmployeeId FROM Employees WHERE UserId = @UserId`);
-      const empId = empCheck.recordset[0] ? empCheck.recordset[0].EmployeeId : null;
+      const empId = empCheck.recordset[0]
+        ? empCheck.recordset[0].EmployeeId
+        : null;
       if (empId) {
-        const hasRecords = await new sql.Request(transaction)
-          .input("EmpId", sql.Int, empId)
-          .query(`
+        const hasRecords = await new sql.Request(transaction).input(
+          "EmpId",
+          sql.Int,
+          empId,
+        ).query(`
             SELECT 1 AS HasData WHERE
               EXISTS (SELECT 1 FROM Appointments WHERE EmployeeId = @EmpId)
               OR EXISTS (SELECT 1 FROM Reviews WHERE EmployeeId = @EmpId)
@@ -442,10 +473,11 @@ async function update(id, data) {
         if (hasRecords.recordset[0]) {
           await new sql.Request(transaction)
             .input("EmpId", sql.Int, empId)
-            .query(`UPDATE Employees SET Status = 'INACTIVE' WHERE EmployeeId = @EmpId`);
+            .query(
+              `UPDATE Employees SET Status = 'INACTIVE' WHERE EmployeeId = @EmpId`,
+            );
         } else {
-          await new sql.Request(transaction)
-            .input("EmpId", sql.Int, empId)
+          await new sql.Request(transaction).input("EmpId", sql.Int, empId)
             .query(`
               DELETE FROM ShiftRegistrations WHERE TechnicianId = @EmpId;
               DELETE FROM EmployeeServices WHERE EmployeeId = @EmpId;
@@ -456,7 +488,11 @@ async function update(id, data) {
       }
 
       // Check if Customer row exists
-      const checkRes = await new sql.Request(transaction).input("UserId", sql.Int, Number(id)).query(`
+      const checkRes = await new sql.Request(transaction).input(
+        "UserId",
+        sql.Int,
+        Number(id),
+      ).query(`
         SELECT CustomerId FROM Customers WHERE UserId = @UserId
       `);
 
@@ -490,30 +526,53 @@ async function update(id, data) {
           .input("DateOfBirth", sql.Date, dateOfBirth)
           .input("Address", sql.NVarChar, address)
           .input("LoyaltyPoints", sql.Int, loyaltyPoints)
-          .input("MembershipLevelId", sql.Int, membershipLevelId || mlId).query(`
+          .input("MembershipLevelId", sql.Int, membershipLevelId || mlId)
+          .query(`
             INSERT INTO Customers (UserId, Gender, DateOfBirth, Address, LoyaltyPoints, MembershipLevelId)
             VALUES (@UserId, @Gender, @DateOfBirth, @Address, @LoyaltyPoints, @MembershipLevelId)
           `);
       }
     } else {
       // Employee role
-      const branchId = data.BranchId !== undefined ? toInt(data.BranchId) : current.BranchId;
-      const position = data.Position !== undefined ? defNullable(data.Position) : current.Position;
-      const specialization = data.Specialization !== undefined ? defNullable(data.Specialization) : current.Specialization;
-      const salary = data.Salary !== undefined ? (data.Salary === "" ? null : Number(data.Salary)) : current.Salary;
-      const hireDate = data.HireDate !== undefined ? defNullable(data.HireDate) : current.HireDate;
-      const yearsOfExperience = data.YearsOfExperience !== undefined ? toInt(data.YearsOfExperience, 0) : toInt(current.YearsOfExperience, 0);
+      const branchId =
+        data.BranchId !== undefined ? toInt(data.BranchId) : current.BranchId;
+      const position =
+        data.Position !== undefined
+          ? defNullable(data.Position)
+          : current.Position;
+      const specialization =
+        data.Specialization !== undefined
+          ? defNullable(data.Specialization)
+          : current.Specialization;
+      const salary =
+        data.Salary !== undefined
+          ? data.Salary === ""
+            ? null
+            : Number(data.Salary)
+          : current.Salary;
+      const hireDate =
+        data.HireDate !== undefined
+          ? defNullable(data.HireDate)
+          : current.HireDate;
+      const yearsOfExperience =
+        data.YearsOfExperience !== undefined
+          ? toInt(data.YearsOfExperience, 0)
+          : toInt(current.YearsOfExperience, 0);
       const bio = data.Bio !== undefined ? defNullable(data.Bio) : current.Bio;
 
       // Clean up Customer record if switching from Customer to Employee
       const custCheck = await new sql.Request(transaction)
         .input("UserId", sql.Int, Number(id))
         .query(`SELECT CustomerId FROM Customers WHERE UserId = @UserId`);
-      const custId = custCheck.recordset[0] ? custCheck.recordset[0].CustomerId : null;
+      const custId = custCheck.recordset[0]
+        ? custCheck.recordset[0].CustomerId
+        : null;
       if (custId) {
-        const hasRecords = await new sql.Request(transaction)
-          .input("CustId", sql.Int, custId)
-          .query(`
+        const hasRecords = await new sql.Request(transaction).input(
+          "CustId",
+          sql.Int,
+          custId,
+        ).query(`
             SELECT 1 AS HasData WHERE
               EXISTS (SELECT 1 FROM Appointments WHERE CustomerId = @CustId)
               OR EXISTS (SELECT 1 FROM Reviews WHERE CustomerId = @CustId)
@@ -525,10 +584,11 @@ async function update(id, data) {
         if (hasRecords.recordset[0]) {
           await new sql.Request(transaction)
             .input("CustId", sql.Int, custId)
-            .query(`UPDATE Customers SET LoyaltyPoints = 0 WHERE CustomerId = @CustId`);
+            .query(
+              `UPDATE Customers SET LoyaltyPoints = 0 WHERE CustomerId = @CustId`,
+            );
         } else {
-          await new sql.Request(transaction)
-            .input("CustId", sql.Int, custId)
+          await new sql.Request(transaction).input("CustId", sql.Int, custId)
             .query(`
               DELETE FROM CustomerVouchers WHERE CustomerId = @CustId;
               DELETE FROM CustomerPackages WHERE CustomerId = @CustId;
@@ -537,9 +597,12 @@ async function update(id, data) {
         }
       }
 
-
       // Check if Employee row exists
-      const checkRes = await new sql.Request(transaction).input("UserId", sql.Int, Number(id)).query(`
+      const checkRes = await new sql.Request(transaction).input(
+        "UserId",
+        sql.Int,
+        Number(id),
+      ).query(`
         SELECT EmployeeId FROM Employees WHERE UserId = @UserId
       `);
 

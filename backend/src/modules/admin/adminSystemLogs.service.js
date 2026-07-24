@@ -21,7 +21,7 @@ async function getLogFilters() {
   `);
   return {
     users: usersRes.recordset,
-    actionTypes: typesRes.recordset.map(r => r.ActionType),
+    actionTypes: typesRes.recordset.map((r) => r.ActionType),
   };
 }
 
@@ -80,7 +80,7 @@ async function list(filters = {}) {
   const totalCount = logs.length > 0 ? logs[0].TotalCount : 0;
 
   return {
-    logs: logs.map(l => {
+    logs: logs.map((l) => {
       const copy = { ...l };
       delete copy.TotalCount;
       return copy;
@@ -117,9 +117,19 @@ async function getById(id) {
   return row;
 }
 
-async function writeLog({ userId = null, roleName = null, actionName = "", actionType = "", description = "", ipAddress = null, oldValue = null, newValue = null }) {
+async function writeLog({
+  userId = null,
+  roleName = null,
+  actionName = "",
+  actionType = "",
+  description = "",
+  ipAddress = null,
+  oldValue = null,
+  newValue = null,
+}) {
   const pool = await connectDB();
-  await pool.request()
+  await pool
+    .request()
     .input("UserId", sql.Int, userId)
     .input("RoleName", sql.NVarChar, roleName)
     .input("ActionName", sql.NVarChar, actionName)
@@ -127,8 +137,7 @@ async function writeLog({ userId = null, roleName = null, actionName = "", actio
     .input("Description", sql.NVarChar, description)
     .input("IpAddress", sql.NVarChar, ipAddress)
     .input("OldValue", sql.NVarChar, oldValue)
-    .input("NewValue", sql.NVarChar, newValue)
-    .query(`
+    .input("NewValue", sql.NVarChar, newValue).query(`
       INSERT INTO SystemLogs (UserId, RoleName, ActionName, ActionType, Description, IpAddress, OldValue, NewValue)
       VALUES (@UserId, @RoleName, @ActionName, @ActionType, @Description, @IpAddress, @OldValue, @NewValue)
     `);
