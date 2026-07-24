@@ -8,8 +8,8 @@ class EventBusService extends EventEmitter {
 
   /**
    * Publish an event with optional data
-   * @param {string} eventName 
-   * @param {any} data 
+   * @param {string} eventName
+   * @param {any} data
    */
   publish(eventName, data) {
     console.log(`[EventBus] Dispatching event: ${eventName}`, data);
@@ -18,8 +18,8 @@ class EventBusService extends EventEmitter {
 
   /**
    * Subscribe a callback to an event
-   * @param {string} eventName 
-   * @param {function} listener 
+   * @param {string} eventName
+   * @param {function} listener
    */
   subscribe(eventName, listener) {
     console.log(`[EventBus] Registered listener for: ${eventName}`);

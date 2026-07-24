@@ -88,7 +88,8 @@ const CHART_DEFINITIONS = {
   teamKpi: {
     key: "teamKpi",
     title: "KPI đội nhóm",
-    description: "Lịch hoàn thành và điểm đánh giá của nhân sự trong phạm vi quản lý.",
+    description:
+      "Lịch hoàn thành và điểm đánh giá của nhân sự trong phạm vi quản lý.",
     type: "bar",
     valueType: "number",
     defaultFilter: "thisMonth",
@@ -133,7 +134,9 @@ const CHART_DEFINITIONS = {
 };
 
 function normalizeRole(role) {
-  return String(role || "").trim().toUpperCase();
+  return String(role || "")
+    .trim()
+    .toUpperCase();
 }
 
 function isInternalRole(role) {

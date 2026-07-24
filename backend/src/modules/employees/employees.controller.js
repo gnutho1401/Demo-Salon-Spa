@@ -71,4 +71,12 @@ async function getBranches(req, res) {
   }
 }
 
-module.exports = { getAll, getById, create, update, remove, getByService, getBranches };
+module.exports = {
+  getAll,
+  getById,
+  create,
+  update,
+  remove,
+  getByService,
+  getBranches,
+};
