@@ -14,7 +14,9 @@ export function useAnalyticsDashboard(chartKeys, filter, enabled = true) {
   const [loading, setLoading] = useState(Boolean(enabled));
   const [error, setError] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
-  const keys = Array.isArray(chartKeys) ? chartKeys.join(",") : String(chartKeys || "");
+  const keys = Array.isArray(chartKeys)
+    ? chartKeys.join(",")
+    : String(chartKeys || "");
   const refreshMs = Number(import.meta.env.VITE_ANALYTICS_REFRESH_MS || 30000);
 
   useEffect(() => {
@@ -40,14 +42,21 @@ export function useAnalyticsDashboard(chartKeys, filter, enabled = true) {
       try {
         if (!data) setLoading(true);
         setError("");
-        const response = await axiosClient.get("/internal-analytics/dashboard", {
-          params: { ...filter, keys },
-          signal: controller.signal,
-        });
+        const response = await axiosClient.get(
+          "/internal-analytics/dashboard",
+          {
+            params: { ...filter, keys },
+            signal: controller.signal,
+          },
+        );
         setData(databasePayload(response));
       } catch (requestError) {
         if (requestError.code === "ERR_CANCELED") return;
-        setError(requestError.response?.data?.message || requestError.message || "Không tải được dữ liệu báo cáo");
+        setError(
+          requestError.response?.data?.message ||
+            requestError.message ||
+            "Không tải được dữ liệu báo cáo",
+        );
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -57,18 +66,25 @@ export function useAnalyticsDashboard(chartKeys, filter, enabled = true) {
   }, [enabled, filter, keys, reloadToken]);
 
   const reload = useCallback(() => setReloadToken((value) => value + 1), []);
-  const getChart = useCallback((chartKey) => data?.charts?.[chartKey] || null, [data]);
+  const getChart = useCallback(
+    (chartKey) => data?.charts?.[chartKey] || null,
+    [data],
+  );
   return { data, loading, error, reload, getChart };
 }
 
 export async function exportInteractiveChart(chartKey, filter, format) {
-  const response = await axiosClient.get(`/internal-analytics/charts/${chartKey}/export`, {
-    params: { ...filter, format },
-    responseType: "blob",
-  });
+  const response = await axiosClient.get(
+    `/internal-analytics/charts/${chartKey}/export`,
+    {
+      params: { ...filter, format },
+      responseType: "blob",
+    },
+  );
   const disposition = response.headers["content-disposition"] || "";
-  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1]
-    || `${chartKey}.${format === "pdf" ? "pdf" : "xls"}`;
+  const filename =
+    disposition.match(/filename="?([^";]+)"?/i)?.[1] ||
+    `${chartKey}.${format === "pdf" ? "pdf" : "xls"}`;
   const url = URL.createObjectURL(response.data);
   const anchor = document.createElement("a");
   anchor.href = url;

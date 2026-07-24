@@ -28,7 +28,8 @@ export default function ReceptionistLayout({ children }) {
   async function syncProfile() {
     try {
       const res = await axiosClient.get("/receptionist/profile");
-      const profileData = res.data?.data?.profile || res.data?.profile || res.data;
+      const profileData =
+        res.data?.data?.profile || res.data?.profile || res.data;
       if (profileData && typeof updateUser === "function") {
         updateUser({
           ...user,
@@ -85,7 +86,9 @@ export default function ReceptionistLayout({ children }) {
               ➕ Tạo lịch hẹn mới
             </NavLink>
             {/* <NavLink to="/receptionist/waiting-list">⏳ Hàng chờ</NavLink> */}
-            <NavLink to="/receptionist/reschedule-requests">📅 Duyệt đổi lịch</NavLink>
+            <NavLink to="/receptionist/reschedule-requests">
+              📅 Duyệt đổi lịch
+            </NavLink>
           </div>
 
           <div className="rx-menu-group">
@@ -98,7 +101,22 @@ export default function ReceptionistLayout({ children }) {
             <p className="rx-menu-group-title">Tương tác khách hàng</p>
             <NavLink to="/receptionist/reviews">⭐ Đánh giá</NavLink>
             <NavLink to="/receptionist/notifications">
-              🔔 Thông báo {unreadCount > 0 && <span style={{ backgroundColor: "#e53e3e", color: "white", padding: "2px 6px", borderRadius: "10px", fontSize: "11px", fontWeight: "bold", marginLeft: "6px" }}>{unreadCount}</span>}
+              🔔 Thông báo{" "}
+              {unreadCount > 0 && (
+                <span
+                  style={{
+                    backgroundColor: "#e53e3e",
+                    color: "white",
+                    padding: "2px 6px",
+                    borderRadius: "10px",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    marginLeft: "6px",
+                  }}
+                >
+                  {unreadCount}
+                </span>
+              )}
             </NavLink>
           </div>
 

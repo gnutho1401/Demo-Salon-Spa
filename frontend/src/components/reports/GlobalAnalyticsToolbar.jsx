@@ -8,7 +8,10 @@ export default function GlobalAnalyticsToolbar({
   scopeLabel = "Toàn hệ thống",
 }) {
   return (
-    <section className="global-analytics-toolbar" aria-label="Điều khiển dữ liệu biểu đồ">
+    <section
+      className="global-analytics-toolbar"
+      aria-label="Điều khiển dữ liệu biểu đồ"
+    >
       <div className="global-analytics-actions">
         <div className="global-analytics-context">
           <span className="global-analytics-pulse" aria-hidden="true" />
@@ -33,7 +36,10 @@ export default function GlobalAnalyticsToolbar({
           {loading ? "Đang đồng bộ" : "Đồng bộ lại"}
         </button>
       </div>
-      <div className="global-analytics-source" title="Không sử dụng dữ liệu giả">
+      <div
+        className="global-analytics-source"
+        title="Không sử dụng dữ liệu giả"
+      >
         <span aria-hidden="true" />
         SQL Server · {scopeLabel}
       </div>
