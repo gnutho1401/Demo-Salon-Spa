@@ -94,7 +94,7 @@ async function list(filters = {}) {
       ORDER BY r.CreatedAt DESC, r.ReviewId DESC
     `);
 
-  return result.recordset.map(row => {
+  return result.recordset.map((row) => {
     try {
       row.ReviewImages = row.ImagesJson ? JSON.parse(row.ImagesJson) : [];
     } catch {
