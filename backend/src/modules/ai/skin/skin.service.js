@@ -1,35 +1,39 @@
-const axios = require('axios');
-const { connectDB, sql } = require('../../../config/db');
+const axios = require("axios");
+const { connectDB, sql } = require("../../../config/db");
 
 async function downloadImageAsBase64(url) {
-  if (url.startsWith('data:')) {
+  if (url.startsWith("data:")) {
     const matches = url.match(/^data:([^;]+);base64,(.+)$/);
     if (!matches) {
-      throw new Error('Định dạng ảnh base64 không hợp lệ.');
+      throw new Error("Định dạng ảnh base64 không hợp lệ.");
     }
     return {
       base64Data: matches[2],
-      mimeType: matches[1]
+      mimeType: matches[1],
     };
   }
   try {
-    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+    const response = await axios.get(url, {
+      responseType: "arraybuffer",
+      timeout: 10000,
+    });
     const buffer = Buffer.from(response.data);
-    const mimeType = response.headers['content-type'] || 'image/jpeg';
+    const mimeType = response.headers["content-type"] || "image/jpeg";
     return {
-      base64Data: buffer.toString('base64'),
-      mimeType
+      base64Data: buffer.toString("base64"),
+      mimeType,
     };
   } catch (err) {
-    console.error('[Skin AI] Download image failed:', url, err.message);
+    console.error("[Skin AI] Download image failed:", url, err.message);
     throw err;
   }
 }
 
 async function getCustomerByUserId(pool, userId) {
-  const result = await pool.request()
-    .input('UserId', sql.Int, userId)
-    .query('SELECT CustomerId FROM Customers WHERE UserId = @UserId');
+  const result = await pool
+    .request()
+    .input("UserId", sql.Int, userId)
+    .query("SELECT CustomerId FROM Customers WHERE UserId = @UserId");
   return result.recordset[0];
 }
 
@@ -83,74 +87,76 @@ Quy tắc: Trả về chuỗi JSON thuần túy, KHÔNG bao gồm ký tự bao n
   // 1. Thử gọi trực tiếp Google Gemini API
   if (geminiApiKey) {
     try {
-      console.log('[Skin AI] Attempting direct Google Gemini Vision call...');
+      console.log("[Skin AI] Attempting direct Google Gemini Vision call...");
       const { base64Data, mimeType } = await downloadImageAsBase64(imageUrl);
-      
+
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiApiKey}`,
         {
           contents: [
             {
-              role: 'user',
+              role: "user",
               parts: [
                 { text: systemInstruction },
                 {
                   inlineData: {
                     mimeType: mimeType,
-                    data: base64Data
-                  }
-                }
-              ]
-            }
+                    data: base64Data,
+                  },
+                },
+              ],
+            },
           ],
           generationConfig: {
-            responseMimeType: "application/json"
-          }
+            responseMimeType: "application/json",
+          },
         },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 20000 }
+        { headers: { "Content-Type": "application/json" }, timeout: 20000 },
       );
 
       const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text) {
-        console.log('[Skin AI] Direct Gemini successful!');
+        console.log("[Skin AI] Direct Gemini successful!");
         return JSON.parse(text.trim());
       }
     } catch (err) {
-      console.warn('[Skin AI] Direct Gemini failed:', err.message);
+      console.warn("[Skin AI] Direct Gemini failed:", err.message);
     }
   }
 
   // 2. Thử gọi OpenRouter Vision API làm phương án dự phòng
   if (openrouterApiKey) {
     const visionModels = [
-      'openrouter/free',
-      'meta-llama/llama-3.2-11b-vision-instruct:free'
+      "openrouter/free",
+      "meta-llama/llama-3.2-11b-vision-instruct:free",
     ];
 
     for (const model of visionModels) {
       try {
-        console.log(`[Skin AI] Attempting OpenRouter Vision call with model: ${model}...`);
+        console.log(
+          `[Skin AI] Attempting OpenRouter Vision call with model: ${model}...`,
+        );
         const response = await axios.post(
-          'https://openrouter.ai/api/v1/chat/completions',
+          "https://openrouter.ai/api/v1/chat/completions",
           {
             model: model,
             messages: [
               {
-                role: 'user',
+                role: "user",
                 content: [
-                  { type: 'text', text: systemInstruction },
-                  { type: 'image_url', image_url: { url: imageUrl } }
-                ]
-              }
-            ]
+                  { type: "text", text: systemInstruction },
+                  { type: "image_url", image_url: { url: imageUrl } },
+                ],
+              },
+            ],
           },
           {
             headers: {
-              'Authorization': `Bearer ${openrouterApiKey}`,
-              'Content-Type': 'application/json'
+              Authorization: `Bearer ${openrouterApiKey}`,
+              "Content-Type": "application/json",
             },
-            timeout: 20000
-          }
+            timeout: 20000,
+          },
         );
 
         const content = response.data?.choices?.[0]?.message?.content;
@@ -159,17 +165,21 @@ Quy tắc: Trả về chuỗi JSON thuần túy, KHÔNG bao gồm ký tự bao n
           return JSON.parse(content.trim());
         }
       } catch (err) {
-        console.warn(`[Skin AI] OpenRouter failed for model ${model}:`, err.message);
+        console.warn(
+          `[Skin AI] OpenRouter failed for model ${model}:`,
+          err.message,
+        );
       }
     }
   }
 
   // Never fabricate a successful medical/cosmetic analysis when providers fail.
-  console.warn('[Skin AI] All configured vision providers failed.');
+  console.warn("[Skin AI] All configured vision providers failed.");
   return {
     is_face: false,
     analysis_unavailable: true,
-    error: 'Không thể phân tích ảnh lúc này vì các dịch vụ AI đang tạm thời không khả dụng. Không có kết quả giả nào được lưu. Vui lòng thử lại sau.'
+    error:
+      "Không thể phân tích ảnh lúc này vì các dịch vụ AI đang tạm thời không khả dụng. Không có kết quả giả nào được lưu. Vui lòng thử lại sau.",
   };
 }
 
@@ -177,7 +187,9 @@ async function analyzeSkin(userId, imageUrl) {
   const pool = await connectDB();
   const customer = await getCustomerByUserId(pool, userId);
   if (!customer) {
-    throw new Error('Không tìm thấy tài khoản khách hàng tương ứng trên hệ thống.');
+    throw new Error(
+      "Không tìm thấy tài khoản khách hàng tương ứng trên hệ thống.",
+    );
   }
 
   // Lấy danh sách dịch vụ Spa/Skincare để làm context cho AI
@@ -197,9 +209,12 @@ async function analyzeSkin(userId, imageUrl) {
     )
   `);
 
-  const servicesText = servicesResult.recordset.map(s => 
-    `- [ID: ${s.ServiceId}] ${s.ServiceName} (Thuộc nhóm: ${s.CategoryName || 'Skincare'}): ${s.Price?.toLocaleString('vi-VN')}đ, thời lượng ${s.DurationMinutes} phút.`
-  ).join('\n');
+  const servicesText = servicesResult.recordset
+    .map(
+      (s) =>
+        `- [ID: ${s.ServiceId}] ${s.ServiceName} (Thuộc nhóm: ${s.CategoryName || "Skincare"}): ${s.Price?.toLocaleString("vi-VN")}đ, thời lượng ${s.DurationMinutes} phút.`,
+    )
+    .join("\n");
 
   // Gọi phân tích hình ảnh qua AI
   const analysis = await analyzeSkinImage(imageUrl, servicesText);
@@ -208,23 +223,24 @@ async function analyzeSkin(userId, imageUrl) {
   }
 
   // Lưu kết quả vào cơ sở dữ liệu nếu phân tích thành công
-  await pool.request()
-    .input('CustomerId', sql.Int, customer.CustomerId)
-    .input('ImageUrl', sql.NVarChar, imageUrl)
-    .input('SkinType', sql.NVarChar, analysis.skin_type)
-    .input('AcneLevel', sql.NVarChar, analysis.acne_level)
-    .input('WrinkleLevel', sql.NVarChar, analysis.wrinkle_level)
-    .input('DarkSpots', sql.NVarChar, analysis.dark_spots)
-    .input('Redness', sql.NVarChar, analysis.redness)
-    .input('SkinScore', sql.Int, analysis.skin_score)
-    .input('Summary', sql.NVarChar, analysis.summary)
-    .input('RoutineSuggestion', sql.NVarChar, analysis.routine_suggestion)
-    .input('Pores', sql.NVarChar, analysis.pores || 'Bình thường')
-    .input('Hydration', sql.NVarChar, analysis.hydration || 'Đủ ẩm')
-    .input('Sebum', sql.NVarChar, analysis.sebum || 'Bình thường')
-    .input('SkinBarrier', sql.NVarChar, analysis.skin_barrier || 'Khỏe mạnh')
-    .input('Elasticity', sql.NVarChar, analysis.elasticity || 'Tốt')
-    .input('DarkCircles', sql.NVarChar, analysis.dark_circles || 'Không có')
+  await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId)
+    .input("ImageUrl", sql.NVarChar, imageUrl)
+    .input("SkinType", sql.NVarChar, analysis.skin_type)
+    .input("AcneLevel", sql.NVarChar, analysis.acne_level)
+    .input("WrinkleLevel", sql.NVarChar, analysis.wrinkle_level)
+    .input("DarkSpots", sql.NVarChar, analysis.dark_spots)
+    .input("Redness", sql.NVarChar, analysis.redness)
+    .input("SkinScore", sql.Int, analysis.skin_score)
+    .input("Summary", sql.NVarChar, analysis.summary)
+    .input("RoutineSuggestion", sql.NVarChar, analysis.routine_suggestion)
+    .input("Pores", sql.NVarChar, analysis.pores || "Bình thường")
+    .input("Hydration", sql.NVarChar, analysis.hydration || "Đủ ẩm")
+    .input("Sebum", sql.NVarChar, analysis.sebum || "Bình thường")
+    .input("SkinBarrier", sql.NVarChar, analysis.skin_barrier || "Khỏe mạnh")
+    .input("Elasticity", sql.NVarChar, analysis.elasticity || "Tốt")
+    .input("DarkCircles", sql.NVarChar, analysis.dark_circles || "Không có")
     .query(`
       INSERT INTO AISkinAnalysisHistory (
         CustomerId, ImageUrl, SkinType, AcneLevel, WrinkleLevel, DarkSpots, Redness, SkinScore, Summary, RoutineSuggestion,
@@ -238,7 +254,7 @@ async function analyzeSkin(userId, imageUrl) {
   return {
     ...analysis,
     image_url: imageUrl,
-    created_at: new Date()
+    created_at: new Date(),
   };
 }
 
@@ -247,9 +263,9 @@ async function getHistory(userId) {
   const customer = await getCustomerByUserId(pool, userId);
   if (!customer) return [];
 
-  const result = await pool.request()
-    .input('CustomerId', sql.Int, customer.CustomerId)
-    .query(`
+  const result = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
       SELECT AnalysisId, ImageUrl, SkinType, AcneLevel, WrinkleLevel, DarkSpots, Redness, SkinScore, Summary, RoutineSuggestion, CreatedAt,
              Pores, Hydration, Sebum, SkinBarrier, Elasticity, DarkCircles
       FROM AISkinAnalysisHistory
@@ -262,5 +278,5 @@ async function getHistory(userId) {
 
 module.exports = {
   analyzeSkin,
-  getHistory
+  getHistory,
 };

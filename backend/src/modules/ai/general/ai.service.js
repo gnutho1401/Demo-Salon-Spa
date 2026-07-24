@@ -1,10 +1,13 @@
-const { sql, connectDB } = require('../../../config/db');
-const { generateContent } = require('../../../config/gemini');
-const { sendMail } = require('../../../utils/sendMail');
+const { sql, connectDB } = require("../../../config/db");
+const { generateContent } = require("../../../config/gemini");
+const { sendMail } = require("../../../utils/sendMail");
 
 async function getCustomerByUserId(pool, userId) {
   if (!userId) return null;
-  const result = await pool.request().input('UserId', sql.Int, userId).query('SELECT CustomerId FROM Customers WHERE UserId = @UserId');
+  const result = await pool
+    .request()
+    .input("UserId", sql.Int, userId)
+    .query("SELECT CustomerId FROM Customers WHERE UserId = @UserId");
   return result.recordset[0];
 }
 
@@ -24,7 +27,9 @@ async function getMine(userId) {
   const customer = await getCustomerByUserId(pool, userId);
   if (!customer) return [];
 
-  let result = await pool.request().input('CustomerId', sql.Int, customer.CustomerId).query(`
+  let result = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
     SELECT TOP 8
       ar.RecommendationId, ar.RecommendationType, ar.Reason, ar.CreatedAt,
       s.ServiceId, s.ServiceName, s.Description, s.DurationMinutes, s.Price, s.ImageUrl
@@ -111,9 +116,9 @@ async function buildSalonContext(pool, userId) {
   if (userId) {
     const customer = await getCustomerByUserId(pool, userId);
     if (customer) {
-      const historyResult = await pool.request()
-        .input('CustomerId', sql.Int, customer.CustomerId)
-        .query(`
+      const historyResult = await pool
+        .request()
+        .input("CustomerId", sql.Int, customer.CustomerId).query(`
           SELECT TOP 10
             s.ServiceName, a.AppointmentDate, a.Status, a.Notes
           FROM Appointments a
@@ -129,9 +134,9 @@ async function buildSalonContext(pool, userId) {
   // 3. Lấy chat history gần nhất để tạo context (nếu có)
   let recentChats = [];
   if (userId) {
-    const chatHistoryResult = await pool.request()
-      .input('UserId', sql.Int, userId)
-      .query(`
+    const chatHistoryResult = await pool
+      .request()
+      .input("UserId", sql.Int, userId).query(`
         SELECT TOP 6 Question, Answer
         FROM AIChatLogs
         WHERE UserId = @UserId
@@ -141,48 +146,80 @@ async function buildSalonContext(pool, userId) {
   }
 
   // Build context string
-  const servicesList = servicesResult.recordset.map(s =>
-    `- [ID: ${s.ServiceId}] ${s.ServiceName} (${s.CategoryName || 'Chung'}): ${s.Price?.toLocaleString('vi-VN')}đ, ${s.DurationMinutes} phút${s.Description ? ' - ' + s.Description : ''}`
-  ).join('\n');
+  const servicesList = servicesResult.recordset
+    .map(
+      (s) =>
+        `- [ID: ${s.ServiceId}] ${s.ServiceName} (${s.CategoryName || "Chung"}): ${s.Price?.toLocaleString("vi-VN")}đ, ${s.DurationMinutes} phút${s.Description ? " - " + s.Description : ""}`,
+    )
+    .join("\n");
 
-  const packagesList = packagesResult.recordset.map(p =>
-    `- [Gói Combo ID: ${p.PackageId}] ${p.PackageName}: Giá bán ${p.SalePrice?.toLocaleString('vi-VN')}đ (Giá gốc ${p.OriginalPrice?.toLocaleString('vi-VN')}đ), Gồm ${p.TotalSessions} buổi, HSD ${p.ValidityDays} ngày${p.Description ? ' - ' + p.Description : ''}`
-  ).join('\n');
+  const packagesList = packagesResult.recordset
+    .map(
+      (p) =>
+        `- [Gói Combo ID: ${p.PackageId}] ${p.PackageName}: Giá bán ${p.SalePrice?.toLocaleString("vi-VN")}đ (Giá gốc ${p.OriginalPrice?.toLocaleString("vi-VN")}đ), Gồm ${p.TotalSessions} buổi, HSD ${p.ValidityDays} ngày${p.Description ? " - " + p.Description : ""}`,
+    )
+    .join("\n");
 
-  const historyText = customerHistory.length > 0
-    ? customerHistory.map(h => `- ${h.ServiceName} (${new Date(h.AppointmentDate).toLocaleDateString('vi-VN')}) - ${h.Status}`).join('\n')
-    : 'Chưa có lịch sử sử dụng dịch vụ.';
+  const historyText =
+    customerHistory.length > 0
+      ? customerHistory
+          .map(
+            (h) =>
+              `- ${h.ServiceName} (${new Date(h.AppointmentDate).toLocaleDateString("vi-VN")}) - ${h.Status}`,
+          )
+          .join("\n")
+      : "Chưa có lịch sử sử dụng dịch vụ.";
 
-  const chatContext = recentChats.length > 0
-    ? recentChats.map(c => {
-        const cleanAns = String(c.Answer || '')
-          .replace(/\[\[WIDGET:[^\]]+\]\]/g, '')
-          .replace(/\[\[SUGGESTIONS:[^\]]+\]\]/g, '')
-          .trim();
-        return `Khách: ${c.Question}\nAI: ${cleanAns}`;
-      }).join('\n')
-    : '';
+  const chatContext =
+    recentChats.length > 0
+      ? recentChats
+          .map((c) => {
+            const cleanAns = String(c.Answer || "")
+              .replace(/\[\[WIDGET:[^\]]+\]\]/g, "")
+              .replace(/\[\[SUGGESTIONS:[^\]]+\]\]/g, "")
+              .trim();
+            return `Khách: ${c.Question}\nAI: ${cleanAns}`;
+          })
+          .join("\n")
+      : "";
 
   // Map shifts to employees
   const employeeShiftsMap = {};
-  shiftsResult.recordset.forEach(s => {
+  shiftsResult.recordset.forEach((s) => {
     if (!employeeShiftsMap[s.EmployeeId]) {
       employeeShiftsMap[s.EmployeeId] = [];
     }
-    employeeShiftsMap[s.EmployeeId].push(`${s.ShiftDate} (${s.StartTime}-${s.EndTime})`);
+    employeeShiftsMap[s.EmployeeId].push(
+      `${s.ShiftDate} (${s.StartTime}-${s.EndTime})`,
+    );
   });
 
-  const techniciansList = employeesResult.recordset.map(e => {
-    const shifts = employeeShiftsMap[e.EmployeeId] || [];
-    const shiftsStr = shifts.length > 0 ? shifts.join(', ') : 'Trực full ca salon (08:00 - 20:00 hàng ngày)';
-    return `- [Stylist ID: ${e.EmployeeId}] ${e.FullName} (${e.Position || 'Kỹ thuật viên'}): Chuyên môn: ${e.Specialization || 'Chăm sóc chung'}, ${e.YearsOfExperience} năm kinh nghiệm, Đánh giá: ${e.AverageRating}/5. Lịch trực 3 ngày tới: ${shiftsStr}`;
-  }).join('\n');
+  const techniciansList = employeesResult.recordset
+    .map((e) => {
+      const shifts = employeeShiftsMap[e.EmployeeId] || [];
+      const shiftsStr =
+        shifts.length > 0
+          ? shifts.join(", ")
+          : "Trực full ca salon (08:00 - 20:00 hàng ngày)";
+      return `- [Stylist ID: ${e.EmployeeId}] ${e.FullName} (${e.Position || "Kỹ thuật viên"}): Chuyên môn: ${e.Specialization || "Chăm sóc chung"}, ${e.YearsOfExperience} năm kinh nghiệm, Đánh giá: ${e.AverageRating}/5. Lịch trực 3 ngày tới: ${shiftsStr}`;
+    })
+    .join("\n");
 
-  const branchesList = branchesResult.recordset.map(b =>
-    `- Chi nhánh ${b.BranchName}: Địa chỉ: ${b.Address || 'Chưa cập nhật'}, Điện thoại: ${b.Phone || 'Chưa cập nhật'}`
-  ).join('\n');
+  const branchesList = branchesResult.recordset
+    .map(
+      (b) =>
+        `- Chi nhánh ${b.BranchName}: Địa chỉ: ${b.Address || "Chưa cập nhật"}, Điện thoại: ${b.Phone || "Chưa cập nhật"}`,
+    )
+    .join("\n");
 
-  return { servicesList, techniciansList, branchesList, packagesList, historyText, chatContext };
+  return {
+    servicesList,
+    techniciansList,
+    branchesList,
+    packagesList,
+    historyText,
+    chatContext,
+  };
 }
 
 /**
@@ -190,15 +227,22 @@ async function buildSalonContext(pool, userId) {
  */
 async function chat(userId, question) {
   const pool = await connectDB();
-  const text = String(question || '').trim();
-  if (!text) throw new Error('Vui lòng nhập câu hỏi');
+  const text = String(question || "").trim();
+  if (!text) throw new Error("Vui lòng nhập câu hỏi");
 
   let answer;
 
   try {
     // Lấy context từ database
-    const { servicesList, techniciansList, branchesList, packagesList, historyText, chatContext } = await buildSalonContext(pool, userId);
-    const todayStr = new Date().toISOString().split('T')[0];
+    const {
+      servicesList,
+      techniciansList,
+      branchesList,
+      packagesList,
+      historyText,
+      chatContext,
+    } = await buildSalonContext(pool, userId);
+    const todayStr = new Date().toISOString().split("T")[0];
 
     // Tạo system prompt
     const systemPrompt = `Bạn là trợ lý AI thông minh của **Beauty Salon** - một salon làm đẹp chuyên nghiệp.
@@ -262,20 +306,19 @@ ${historyText}
 
     // Gọi Gemini API
     answer = await generateContent(systemPrompt, fullQuestion);
-
   } catch (err) {
-    console.error('Gemini API error:', err.message);
+    console.error("Gemini API error:", err.message);
     // Fallback nếu Gemini lỗi
     answer = await getFallbackAnswer(pool, userId, text);
   }
 
   // Lưu vào database nếu người dùng đã đăng nhập (userId có giá trị)
   if (userId) {
-    const saved = await pool.request()
-      .input('UserId', sql.Int, userId)
-      .input('Question', sql.NVarChar, text)
-      .input('Answer', sql.NVarChar, answer)
-      .query(`
+    const saved = await pool
+      .request()
+      .input("UserId", sql.Int, userId)
+      .input("Question", sql.NVarChar, text)
+      .input("Answer", sql.NVarChar, answer).query(`
         INSERT INTO AIChatLogs (UserId, Question, Answer)
         OUTPUT INSERTED.*
         VALUES (@UserId, @Question, @Answer)
@@ -289,7 +332,7 @@ ${historyText}
       UserId: null,
       Question: text,
       Answer: answer,
-      CreatedAt: new Date()
+      CreatedAt: new Date(),
     };
   }
 }
@@ -302,38 +345,50 @@ async function getFallbackAnswer(pool, userId, text) {
 
   // Helper to safely match keyword without substring collisions (e.g. uốn vs muốn)
   const match = (keywords, exclusions = []) => {
-    return keywords.some(kw => {
+    return keywords.some((kw) => {
       if (!lower.includes(kw)) return false;
-      if (exclusions.some(exc => lower.includes(exc))) return false;
+      if (exclusions.some((exc) => lower.includes(exc))) return false;
       return true;
     });
   };
 
   // 1. Voucher/Khuyến mãi
-  if (match(['voucher', 'mã giảm', 'khuyến mãi', 'discount'])) {
-    if (!userId) return '🎁 Vui lòng đăng nhập để xem danh sách voucher ưu đãi của bạn.';
-    return '🎁 Dưới đây là danh sách các voucher ưu đãi hiện tại của bạn. Nhấp vào mã để sao chép:\n\n[[WIDGET:MY_VOUCHERS]]';
+  if (match(["voucher", "mã giảm", "khuyến mãi", "discount"])) {
+    if (!userId)
+      return "🎁 Vui lòng đăng nhập để xem danh sách voucher ưu đãi của bạn.";
+    return "🎁 Dưới đây là danh sách các voucher ưu đãi hiện tại của bạn. Nhấp vào mã để sao chép:\n\n[[WIDGET:MY_VOUCHERS]]";
   }
 
   // 2. Lịch sử dịch vụ
-  if (match(['lịch sử', 'dịch vụ đã làm', 'đã sử dụng', 'từng làm'])) {
-    if (!userId) return '📜 Vui lòng đăng nhập để xem lịch sử dịch vụ làm đẹp của bạn.';
-    return '📜 Dưới đây là lịch sử các dịch vụ làm đẹp bạn đã thực hiện tại salon của chúng tôi:\n\n[[WIDGET:SERVICE_HISTORY]]';
+  if (match(["lịch sử", "dịch vụ đã làm", "đã sử dụng", "từng làm"])) {
+    if (!userId)
+      return "📜 Vui lòng đăng nhập để xem lịch sử dịch vụ làm đẹp của bạn.";
+    return "📜 Dưới đây là lịch sử các dịch vụ làm đẹp bạn đã thực hiện tại salon của chúng tôi:\n\n[[WIDGET:SERVICE_HISTORY]]";
   }
 
   // 3. Danh sách lịch hẹn / Hủy / Đổi lịch
-  if (match(['lịch hẹn', 'đã đặt', 'hủy lịch', 'đổi lịch', 'lịch của tôi'])) {
-    if (!userId) return '📅 Vui lòng đăng nhập để xem hoặc quản lý lịch hẹn sắp tới của bạn.';
-    return '📅 Dưới đây là các lịch hẹn sắp tới của bạn. Bạn có thể thay đổi thời gian (đổi lịch trực tiếp) hoặc hủy lịch hẹn ngay tại đây:\n\n[[WIDGET:MY_APPOINTMENTS]]';
+  if (match(["lịch hẹn", "đã đặt", "hủy lịch", "đổi lịch", "lịch của tôi"])) {
+    if (!userId)
+      return "📅 Vui lòng đăng nhập để xem hoặc quản lý lịch hẹn sắp tới của bạn.";
+    return "📅 Dưới đây là các lịch hẹn sắp tới của bạn. Bạn có thể thay đổi thời gian (đổi lịch trực tiếp) hoặc hủy lịch hẹn ngay tại đây:\n\n[[WIDGET:MY_APPOINTMENTS]]";
   }
 
   // 4. Đặt lịch / Giờ trống
-  if (match(['đặt', 'giờ trống', 'lịch', 'slot', 'booking', 'làm'], ['hủy lịch', 'đổi lịch', 'lịch sử', 'lịch hẹn'])) {
+  if (
+    match(
+      ["đặt", "giờ trống", "lịch", "slot", "booking", "làm"],
+      ["hủy lịch", "đổi lịch", "lịch sử", "lịch hẹn"],
+    )
+  ) {
     try {
       // Tìm dịch vụ phù hợp trong DB
-      const servicesResult = await pool.request().query("SELECT ServiceId, ServiceName FROM Services WHERE Status = 'AVAILABLE'");
+      const servicesResult = await pool
+        .request()
+        .query(
+          "SELECT ServiceId, ServiceName FROM Services WHERE Status = 'AVAILABLE'",
+        );
       const services = servicesResult.recordset;
-      
+
       // Tìm xem tên dịch vụ nào xuất hiện trong câu hỏi
       let matchedService = null;
       for (const s of services) {
@@ -343,17 +398,39 @@ async function getFallbackAnswer(pool, userId, text) {
           break;
         }
       }
-      
+
       // Nếu không khớp trực tiếp, thử tìm từ khóa thông thường
       if (!matchedService) {
-        if (match(['tóc', 'cắt', 'uốn', 'nhuộm', 'gội'], ['muốn', 'cuốn'])) {
-          matchedService = services.find(s => s.ServiceName.toLowerCase().includes('tóc') || s.ServiceName.toLowerCase().includes('cắt') || s.ServiceName.toLowerCase().includes('uốn') || s.ServiceName.toLowerCase().includes('gội'));
-        } else if (match(['nail', 'móng', 'sơn'])) {
-          matchedService = services.find(s => s.ServiceName.toLowerCase().includes('nail') || s.ServiceName.toLowerCase().includes('móng') || s.ServiceName.toLowerCase().includes('sơn'));
-        } else if (match(['massage', 'spa', 'body'])) {
-          matchedService = services.find(s => s.ServiceName.toLowerCase().includes('massage') || s.ServiceName.toLowerCase().includes('spa') || s.ServiceName.toLowerCase().includes('body'));
-        } else if (match(['da', 'mặt', 'skincare', 'mụn'])) {
-          matchedService = services.find(s => s.ServiceName.toLowerCase().includes('da') || s.ServiceName.toLowerCase().includes('mặt') || s.ServiceName.toLowerCase().includes('skincare') || s.ServiceName.toLowerCase().includes('mụn'));
+        if (match(["tóc", "cắt", "uốn", "nhuộm", "gội"], ["muốn", "cuốn"])) {
+          matchedService = services.find(
+            (s) =>
+              s.ServiceName.toLowerCase().includes("tóc") ||
+              s.ServiceName.toLowerCase().includes("cắt") ||
+              s.ServiceName.toLowerCase().includes("uốn") ||
+              s.ServiceName.toLowerCase().includes("gội"),
+          );
+        } else if (match(["nail", "móng", "sơn"])) {
+          matchedService = services.find(
+            (s) =>
+              s.ServiceName.toLowerCase().includes("nail") ||
+              s.ServiceName.toLowerCase().includes("móng") ||
+              s.ServiceName.toLowerCase().includes("sơn"),
+          );
+        } else if (match(["massage", "spa", "body"])) {
+          matchedService = services.find(
+            (s) =>
+              s.ServiceName.toLowerCase().includes("massage") ||
+              s.ServiceName.toLowerCase().includes("spa") ||
+              s.ServiceName.toLowerCase().includes("body"),
+          );
+        } else if (match(["da", "mặt", "skincare", "mụn"])) {
+          matchedService = services.find(
+            (s) =>
+              s.ServiceName.toLowerCase().includes("da") ||
+              s.ServiceName.toLowerCase().includes("mặt") ||
+              s.ServiceName.toLowerCase().includes("skincare") ||
+              s.ServiceName.toLowerCase().includes("mụn"),
+          );
         }
       }
 
@@ -361,77 +438,144 @@ async function getFallbackAnswer(pool, userId, text) {
         return `📅 Tôi đã mở bảng giờ trống cho dịch vụ **${matchedService.ServiceName}**. Bạn có thể chọn Stylist yêu thích và thời gian trực tiếp bên dưới để đặt lịch nhanh:\n\n[[WIDGET:SLOTS|${matchedService.ServiceId}||]]`;
       }
     } catch (dbErr) {
-      console.error('Fallback DB service search failed:', dbErr.message);
+      console.error("Fallback DB service search failed:", dbErr.message);
     }
   }
 
   // 5. Tìm kiếm dịch vụ dựa trên triệu chứng hoặc nhu cầu đặc biệt (đau lưng, mụn, tóc xơ, v.v.)
   try {
-    const servicesResult = await pool.request().query("SELECT ServiceId, ServiceName, Description, Price, DurationMinutes FROM Services WHERE Status = 'AVAILABLE'");
+    const servicesResult = await pool
+      .request()
+      .query(
+        "SELECT ServiceId, ServiceName, Description, Price, DurationMinutes FROM Services WHERE Status = 'AVAILABLE'",
+      );
     const services = servicesResult.recordset;
 
     let matchedServices = [];
     let symptomTitle = "";
-    if (match(['đau lưng', 'vai gáy', 'mỏi cổ', 'nhức mỏi', 'mệt mỏi', 'massage', 'đá nóng', 'stress', 'mỏi lưng'])) {
+    if (
+      match([
+        "đau lưng",
+        "vai gáy",
+        "mỏi cổ",
+        "nhức mỏi",
+        "mệt mỏi",
+        "massage",
+        "đá nóng",
+        "stress",
+        "mỏi lưng",
+      ])
+    ) {
       symptomTitle = "giảm đau nhức mỏi cơ và thư giãn";
-      matchedServices = services.filter(s => 
-        s.ServiceName.toLowerCase().includes('massage') || 
-        s.ServiceName.toLowerCase().includes('body') ||
-        s.Description?.toLowerCase().includes('massage') ||
-        s.Description?.toLowerCase().includes('thư giãn') ||
-        s.Description?.toLowerCase().includes('vai gáy')
+      matchedServices = services.filter(
+        (s) =>
+          s.ServiceName.toLowerCase().includes("massage") ||
+          s.ServiceName.toLowerCase().includes("body") ||
+          s.Description?.toLowerCase().includes("massage") ||
+          s.Description?.toLowerCase().includes("thư giãn") ||
+          s.Description?.toLowerCase().includes("vai gáy"),
       );
-    } else if (match(['mụn', 'skincare', 'thâm', 'nám', 'sạch da', 'da mặt', 'hút chì', 'da dầu', 'da khô', 'rửa mặt'])) {
+    } else if (
+      match([
+        "mụn",
+        "skincare",
+        "thâm",
+        "nám",
+        "sạch da",
+        "da mặt",
+        "hút chì",
+        "da dầu",
+        "da khô",
+        "rửa mặt",
+      ])
+    ) {
       symptomTitle = "chăm sóc và trị liệu da mặt chuyên sâu";
-      matchedServices = services.filter(s => 
-        s.ServiceName.toLowerCase().includes('da') || 
-        s.ServiceName.toLowerCase().includes('mặt') ||
-        s.ServiceName.toLowerCase().includes('mụn') ||
-        s.ServiceName.toLowerCase().includes('tẩy') ||
-        s.Description?.toLowerCase().includes('da') ||
-        s.Description?.toLowerCase().includes('mụn') ||
-        s.Description?.toLowerCase().includes('skincare')
+      matchedServices = services.filter(
+        (s) =>
+          s.ServiceName.toLowerCase().includes("da") ||
+          s.ServiceName.toLowerCase().includes("mặt") ||
+          s.ServiceName.toLowerCase().includes("mụn") ||
+          s.ServiceName.toLowerCase().includes("tẩy") ||
+          s.Description?.toLowerCase().includes("da") ||
+          s.Description?.toLowerCase().includes("mụn") ||
+          s.Description?.toLowerCase().includes("skincare"),
       );
-    } else if (match(['gội', 'da đầu', 'gàu', 'dưỡng sinh', 'thảo dược', 'rụng tóc', 'ngứa đầu'])) {
+    } else if (
+      match([
+        "gội",
+        "da đầu",
+        "gàu",
+        "dưỡng sinh",
+        "thảo dược",
+        "rụng tóc",
+        "ngứa đầu",
+      ])
+    ) {
       symptomTitle = "chăm sóc da đầu và gội dưỡng sinh thảo dược";
-      matchedServices = services.filter(s => 
-        s.ServiceName.toLowerCase().includes('gội') || 
-        s.ServiceName.toLowerCase().includes('đầu') ||
-        s.Description?.toLowerCase().includes('gội') ||
-        s.Description?.toLowerCase().includes('da đầu')
+      matchedServices = services.filter(
+        (s) =>
+          s.ServiceName.toLowerCase().includes("gội") ||
+          s.ServiceName.toLowerCase().includes("đầu") ||
+          s.Description?.toLowerCase().includes("gội") ||
+          s.Description?.toLowerCase().includes("da đầu"),
       );
-    } else if (match(['uốn', 'nhuộm', 'cắt tóc', 'tạo kiểu', 'duỗi', 'phục hồi tóc', 'chẻ ngọn', 'tóc xơ'], ['muốn', 'cuốn'])) {
+    } else if (
+      match(
+        [
+          "uốn",
+          "nhuộm",
+          "cắt tóc",
+          "tạo kiểu",
+          "duỗi",
+          "phục hồi tóc",
+          "chẻ ngọn",
+          "tóc xơ",
+        ],
+        ["muốn", "cuốn"],
+      )
+    ) {
       symptomTitle = "cắt tạo kiểu và phục hồi tóc chuyên sâu";
-      matchedServices = services.filter(s => 
-        s.ServiceName.toLowerCase().includes('uốn') || 
-        s.ServiceName.toLowerCase().includes('nhuộm') ||
-        s.ServiceName.toLowerCase().includes('tóc') ||
-        s.ServiceName.toLowerCase().includes('cắt') ||
-        s.Description?.toLowerCase().includes('tóc')
+      matchedServices = services.filter(
+        (s) =>
+          s.ServiceName.toLowerCase().includes("uốn") ||
+          s.ServiceName.toLowerCase().includes("nhuộm") ||
+          s.ServiceName.toLowerCase().includes("tóc") ||
+          s.ServiceName.toLowerCase().includes("cắt") ||
+          s.Description?.toLowerCase().includes("tóc"),
       );
     }
 
     if (matchedServices.length > 0) {
-      const listText = matchedServices.map(s => `- **${s.ServiceName}** (${Number(s.Price).toLocaleString('vi-VN')}đ • ${s.DurationMinutes} phút)`).join('\n');
-      return `💆 Rất chia sẻ với tình trạng hiện tại của bạn. Salon gợi ý các liệu trình **${symptomTitle}** phù hợp nhất dành cho bạn dưới đây:\n\n${listText}\n\nBạn có thể nhấp vào bảng giờ trống hoặc đặt lịch nhanh cho các dịch vụ này ngay dưới đây:\n\n[[WIDGET:SEARCH_SERVICES|${matchedServices[0].ServiceName.split(' ')[0]}]]\n\n[[SUGGESTIONS:Xem giờ trống dịch vụ này|Voucher ưu đãi của tôi|Hỏi đáp dịch vụ khác]]`;
+      const listText = matchedServices
+        .map(
+          (s) =>
+            `- **${s.ServiceName}** (${Number(s.Price).toLocaleString("vi-VN")}đ • ${s.DurationMinutes} phút)`,
+        )
+        .join("\n");
+      return `💆 Rất chia sẻ với tình trạng hiện tại của bạn. Salon gợi ý các liệu trình **${symptomTitle}** phù hợp nhất dành cho bạn dưới đây:\n\n${listText}\n\nBạn có thể nhấp vào bảng giờ trống hoặc đặt lịch nhanh cho các dịch vụ này ngay dưới đây:\n\n[[WIDGET:SEARCH_SERVICES|${matchedServices[0].ServiceName.split(" ")[0]}]]\n\n[[SUGGESTIONS:Xem giờ trống dịch vụ này|Voucher ưu đãi của tôi|Hỏi đáp dịch vụ khác]]`;
     }
   } catch (err) {
-    console.error('Symptoms fallback lookup failed:', err.message);
+    console.error("Symptoms fallback lookup failed:", err.message);
   }
 
   // Fallback thông thường khác
-  if (match(['nail', 'móng'])) return '💅 Với dịch vụ nail, bạn có thể chọn các gói làm móng cao cấp, sơn gel hoặc đính đá nghệ thuật. Bạn nên đặt lịch hẹn trực tiếp bằng cách nhắn tin "đặt lịch làm nail" tại đây.\n\n[[WIDGET:SEARCH_SERVICES|nail]]\n\n[[SUGGESTIONS:Đặt lịch sơn gel móng|Xem voucher của tôi|Tư vấn chăm sóc da]]';
-  if (match(['hair', 'tóc'])) return '💇 Về tóc, salon có cắt tạo kiểu nam/nữ, nhuộm màu thời trang, uốn xoăn và hấp phục hồi collagen. Hãy chọn dịch vụ uốn/cắt/nhuộm tóc trực tiếp bên dưới:\n\n[[WIDGET:SEARCH_SERVICES|tóc]]\n\n[[SUGGESTIONS:Xem giờ trống làm tóc|Tìm stylist uốn tóc đẹp|Khuyến mãi combo tóc]]';
-  if (match(['massage', 'spa'])) return '💆 Massage body đá nóng và chăm sóc sức khỏe của chúng tôi sẽ giúp bạn thư giãn tốt nhất. Chọn dịch vụ massage bên dưới để xem giờ trống:\n\n[[WIDGET:SEARCH_SERVICES|massage]]\n\n[[SUGGESTIONS:Đặt lịch Massage Body|Xem các chuyên viên massage|Voucher áp dụng]]';
-  if (match(['da', 'skincare'], ['đá'])) return '✨ Chúng tôi có các liệu trình chăm sóc da mặt chuyên sâu, hút chì thải độc và trị liệu mụn chuyên nghiệp. Hãy chọn dịch vụ chăm sóc da bên dưới:\n\n[[WIDGET:SEARCH_SERVICES|da]]\n\n[[SUGGESTIONS:Đặt lịch nặn mụn|Xem chuyên viên chăm sóc da|Giá dịch vụ hút chì]]';
-  if (match(['giá', 'bao nhiêu'])) return '💰 Bảng giá của từng dịch vụ được niêm yết công khai tại mục Dịch vụ. Bạn cũng có thể xem giá trực tiếp khi chọn dịch vụ đặt lịch trong khung chat này:\n\n[[WIDGET:SEARCH_SERVICES|]]\n\n[[SUGGESTIONS:Xem voucher giảm giá|Đặt lịch cắt tóc nam|Liên hệ chi nhánh]]';
-  
+  if (match(["nail", "móng"]))
+    return '💅 Với dịch vụ nail, bạn có thể chọn các gói làm móng cao cấp, sơn gel hoặc đính đá nghệ thuật. Bạn nên đặt lịch hẹn trực tiếp bằng cách nhắn tin "đặt lịch làm nail" tại đây.\n\n[[WIDGET:SEARCH_SERVICES|nail]]\n\n[[SUGGESTIONS:Đặt lịch sơn gel móng|Xem voucher của tôi|Tư vấn chăm sóc da]]';
+  if (match(["hair", "tóc"]))
+    return "💇 Về tóc, salon có cắt tạo kiểu nam/nữ, nhuộm màu thời trang, uốn xoăn và hấp phục hồi collagen. Hãy chọn dịch vụ uốn/cắt/nhuộm tóc trực tiếp bên dưới:\n\n[[WIDGET:SEARCH_SERVICES|tóc]]\n\n[[SUGGESTIONS:Xem giờ trống làm tóc|Tìm stylist uốn tóc đẹp|Khuyến mãi combo tóc]]";
+  if (match(["massage", "spa"]))
+    return "💆 Massage body đá nóng và chăm sóc sức khỏe của chúng tôi sẽ giúp bạn thư giãn tốt nhất. Chọn dịch vụ massage bên dưới để xem giờ trống:\n\n[[WIDGET:SEARCH_SERVICES|massage]]\n\n[[SUGGESTIONS:Đặt lịch Massage Body|Xem các chuyên viên massage|Voucher áp dụng]]";
+  if (match(["da", "skincare"], ["đá"]))
+    return "✨ Chúng tôi có các liệu trình chăm sóc da mặt chuyên sâu, hút chì thải độc và trị liệu mụn chuyên nghiệp. Hãy chọn dịch vụ chăm sóc da bên dưới:\n\n[[WIDGET:SEARCH_SERVICES|da]]\n\n[[SUGGESTIONS:Đặt lịch nặn mụn|Xem chuyên viên chăm sóc da|Giá dịch vụ hút chì]]";
+  if (match(["giá", "bao nhiêu"]))
+    return "💰 Bảng giá của từng dịch vụ được niêm yết công khai tại mục Dịch vụ. Bạn cũng có thể xem giá trực tiếp khi chọn dịch vụ đặt lịch trong khung chat này:\n\n[[WIDGET:SEARCH_SERVICES|]]\n\n[[SUGGESTIONS:Xem voucher giảm giá|Đặt lịch cắt tóc nam|Liên hệ chi nhánh]]";
+
   return '😊 Xin chào! Hiện tại tôi có thể hỗ trợ bạn trực tiếp các việc sau:\n- Tư vấn & đặt lịch dịch vụ (ví dụ: gõ "tôi bị đau lưng", "tôi muốn làm nail")\n- Xem lịch hẹn sắp tới & đổi lịch/hủy lịch (gõ "lịch hẹn của tôi")\n- Xem các voucher ưu đãi (gõ "voucher của tôi")\n- Xem lịch sử làm đẹp (gõ "lịch sử dịch vụ")\n\n[[SUGGESTIONS:Tôi bị đau lưng mỏi cổ|Tôi muốn tư vấn trị mụn|Xem voucher giảm giá của tôi]]';
 }
 
 async function getChatHistory(userId) {
   const pool = await connectDB();
-  const result = await pool.request().input('UserId', sql.Int, userId).query(`
+  const result = await pool.request().input("UserId", sql.Int, userId).query(`
     SELECT TOP 20 ChatId, Question, Answer, CreatedAt
     FROM AIChatLogs
     WHERE UserId = @UserId
@@ -442,18 +586,29 @@ async function getChatHistory(userId) {
 
 async function getById(id) {
   const pool = await connectDB();
-  const result = await pool.request().input('RecommendationId', sql.Int, id).query('SELECT * FROM AIRecommendations WHERE RecommendationId = @RecommendationId');
+  const result = await pool
+    .request()
+    .input("RecommendationId", sql.Int, id)
+    .query(
+      "SELECT * FROM AIRecommendations WHERE RecommendationId = @RecommendationId",
+    );
   return result.recordset[0];
 }
 
 async function create(data) {
   const pool = await connectDB();
-  const result = await pool.request()
-    .input('CustomerId', sql.Int, data.customerId || data.CustomerId || null)
-    .input('ServiceId', sql.Int, data.serviceId || data.ServiceId || null)
-    .input('RecommendationType', sql.NVarChar, data.recommendationType || data.RecommendationType || 'SERVICE_SUGGESTION')
-    .input('Reason', sql.NVarChar, data.reason || data.Reason || null)
-    .query(`
+  const result = await pool
+    .request()
+    .input("CustomerId", sql.Int, data.customerId || data.CustomerId || null)
+    .input("ServiceId", sql.Int, data.serviceId || data.ServiceId || null)
+    .input(
+      "RecommendationType",
+      sql.NVarChar,
+      data.recommendationType ||
+        data.RecommendationType ||
+        "SERVICE_SUGGESTION",
+    )
+    .input("Reason", sql.NVarChar, data.reason || data.Reason || null).query(`
       INSERT INTO AIRecommendations (CustomerId, ServiceId, RecommendationType, Reason)
       OUTPUT INSERTED.*
       VALUES (@CustomerId, @ServiceId, @RecommendationType, @Reason)
@@ -461,15 +616,22 @@ async function create(data) {
   return result.recordset[0];
 }
 
-async function update(id, data) { return { RecommendationId: Number(id), ...data }; }
+async function update(id, data) {
+  return { RecommendationId: Number(id), ...data };
+}
 async function remove(id) {
   const pool = await connectDB();
-  await pool.request().input('RecommendationId', sql.Int, id).query('DELETE FROM AIRecommendations WHERE RecommendationId = @RecommendationId');
+  await pool
+    .request()
+    .input("RecommendationId", sql.Int, id)
+    .query(
+      "DELETE FROM AIRecommendations WHERE RecommendationId = @RecommendationId",
+    );
   return { RecommendationId: Number(id) };
 }
 
 function ruleBasedChurnPrediction(customerData) {
-  const CURRENT_DATE = new Date('2026-06-27');
+  const CURRENT_DATE = new Date("2026-06-27");
   const results = [];
 
   for (const c of customerData) {
@@ -480,7 +642,9 @@ function ruleBasedChurnPrediction(customerData) {
     // Check no-shows
     if (c.no_show_count > 0) {
       risk_score += c.no_show_count * 20;
-      reason.push(`Số lần đặt lịch nhưng không đến (no-show) cao: ${c.no_show_count} lần`);
+      reason.push(
+        `Số lần đặt lịch nhưng không đến (no-show) cao: ${c.no_show_count} lần`,
+      );
     }
 
     // Check cancellations
@@ -498,15 +662,21 @@ function ruleBasedChurnPrediction(customerData) {
     // Check recency
     if (c.last_visit_date) {
       const lastVisit = new Date(c.last_visit_date);
-      const daysSinceLast = Math.round((CURRENT_DATE - lastVisit) / (1000 * 60 * 60 * 24));
+      const daysSinceLast = Math.round(
+        (CURRENT_DATE - lastVisit) / (1000 * 60 * 60 * 24),
+      );
 
       if (c.avg_days_between_visits) {
         if (daysSinceLast > c.avg_days_between_visits * 2) {
           risk_score += 35;
-          reason.push(`Đã ${daysSinceLast} ngày chưa quay lại, vượt xa tần suất trung bình (${c.avg_days_between_visits} ngày)`);
+          reason.push(
+            `Đã ${daysSinceLast} ngày chưa quay lại, vượt xa tần suất trung bình (${c.avg_days_between_visits} ngày)`,
+          );
         } else if (daysSinceLast > c.avg_days_between_visits * 1.3) {
           risk_score += 20;
-          reason.push(`Đã ${daysSinceLast} ngày chưa quay lại, lâu hơn tần suất trung bình (${c.avg_days_between_visits} ngày)`);
+          reason.push(
+            `Đã ${daysSinceLast} ngày chưa quay lại, lâu hơn tần suất trung bình (${c.avg_days_between_visits} ngày)`,
+          );
         }
       } else {
         if (daysSinceLast > 60) {
@@ -524,38 +694,62 @@ function ruleBasedChurnPrediction(customerData) {
 
     risk_score = Math.min(Math.max(Math.round(risk_score), 0), 100);
 
-    let risk_level = 'LOW_RISK';
+    let risk_level = "LOW_RISK";
     if (risk_score >= 70) {
-      risk_level = 'HIGH_RISK';
+      risk_level = "HIGH_RISK";
     } else if (risk_score >= 40) {
-      risk_level = 'MEDIUM_RISK';
+      risk_level = "MEDIUM_RISK";
     }
 
-    if (risk_level === 'HIGH_RISK') {
-      recommended_action.push("💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.");
-      
+    if (risk_level === "HIGH_RISK") {
+      recommended_action.push(
+        "💝 Gửi tặng Voucher giảm giá 20% áp dụng cho toàn bộ dịch vụ.",
+      );
+
       let hasBodySpa = false;
       if (c.favorite_services && c.favorite_services.length > 0) {
-        hasBodySpa = c.favorite_services.some(svc => 
-          svc.includes("Massage") || svc.includes("Spa") || svc.includes("Chăm sóc da") || svc.includes("Thảo dược")
+        hasBodySpa = c.favorite_services.some(
+          (svc) =>
+            svc.includes("Massage") ||
+            svc.includes("Spa") ||
+            svc.includes("Chăm sóc da") ||
+            svc.includes("Thảo dược"),
         );
       }
       if (hasBodySpa) {
-        recommended_action.push("🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.");
+        recommended_action.push(
+          "🎁 Tặng kèm 01 suất Massage cổ vai gáy miễn phí ở lần hẹn tiếp theo.",
+        );
       } else {
-        recommended_action.push("🎁 Tặng kèm 01 suất Phục hồi tóc hư tổn miễn phí ở lần hẹn tiếp theo.");
+        recommended_action.push(
+          "🎁 Tặng kèm 01 suất Phục hồi tóc hư tổn miễn phí ở lần hẹn tiếp theo.",
+        );
       }
-      recommended_action.push("👑 Đặc cách nâng cấp lên hạng thành viên VIP để giữ chân khách hàng.");
-    } else if (risk_level === 'MEDIUM_RISK') {
-      recommended_action.push("✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.");
-      recommended_action.push("🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.");
-      recommended_action.push("🌟 Tặng +200 điểm tích lũy Loyalty để kích thích khách hàng quay lại.");
+      recommended_action.push(
+        "👑 Đặc cách nâng cấp lên hạng thành viên VIP để giữ chân khách hàng.",
+      );
+    } else if (risk_level === "MEDIUM_RISK") {
+      recommended_action.push(
+        "✉️ Gửi tin nhắn Zalo/SMS hỏi thăm sức khỏe và nhắc lịch chăm sóc định kỳ.",
+      );
+      recommended_action.push(
+        "🎫 Tặng Voucher ưu đãi 15% cho dịch vụ được yêu thích của khách.",
+      );
+      recommended_action.push(
+        "🌟 Tặng +200 điểm tích lũy Loyalty để kích thích khách hàng quay lại.",
+      );
     } else {
-      recommended_action.push("💝 Gửi tặng Voucher giảm giá 10% áp dụng cho toàn bộ dịch vụ.");
+      recommended_action.push(
+        "💝 Gửi tặng Voucher giảm giá 10% áp dụng cho toàn bộ dịch vụ.",
+      );
       if (c.favorite_services && c.favorite_services.length > 0) {
-        recommended_action.push(`✨ Giới thiệu liệu trình làm đẹp mới liên quan đến ${c.favorite_services[0]}.`);
+        recommended_action.push(
+          `✨ Giới thiệu liệu trình làm đẹp mới liên quan đến ${c.favorite_services[0]}.`,
+        );
       } else {
-        recommended_action.push("✨ Giới thiệu dịch vụ mới chăm sóc da mặt chuyên sâu.");
+        recommended_action.push(
+          "✨ Giới thiệu dịch vụ mới chăm sóc da mặt chuyên sâu.",
+        );
       }
     }
 
@@ -564,24 +758,27 @@ function ruleBasedChurnPrediction(customerData) {
       name: c.name,
       risk_level,
       risk_score,
-      reason: reason.length > 0 ? reason : ["Khách hàng có lịch sử hoạt động bình thường, ổn định."],
-      recommended_action
+      reason:
+        reason.length > 0
+          ? reason
+          : ["Khách hàng có lịch sử hoạt động bình thường, ổn định."],
+      recommended_action,
     });
   }
 
-  const high = results.filter(r => r.risk_level === 'HIGH_RISK').length;
-  const med = results.filter(r => r.risk_level === 'MEDIUM_RISK').length;
-  const low = results.filter(r => r.risk_level === 'LOW_RISK').length;
+  const high = results.filter((r) => r.risk_level === "HIGH_RISK").length;
+  const med = results.filter((r) => r.risk_level === "MEDIUM_RISK").length;
+  const low = results.filter((r) => r.risk_level === "LOW_RISK").length;
 
   return {
     summary: `Hệ thống tự động ghi nhận tổng cộng ${results.length} khách hàng đang hoạt động. Trong đó, có ${high} khách hàng xếp hạng rủi ro cao (HIGH_RISK), ${med} khách hàng rủi ro trung bình (MEDIUM_RISK), và ${low} khách hàng ổn định (LOW_RISK).`,
-    customers: results.sort((a, b) => b.risk_score - a.risk_score)
+    customers: results.sort((a, b) => b.risk_score - a.risk_score),
   };
 }
 
 async function predictCustomersChurn(executorUserId) {
   const pool = await connectDB();
-  
+
   // 1. Get all customers
   const customersResult = await pool.request().query(`
     SELECT c.CustomerId, u.FullName, u.Phone, u.Email, c.CreatedAt
@@ -609,7 +806,7 @@ async function predictCustomersChurn(executorUserId) {
   `);
   const appServices = appServicesResult.recordset;
   const servicesByApp = {};
-  appServices.forEach(s => {
+  appServices.forEach((s) => {
     if (!servicesByApp[s.AppointmentId]) servicesByApp[s.AppointmentId] = [];
     servicesByApp[s.AppointmentId].push(s.ServiceName);
   });
@@ -620,7 +817,9 @@ async function predictCustomersChurn(executorUserId) {
     FROM CustomerPackages
     GROUP BY CustomerId
   `);
-  const packageCountMap = new Map(pkgsResult.recordset.map(row => [row.CustomerId, row.PackageCount]));
+  const packageCountMap = new Map(
+    pkgsResult.recordset.map((row) => [row.CustomerId, row.PackageCount]),
+  );
 
   // Get all reviews
   const reviewsResult = await pool.request().query(`
@@ -630,81 +829,107 @@ async function predictCustomersChurn(executorUserId) {
   const reviews = reviewsResult.recordset;
 
   // Map data
-  const customerData = customers.map(cust => {
-    const custApps = appointments.filter(a => a.CustomerId === cust.CustomerId);
-    const custReviews = reviews.filter(r => r.CustomerId === cust.CustomerId);
-    
-    const completedApps = custApps.filter(a => a.Status === 'COMPLETED');
-    const total_visits = completedApps.length;
-    const package_count = packageCountMap.get(cust.CustomerId) || 0;
-    
-    const lastVisit = completedApps.length > 0 ? completedApps[completedApps.length - 1] : null;
-    const last_visit_date = lastVisit ? new Date(lastVisit.AppointmentDate).toISOString().split('T')[0] : null;
+  const customerData = customers
+    .map((cust) => {
+      const custApps = appointments.filter(
+        (a) => a.CustomerId === cust.CustomerId,
+      );
+      const custReviews = reviews.filter(
+        (r) => r.CustomerId === cust.CustomerId,
+      );
 
-    // Compute avg_days_between_visits
-    let avg_days_between_visits = null;
-    if (completedApps.length > 1) {
-      let diffSum = 0;
-      for (let i = 1; i < completedApps.length; i++) {
-        const d1 = new Date(completedApps[i - 1].AppointmentDate);
-        const d2 = new Date(completedApps[i].AppointmentDate);
-        const diffDays = (d2 - d1) / (1000 * 60 * 60 * 24);
-        diffSum += diffDays;
+      const completedApps = custApps.filter((a) => a.Status === "COMPLETED");
+      const total_visits = completedApps.length;
+      const package_count = packageCountMap.get(cust.CustomerId) || 0;
+
+      const lastVisit =
+        completedApps.length > 0
+          ? completedApps[completedApps.length - 1]
+          : null;
+      const last_visit_date = lastVisit
+        ? new Date(lastVisit.AppointmentDate).toISOString().split("T")[0]
+        : null;
+
+      // Compute avg_days_between_visits
+      let avg_days_between_visits = null;
+      if (completedApps.length > 1) {
+        let diffSum = 0;
+        for (let i = 1; i < completedApps.length; i++) {
+          const d1 = new Date(completedApps[i - 1].AppointmentDate);
+          const d2 = new Date(completedApps[i].AppointmentDate);
+          const diffDays = (d2 - d1) / (1000 * 60 * 60 * 24);
+          diffSum += diffDays;
+        }
+        avg_days_between_visits = Math.round(
+          diffSum / (completedApps.length - 1),
+        );
       }
-      avg_days_between_visits = Math.round(diffSum / (completedApps.length - 1));
-    }
 
-    // Compute total spent (sum of paid invoices)
-    const total_spent = custApps
-      .filter(a => a.PaymentStatus === 'PAID')
-      .reduce((sum, a) => sum + (a.Amount || 0), 0);
+      // Compute total spent (sum of paid invoices)
+      const total_spent = custApps
+        .filter((a) => a.PaymentStatus === "PAID")
+        .reduce((sum, a) => sum + (a.Amount || 0), 0);
 
-    // Favorite services
-    const serviceCounts = {};
-    custApps.forEach(a => {
-      const svcs = servicesByApp[a.AppointmentId] || [];
-      svcs.forEach(s => {
-        serviceCounts[s] = (serviceCounts[s] || 0) + 1;
+      // Favorite services
+      const serviceCounts = {};
+      custApps.forEach((a) => {
+        const svcs = servicesByApp[a.AppointmentId] || [];
+        svcs.forEach((s) => {
+          serviceCounts[s] = (serviceCounts[s] || 0) + 1;
+        });
       });
-    });
-    const favorite_services = Object.entries(serviceCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(entry => entry[0]);
+      const favorite_services = Object.entries(serviceCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map((entry) => entry[0]);
 
-    // Cancellation and no show counts
-    const cancellation_count = custApps.filter(a => a.Status.includes('CANCEL') || a.Status === 'CANCELLED').length;
-    const no_show_count = custApps.filter(a => a.Status === 'NO_SHOW').length;
+      // Cancellation and no show counts
+      const cancellation_count = custApps.filter(
+        (a) => a.Status.includes("CANCEL") || a.Status === "CANCELLED",
+      ).length;
+      const no_show_count = custApps.filter(
+        (a) => a.Status === "NO_SHOW",
+      ).length;
 
-    // Feedback rating
-    const avgRating = custReviews.length > 0
-      ? parseFloat((custReviews.reduce((sum, r) => sum + r.Rating, 0) / custReviews.length).toFixed(1))
-      : null;
+      // Feedback rating
+      const avgRating =
+        custReviews.length > 0
+          ? parseFloat(
+              (
+                custReviews.reduce((sum, r) => sum + r.Rating, 0) /
+                custReviews.length
+              ).toFixed(1),
+            )
+          : null;
 
-    // Booking history simplified (last 5 bookings)
-    const booking_history = custApps.slice(-5).map(a => ({
-      date: new Date(a.AppointmentDate).toISOString().split('T')[0],
-      status: a.Status,
-      services: servicesByApp[a.AppointmentId] || []
-    }));
+      // Booking history simplified (last 5 bookings)
+      const booking_history = custApps.slice(-5).map((a) => ({
+        date: new Date(a.AppointmentDate).toISOString().split("T")[0],
+        status: a.Status,
+        services: servicesByApp[a.AppointmentId] || [],
+      }));
 
-    return {
-      customer_id: cust.CustomerId.toString(),
-      name: cust.FullName,
-      phone: cust.Phone || null,
-      email: cust.Email || null,
-      total_visits,
-      last_visit_date,
-      avg_days_between_visits,
-      total_spent,
-      favorite_services,
-      booking_history,
-      cancellation_count,
-      no_show_count,
-      feedback_rating: avgRating,
-      package_count
-    };
-  }).filter(c => c.total_visits > 0 || c.cancellation_count > 0 || c.no_show_count > 0);
+      return {
+        customer_id: cust.CustomerId.toString(),
+        name: cust.FullName,
+        phone: cust.Phone || null,
+        email: cust.Email || null,
+        total_visits,
+        last_visit_date,
+        avg_days_between_visits,
+        total_spent,
+        favorite_services,
+        booking_history,
+        cancellation_count,
+        no_show_count,
+        feedback_rating: avgRating,
+        package_count,
+      };
+    })
+    .filter(
+      (c) =>
+        c.total_visits > 0 || c.cancellation_count > 0 || c.no_show_count > 0,
+    );
 
   let resultPayload;
   let isFallback = false;
@@ -764,57 +989,79 @@ Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghi
 - reasoning phải ngắn gọn, đúng dữ liệu.`;
 
   try {
-    const aiResponse = await generateContent(systemPrompt, JSON.stringify(customerData));
+    const aiResponse = await generateContent(
+      systemPrompt,
+      JSON.stringify(customerData),
+    );
     let cleanAnswer = aiResponse.trim();
-    if (cleanAnswer.startsWith('```')) {
-      cleanAnswer = cleanAnswer.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    if (cleanAnswer.startsWith("```")) {
+      cleanAnswer = cleanAnswer
+        .replace(/^```json\s*/i, "")
+        .replace(/```\s*$/, "")
+        .trim();
     }
     resultPayload = JSON.parse(cleanAnswer);
   } catch (err) {
-    console.warn('[AI] predictCustomersChurn failed, falling back to rule-based logic:', err.message);
+    console.warn(
+      "[AI] predictCustomersChurn failed, falling back to rule-based logic:",
+      err.message,
+    );
     resultPayload = ruleBasedChurnPrediction(customerData);
     isFallback = true;
   }
 
   try {
     // 1. Ghi nhận vào AIPredictions
-    await pool.request()
-      .input('PredictionType', sql.NVarChar, 'CUSTOMER_CHURN')
-      .input('Result', sql.NVarChar, resultPayload.summary)
-      .query('INSERT INTO AIPredictions (PredictionType, Result) VALUES (@PredictionType, @Result)');
+    await pool
+      .request()
+      .input("PredictionType", sql.NVarChar, "CUSTOMER_CHURN")
+      .input("Result", sql.NVarChar, resultPayload.summary)
+      .query(
+        "INSERT INTO AIPredictions (PredictionType, Result) VALUES (@PredictionType, @Result)",
+      );
 
     // 2. Ghi nhận vào AIAuditLogs
-    await pool.request()
-      .input('UserId', sql.Int, executorUserId || null)
-      .input('FeatureName', sql.NVarChar, 'Customer Churn Prediction')
-      .input('Prompt', sql.NVarChar, 'Phân tích rủi ro churn dựa trên dữ liệu khách hàng')
-      .input('AIResponse', sql.NVarChar, JSON.stringify(resultPayload))
-      .input('ModelName', sql.NVarChar, isFallback ? 'rule-based-fallback' : 'gemini-3.5-flash')
-      .input('InputToken', sql.Int, 1200)
-      .input('OutputToken', sql.Int, 800)
-      .input('Cost', sql.Decimal(18, 4), isFallback ? 0 : 0.0150)
-      .query(`
+    await pool
+      .request()
+      .input("UserId", sql.Int, executorUserId || null)
+      .input("FeatureName", sql.NVarChar, "Customer Churn Prediction")
+      .input(
+        "Prompt",
+        sql.NVarChar,
+        "Phân tích rủi ro churn dựa trên dữ liệu khách hàng",
+      )
+      .input("AIResponse", sql.NVarChar, JSON.stringify(resultPayload))
+      .input(
+        "ModelName",
+        sql.NVarChar,
+        isFallback ? "rule-based-fallback" : "gemini-3.5-flash",
+      )
+      .input("InputToken", sql.Int, 1200)
+      .input("OutputToken", sql.Int, 800)
+      .input("Cost", sql.Decimal(18, 4), isFallback ? 0 : 0.015).query(`
         INSERT INTO AIAuditLogs (UserId, FeatureName, Prompt, AIResponse, ModelName, InputToken, OutputToken, Cost)
         VALUES (@UserId, @FeatureName, @Prompt, @AIResponse, @ModelName, @InputToken, @OutputToken, @Cost)
       `);
   } catch (dbLogErr) {
-    console.error('[AI] DB logging prediction/audit failed:', dbLogErr.message);
+    console.error("[AI] DB logging prediction/audit failed:", dbLogErr.message);
   }
 
   // Enrich result payload with dynamic segment tags and raw metrics for dashboard
-  const enrichedCustomers = resultPayload.customers.map(c => {
-    const orig = customerData.find(o => o.customer_id === c.customer_id);
+  const enrichedCustomers = resultPayload.customers.map((c) => {
+    const orig = customerData.find((o) => o.customer_id === c.customer_id);
     const segments = [];
     if (orig) {
       if (orig.total_spent >= 5000000 || orig.total_visits >= 10) {
         segments.push("Khách VIP");
       }
-      if (c.risk_level === 'HIGH_RISK' || c.risk_score >= 60) {
+      if (c.risk_level === "HIGH_RISK" || c.risk_score >= 60) {
         segments.push("Nguy cơ rời bỏ");
       }
       if (orig.last_visit_date) {
         const lastVisit = new Date(orig.last_visit_date);
-        const daysSinceLast = Math.round((new Date('2026-06-27') - lastVisit) / (1000 * 60 * 60 * 24));
+        const daysSinceLast = Math.round(
+          (new Date("2026-06-27") - lastVisit) / (1000 * 60 * 60 * 24),
+        );
         if (daysSinceLast > 45) {
           segments.push("Lâu chưa quay lại");
         }
@@ -839,21 +1086,26 @@ Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghi
       last_visit_date: orig ? orig.last_visit_date : null,
       cancellation_count: orig ? orig.cancellation_count : 0,
       no_show_count: orig ? orig.no_show_count : 0,
-      feedback_rating: orig ? orig.feedback_rating : null
+      feedback_rating: orig ? orig.feedback_rating : null,
     };
   });
 
-  resultPayload.customers = enrichedCustomers.sort((a, b) => b.risk_score - a.risk_score);
+  resultPayload.customers = enrichedCustomers.sort(
+    (a, b) => b.risk_score - a.risk_score,
+  );
 
   return resultPayload;
 }
 
 async function sendVoucherToCustomer(customerId, voucherId, discountPercent) {
   const pool = await connectDB();
-  
-  const custRes = await pool.request()
+
+  const custRes = await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT c.CustomerId, u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query(
+      "SELECT c.CustomerId, u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId",
+    );
   const customer = custRes.recordset[0];
   if (!customer) throw new Error("Khách hàng không tồn tại");
 
@@ -865,31 +1117,35 @@ async function sendVoucherToCustomer(customerId, voucherId, discountPercent) {
   if (discountPercent) {
     discountVal = Number(discountPercent);
     voucherCode = `CRM${discountVal}C${customerId}R${Math.floor(1000 + Math.random() * 9000)}`;
-    
-    const voucherInsert = await pool.request()
+
+    const voucherInsert = await pool
+      .request()
       .input("Code", sql.NVarChar, voucherCode)
-      .input("DiscountValue", sql.Decimal(18, 2), discountVal)
-      .query(`
+      .input("DiscountValue", sql.Decimal(18, 2), discountVal).query(`
         INSERT INTO Vouchers (Code, DiscountType, DiscountValue, MinOrderAmount, StartDate, EndDate, Quantity, Status)
         OUTPUT INSERTED.VoucherId
         VALUES (@Code, 'PERCENT', @DiscountValue, 0, CAST(GETDATE() AS DATE), CAST(DATEADD(month, 3, GETDATE()) AS DATE), 1, 'ACTIVE')
       `);
     finalVoucherId = voucherInsert.recordset[0].VoucherId;
   } else {
-    const vouchRes = await pool.request()
+    const vouchRes = await pool
+      .request()
       .input("VoucherId", sql.Int, voucherId)
-      .query("SELECT VoucherId, Code, DiscountValue, DiscountType FROM Vouchers WHERE VoucherId = @VoucherId AND Status = 'ACTIVE'");
+      .query(
+        "SELECT VoucherId, Code, DiscountValue, DiscountType FROM Vouchers WHERE VoucherId = @VoucherId AND Status = 'ACTIVE'",
+      );
     const voucher = vouchRes.recordset[0];
-    if (!voucher) throw new Error("Voucher không tồn tại hoặc đã hết hạn/bị vô hiệu hóa");
+    if (!voucher)
+      throw new Error("Voucher không tồn tại hoặc đã hết hạn/bị vô hiệu hóa");
     voucherCode = voucher.Code;
     discountType = voucher.DiscountType;
     discountVal = Number(voucher.DiscountValue);
   }
 
-  await pool.request()
+  await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
-    .input("VoucherId", sql.Int, finalVoucherId)
-    .query(`
+    .input("VoucherId", sql.Int, finalVoucherId).query(`
       MERGE INTO CustomerVouchers AS target
       USING (SELECT @CustomerId AS CustomerId, @VoucherId AS VoucherId) AS source
       ON (target.CustomerId = source.CustomerId AND target.VoucherId = source.VoucherId)
@@ -900,21 +1156,24 @@ async function sendVoucherToCustomer(customerId, voucherId, discountPercent) {
     `);
 
   const title = "🎁 Bạn nhận được quà tặng Voucher từ Salon!";
-  const content = `Beauty Salon thân tặng quý khách voucher ưu đãi: ${voucherCode} (Giảm ${discountType === 'PERCENT' ? `${discountVal}%` : `${discountVal.toLocaleString('vi-VN')}đ`}). Trân trọng kính mời quý khách đặt lịch hẹn trải nghiệm dịch vụ.`;
-  
-  await pool.request()
+  const content = `Beauty Salon thân tặng quý khách voucher ưu đãi: ${voucherCode} (Giảm ${discountType === "PERCENT" ? `${discountVal}%` : `${discountVal.toLocaleString("vi-VN")}đ`}). Trân trọng kính mời quý khách đặt lịch hẹn trải nghiệm dịch vụ.`;
+
+  await pool
+    .request()
     .input("UserId", sql.Int, customer.UserId)
     .input("Title", sql.NVarChar, title)
     .input("Content", sql.NVarChar, content)
     .input("Type", sql.NVarChar, "PROMOTION")
-    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+    .query(
+      "INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)",
+    );
 
   // Send email if email exists
   if (customer.Email) {
     try {
       await sendMail({
         to: customer.Email,
-        subject: `🎁 Quà tặng Voucher giảm giá ${discountType === 'PERCENT' ? `${discountVal}%` : `${discountVal.toLocaleString('vi-VN')}đ`} từ Beauty Salon!`,
+        subject: `🎁 Quà tặng Voucher giảm giá ${discountType === "PERCENT" ? `${discountVal}%` : `${discountVal.toLocaleString("vi-VN")}đ`} từ Beauty Salon!`,
         html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ebdcc5; padding: 20px; border-radius: 12px;">
             <h2 style="color: #1b3d2f; text-align: center;">Món Quà Tri Ân Đặc Biệt</h2>
@@ -924,41 +1183,49 @@ async function sendVoucherToCustomer(customerId, voucherId, discountPercent) {
             <div style="background-color: #fcf8f2; border: 1px dashed #b45309; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
               <span style="font-size: 1.2rem; color: #8c2d19; font-weight: bold; letter-spacing: 1px;">Mã Voucher: ${voucherCode}</span>
               <br/>
-              <span style="font-size: 0.9rem; color: #6b7280;">Ưu đãi giảm giá <strong>${discountType === 'PERCENT' ? `${discountVal}%` : `${discountVal.toLocaleString('vi-VN')}đ`}</strong> cho toàn bộ dịch vụ</span>
+              <span style="font-size: 0.9rem; color: #6b7280;">Ưu đãi giảm giá <strong>${discountType === "PERCENT" ? `${discountVal}%` : `${discountVal.toLocaleString("vi-VN")}đ`}</strong> cho toàn bộ dịch vụ</span>
             </div>
             <p><strong>Hạn sử dụng:</strong> 3 tháng kể từ ngày nhận được email này.</p>
             <p>Bạn có thể áp dụng mã này khi đặt lịch trực tiếp trên website của chúng tôi hoặc xuất trình cho lễ tân khi thanh toán tại quầy.</p>
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Đặt lịch hẹn ngay</a>
+              <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Đặt lịch hẹn ngay</a>
             </p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
             <p style="font-size: 0.8rem; color: #999; text-align: center;">Mọi thắc mắc xin vui lòng liên hệ hotline của salon. Trân trọng cảm ơn!</p>
           </div>
-        `
+        `,
       });
     } catch (mailErr) {
       console.error("[Mail Error] Gửi mail voucher thất bại:", mailErr.message);
     }
   }
 
-  return { message: `Đã gửi tặng Voucher ${voucherCode} thành công cho khách hàng ${customer.FullName}.` };
+  return {
+    message: `Đã gửi tặng Voucher ${voucherCode} thành công cho khách hàng ${customer.FullName}.`,
+  };
 }
 
 async function sendReminderToCustomer(customerId, message) {
   const pool = await connectDB();
 
-  const custRes = await pool.request()
+  const custRes = await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT c.CustomerId, u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query(
+      "SELECT c.CustomerId, u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId",
+    );
   const customer = custRes.recordset[0];
   if (!customer) throw new Error("Khách hàng không tồn tại");
 
-  await pool.request()
+  await pool
+    .request()
     .input("UserId", sql.Int, customer.UserId)
     .input("Title", sql.NVarChar, "Chăm sóc khách hàng (Beauty Salon)")
     .input("Content", sql.NVarChar, message)
     .input("Type", sql.NVarChar, "PROMOTION")
-    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+    .query(
+      "INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)",
+    );
 
   // Send email if email exists
   if (customer.Email) {
@@ -974,64 +1241,90 @@ async function sendReminderToCustomer(customerId, message) {
               ${message}
             </div>
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Ghé thăm Beauty Salon</a>
+              <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Ghé thăm Beauty Salon</a>
             </p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
             <p style="font-size: 0.8rem; color: #999; text-align: center;">Mọi thắc mắc xin vui lòng liên hệ hotline của salon. Trân trọng cảm ơn!</p>
           </div>
-        `
+        `,
       });
     } catch (mailErr) {
-      console.error("[Mail Error] Gửi mail nhắc nhở thất bại:", mailErr.message);
+      console.error(
+        "[Mail Error] Gửi mail nhắc nhở thất bại:",
+        mailErr.message,
+      );
     }
   }
 
-  return { message: `Đã gửi nhắc nhở chăm sóc thành công tới khách hàng ${customer.FullName}.` };
+  return {
+    message: `Đã gửi nhắc nhở chăm sóc thành công tới khách hàng ${customer.FullName}.`,
+  };
 }
 
 async function upgradeToVIP(customerId) {
   const pool = await connectDB();
-  
-  const levelRes = await pool.request()
-    .query("SELECT MembershipLevelId, LevelName FROM MembershipLevels WHERE LevelName = 'Diamond' OR LevelName = 'VIP' OR LevelName = 'Gold' ORDER BY MinPoints DESC");
+
+  const levelRes = await pool
+    .request()
+    .query(
+      "SELECT MembershipLevelId, LevelName FROM MembershipLevels WHERE LevelName = 'Diamond' OR LevelName = 'VIP' OR LevelName = 'Gold' ORDER BY MinPoints DESC",
+    );
   let vipLevelId = null;
   if (levelRes.recordset.length > 0) {
     vipLevelId = levelRes.recordset[0].MembershipLevelId;
   } else {
-    const allLevels = await pool.request().query("SELECT TOP 1 MembershipLevelId FROM MembershipLevels ORDER BY MinPoints DESC");
+    const allLevels = await pool
+      .request()
+      .query(
+        "SELECT TOP 1 MembershipLevelId FROM MembershipLevels ORDER BY MinPoints DESC",
+      );
     if (allLevels.recordset.length > 0) {
       vipLevelId = allLevels.recordset[0].MembershipLevelId;
     }
   }
-  
-  if (!vipLevelId) throw new Error("Không thể tìm thấy cấp độ thành viên VIP/cao cấp để nâng cấp");
 
-  await pool.request()
+  if (!vipLevelId)
+    throw new Error(
+      "Không thể tìm thấy cấp độ thành viên VIP/cao cấp để nâng cấp",
+    );
+
+  await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
     .input("LevelId", sql.Int, vipLevelId)
-    .query("UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = DATEADD(minute, 1, GETUTCDATE()) WHERE CustomerId = @CustomerId");
-    
-  const custRes = await pool.request()
+    .query(
+      "UPDATE Customers SET MembershipLevelId = @LevelId, VIPExpiredAt = DATEADD(minute, 1, GETUTCDATE()) WHERE CustomerId = @CustomerId",
+    );
+
+  const custRes = await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query(
+      "SELECT u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId",
+    );
   const customer = custRes.recordset[0];
 
-  const title = "👑 Chúc mừng! Bạn đã được nâng cấp thử nghiệm hạng thành viên VIP!";
+  const title =
+    "👑 Chúc mừng! Bạn đã được nâng cấp thử nghiệm hạng thành viên VIP!";
   const content = `Beauty Salon trân trọng thông báo quý khách ${customer.FullName} đã được đặc cách nâng cấp thử nghiệm hạng thành viên VIP (hiệu lực trong 1 phút để trải nghiệm ưu đãi).`;
-  
-  await pool.request()
+
+  await pool
+    .request()
     .input("UserId", sql.Int, customer.UserId)
     .input("Title", sql.NVarChar, title)
     .input("Content", sql.NVarChar, content)
     .input("Type", sql.NVarChar, "SYSTEM")
-    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+    .query(
+      "INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)",
+    );
 
   // Send email if email exists
   if (customer.Email) {
     try {
       await sendMail({
         to: customer.Email,
-        subject: "👑 Chúc mừng! Bạn đã được đặc cách nâng cấp thử nghiệm hạng VIP tại Beauty Salon!",
+        subject:
+          "👑 Chúc mừng! Bạn đã được đặc cách nâng cấp thử nghiệm hạng VIP tại Beauty Salon!",
         html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ebdcc5; padding: 20px; border-radius: 12px;">
             <h2 style="color: #b45309; text-align: center;">✨ Thử Nghiệm Thành Viên VIP ✨</h2>
@@ -1047,66 +1340,84 @@ async function upgradeToVIP(customerId) {
             </div>
             <p>Chúng tôi hy vọng sẽ luôn được phục vụ và đồng hành cùng hành trình duy trì vẻ đẹp và sự tự tin của bạn.</p>
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Truy cập tài khoản VIP</a>
+              <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Truy cập tài khoản VIP</a>
             </p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
             <p style="font-size: 0.8rem; color: #999; text-align: center;">Trân trọng cảm ơn quý khách!</p>
           </div>
-        `
+        `,
       });
     } catch (mailErr) {
-      console.error("[Mail Error] Gửi mail nâng cấp VIP thất bại:", mailErr.message);
+      console.error(
+        "[Mail Error] Gửi mail nâng cấp VIP thất bại:",
+        mailErr.message,
+      );
     }
   }
 
-  return { message: `Đã nâng cấp khách hàng ${customer.FullName} lên VIP và gửi thông báo thành công!` };
+  return {
+    message: `Đã nâng cấp khách hàng ${customer.FullName} lên VIP và gửi thông báo thành công!`,
+  };
 }
 
 async function giftFreeService(customerId, serviceName) {
   const pool = await connectDB();
-  const custRes = await pool.request()
+  const custRes = await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query(
+      "SELECT u.FullName, u.UserId, u.Email FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId",
+    );
   const customer = custRes.recordset[0];
   if (!customer) throw new Error("Khách hàng không tồn tại");
 
-  const serviceRes = await pool.request()
+  const serviceRes = await pool
+    .request()
     .input("ServiceName", sql.NVarChar, `%${serviceName.slice(0, 7)}%`)
-    .query("SELECT TOP 1 Price FROM Services WHERE ServiceName LIKE @ServiceName AND Status = 'AVAILABLE'");
-  
+    .query(
+      "SELECT TOP 1 Price FROM Services WHERE ServiceName LIKE @ServiceName AND Status = 'AVAILABLE'",
+    );
+
   let giftValue = 150000;
   if (serviceRes.recordset.length > 0) {
     giftValue = Number(serviceRes.recordset[0].Price);
   }
 
-  const cleanCode = serviceName.includes("Phục hồi") || serviceName.includes("tóc")
-    ? `FREEPH${customerId}${Math.floor(1000 + Math.random() * 9000)}` 
-    : `FREEMS${customerId}${Math.floor(1000 + Math.random() * 9000)}`;
+  const cleanCode =
+    serviceName.includes("Phục hồi") || serviceName.includes("tóc")
+      ? `FREEPH${customerId}${Math.floor(1000 + Math.random() * 9000)}`
+      : `FREEMS${customerId}${Math.floor(1000 + Math.random() * 9000)}`;
 
-  const voucherInsert = await pool.request()
+  const voucherInsert = await pool
+    .request()
     .input("Code", sql.NVarChar, cleanCode)
-    .input("DiscountValue", sql.Decimal(18, 2), giftValue)
-    .query(`
+    .input("DiscountValue", sql.Decimal(18, 2), giftValue).query(`
       INSERT INTO Vouchers (Code, DiscountType, DiscountValue, MinOrderAmount, StartDate, EndDate, Quantity, Status)
       OUTPUT INSERTED.VoucherId
       VALUES (@Code, 'AMOUNT', @DiscountValue, 0, CAST(GETDATE() AS DATE), CAST(DATEADD(month, 3, GETDATE()) AS DATE), 1, 'ACTIVE')
     `);
   const newVoucherId = voucherInsert.recordset[0].VoucherId;
 
-  await pool.request()
+  await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
     .input("VoucherId", sql.Int, newVoucherId)
-    .query("INSERT INTO CustomerVouchers (CustomerId, VoucherId, UsedStatus) VALUES (@CustomerId, @VoucherId, 0)");
+    .query(
+      "INSERT INTO CustomerVouchers (CustomerId, VoucherId, UsedStatus) VALUES (@CustomerId, @VoucherId, 0)",
+    );
 
   const title = `💆 Quà tặng dịch vụ miễn phí: ${serviceName}!`;
-  const content = `Beauty Salon thân tặng quý khách ${customer.FullName} một suất ${serviceName} miễn phí. Mã Voucher ưu đãi đã được nạp trực tiếp vào tài khoản của bạn: ${cleanCode} (Trị giá ${giftValue.toLocaleString('vi-VN')}đ). Bạn có thể áp dụng mã này khi đặt lịch hoặc đưa cho lễ tân khi thanh toán.`;
+  const content = `Beauty Salon thân tặng quý khách ${customer.FullName} một suất ${serviceName} miễn phí. Mã Voucher ưu đãi đã được nạp trực tiếp vào tài khoản của bạn: ${cleanCode} (Trị giá ${giftValue.toLocaleString("vi-VN")}đ). Bạn có thể áp dụng mã này khi đặt lịch hoặc đưa cho lễ tân khi thanh toán.`;
 
-  await pool.request()
+  await pool
+    .request()
     .input("UserId", sql.Int, customer.UserId)
     .input("Title", sql.NVarChar, title)
     .input("Content", sql.NVarChar, content)
     .input("Type", sql.NVarChar, "PROMOTION")
-    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+    .query(
+      "INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)",
+    );
 
   // Send email if email exists
   if (customer.Email) {
@@ -1123,37 +1434,43 @@ async function giftFreeService(customerId, serviceName) {
             <div style="background-color: #fcf8f2; border: 1px dashed #b45309; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
               <span style="font-size: 1.2rem; color: #8c2d19; font-weight: bold; letter-spacing: 1px;">Mã Quà Tặng: ${cleanCode}</span>
               <br/>
-              <span style="font-size: 0.9rem; color: #6b7280;">Trị giá <strong>${giftValue.toLocaleString('vi-VN')}đ</strong> (Miễn phí 100% dịch vụ ${serviceName})</span>
+              <span style="font-size: 0.9rem; color: #6b7280;">Trị giá <strong>${giftValue.toLocaleString("vi-VN")}đ</strong> (Miễn phí 100% dịch vụ ${serviceName})</span>
             </div>
             <p><strong>Hạn sử dụng:</strong> 3 tháng kể từ ngày nhận được email này.</p>
             <p>Bạn có thể áp dụng mã này khi đặt lịch trực tiếp trên website của chúng tôi hoặc xuất trình cho lễ tân khi thanh toán tại quầy.</p>
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Đặt lịch hẹn ngay</a>
+              <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}" style="background-color: #1b3d2f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold;">Đặt lịch hẹn ngay</a>
             </p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
             <p style="font-size: 0.8rem; color: #999; text-align: center;">Mọi thắc mắc xin vui lòng liên hệ hotline của salon. Trân trọng cảm ơn!</p>
           </div>
-        `
+        `,
       });
     } catch (mailErr) {
-      console.error("[Mail Error] Gửi mail quà tặng dịch vụ thất bại:", mailErr.message);
+      console.error(
+        "[Mail Error] Gửi mail quà tặng dịch vụ thất bại:",
+        mailErr.message,
+      );
     }
   }
 
-  return { message: `Đã tặng quà miễn phí (${serviceName}) thành công cho ${customer.FullName}. Mã voucher: ${cleanCode}` };
+  return {
+    message: `Đã tặng quà miễn phí (${serviceName}) thành công cho ${customer.FullName}. Mã voucher: ${cleanCode}`,
+  };
 }
 
 async function addLoyaltyPoints(customerId, points) {
   const pool = await connectDB();
-  await pool.request()
+  await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
     .input("Points", sql.Int, points)
-    .query("UPDATE Customers SET LoyaltyPoints = LoyaltyPoints + @Points WHERE CustomerId = @CustomerId");
+    .query(
+      "UPDATE Customers SET LoyaltyPoints = LoyaltyPoints + @Points WHERE CustomerId = @CustomerId",
+    );
 
   // Automatically recalculate and update membership rank based on new loyalty points (only keep or upgrade, no downgrade)
-  await pool.request()
-    .input("CustomerId", sql.Int, customerId)
-    .query(`
+  await pool.request().input("CustomerId", sql.Int, customerId).query(`
       UPDATE c
       SET MembershipLevelId = lv.MembershipLevelId
       FROM Customers c
@@ -1169,20 +1486,26 @@ async function addLoyaltyPoints(customerId, points) {
         AND (cur.MinPoints IS NULL OR lv.MinPoints >= cur.MinPoints)
     `);
 
-  const custRes = await pool.request()
+  const custRes = await pool
+    .request()
     .input("CustomerId", sql.Int, customerId)
-    .query("SELECT u.FullName, u.UserId, u.Email, c.LoyaltyPoints FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId");
+    .query(
+      "SELECT u.FullName, u.UserId, u.Email, c.LoyaltyPoints FROM Customers c JOIN Users u ON c.UserId = u.UserId WHERE c.CustomerId = @CustomerId",
+    );
   const customer = custRes.recordset[0];
 
   const title = `🌟 Điểm thưởng tích lũy tăng thêm: +${points} điểm!`;
   const content = `Chúc mừng quý khách ${customer.FullName} đã được cộng thêm ${points} điểm tích lũy thành viên từ hệ thống chăm sóc khách hàng. Tổng điểm hiện tại của bạn là: ${customer.LoyaltyPoints} điểm.`;
 
-  await pool.request()
+  await pool
+    .request()
     .input("UserId", sql.Int, customer.UserId)
     .input("Title", sql.NVarChar, title)
     .input("Content", sql.NVarChar, content)
     .input("Type", sql.NVarChar, "SYSTEM")
-    .query("INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)");
+    .query(
+      "INSERT INTO Notifications (UserId, Title, Content, Type, CreatedAt, IsRead) VALUES (@UserId, @Title, @Content, @Type, GETDATE(), 0)",
+    );
 
   // Send email if email exists
   if (customer.Email) {
@@ -1204,38 +1527,44 @@ async function addLoyaltyPoints(customerId, points) {
             <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;"/>
             <p style="font-size: 0.8rem; color: #999; text-align: center;">Trân trọng cảm ơn quý khách!</p>
           </div>
-        `
+        `,
       });
     } catch (mailErr) {
-      console.error("[Mail Error] Gửi mail tích điểm thất bại:", mailErr.message);
+      console.error(
+        "[Mail Error] Gửi mail tích điểm thất bại:",
+        mailErr.message,
+      );
     }
   }
 
-  return { message: `Đã tặng +${points} điểm tích lũy thành công cho khách hàng ${customer.FullName}.` };
+  return {
+    message: `Đã tặng +${points} điểm tích lũy thành công cho khách hàng ${customer.FullName}.`,
+  };
 }
 
 async function clearChatHistory(userId) {
   const pool = await connectDB();
-  await pool.request()
+  await pool
+    .request()
     .input("UserId", sql.Int, userId)
     .query("DELETE FROM AIChatLogs WHERE UserId = @UserId");
   return { success: true, message: "Đã xóa lịch sử trò chuyện thành công" };
 }
 
-module.exports = { 
-  getAll, 
-  getMine, 
-  chat, 
-  getChatHistory, 
-  getById, 
-  create, 
-  update, 
-  remove, 
+module.exports = {
+  getAll,
+  getMine,
+  chat,
+  getChatHistory,
+  getById,
+  create,
+  update,
+  remove,
   predictCustomersChurn,
   sendVoucherToCustomer,
   sendReminderToCustomer,
   upgradeToVIP,
   giftFreeService,
   addLoyaltyPoints,
-  clearChatHistory
+  clearChatHistory,
 };
