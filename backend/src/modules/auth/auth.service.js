@@ -79,9 +79,8 @@ async function getUserByGoogleId(googleId) {
   if (!googleId) return null;
 
   const pool = await connectDB();
-  const result = await pool
-    .request()
-    .input("GoogleId", sql.NVarChar, googleId).query(`
+  const result = await pool.request().input("GoogleId", sql.NVarChar, googleId)
+    .query(`
       SELECT
         u.UserId,
         u.FullName,
@@ -480,7 +479,8 @@ async function googleLogin(idToken) {
   }
 
   user = await getUserByGoogleId(googleId);
-  if (!user) throw new Error("Không thể tải tài khoản sau khi đăng nhập Google");
+  if (!user)
+    throw new Error("Không thể tải tài khoản sau khi đăng nhập Google");
 
   const token = createToken(user);
   return {

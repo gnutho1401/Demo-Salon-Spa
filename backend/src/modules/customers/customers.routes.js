@@ -46,7 +46,10 @@ const reviewUpload = multer({
     destination: (req, file, cb) => cb(null, reviewDir),
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `review-${req.user.userId}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+      cb(
+        null,
+        `review-${req.user.userId}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`,
+      );
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024, files: 6 },
@@ -69,7 +72,11 @@ router.get("/me/service-history", authMiddleware, async (req, res) => {
   }
 });
 router.get("/me/reviews", authMiddleware, controller.getMyReviews);
-router.get("/me/reviewable-services", authMiddleware, controller.getMyReviewableServices);
+router.get(
+  "/me/reviewable-services",
+  authMiddleware,
+  controller.getMyReviewableServices,
+);
 router.get("/me/favorites", authMiddleware, async (req, res) => {
   try {
     const data = await service.getMyFavorites(req.user.userId);
@@ -78,11 +85,32 @@ router.get("/me/favorites", authMiddleware, async (req, res) => {
     return res.status(400).json({ success: false, message: err.message });
   }
 });
-router.get("/me/favorites/services", authMiddleware, controller.getMyFavoriteServices);
-router.get("/me/favorites/employees", authMiddleware, controller.getMyFavoriteEmployees);
-router.post("/me/favorites/services/toggle", authMiddleware, controller.toggleFavoriteService);
-router.post("/me/favorites/employees/toggle", authMiddleware, controller.toggleFavoriteEmployee);
-router.post("/me/reviews", authMiddleware, reviewUpload.array("images", 6), controller.createMyReview);
+router.get(
+  "/me/favorites/services",
+  authMiddleware,
+  controller.getMyFavoriteServices,
+);
+router.get(
+  "/me/favorites/employees",
+  authMiddleware,
+  controller.getMyFavoriteEmployees,
+);
+router.post(
+  "/me/favorites/services/toggle",
+  authMiddleware,
+  controller.toggleFavoriteService,
+);
+router.post(
+  "/me/favorites/employees/toggle",
+  authMiddleware,
+  controller.toggleFavoriteEmployee,
+);
+router.post(
+  "/me/reviews",
+  authMiddleware,
+  reviewUpload.array("images", 6),
+  controller.createMyReview,
+);
 router.put("/me/profile", authMiddleware, controller.updateMyProfile);
 router.put(
   "/me/avatar",

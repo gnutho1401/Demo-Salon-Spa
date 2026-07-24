@@ -63,8 +63,7 @@ async function getMyProfile(userId) {
   const pool = await connectDB();
 
   // Expire temporary VIP status if it has exceeded its lifetime
-  await pool.request().input("UserId", sql.Int, userId)
-    .query(`
+  await pool.request().input("UserId", sql.Int, userId).query(`
       UPDATE c
       SET 
         c.MembershipLevelId = lv.MembershipLevelId,
@@ -199,8 +198,7 @@ async function getMyDashboard(userId) {
   const pool = await connectDB();
 
   // Expire temporary VIP status if it has exceeded its lifetime
-  await pool.request().input("UserId", sql.Int, userId)
-    .query(`
+  await pool.request().input("UserId", sql.Int, userId).query(`
       UPDATE c
       SET 
         c.MembershipLevelId = lv.MembershipLevelId,
@@ -1016,18 +1014,18 @@ async function getMyServiceHistory(userId) {
   const categoryMap = new Map();
   const monthMap = new Map();
 
-  const appointmentSpentRes = await pool.request()
-    .input("CustomerId", sql.Int, customerId)
-    .query(`
+  const appointmentSpentRes = await pool
+    .request()
+    .input("CustomerId", sql.Int, customerId).query(`
       SELECT SUM(i.FinalAmount) AS AppointmentSpent
       FROM Invoices i
       JOIN Appointments a ON i.AppointmentId = a.AppointmentId
       WHERE a.CustomerId = @CustomerId AND i.Status = 'PAID'
     `);
 
-  const packageSpentRes = await pool.request()
-    .input("CustomerId", sql.Int, customerId)
-    .query(`
+  const packageSpentRes = await pool
+    .request()
+    .input("CustomerId", sql.Int, customerId).query(`
       SELECT SUM(pp.Amount) AS PackageSpent
       FROM PackagePayments pp
       JOIN CustomerPackages cp ON pp.CustomerPackageId = cp.CustomerPackageId
