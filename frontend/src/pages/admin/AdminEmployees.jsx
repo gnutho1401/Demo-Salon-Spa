@@ -116,11 +116,12 @@ export default function AdminEmployees() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -129,11 +130,12 @@ export default function AdminEmployees() {
     setTimeout(() => {
       const element = document.getElementById(`${type}-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -312,10 +314,14 @@ export default function AdminEmployees() {
     setAssigningEmployee(employee);
     setLoadingServices(true);
     try {
-      const res = await axiosClient.get(`/admin/employees/${employee.EmployeeId}/services`);
+      const res = await axiosClient.get(
+        `/admin/employees/${employee.EmployeeId}/services`,
+      );
       const servicesData = res.data.data || res.data || [];
       setAllServices(servicesData);
-      setSelectedServices(servicesData.filter(s => s.Assigned === 1).map(s => s.ServiceId));
+      setSelectedServices(
+        servicesData.filter((s) => s.Assigned === 1).map((s) => s.ServiceId),
+      );
     } catch (err) {
       console.error("Error loading employee services", err);
       setError(
@@ -329,10 +335,10 @@ export default function AdminEmployees() {
   };
 
   const handleCheckboxChange = (serviceId) => {
-    setSelectedServices(prev =>
+    setSelectedServices((prev) =>
       prev.includes(serviceId)
-        ? prev.filter(id => id !== serviceId)
-        : [...prev, serviceId]
+        ? prev.filter((id) => id !== serviceId)
+        : [...prev, serviceId],
     );
   };
 
@@ -340,9 +346,12 @@ export default function AdminEmployees() {
     if (!assigningEmployee) return;
     setSavingServices(true);
     try {
-      await axiosClient.put(`/admin/employees/${assigningEmployee.EmployeeId}/services`, {
-        serviceIds: selectedServices
-      });
+      await axiosClient.put(
+        `/admin/employees/${assigningEmployee.EmployeeId}/services`,
+        {
+          serviceIds: selectedServices,
+        },
+      );
       const empId = assigningEmployee.EmployeeId;
       setAssigningEmployee(null);
       await load();
@@ -362,7 +371,7 @@ export default function AdminEmployees() {
   // Group services by category name
   const groupedServices = useMemo(() => {
     const groups = {};
-    allServices.forEach(s => {
+    allServices.forEach((s) => {
       const cat = s.CategoryName || "Khác";
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(s);
@@ -860,12 +869,22 @@ export default function AdminEmployees() {
       {/* Header section */}
       <div className="admin-employee-hero">
         <div>
-          <div className="admin-eyebrow" style={{ textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, fontSize: "11px", color: "#d6b57e" }}>
+          <div
+            className="admin-eyebrow"
+            style={{
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              fontWeight: 700,
+              fontSize: "11px",
+              color: "#d6b57e",
+            }}
+          >
             Hệ thống quản trị
           </div>
           <h1>Quản lý nhân viên</h1>
           <p>
-            Quản lý đầy đủ tài khoản Admin, Quản lý, Lễ tân và Kỹ thuật viên cùng hồ sơ công việc tương ứng.
+            Quản lý đầy đủ tài khoản Admin, Quản lý, Lễ tân và Kỹ thuật viên
+            cùng hồ sơ công việc tương ứng.
           </p>
         </div>
 
@@ -975,132 +994,203 @@ export default function AdminEmployees() {
           <option value="BANNED">BANNED</option>
         </select>
 
-        <button className="admin-refresh-btn" style={{ padding: "10px 20px" }} onClick={handleFilter}>
+        <button
+          className="admin-refresh-btn"
+          style={{ padding: "10px 20px" }}
+          onClick={handleFilter}
+        >
           Lọc dữ liệu
         </button>
       </div>
 
       <div ref={gridRef}>
         {loading ? (
-          <div style={{ padding: "60px", textAlign: "center", color: "#64748b", background: "#ffffff", borderRadius: "16px", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)" }}>
+          <div
+            style={{
+              padding: "60px",
+              textAlign: "center",
+              color: "#64748b",
+              background: "#ffffff",
+              borderRadius: "16px",
+              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
+            }}
+          >
             Đang tải danh sách nhân viên...
           </div>
         ) : (
           <div className="admin-employee-grid">
-          {items.map((item) => (
-            <article className="admin-employee-card" id={`employee-card-${item.EmployeeId}`} key={item.EmployeeId}>
-              <div className="card-header-gradient" />
-              <div className="admin-employee-card-body">
-                <div className="admin-employee-top">
-                  <img
-                    src={avatar(item.ImageUrl || item.AvatarUrl)}
-                    alt={item.FullName}
-                  />
-                  <div className="admin-employee-top-info">
-                    <h3>{item.FullName}</h3>
-                    <p>{item.Email}</p>
-                    <span className={`status-badge status-badge-${String(item.Status).toLowerCase()}`}>
-                      {item.Status}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="admin-employee-info">
-                  <div className="info-item">
-                    <span>Vai trò</span>
-                    <strong>{roleLabel(item.RoleName)}</strong>
-                  </div>
-                  <div className="info-item">
-                    <span>Chi nhánh</span>
-                    <strong>{item.BranchName || "Chưa có"}</strong>
-                  </div>
-                  <div className="info-item">
-                    <span>Vị trí</span>
-                    <strong>{item.Position || "Chưa có"}</strong>
-                  </div>
-                  <div className="info-item">
-                    <span>Chuyên môn</span>
-                    <strong>{item.Specialization || "Chưa có"}</strong>
-                  </div>
-                  <div className="info-item">
-                    <span>Mức lương</span>
-                    <strong>{money(item.Salary)}</strong>
-                  </div>
-                  <div className="info-item">
-                    <span>Kinh nghiệm</span>
-                    <strong>{item.YearsOfExperience || 0} năm</strong>
-                  </div>
-                  <div className="info-item">
-                    <span>Lịch hẹn</span>
-                    <strong>{item.TotalAppointments || 0} ca</strong>
-                  </div>
-                  <div className="info-item">
-                    <span>Đánh giá</span>
-                    <strong style={{ color: "#eab308" }}>
-                      ★ {Number(item.AvgRating || 0).toFixed(1)} ({item.ReviewCount})
-                    </strong>
-                  </div>
-                  <div className="info-item form-wide" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <span style={{ marginBottom: "0" }}>Dịch vụ phụ trách</span>
-                      <strong>{item.ServiceCount || 0} dịch vụ</strong>
+            {items.map((item) => (
+              <article
+                className="admin-employee-card"
+                id={`employee-card-${item.EmployeeId}`}
+                key={item.EmployeeId}
+              >
+                <div className="card-header-gradient" />
+                <div className="admin-employee-card-body">
+                  <div className="admin-employee-top">
+                    <img
+                      src={avatar(item.ImageUrl || item.AvatarUrl)}
+                      alt={item.FullName}
+                    />
+                    <div className="admin-employee-top-info">
+                      <h3>{item.FullName}</h3>
+                      <p>{item.Email}</p>
+                      <span
+                        className={`status-badge status-badge-${String(item.Status).toLowerCase()}`}
+                      >
+                        {item.Status}
+                      </span>
                     </div>
-                    {item.RoleName === "TECHNICIAN" && (
+                  </div>
+
+                  <div className="admin-employee-info">
+                    <div className="info-item">
+                      <span>Vai trò</span>
+                      <strong>{roleLabel(item.RoleName)}</strong>
+                    </div>
+                    <div className="info-item">
+                      <span>Chi nhánh</span>
+                      <strong>{item.BranchName || "Chưa có"}</strong>
+                    </div>
+                    <div className="info-item">
+                      <span>Vị trí</span>
+                      <strong>{item.Position || "Chưa có"}</strong>
+                    </div>
+                    <div className="info-item">
+                      <span>Chuyên môn</span>
+                      <strong>{item.Specialization || "Chưa có"}</strong>
+                    </div>
+                    <div className="info-item">
+                      <span>Mức lương</span>
+                      <strong>{money(item.Salary)}</strong>
+                    </div>
+                    <div className="info-item">
+                      <span>Kinh nghiệm</span>
+                      <strong>{item.YearsOfExperience || 0} năm</strong>
+                    </div>
+                    <div className="info-item">
+                      <span>Lịch hẹn</span>
+                      <strong>{item.TotalAppointments || 0} ca</strong>
+                    </div>
+                    <div className="info-item">
+                      <span>Đánh giá</span>
+                      <strong style={{ color: "#eab308" }}>
+                        ★ {Number(item.AvgRating || 0).toFixed(1)} (
+                        {item.ReviewCount})
+                      </strong>
+                    </div>
+                    <div
+                      className="info-item form-wide"
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <span style={{ marginBottom: "0" }}>
+                          Dịch vụ phụ trách
+                        </span>
+                        <strong>{item.ServiceCount || 0} dịch vụ</strong>
+                      </div>
+                      {item.RoleName === "TECHNICIAN" && (
+                        <button
+                          className="card-btn-action btn-secondary"
+                          style={{ padding: "4px 8px", fontSize: "11px" }}
+                          onClick={() => openServiceAssign(item)}
+                        >
+                          Phân bổ
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ flexGrow: 1 }} />
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      marginTop: "12px",
+                      borderTop: "1px solid #f1f5f9",
+                      paddingTop: "12px",
+                    }}
+                  >
+                    <button
+                      className="card-btn-action btn-secondary"
+                      style={{ flexGrow: 1 }}
+                      onClick={() => setSelected(item)}
+                    >
+                      Chi tiết
+                    </button>
+                    <button
+                      className="card-btn-action btn-primary"
+                      style={{ flexGrow: 1 }}
+                      onClick={() => openEdit(item)}
+                    >
+                      Sửa
+                    </button>
+                    {item.Status !== "ACTIVE" ? (
                       <button
                         className="card-btn-action btn-secondary"
-                        style={{ padding: "4px 8px", fontSize: "11px" }}
-                        onClick={() => openServiceAssign(item)}
+                        onClick={() => changeStatus(item, "ACTIVE")}
                       >
-                        Phân bổ
+                        Kích hoạt
+                      </button>
+                    ) : (
+                      <button
+                        className="card-btn-action btn-secondary"
+                        onClick={() => changeStatus(item, "INACTIVE")}
+                      >
+                        Khóa tạm
+                      </button>
+                    )}
+                    {item.Status !== "BANNED" && (
+                      <button
+                        className="card-btn-action btn-danger"
+                        onClick={() => changeStatus(item, "BANNED")}
+                      >
+                        Ban
                       </button>
                     )}
                   </div>
                 </div>
+              </article>
+            ))}
 
-                <div style={{ flexGrow: 1 }} />
-
-                <div style={{ display: "flex", gap: "8px", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
-                  <button className="card-btn-action btn-secondary" style={{ flexGrow: 1 }} onClick={() => setSelected(item)}>
-                    Chi tiết
-                  </button>
-                  <button className="card-btn-action btn-primary" style={{ flexGrow: 1 }} onClick={() => openEdit(item)}>
-                    Sửa
-                  </button>
-                  {item.Status !== "ACTIVE" ? (
-                    <button className="card-btn-action btn-secondary" onClick={() => changeStatus(item, "ACTIVE")}>
-                      Kích hoạt
-                    </button>
-                  ) : (
-                    <button className="card-btn-action btn-secondary" onClick={() => changeStatus(item, "INACTIVE")}>
-                      Khóa tạm
-                    </button>
-                  )}
-                  {item.Status !== "BANNED" && (
-                    <button className="card-btn-action btn-danger" onClick={() => changeStatus(item, "BANNED")}>
-                      Ban
-                    </button>
-                  )}
-                </div>
+            {!items.length && (
+              <div
+                className="admin-empty"
+                style={{
+                  gridColumn: "1 / -1",
+                  padding: "40px",
+                  background: "#ffffff",
+                  borderRadius: "16px",
+                }}
+              >
+                Không tìm thấy nhân viên nào phù hợp bộ lọc.
               </div>
-            </article>
-          ))}
-
-          {!items.length && (
-            <div className="admin-empty" style={{ gridColumn: "1 / -1", padding: "40px", background: "#ffffff", borderRadius: "16px" }}>
-              Không tìm thấy nhân viên nào phù hợp bộ lọc.
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
       </div>
 
       {/* Employee Detail Modal */}
       {selected ? (
         <div className="modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "600px" }}>
-            <button className="admin-modal-close" onClick={() => setSelected(null)}>×</button>
+          <div
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "600px" }}
+          >
+            <button
+              className="admin-modal-close"
+              onClick={() => setSelected(null)}
+            >
+              ×
+            </button>
             <h3 className="modal-title">Hồ sơ nhân viên chi tiết</h3>
-            
+
             <div className="modal-body">
               <div className="detail-header">
                 <img
@@ -1110,7 +1200,9 @@ export default function AdminEmployees() {
                 <div className="detail-header-info">
                   <h2>{selected.FullName}</h2>
                   <p>{selected.Email}</p>
-                  <span className={`status-badge status-badge-${String(selected.Status).toLowerCase()}`}>
+                  <span
+                    className={`status-badge status-badge-${String(selected.Status).toLowerCase()}`}
+                  >
                     {selected.Status}
                   </span>
                 </div>
@@ -1133,35 +1225,105 @@ export default function AdminEmployees() {
 
               {activeDetailTab === "general" ? (
                 <div className="detail-grid">
-                  <p><strong>Số điện thoại:</strong> {selected.Phone || "Chưa có"}</p>
-                  <p><strong>Vai trò:</strong> {roleLabel(selected.RoleName)}</p>
-                  <p><strong>Chi nhánh làm việc:</strong> {selected.BranchName || "Chưa gán"}</p>
-                  <p><strong>Địa chỉ chi nhánh:</strong> {selected.BranchAddress || "Chưa có"}</p>
-                  <p><strong>Vị trí:</strong> {selected.Position || "Chưa có"}</p>
-                  <p><strong>Mức lương cơ bản:</strong> {money(selected.Salary)}</p>
-                  <p><strong>Ngày gia nhập:</strong> {dateText(selected.HireDate)}</p>
-                  <p><strong>Kinh nghiệm:</strong> {selected.YearsOfExperience || 0} năm</p>
-                  <p><strong>Tổng lịch hẹn:</strong> {selected.TotalAppointments || 0} ca</p>
-                  <p><strong>Hoàn thành:</strong> {selected.CompletedAppointments || 0} ca</p>
+                  <p>
+                    <strong>Số điện thoại:</strong>{" "}
+                    {selected.Phone || "Chưa có"}
+                  </p>
+                  <p>
+                    <strong>Vai trò:</strong> {roleLabel(selected.RoleName)}
+                  </p>
+                  <p>
+                    <strong>Chi nhánh làm việc:</strong>{" "}
+                    {selected.BranchName || "Chưa gán"}
+                  </p>
+                  <p>
+                    <strong>Địa chỉ chi nhánh:</strong>{" "}
+                    {selected.BranchAddress || "Chưa có"}
+                  </p>
+                  <p>
+                    <strong>Vị trí:</strong> {selected.Position || "Chưa có"}
+                  </p>
+                  <p>
+                    <strong>Mức lương cơ bản:</strong> {money(selected.Salary)}
+                  </p>
+                  <p>
+                    <strong>Ngày gia nhập:</strong>{" "}
+                    {dateText(selected.HireDate)}
+                  </p>
+                  <p>
+                    <strong>Kinh nghiệm:</strong>{" "}
+                    {selected.YearsOfExperience || 0} năm
+                  </p>
+                  <p>
+                    <strong>Tổng lịch hẹn:</strong>{" "}
+                    {selected.TotalAppointments || 0} ca
+                  </p>
+                  <p>
+                    <strong>Hoàn thành:</strong>{" "}
+                    {selected.CompletedAppointments || 0} ca
+                  </p>
                 </div>
               ) : (
                 <div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-                    <p><strong>Chuyên môn:</strong> {selected.Specialization || "Chưa cấu hình"}</p>
-                    <p><strong>Đánh giá TB:</strong> ⭐ {Number(selected.AvgRating || 0).toFixed(1)} / 5 ({selected.ReviewCount || 0} lượt đánh giá)</p>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "16px",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <p>
+                      <strong>Chuyên môn:</strong>{" "}
+                      {selected.Specialization || "Chưa cấu hình"}
+                    </p>
+                    <p>
+                      <strong>Đánh giá TB:</strong> ⭐{" "}
+                      {Number(selected.AvgRating || 0).toFixed(1)} / 5 (
+                      {selected.ReviewCount || 0} lượt đánh giá)
+                    </p>
                   </div>
-                  <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-                    <strong style={{ display: "block", color: "#475569", marginBottom: "6px", fontSize: "14px" }}>Giới thiệu tóm tắt</strong>
-                    <p style={{ margin: 0, padding: 0, background: "transparent", border: "none", fontSize: "13.5px", lineHeight: "1.6", color: "#334155" }}>
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      padding: "16px",
+                      borderRadius: "12px",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <strong
+                      style={{
+                        display: "block",
+                        color: "#475569",
+                        marginBottom: "6px",
+                        fontSize: "14px",
+                      }}
+                    >
+                      Giới thiệu tóm tắt
+                    </strong>
+                    <p
+                      style={{
+                        margin: 0,
+                        padding: 0,
+                        background: "transparent",
+                        border: "none",
+                        fontSize: "13.5px",
+                        lineHeight: "1.6",
+                        color: "#334155",
+                      }}
+                    >
                       {selected.Bio || "Không có giới thiệu nào về nhân viên."}
                     </p>
                   </div>
                 </div>
               )}
             </div>
-            
+
             <div className="modal-footer">
-              <button className="card-btn-action btn-secondary" onClick={() => setSelected(null)}>
+              <button
+                className="card-btn-action btn-secondary"
+                onClick={() => setSelected(null)}
+              >
                 Đóng
               </button>
             </div>
@@ -1178,8 +1340,16 @@ export default function AdminEmployees() {
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: "650px" }}
           >
-            <button type="button" className="admin-modal-close" onClick={() => setShowModal(false)}>×</button>
-            <h3 className="modal-title">{editingId ? "Cập nhật hồ sơ nhân sự" : "Thêm nhân viên mới"}</h3>
+            <button
+              type="button"
+              className="admin-modal-close"
+              onClick={() => setShowModal(false)}
+            >
+              ×
+            </button>
+            <h3 className="modal-title">
+              {editingId ? "Cập nhật hồ sơ nhân sự" : "Thêm nhân viên mới"}
+            </h3>
 
             <div className="modal-body">
               <div className="admin-form-grid">
@@ -1188,7 +1358,9 @@ export default function AdminEmployees() {
                   <input
                     className="form-input"
                     value={form.fullName}
-                    onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, fullName: e.target.value })
+                    }
                     required
                   />
                 </label>
@@ -1199,7 +1371,9 @@ export default function AdminEmployees() {
                     className="form-input"
                     type="email"
                     value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, email: e.target.value })
+                    }
                     required
                   />
                 </label>
@@ -1209,7 +1383,9 @@ export default function AdminEmployees() {
                   <input
                     className="form-input"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, phone: e.target.value })
+                    }
                   />
                 </label>
 
@@ -1219,7 +1395,9 @@ export default function AdminEmployees() {
                     className="form-select"
                     style={{ padding: "10px 12px" }}
                     value={form.roleId}
-                    onChange={(e) => setForm({ ...form, roleId: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, roleId: e.target.value })
+                    }
                     required
                   >
                     <option value="">Chọn vai trò</option>
@@ -1237,7 +1415,9 @@ export default function AdminEmployees() {
                     className="form-select"
                     style={{ padding: "10px 12px" }}
                     value={form.userStatus}
-                    onChange={(e) => setForm({ ...form, userStatus: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, userStatus: e.target.value })
+                    }
                   >
                     <option value="ACTIVE">ACTIVE (Đang hoạt động)</option>
                     <option value="INACTIVE">INACTIVE (Tạm dừng)</option>
@@ -1251,7 +1431,9 @@ export default function AdminEmployees() {
                     className="form-select"
                     style={{ padding: "10px 12px" }}
                     value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, status: e.target.value })
+                    }
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="INACTIVE">INACTIVE</option>
@@ -1265,7 +1447,9 @@ export default function AdminEmployees() {
                     className="form-select"
                     style={{ padding: "10px 12px" }}
                     value={form.branchId}
-                    onChange={(e) => setForm({ ...form, branchId: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, branchId: e.target.value })
+                    }
                   >
                     <option value="">Chưa chọn chi nhánh</option>
                     {branches.map((b) => (
@@ -1281,7 +1465,9 @@ export default function AdminEmployees() {
                   <input
                     className="form-input"
                     value={form.position}
-                    onChange={(e) => setForm({ ...form, position: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, position: e.target.value })
+                    }
                     placeholder="Technician / Receptionist / Manager..."
                   />
                 </label>
@@ -1291,7 +1477,9 @@ export default function AdminEmployees() {
                   <input
                     className="form-input"
                     value={form.specialization}
-                    onChange={(e) => setForm({ ...form, specialization: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, specialization: e.target.value })
+                    }
                     placeholder="Massage, Skincare, Haircare..."
                   />
                 </label>
@@ -1302,7 +1490,9 @@ export default function AdminEmployees() {
                     className="form-input"
                     type="number"
                     value={form.salary}
-                    onChange={(e) => setForm({ ...form, salary: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, salary: e.target.value })
+                    }
                     placeholder="Ví dụ: 8000000"
                   />
                 </label>
@@ -1313,7 +1503,9 @@ export default function AdminEmployees() {
                     className="form-input"
                     type="date"
                     value={form.hireDate}
-                    onChange={(e) => setForm({ ...form, hireDate: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, hireDate: e.target.value })
+                    }
                   />
                 </label>
 
@@ -1323,7 +1515,9 @@ export default function AdminEmployees() {
                     className="form-input"
                     type="number"
                     value={form.yearsOfExperience}
-                    onChange={(e) => setForm({ ...form, yearsOfExperience: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, yearsOfExperience: e.target.value })
+                    }
                   />
                 </label>
 
@@ -1332,7 +1526,9 @@ export default function AdminEmployees() {
                   <input
                     className="form-input"
                     value={form.avatarUrl}
-                    onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, avatarUrl: e.target.value })
+                    }
                   />
                 </label>
 
@@ -1341,7 +1537,9 @@ export default function AdminEmployees() {
                   <input
                     className="form-input"
                     value={form.imageUrl}
-                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, imageUrl: e.target.value })
+                    }
                   />
                 </label>
 
@@ -1353,7 +1551,9 @@ export default function AdminEmployees() {
                     className="form-input"
                     type="password"
                     value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, password: e.target.value })
+                    }
                     minLength={6}
                     required={!editingId}
                   />
@@ -1373,10 +1573,18 @@ export default function AdminEmployees() {
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="card-btn-action btn-secondary" onClick={() => setShowModal(false)}>
+              <button
+                type="button"
+                className="card-btn-action btn-secondary"
+                onClick={() => setShowModal(false)}
+              >
                 Hủy bỏ
               </button>
-              <button className="card-btn-action btn-primary" type="submit" disabled={saving}>
+              <button
+                className="card-btn-action btn-primary"
+                type="submit"
+                disabled={saving}
+              >
                 {saving ? "Đang lưu..." : "Lưu thông tin"}
               </button>
             </div>
@@ -1386,41 +1594,100 @@ export default function AdminEmployees() {
 
       {/* Service Assignments Modal */}
       {assigningEmployee ? (
-        <div className="modal-backdrop" onClick={() => setAssigningEmployee(null)}>
+        <div
+          className="modal-backdrop"
+          onClick={() => setAssigningEmployee(null)}
+        >
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <button className="admin-modal-close" onClick={() => setAssigningEmployee(null)}>×</button>
+            <button
+              className="admin-modal-close"
+              onClick={() => setAssigningEmployee(null)}
+            >
+              ×
+            </button>
             <h3 className="modal-title">Phân bổ dịch vụ trị liệu phụ trách</h3>
 
             <div className="modal-body">
-              <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", background: "#f8fafc", padding: "14px", borderRadius: "10px" }}>
+              <div
+                style={{
+                  marginBottom: "16px",
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "center",
+                  background: "#f8fafc",
+                  padding: "14px",
+                  borderRadius: "10px",
+                }}
+              >
                 <img
-                  src={avatar(assigningEmployee.ImageUrl || assigningEmployee.AvatarUrl)}
+                  src={avatar(
+                    assigningEmployee.ImageUrl || assigningEmployee.AvatarUrl,
+                  )}
                   alt={assigningEmployee.FullName}
-                  style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover", border: "2px solid #d6b57e" }}
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: "2px solid #d6b57e",
+                  }}
                 />
                 <div>
-                  <strong style={{ display: "block", fontSize: "15px", color: "#1e293b" }}>{assigningEmployee.FullName}</strong>
-                  <span style={{ fontSize: "12px", color: "#64748b" }}>Chọn các dịch vụ spa mà nhân viên kỹ thuật này phụ trách phục vụ</span>
+                  <strong
+                    style={{
+                      display: "block",
+                      fontSize: "15px",
+                      color: "#1e293b",
+                    }}
+                  >
+                    {assigningEmployee.FullName}
+                  </strong>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>
+                    Chọn các dịch vụ spa mà nhân viên kỹ thuật này phụ trách
+                    phục vụ
+                  </span>
                 </div>
               </div>
 
               {loadingServices ? (
-                <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "40px",
+                    color: "#64748b",
+                  }}
+                >
                   Đang tải danh sách dịch vụ của Spa...
                 </div>
               ) : (
-                <div style={{ maxHeight: "350px", overflowY: "auto", paddingRight: "4px" }}>
+                <div
+                  style={{
+                    maxHeight: "350px",
+                    overflowY: "auto",
+                    paddingRight: "4px",
+                  }}
+                >
                   {Object.keys(groupedServices).map((catName) => (
                     <div className="category-group-box" key={catName}>
                       <div className="category-group-header">{catName}</div>
                       <div className="services-checkbox-grid">
                         {groupedServices[catName].map((srv) => (
-                          <label className="service-checkbox-label" key={srv.ServiceId}>
+                          <label
+                            className="service-checkbox-label"
+                            key={srv.ServiceId}
+                          >
                             <input
                               type="checkbox"
-                              style={{ width: "16px", height: "16px", accentColor: "#a0573a", cursor: "pointer" }}
+                              style={{
+                                width: "16px",
+                                height: "16px",
+                                accentColor: "#a0573a",
+                                cursor: "pointer",
+                              }}
                               checked={selectedServices.includes(srv.ServiceId)}
-                              onChange={() => handleCheckboxChange(srv.ServiceId)}
+                              onChange={() =>
+                                handleCheckboxChange(srv.ServiceId)
+                              }
                             />
                             <span>{srv.ServiceName}</span>
                           </label>
@@ -1429,7 +1696,13 @@ export default function AdminEmployees() {
                     </div>
                   ))}
                   {allServices.length === 0 && (
-                    <div style={{ textStyle: "center", padding: "20px", color: "#94a3b8" }}>
+                    <div
+                      style={{
+                        textStyle: "center",
+                        padding: "20px",
+                        color: "#94a3b8",
+                      }}
+                    >
                       Không tìm thấy dịch vụ hoạt động nào trong hệ thống
                     </div>
                   )}
@@ -1471,11 +1744,22 @@ export default function AdminEmployees() {
           confirmAction ? (
             <>
               <strong>{confirmAction.item.FullName}</strong>
-              <span> · {confirmAction.item.Position || roleLabel(confirmAction.item.RoleName) || "Nhân viên"} · Trạng thái mới: {confirmAction.nextStatus}</span>
+              <span>
+                {" "}
+                ·{" "}
+                {confirmAction.item.Position ||
+                  roleLabel(confirmAction.item.RoleName) ||
+                  "Nhân viên"}{" "}
+                · Trạng thái mới: {confirmAction.nextStatus}
+              </span>
             </>
           ) : null
         }
-        confirmLabel={confirmAction?.nextStatus === "ACTIVE" ? "Kích hoạt nhân viên" : "Cập nhật trạng thái"}
+        confirmLabel={
+          confirmAction?.nextStatus === "ACTIVE"
+            ? "Kích hoạt nhân viên"
+            : "Cập nhật trạng thái"
+        }
         tone={confirmAction?.nextStatus === "ACTIVE" ? "warning" : "danger"}
         busy={confirmBusy}
         onCancel={() => setConfirmAction(null)}

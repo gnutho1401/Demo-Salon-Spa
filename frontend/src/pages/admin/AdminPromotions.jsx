@@ -67,11 +67,12 @@ export default function AdminPromotions() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -80,11 +81,12 @@ export default function AdminPromotions() {
     setTimeout(() => {
       const element = document.getElementById(`${type}-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -181,7 +183,8 @@ export default function AdminPromotions() {
   };
 
   const handleClearFilters = () => {
-    const wasEmpty = filters.status === "" && filters.fromDate === "" && filters.toDate === "";
+    const wasEmpty =
+      filters.status === "" && filters.fromDate === "" && filters.toDate === "";
     setFilters({
       keyword: "",
       status: "",
@@ -206,7 +209,9 @@ export default function AdminPromotions() {
     setDetailServices([]);
     setLoadingDetailSvc(true);
     try {
-      const res = await axiosClient.get(`/admin/promotions/${item.PromotionId}/services`);
+      const res = await axiosClient.get(
+        `/admin/promotions/${item.PromotionId}/services`,
+      );
       const assigned = res.data.data || res.data || [];
       setDetailServices(assigned.filter((x) => x.IsAssigned));
     } catch (err) {
@@ -1028,7 +1033,10 @@ export default function AdminPromotions() {
       {error ? <div className="admin-error-card">{error}</div> : null}
 
       <div className="admin-stat-grid">
-        <article className="admin-stat-card" style={{ borderLeftColor: "#d6b57e" }}>
+        <article
+          className="admin-stat-card"
+          style={{ borderLeftColor: "#d6b57e" }}
+        >
           <div className="admin-stat-icon">🎁</div>
           <div>
             <p>Tổng khuyến mãi</p>
@@ -1037,7 +1045,10 @@ export default function AdminPromotions() {
           </div>
         </article>
 
-        <article className="admin-stat-card" style={{ borderLeftColor: "#10b981" }}>
+        <article
+          className="admin-stat-card"
+          style={{ borderLeftColor: "#10b981" }}
+        >
           <div className="admin-stat-icon">✓</div>
           <div>
             <p>Đang hoạt động</p>
@@ -1046,7 +1057,10 @@ export default function AdminPromotions() {
           </div>
         </article>
 
-        <article className="admin-stat-card" style={{ borderLeftColor: "#cf7b59" }}>
+        <article
+          className="admin-stat-card"
+          style={{ borderLeftColor: "#cf7b59" }}
+        >
           <div className="admin-stat-icon">🔥</div>
           <div>
             <p>Đang diễn ra</p>
@@ -1055,7 +1069,10 @@ export default function AdminPromotions() {
           </div>
         </article>
 
-        <article className="admin-stat-card" style={{ borderLeftColor: "#3b82f6" }}>
+        <article
+          className="admin-stat-card"
+          style={{ borderLeftColor: "#3b82f6" }}
+        >
           <div className="admin-stat-icon">⏳</div>
           <div>
             <p>Sắp tới / Hết hạn</p>
@@ -1114,7 +1131,11 @@ export default function AdminPromotions() {
       {!loading ? (
         <div ref={gridRef} className="admin-promotions-grid">
           {items.map((item) => (
-            <article className="admin-promotion-card" id={`promotion-card-${item.PromotionId}`} key={item.PromotionId}>
+            <article
+              className="admin-promotion-card"
+              id={`promotion-card-${item.PromotionId}`}
+              key={item.PromotionId}
+            >
               <div className="admin-promotion-image">
                 <img src={image(item.ImageUrl)} alt={item.Title} />
                 <div className="admin-promotion-badge">
@@ -1153,10 +1174,7 @@ export default function AdminPromotions() {
                 </div>
 
                 <div className="admin-card-actions">
-                  <button
-                    className="card-btn"
-                    onClick={() => openDetail(item)}
-                  >
+                  <button className="card-btn" onClick={() => openDetail(item)}>
                     Chi tiết
                   </button>
 
@@ -1255,25 +1273,82 @@ export default function AdminPromotions() {
                 <strong>Số dịch vụ:</strong> {selected.ServiceCount || 0}
               </p>
               <p>
-                <strong>Runtime status:</strong> {selected.RuntimeStatus || "N/A"}
+                <strong>Runtime status:</strong>{" "}
+                {selected.RuntimeStatus || "N/A"}
               </p>
             </div>
 
-            <div className="admin-detail-services" style={{ padding: "0 24px 24px 24px", borderTop: "1px solid #f3f4f6", paddingTop: "16px" }}>
-              <h4 style={{ margin: "0 0 10px 0", fontSize: "13.5px", fontWeight: "700", color: "#2b1c12" }}>Dịch vụ áp dụng khuyến mãi:</h4>
+            <div
+              className="admin-detail-services"
+              style={{
+                padding: "0 24px 24px 24px",
+                borderTop: "1px solid #f3f4f6",
+                paddingTop: "16px",
+              }}
+            >
+              <h4
+                style={{
+                  margin: "0 0 10px 0",
+                  fontSize: "13.5px",
+                  fontWeight: "700",
+                  color: "#2b1c12",
+                }}
+              >
+                Dịch vụ áp dụng khuyến mãi:
+              </h4>
               {loadingDetailSvc ? (
-                <span style={{ fontSize: "12px", color: "#64748b" }}>Đang tải danh sách dịch vụ...</span>
+                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  Đang tải danh sách dịch vụ...
+                </span>
               ) : detailServices.length > 0 ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", maxHeight: "150px", overflowY: "auto" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                    maxHeight: "150px",
+                    overflowY: "auto",
+                  }}
+                >
                   {detailServices.map((s) => (
-                    <div key={s.ServiceId} style={{ display: "flex", alignItems: "center", gap: "6px", background: "#f8fafc", padding: "4px 8px", borderRadius: "16px", border: "1px solid #e2e8f0" }}>
-                      <img src={image(s.ImageUrl)} alt={s.ServiceName} style={{ width: "20px", height: "20px", borderRadius: "4px", objectFit: "cover" }} />
-                      <span style={{ fontSize: "11px", fontWeight: "600", color: "#334155" }}>{s.ServiceName} ({money(s.Price)})</span>
+                    <div
+                      key={s.ServiceId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "#f8fafc",
+                        padding: "4px 8px",
+                        borderRadius: "16px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <img
+                        src={image(s.ImageUrl)}
+                        alt={s.ServiceName}
+                        style={{
+                          width: "20px",
+                          height: "20px",
+                          borderRadius: "4px",
+                          objectFit: "cover",
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          color: "#334155",
+                        }}
+                      >
+                        {s.ServiceName} ({money(s.Price)})
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>Chưa áp dụng dịch vụ nào.</span>
+                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                  Chưa áp dụng dịch vụ nào.
+                </span>
               )}
             </div>
           </div>
@@ -1440,7 +1515,11 @@ export default function AdminPromotions() {
 
       <AdminConfirmDialog
         open={Boolean(confirmAction)}
-        title={confirmAction?.type === "delete" ? "Xóa khuyến mãi?" : "Cập nhật trạng thái khuyến mãi?"}
+        title={
+          confirmAction?.type === "delete"
+            ? "Xóa khuyến mãi?"
+            : "Cập nhật trạng thái khuyến mãi?"
+        }
         description={
           confirmAction?.type === "delete"
             ? "Khuyến mãi sẽ bị xóa khỏi hệ thống và không thể khôi phục từ giao diện Admin."
@@ -1450,11 +1529,17 @@ export default function AdminPromotions() {
           confirmAction ? (
             <>
               <strong>{confirmAction.item.Title}</strong>
-              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+              {confirmAction.type === "status" ? (
+                <span> · Trạng thái mới: {confirmAction.nextStatus}</span>
+              ) : null}
             </>
           ) : null
         }
-        confirmLabel={confirmAction?.type === "delete" ? "Xóa khuyến mãi" : "Cập nhật trạng thái"}
+        confirmLabel={
+          confirmAction?.type === "delete"
+            ? "Xóa khuyến mãi"
+            : "Cập nhật trạng thái"
+        }
         tone={confirmAction?.type === "delete" ? "danger" : "warning"}
         busy={confirmBusy}
         onCancel={() => setConfirmAction(null)}

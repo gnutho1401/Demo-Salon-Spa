@@ -156,7 +156,10 @@ export default function AdminPackages() {
   };
 
   const handleClearFilters = () => {
-    const wasEmpty = filters.status === "" && filters.packageCategoryId === "" && filters.isHot === "";
+    const wasEmpty =
+      filters.status === "" &&
+      filters.packageCategoryId === "" &&
+      filters.isHot === "";
     setFilters({
       keyword: "",
       status: "",
@@ -1312,8 +1315,9 @@ export default function AdminPackages() {
           <div className="admin-eyebrow">Packages Management</div>
           <h1>Quản lý gói dịch vụ</h1>
           <p>
-            Quản lý combo, liệu trình trị liệu dài ngày. Thiết lập OriginalPrice, SalePrice,
-            TotalSessions, ValidityDays, IsHot và gán số lượng buổi cho từng dịch vụ con của Luxury Spa.
+            Quản lý combo, liệu trình trị liệu dài ngày. Thiết lập
+            OriginalPrice, SalePrice, TotalSessions, ValidityDays, IsHot và gán
+            số lượng buổi cho từng dịch vụ con của Luxury Spa.
           </p>
         </div>
 
@@ -1419,15 +1423,17 @@ export default function AdminPackages() {
       {!loading ? (
         <div className="admin-packages-grid" ref={gridRef}>
           {items.map((item) => (
-            <article 
-              className="admin-package-card" 
-              id={`package-card-${item.PackageId}`} 
+            <article
+              className="admin-package-card"
+              id={`package-card-${item.PackageId}`}
               key={item.PackageId}
             >
               <div className="admin-package-image">
                 <img src={image(item.ImageUrl)} alt={item.PackageName} />
                 <span className={statusClass(item.Status)}>{item.Status}</span>
-                {item.IsHot ? <span className="package-hot-badge">🔥 HOT</span> : null}
+                {item.IsHot ? (
+                  <span className="package-hot-badge">🔥 HOT</span>
+                ) : null}
               </div>
 
               <div className="admin-package-body">
@@ -1436,7 +1442,10 @@ export default function AdminPackages() {
                 </div>
 
                 <h3>{item.PackageName}</h3>
-                <p>{item.Description || "Chưa có mô tả chi tiết cho gói combo này."}</p>
+                <p>
+                  {item.Description ||
+                    "Chưa có mô tả chi tiết cho gói combo này."}
+                </p>
 
                 <div className="admin-package-price">
                   <div>
@@ -1627,8 +1636,8 @@ export default function AdminPackages() {
                 <span>{editingId ? "Edit Package" : "Create Package"}</span>
                 <h3>{editingId ? "Sửa package" : "Thêm package mới"}</h3>
                 <p>
-                  Thiết lập combo trị liệu: OriginalPrice, SalePrice, TotalSessions,
-                  ValidityDays và session cho từng dịch vụ.
+                  Thiết lập combo trị liệu: OriginalPrice, SalePrice,
+                  TotalSessions, ValidityDays và session cho từng dịch vụ.
                 </p>
               </div>
 
@@ -1895,7 +1904,9 @@ export default function AdminPackages() {
 
                 <div className="package-summary-card">
                   <span>Dịch vụ đã chọn</span>
-                  <strong>{Object.keys(selectedServices).length} dịch vụ</strong>
+                  <strong>
+                    {Object.keys(selectedServices).length} dịch vụ
+                  </strong>
                 </div>
 
                 <div className="package-summary-card">

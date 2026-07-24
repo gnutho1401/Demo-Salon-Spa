@@ -50,11 +50,12 @@ export default function AdminMemberships() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -63,11 +64,12 @@ export default function AdminMemberships() {
     setTimeout(() => {
       const element = document.getElementById(`${type}-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -1153,8 +1155,9 @@ export default function AdminMemberships() {
           <div className="admin-eyebrow">Membership Management</div>
           <h1>Quản lý hạng thành viên</h1>
           <p>
-            Cấu hình hạng khách hàng VIP, điểm tích lũy tối thiểu, phần trăm ưu đãi đặc quyền và theo
-            dõi số lượng khách đang thuộc từng hạng của Luxury Spa.
+            Cấu hình hạng khách hàng VIP, điểm tích lũy tối thiểu, phần trăm ưu
+            đãi đặc quyền và theo dõi số lượng khách đang thuộc từng hạng của
+            Luxury Spa.
           </p>
         </div>
 
@@ -1243,11 +1246,15 @@ export default function AdminMemberships() {
 
                 <div className="vip-card-body">
                   <h3 className="vip-tier-name">{item.LevelName}</h3>
-                  <div className="vip-card-number">•••• •••• •••• {1000 + item.MembershipLevelId}</div>
+                  <div className="vip-card-number">
+                    •••• •••• •••• {1000 + item.MembershipLevelId}
+                  </div>
                 </div>
 
                 <div className="vip-card-footer">
-                  <div className="vip-discount-badge">{item.DiscountPercent}% OFF</div>
+                  <div className="vip-discount-badge">
+                    {item.DiscountPercent}% OFF
+                  </div>
                   <div className="vip-min-points">
                     <span>MIN POINTS</span>
                     <strong>{moneyPoint(item.MinPoints)}</strong>
@@ -1256,7 +1263,10 @@ export default function AdminMemberships() {
               </div>
 
               <div className="membership-stats-overlay">
-                <p className="vip-desc">{item.Description || "Không có mô tả cho hạng thành viên này."}</p>
+                <p className="vip-desc">
+                  {item.Description ||
+                    "Không có mô tả cho hạng thành viên này."}
+                </p>
 
                 <div className="vip-stats-grid">
                   <div className="stat-item">
@@ -1411,7 +1421,9 @@ export default function AdminMemberships() {
 
               <div className="membership-preview-container">
                 <div className="membership-preview-label">LIVE PREVIEW</div>
-                <div className={`vip-card preview ${levelClass(form.LevelName)}`}>
+                <div
+                  className={`vip-card preview ${levelClass(form.LevelName)}`}
+                >
                   <div className="vip-card-header">
                     <div className="vip-badge-chip">
                       <div className="metallic-chip"></div>
@@ -1421,12 +1433,18 @@ export default function AdminMemberships() {
                   </div>
 
                   <div className="vip-card-body">
-                    <h3 className="vip-tier-name">{form.LevelName || "GOLD MEMBER"}</h3>
-                    <div className="vip-card-number">•••• •••• •••• {editingId ? 1000 + editingId : "2026"}</div>
+                    <h3 className="vip-tier-name">
+                      {form.LevelName || "GOLD MEMBER"}
+                    </h3>
+                    <div className="vip-card-number">
+                      •••• •••• •••• {editingId ? 1000 + editingId : "2026"}
+                    </div>
                   </div>
 
                   <div className="vip-card-footer">
-                    <div className="vip-discount-badge">{form.DiscountPercent || 0}% OFF</div>
+                    <div className="vip-discount-badge">
+                      {form.DiscountPercent || 0}% OFF
+                    </div>
                     <div className="vip-min-points">
                       <span>MIN POINTS</span>
                       <strong>{moneyPoint(form.MinPoints || 0)}</strong>
@@ -1562,7 +1580,10 @@ export default function AdminMemberships() {
           confirmAction ? (
             <>
               <strong>{confirmAction.item.LevelName}</strong>
-              <span> · Ưu đãi {Number(confirmAction.item.DiscountPercent || 0)}%</span>
+              <span>
+                {" "}
+                · Ưu đãi {Number(confirmAction.item.DiscountPercent || 0)}%
+              </span>
             </>
           ) : null
         }

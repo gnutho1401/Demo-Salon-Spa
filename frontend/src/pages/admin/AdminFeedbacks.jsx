@@ -29,7 +29,14 @@ function renderAvatar(item, size = 42) {
   const url = item?.AvatarUrl ? resolveFileUrl(item.AvatarUrl) : "";
   if (url) {
     return (
-      <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <div
+        style={{
+          position: "relative",
+          width: size,
+          height: size,
+          flexShrink: 0,
+        }}
+      >
         <img
           src={url}
           alt={item?.FullName || "Customer"}
@@ -39,7 +46,7 @@ function renderAvatar(item, size = 42) {
             borderRadius: "50%",
             objectFit: "cover",
             border: "2px solid #d6b57e",
-            boxShadow: "0 2px 8px rgba(120,80,40,0.15)"
+            boxShadow: "0 2px 8px rgba(120,80,40,0.15)",
           }}
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -61,7 +68,10 @@ function renderAvatar(item, size = 42) {
             fontSize: size * 0.42,
           }}
         >
-          {String(item?.FullName || "?").trim().charAt(0).toUpperCase()}
+          {String(item?.FullName || "?")
+            .trim()
+            .charAt(0)
+            .toUpperCase()}
         </div>
       </div>
     );
@@ -77,7 +87,10 @@ function renderAvatar(item, size = 42) {
   ];
   const charCode = item?.FullName ? item.FullName.charCodeAt(0) : 65;
   const background = gradients[charCode % gradients.length];
-  const letter = String(item?.FullName || "?").trim().charAt(0).toUpperCase();
+  const letter = String(item?.FullName || "?")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <div
@@ -95,7 +108,7 @@ function renderAvatar(item, size = 42) {
         boxShadow: "0 3px 10px rgba(120,80,40,0.12)",
         border: "2px solid #ffffff",
         textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-        flexShrink: 0
+        flexShrink: 0,
       }}
     >
       {letter}
@@ -129,11 +142,12 @@ export default function AdminFeedbacks() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -142,11 +156,12 @@ export default function AdminFeedbacks() {
     setTimeout(() => {
       const element = document.getElementById(`feedback-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -224,7 +239,8 @@ export default function AdminFeedbacks() {
   };
 
   const handleClearFilters = () => {
-    const wasEmpty = filters.status === "" && filters.fromDate === "" && filters.toDate === "";
+    const wasEmpty =
+      filters.status === "" && filters.fromDate === "" && filters.toDate === "";
     setFilters({
       keyword: "",
       status: "",
@@ -258,7 +274,8 @@ export default function AdminFeedbacks() {
     setResponseModal(item);
     setResponseForm({
       AdminResponse: item.AdminResponse || "",
-      Status: item.Status === "PENDING" ? "RESOLVED" : item.Status || "RESOLVED",
+      Status:
+        item.Status === "PENDING" ? "RESOLVED" : item.Status || "RESOLVED",
     });
     setError("");
     setSuccessMsg("");
@@ -272,7 +289,9 @@ export default function AdminFeedbacks() {
         Status: nextStatus,
       });
 
-      setSuccessMsg(`Đã đổi trạng thái feedback #${item.FeedbackId} thành ${nextStatus}!`);
+      setSuccessMsg(
+        `Đã đổi trạng thái feedback #${item.FeedbackId} thành ${nextStatus}!`,
+      );
       await load();
       scrollToItem(item.FeedbackId);
       setTimeout(() => setSuccessMsg(""), 4000);
@@ -1010,7 +1029,8 @@ export default function AdminFeedbacks() {
           <div className="admin-eyebrow">Feedbacks Management</div>
           <h1>Quản lý phản hồi khách hàng</h1>
           <p>
-            Theo dõi ý kiến đóng góp từ khách hàng, xử lý trạng thái và phản hồi chính thức từ quản trị viên.
+            Theo dõi ý kiến đóng góp từ khách hàng, xử lý trạng thái và phản hồi
+            chính thức từ quản trị viên.
           </p>
         </div>
         <button className="admin-refresh-btn" onClick={load}>
@@ -1088,25 +1108,51 @@ export default function AdminFeedbacks() {
       </div>
 
       {/* Alerts */}
-      {error && <div className="admin-error-card" style={{ marginBottom: 20 }}>{error}</div>}
+      {error && (
+        <div className="admin-error-card" style={{ marginBottom: 20 }}>
+          {error}
+        </div>
+      )}
       {successMsg && (
-        <div className="admin-loading-card" style={{ marginBottom: 20, color: "#107c41", borderColor: "rgba(16, 124, 65, 0.2)", background: "#e8f7ec" }}>
+        <div
+          className="admin-loading-card"
+          style={{
+            marginBottom: 20,
+            color: "#107c41",
+            borderColor: "rgba(16, 124, 65, 0.2)",
+            background: "#e8f7ec",
+          }}
+        >
           {successMsg}
         </div>
       )}
 
       {loading ? (
-        <div className="admin-loading-card">Đang tải danh sách feedbacks...</div>
+        <div className="admin-loading-card">
+          Đang tải danh sách feedbacks...
+        </div>
       ) : (
         <div ref={gridRef} className="admin-feedbacks-grid">
           {items.map((item) => (
-            <div key={item.FeedbackId} id={`feedback-card-${item.FeedbackId}`} className="luxury-feedback-card">
+            <div
+              key={item.FeedbackId}
+              id={`feedback-card-${item.FeedbackId}`}
+              className="luxury-feedback-card"
+            >
               <div className="feedback-card-head">
                 <div className="customer-meta">
-                  {renderAvatar({ AvatarUrl: item.CustomerAvatar, FullName: item.CustomerName }, 48)}
+                  {renderAvatar(
+                    {
+                      AvatarUrl: item.CustomerAvatar,
+                      FullName: item.CustomerName,
+                    },
+                    48,
+                  )}
                   <div className="customer-meta-text">
                     <h4>{item.CustomerName}</h4>
-                    <span>{item.CustomerEmail} • {dateText(item.CreatedAt)}</span>
+                    <span>
+                      {item.CustomerEmail} • {dateText(item.CreatedAt)}
+                    </span>
                   </div>
                 </div>
 
@@ -1118,20 +1164,32 @@ export default function AdminFeedbacks() {
               </div>
 
               <div className="feedback-body">
-                <h4 className="feedback-subject-text">Chủ đề: {item.Subject || "Không có tiêu đề"}</h4>
+                <h4 className="feedback-subject-text">
+                  Chủ đề: {item.Subject || "Không có tiêu đề"}
+                </h4>
                 <p className="feedback-body-text">
                   "{item.Content || "Không có nội dung chi tiết."}"
                 </p>
 
                 <div className="feedback-connections">
                   <div className="connection-chip">
-                    <span>Mã KH: <strong>{item.CustomerId ? `#${item.CustomerId}` : "N/A"}</strong></span>
+                    <span>
+                      Mã KH:{" "}
+                      <strong>
+                        {item.CustomerId ? `#${item.CustomerId}` : "N/A"}
+                      </strong>
+                    </span>
                   </div>
                   <div className="connection-chip">
-                    <span>Hạng thành viên: <strong>{item.MembershipLevelName || "Standard"}</strong></span>
+                    <span>
+                      Hạng thành viên:{" "}
+                      <strong>{item.MembershipLevelName || "Standard"}</strong>
+                    </span>
                   </div>
                   <div className="connection-chip">
-                    <span>Điểm loyalty: <strong>{item.LoyaltyPoints || 0}</strong></span>
+                    <span>
+                      Điểm loyalty: <strong>{item.LoyaltyPoints || 0}</strong>
+                    </span>
                   </div>
                 </div>
 
@@ -1150,24 +1208,39 @@ export default function AdminFeedbacks() {
                 <button className="card-btn" onClick={() => setSelected(item)}>
                   Chi tiết 👁
                 </button>
-                <button className="card-btn primary" onClick={() => openResponse(item)}>
+                <button
+                  className="card-btn primary"
+                  onClick={() => openResponse(item)}
+                >
                   Phản hồi 💬
                 </button>
                 {item.Status !== "IN_PROGRESS" && (
-                  <button className="card-btn" onClick={() => changeStatus(item, "IN_PROGRESS")}>
+                  <button
+                    className="card-btn"
+                    onClick={() => changeStatus(item, "IN_PROGRESS")}
+                  >
                     Đang xử lý 🛠
                   </button>
                 )}
                 {item.Status !== "RESOLVED" && (
-                  <button className="card-btn" onClick={() => changeStatus(item, "RESOLVED")}>
+                  <button
+                    className="card-btn"
+                    onClick={() => changeStatus(item, "RESOLVED")}
+                  >
                     Giải quyết ✓
                   </button>
                 )}
-                <button className="card-btn danger" onClick={() => changeStatus(item, "REJECTED")}>
+                <button
+                  className="card-btn danger"
+                  onClick={() => changeStatus(item, "REJECTED")}
+                >
                   Reject ✖
                 </button>
                 {item.AdminResponse ? (
-                  <button className="card-btn danger" onClick={() => removeResponse(item)}>
+                  <button
+                    className="card-btn danger"
+                    onClick={() => removeResponse(item)}
+                  >
                     Xóa Reply
                   </button>
                 ) : null}
@@ -1186,24 +1259,62 @@ export default function AdminFeedbacks() {
       {/* DETAIL MODAL */}
       {selected && (
         <div className="admin-modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="admin-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header" style={{ background: "linear-gradient(135deg, #161a1d 0%, #2f3438 100%)", color: "#fff" }}>
+          <div
+            className="admin-modal-wrapper"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="admin-modal-header"
+              style={{
+                background: "linear-gradient(135deg, #161a1d 0%, #2f3438 100%)",
+                color: "#fff",
+              }}
+            >
               <h3>Chi tiết feedback #{selected.FeedbackId}</h3>
-              <button className="admin-modal-close" onClick={() => setSelected(null)} style={{ color: "#fff" }}>
+              <button
+                className="admin-modal-close"
+                onClick={() => setSelected(null)}
+                style={{ color: "#fff" }}
+              >
                 &times;
               </button>
             </div>
             <div className="admin-modal-body">
               <div className="admin-detail-grid">
-                <p><strong>Feedback ID:</strong> #{selected.FeedbackId}</p>
-                <p><strong>Khách hàng:</strong> {selected.CustomerName}</p>
-                <p><strong>Email khách hàng:</strong> {selected.CustomerEmail}</p>
-                <p><strong>Điện thoại:</strong> {selected.CustomerPhone || "N/A"}</p>
-                <p><strong>Hạng thành viên:</strong> {selected.MembershipLevelName || "Standard"}</p>
-                <p><strong>Loyalty Points:</strong> {selected.LoyaltyPoints || 0}</p>
-                <p><strong>Trạng thái:</strong> <span className={statusClass(selected.Status)} style={{ position: "static" }}>{selected.Status}</span></p>
-                <p><strong>Ngày gửi:</strong> {dateText(selected.CreatedAt)}</p>
-                <p><strong>Ngày cập nhật:</strong> {dateText(selected.UpdatedAt)}</p>
+                <p>
+                  <strong>Feedback ID:</strong> #{selected.FeedbackId}
+                </p>
+                <p>
+                  <strong>Khách hàng:</strong> {selected.CustomerName}
+                </p>
+                <p>
+                  <strong>Email khách hàng:</strong> {selected.CustomerEmail}
+                </p>
+                <p>
+                  <strong>Điện thoại:</strong> {selected.CustomerPhone || "N/A"}
+                </p>
+                <p>
+                  <strong>Hạng thành viên:</strong>{" "}
+                  {selected.MembershipLevelName || "Standard"}
+                </p>
+                <p>
+                  <strong>Loyalty Points:</strong> {selected.LoyaltyPoints || 0}
+                </p>
+                <p>
+                  <strong>Trạng thái:</strong>{" "}
+                  <span
+                    className={statusClass(selected.Status)}
+                    style={{ position: "static" }}
+                  >
+                    {selected.Status}
+                  </span>
+                </p>
+                <p>
+                  <strong>Ngày gửi:</strong> {dateText(selected.CreatedAt)}
+                </p>
+                <p>
+                  <strong>Ngày cập nhật:</strong> {dateText(selected.UpdatedAt)}
+                </p>
               </div>
 
               <div className="feedback-detail-text">
@@ -1218,13 +1329,25 @@ export default function AdminFeedbacks() {
 
               <div className="feedback-detail-text">
                 <strong>Admin response</strong>
-                <p style={{ fontStyle: selected.AdminResponse ? "normal" : "italic", color: selected.AdminResponse ? "#3a2519" : "#8c7e74" }}>
+                <p
+                  style={{
+                    fontStyle: selected.AdminResponse ? "normal" : "italic",
+                    color: selected.AdminResponse ? "#3a2519" : "#8c7e74",
+                  }}
+                >
                   {selected.AdminResponse || "Chưa có phản hồi chính thức."}
                 </p>
               </div>
             </div>
             <div className="admin-modal-footer">
-              <button className="card-btn primary" onClick={() => { setResponseModal(selected); setSelected(null); openResponse(selected); }}>
+              <button
+                className="card-btn primary"
+                onClick={() => {
+                  setResponseModal(selected);
+                  setSelected(null);
+                  openResponse(selected);
+                }}
+              >
                 Phản hồi ngay 💬
               </button>
               <button className="card-btn" onClick={() => setSelected(null)}>
@@ -1237,11 +1360,27 @@ export default function AdminFeedbacks() {
 
       {/* RESPONSE MODAL */}
       {responseModal && (
-        <div className="admin-modal-backdrop" onClick={() => setResponseModal(null)}>
-          <div className="admin-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header" style={{ background: "linear-gradient(135deg, #161a1d 0%, #2f3438 100%)", color: "#fff" }}>
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setResponseModal(null)}
+        >
+          <div
+            className="admin-modal-wrapper"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="admin-modal-header"
+              style={{
+                background: "linear-gradient(135deg, #161a1d 0%, #2f3438 100%)",
+                color: "#fff",
+              }}
+            >
               <h3>Phản hồi feedback #{responseModal.FeedbackId}</h3>
-              <button className="admin-modal-close" onClick={() => setResponseModal(null)} style={{ color: "#fff" }}>
+              <button
+                className="admin-modal-close"
+                onClick={() => setResponseModal(null)}
+                style={{ color: "#fff" }}
+              >
                 &times;
               </button>
             </div>
@@ -1252,7 +1391,12 @@ export default function AdminFeedbacks() {
                   <textarea
                     rows={6}
                     value={responseForm.AdminResponse}
-                    onChange={(e) => setResponseForm({ ...responseForm, AdminResponse: e.target.value })}
+                    onChange={(e) =>
+                      setResponseForm({
+                        ...responseForm,
+                        AdminResponse: e.target.value,
+                      })
+                    }
                     placeholder="Chào quý khách, chúng tôi chân thành ghi nhận phản hồi của quý khách..."
                     required
                   />
@@ -1262,10 +1406,17 @@ export default function AdminFeedbacks() {
                   Trạng thái xử lý phản hồi
                   <select
                     value={responseForm.Status}
-                    onChange={(e) => setResponseForm({ ...responseForm, Status: e.target.value })}
+                    onChange={(e) =>
+                      setResponseForm({
+                        ...responseForm,
+                        Status: e.target.value,
+                      })
+                    }
                   >
                     <option value="PENDING">PENDING (Đang chờ)</option>
-                    <option value="IN_PROGRESS">IN_PROGRESS (Đang xử lý)</option>
+                    <option value="IN_PROGRESS">
+                      IN_PROGRESS (Đang xử lý)
+                    </option>
                     <option value="RESOLVED">RESOLVED (Đã giải quyết)</option>
                     <option value="REJECTED">REJECTED (Từ chối xử lý)</option>
                     <option value="CLOSED">CLOSED (Đóng phản hồi)</option>
@@ -1278,32 +1429,68 @@ export default function AdminFeedbacks() {
                 <span className="admin-preview-title">Xem trước hiển thị</span>
                 <div
                   className="luxury-feedback-card"
-                  style={{ width: "100%", maxWidth: 320, transform: "none", boxShadow: "none" }}
+                  style={{
+                    width: "100%",
+                    maxWidth: 320,
+                    transform: "none",
+                    boxShadow: "none",
+                  }}
                 >
-                  <div className="feedback-card-head" style={{ paddingBottom: 10, marginBottom: 10 }}>
+                  <div
+                    className="feedback-card-head"
+                    style={{ paddingBottom: 10, marginBottom: 10 }}
+                  >
                     <div className="customer-meta">
-                      {renderAvatar({ AvatarUrl: responseModal.CustomerAvatar, FullName: responseModal.CustomerName }, 40)}
+                      {renderAvatar(
+                        {
+                          AvatarUrl: responseModal.CustomerAvatar,
+                          FullName: responseModal.CustomerName,
+                        },
+                        40,
+                      )}
                       <div className="customer-meta-text">
-                        <h4 style={{ fontSize: "14.5px" }}>{responseModal.CustomerName}</h4>
-                        <span style={{ fontSize: "11.5px" }}>{dateOnlyText(responseModal.CreatedAt)}</span>
+                        <h4 style={{ fontSize: "14.5px" }}>
+                          {responseModal.CustomerName}
+                        </h4>
+                        <span style={{ fontSize: "11.5px" }}>
+                          {dateOnlyText(responseModal.CreatedAt)}
+                        </span>
                       </div>
                     </div>
                   </div>
                   <div className="feedback-body">
-                    <h5 style={{ fontSize: "14px", fontWeight: "bold", margin: "0 0 6px 0", color: "#1f140e" }}>
+                    <h5
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: "bold",
+                        margin: "0 0 6px 0",
+                        color: "#1f140e",
+                      }}
+                    >
                       Chủ đề: {responseModal.Subject || "Không có tiêu đề"}
                     </h5>
-                    <p className="feedback-body-text" style={{ fontSize: "13px", marginBottom: 12 }}>
+                    <p
+                      className="feedback-body-text"
+                      style={{ fontSize: "13px", marginBottom: 12 }}
+                    >
                       "{responseModal.Content || "Không có nội dung"}"
                     </p>
 
                     {responseForm.AdminResponse.trim() ? (
-                      <div className="admin-reply-box" style={{ padding: 12, marginTop: 4 }}>
-                        <div className="admin-reply-header" style={{ marginBottom: 4 }}>
+                      <div
+                        className="admin-reply-box"
+                        style={{ padding: 12, marginTop: 4 }}
+                      >
+                        <div
+                          className="admin-reply-header"
+                          style={{ marginBottom: 4 }}
+                        >
                           <strong>ADMIN REPLY</strong>
                           <span>Bây giờ</span>
                         </div>
-                        <p style={{ fontSize: "12.5px" }}>{responseForm.AdminResponse.trim()}</p>
+                        <p style={{ fontSize: "12.5px" }}>
+                          {responseForm.AdminResponse.trim()}
+                        </p>
                       </div>
                     ) : null}
                   </div>
@@ -1311,10 +1498,19 @@ export default function AdminFeedbacks() {
               </div>
             </div>
             <div className="admin-modal-footer">
-              <button className="card-btn" type="button" onClick={() => setResponseModal(null)}>
+              <button
+                className="card-btn"
+                type="button"
+                onClick={() => setResponseModal(null)}
+              >
                 Hủy
               </button>
-              <button className="card-btn primary" type="button" onClick={submitResponse} disabled={saving}>
+              <button
+                className="card-btn primary"
+                type="button"
+                onClick={submitResponse}
+                disabled={saving}
+              >
                 {saving ? "Đang lưu..." : "Lưu phản hồi & Trạng thái"}
               </button>
             </div>
@@ -1324,7 +1520,11 @@ export default function AdminFeedbacks() {
 
       <AdminConfirmDialog
         open={Boolean(confirmAction)}
-        title={confirmAction?.type === "remove-response" ? "Xóa phản hồi của Admin?" : "Cập nhật trạng thái feedback?"}
+        title={
+          confirmAction?.type === "remove-response"
+            ? "Xóa phản hồi của Admin?"
+            : "Cập nhật trạng thái feedback?"
+        }
         description={
           confirmAction?.type === "remove-response"
             ? "Nội dung phản hồi hiện tại của Admin sẽ bị xóa khỏi feedback này."
@@ -1335,12 +1535,23 @@ export default function AdminFeedbacks() {
             <>
               <strong>Feedback #{confirmAction.item.FeedbackId}</strong>
               <span> · {confirmAction.item.CustomerName || "Khách hàng"}</span>
-              {confirmAction.type === "status" ? <span> · Trạng thái mới: {confirmAction.nextStatus}</span> : null}
+              {confirmAction.type === "status" ? (
+                <span> · Trạng thái mới: {confirmAction.nextStatus}</span>
+              ) : null}
             </>
           ) : null
         }
-        confirmLabel={confirmAction?.type === "remove-response" ? "Xóa phản hồi" : "Cập nhật trạng thái"}
-        tone={confirmAction?.type === "remove-response" || confirmAction?.nextStatus === "REJECTED" ? "danger" : "warning"}
+        confirmLabel={
+          confirmAction?.type === "remove-response"
+            ? "Xóa phản hồi"
+            : "Cập nhật trạng thái"
+        }
+        tone={
+          confirmAction?.type === "remove-response" ||
+          confirmAction?.nextStatus === "REJECTED"
+            ? "danger"
+            : "warning"
+        }
         busy={confirmBusy}
         onCancel={() => setConfirmAction(null)}
         onConfirm={handleConfirmedAction}
