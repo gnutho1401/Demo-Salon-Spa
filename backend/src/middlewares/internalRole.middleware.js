@@ -1,4 +1,6 @@
-const { isInternalRole } = require("../modules/internal-analytics/internalAnalytics.catalog");
+const {
+  isInternalRole,
+} = require("../modules/internal-analytics/internalAnalytics.catalog");
 
 function requireInternalRole(req, res, next) {
   if (!req.user || !isInternalRole(req.user.role)) {

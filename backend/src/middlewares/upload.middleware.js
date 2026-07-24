@@ -23,7 +23,10 @@ const reviewUpload = multer({
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
       const userId = req.user?.userId || "guest";
-      cb(null, `review-${userId}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+      cb(
+        null,
+        `review-${userId}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`,
+      );
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024, files: 6 },
