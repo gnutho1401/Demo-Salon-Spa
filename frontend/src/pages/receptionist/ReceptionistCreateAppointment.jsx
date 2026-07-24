@@ -39,7 +39,6 @@ export default function ReceptionistCreateAppointment() {
   const [alternatives, setAlternatives] = useState([]);
   const [slotLoading, setSlotLoading] = useState(false);
 
-
   const [keyword, setKeyword] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [employeeKeyword, setEmployeeKeyword] = useState("");
@@ -82,7 +81,9 @@ export default function ReceptionistCreateAppointment() {
         setPageLoading(true);
         const [servicesRes, branchesRes] = await Promise.all([
           axiosClient.get("/services"),
-          axiosClient.get("/employees/branches").catch(() => ({ data: { data: [] } })),
+          axiosClient
+            .get("/employees/branches")
+            .catch(() => ({ data: { data: [] } })),
         ]);
         setServices(servicesRes.data.data || servicesRes.data || []);
         const branchList = branchesRes.data.data || branchesRes.data || [];
@@ -112,9 +113,19 @@ export default function ReceptionistCreateAppointment() {
       try {
         setError("");
         const [pkgRes, voucherRes, detailsRes] = await Promise.all([
-          axiosClient.get("/packages/my", { params: { customerId: selectedCustomer.CustomerId } }).catch(() => ({ data: { data: [] } })),
-          axiosClient.get("/vouchers/my", { params: { customerId: selectedCustomer.CustomerId } }).catch(() => ({ data: { data: [] } })),
-          axiosClient.get(`/receptionist/customers/${selectedCustomer.CustomerId}`).catch(() => ({ data: { data: null } })),
+          axiosClient
+            .get("/packages/my", {
+              params: { customerId: selectedCustomer.CustomerId },
+            })
+            .catch(() => ({ data: { data: [] } })),
+          axiosClient
+            .get("/vouchers/my", {
+              params: { customerId: selectedCustomer.CustomerId },
+            })
+            .catch(() => ({ data: { data: [] } })),
+          axiosClient
+            .get(`/receptionist/customers/${selectedCustomer.CustomerId}`)
+            .catch(() => ({ data: { data: null } })),
         ]);
 
         const pkgs = pkgRes.data.data || pkgRes.data || [];
@@ -178,7 +189,9 @@ export default function ReceptionistCreateAppointment() {
 
       try {
         setEmployeeLoading(true);
-        const res = await axiosClient.get(`/employees/by-service/${form.serviceId}`);
+        const res = await axiosClient.get(
+          `/employees/by-service/${form.serviceId}`,
+        );
         setEmployees(res.data.data || []);
       } catch {
         setEmployees([]);
@@ -243,22 +256,33 @@ export default function ReceptionistCreateAppointment() {
     return services.filter((s) => {
       const text = keyword.toLowerCase();
       const matchKeyword =
-        String(s.ServiceName || "").toLowerCase().includes(text) ||
-        String(s.Description || "").toLowerCase().includes(text);
-      const matchCategory = categoryFilter === "ALL" || s.CategoryName === categoryFilter;
+        String(s.ServiceName || "")
+          .toLowerCase()
+          .includes(text) ||
+        String(s.Description || "")
+          .toLowerCase()
+          .includes(text);
+      const matchCategory =
+        categoryFilter === "ALL" || s.CategoryName === categoryFilter;
       return matchKeyword && matchCategory;
     });
   }, [services, keyword, categoryFilter]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((e) => {
-      const matchBranch = !selectedBranchId || String(e.BranchId) === String(selectedBranchId);
+      const matchBranch =
+        !selectedBranchId || String(e.BranchId) === String(selectedBranchId);
       const text = employeeKeyword.toLowerCase();
-      const matchText = (
-        String(e.FullName || "").toLowerCase().includes(text) ||
-        String(e.Specialization || "").toLowerCase().includes(text) ||
-        String(e.Position || "").toLowerCase().includes(text)
-      );
+      const matchText =
+        String(e.FullName || "")
+          .toLowerCase()
+          .includes(text) ||
+        String(e.Specialization || "")
+          .toLowerCase()
+          .includes(text) ||
+        String(e.Position || "")
+          .toLowerCase()
+          .includes(text);
       return matchBranch && matchText;
     });
   }, [employees, employeeKeyword, selectedBranchId]);
@@ -268,10 +292,14 @@ export default function ReceptionistCreateAppointment() {
   }, [services, form.serviceId]);
 
   const selectedEmployee = useMemo(() => {
-    return employees.find((e) => String(e.EmployeeId) === String(form.employeeId));
+    return employees.find(
+      (e) => String(e.EmployeeId) === String(form.employeeId),
+    );
   }, [employees, form.employeeId]);
 
-  const totalPrice = form.customerPackageId ? 0 : Number(selectedService?.Price || 0);
+  const totalPrice = form.customerPackageId
+    ? 0
+    : Number(selectedService?.Price || 0);
 
   const availableVouchers = useMemo(() => {
     if (!selectedService) return [];
@@ -283,12 +311,17 @@ export default function ReceptionistCreateAppointment() {
       const useCount = Number(voucher.UseCount || 0);
       if (used || useCount >= 1) return false;
 
-      const status = String(voucher.Status || voucher.status || "ACTIVE").toUpperCase();
+      const status = String(
+        voucher.Status || voucher.status || "ACTIVE",
+      ).toUpperCase();
       if (status !== "ACTIVE") return false;
 
-      if (voucher.EndDate && new Date(voucher.EndDate) < new Date()) return false;
+      if (voucher.EndDate && new Date(voucher.EndDate) < new Date())
+        return false;
 
-      const minOrder = Number(voucher.MinOrderAmount || voucher.minOrderAmount || 0);
+      const minOrder = Number(
+        voucher.MinOrderAmount || voucher.minOrderAmount || 0,
+      );
       if (minOrder > 0 && totalPrice < minOrder) return false;
 
       const code = String(voucher.Code || "").toUpperCase();
@@ -305,7 +338,9 @@ export default function ReceptionistCreateAppointment() {
 
   const calc = useMemo(() => {
     const membershipPercent = Number(membership?.DiscountPercent || 0);
-    const membershipDiscount = Math.round((totalPrice * membershipPercent) / 100);
+    const membershipDiscount = Math.round(
+      (totalPrice * membershipPercent) / 100,
+    );
     const afterMembership = Math.max(totalPrice - membershipDiscount, 0);
     const voucherDiscountAmount = Math.min(voucherDiscount, afterMembership);
     const finalPrice = Math.max(afterMembership - voucherDiscountAmount, 0);
@@ -357,7 +392,6 @@ export default function ReceptionistCreateAppointment() {
     setCustomerResults([]);
   }
 
-
   function chooseService(serviceId) {
     resetAfterServiceChange({
       ...form,
@@ -375,9 +409,12 @@ export default function ReceptionistCreateAppointment() {
     setError("");
 
     try {
-      const res = await axiosClient.get(`/packages/my/${pkg.CustomerPackageId}/detail`, {
-        params: { customerId: selectedCustomer.CustomerId }
-      });
+      const res = await axiosClient.get(
+        `/packages/my/${pkg.CustomerPackageId}/detail`,
+        {
+          params: { customerId: selectedCustomer.CustomerId },
+        },
+      );
       const data = res.data.data || res.data;
       setPackageServices(data.Services || []);
     } catch {
@@ -516,8 +553,13 @@ export default function ReceptionistCreateAppointment() {
     if (!form.employeeId) return setError("Vui lòng chọn kỹ thuật viên");
     if (!form.appointmentDate) return setError("Vui lòng chọn ngày hẹn");
     if (form.appointmentDate < today) {
-      if (now.getHours() >= 21 && form.appointmentDate === now.toISOString().split("T")[0]) {
-        return setError("Thời gian hoạt động trong ngày đã kết thúc. Vui lòng chọn ngày khác.");
+      if (
+        now.getHours() >= 21 &&
+        form.appointmentDate === now.toISOString().split("T")[0]
+      ) {
+        return setError(
+          "Thời gian hoạt động trong ngày đã kết thúc. Vui lòng chọn ngày khác.",
+        );
       }
       return setError("Không được đặt lịch trong quá khứ");
     }
@@ -525,8 +567,8 @@ export default function ReceptionistCreateAppointment() {
 
     const isValidSlot = availableSlots.some(
       (slot) =>
-        String(slot.startTime).slice(0, 5) === String(form.startTime).slice(0, 5) &&
-        slot.available !== false,
+        String(slot.startTime).slice(0, 5) ===
+          String(form.startTime).slice(0, 5) && slot.available !== false,
     );
 
     if (!isValidSlot) {
@@ -536,15 +578,20 @@ export default function ReceptionistCreateAppointment() {
     try {
       setLoading(true);
 
-      const endpoint = isWalkIn ? "/receptionist/walk-ins" : "/receptionist/appointments";
+      const endpoint = isWalkIn
+        ? "/receptionist/walk-ins"
+        : "/receptionist/appointments";
       const payload = {
         customerId: Number(selectedCustomer.CustomerId),
         serviceId: Number(form.serviceId),
         technicianId: Number(form.employeeId),
         appointmentDate: form.appointmentDate,
-        startTime: form.startTime.length === 5 ? `${form.startTime}:00` : form.startTime,
+        startTime:
+          form.startTime.length === 5 ? `${form.startTime}:00` : form.startTime,
         note: form.notes,
-        customerPackageId: form.customerPackageId ? Number(form.customerPackageId) : null,
+        customerPackageId: form.customerPackageId
+          ? Number(form.customerPackageId)
+          : null,
         isWalkIn,
       };
 
@@ -554,13 +601,19 @@ export default function ReceptionistCreateAppointment() {
 
       if (voucherId) {
         try {
-          await axiosClient.post(`/payments/appointment/${newAppointmentId}/apply-voucher`, {
-            voucherId: voucherId,
-            rewardPoints: 0,
-            customerId: Number(selectedCustomer.CustomerId)
-          });
+          await axiosClient.post(
+            `/payments/appointment/${newAppointmentId}/apply-voucher`,
+            {
+              voucherId: voucherId,
+              rewardPoints: 0,
+              customerId: Number(selectedCustomer.CustomerId),
+            },
+          );
         } catch (voucherErr) {
-          console.error("Failed to apply voucher to booking invoice:", voucherErr);
+          console.error(
+            "Failed to apply voucher to booking invoice:",
+            voucherErr,
+          );
         }
       }
 
@@ -574,21 +627,38 @@ export default function ReceptionistCreateAppointment() {
 
   return (
     <ReceptionistLayout>
-      <div className="customer-booking-page rx-booking-wrapper" style={{ padding: "0 20px" }}>
-
+      <div
+        className="customer-booking-page rx-booking-wrapper"
+        style={{ padding: "0 20px" }}
+      >
         {/* Header Hero */}
         <div className="booking-hero" style={{ margin: "20px 0" }}>
           <div>
-            <div className="eyebrow" style={{ color: "#d4a94f" }}>Receptionist Booking Support</div>
-            <h1>{isWalkIn ? "Hỗ trợ khách vãng lai (Walk-in)" : "Hỗ trợ đặt lịch hẹn"}</h1>
-            <p>Quy trình đặt lịch của lễ tân tương thích 100% với giao diện và quy định của khách hàng.</p>
+            <div className="eyebrow" style={{ color: "#d4a94f" }}>
+              Receptionist Booking Support
+            </div>
+            <h1>
+              {isWalkIn
+                ? "Hỗ trợ khách vãng lai (Walk-in)"
+                : "Hỗ trợ đặt lịch hẹn"}
+            </h1>
+            <p>
+              Quy trình đặt lịch của lễ tân tương thích 100% với giao diện và
+              quy định của khách hàng.
+            </p>
           </div>
         </div>
 
         {/* STEP 0: SELECT CUSTOMER */}
         {!selectedCustomer ? (
           <section className="booking-main-card" style={{ padding: 24 }}>
-            <h2 style={{ fontFamily: "Georgia, serif", fontSize: "1.5rem", marginBottom: 8 }}>
+            <h2
+              style={{
+                fontFamily: "Georgia, serif",
+                fontSize: "1.5rem",
+                marginBottom: 8,
+              }}
+            >
               Chọn khách hàng cần hỗ trợ
             </h2>
             <p style={{ color: "#666", fontSize: "0.9rem", marginBottom: 20 }}>
@@ -608,25 +678,49 @@ export default function ReceptionistCreateAppointment() {
             {customerLoading && <p>Đang tìm kiếm khách hàng...</p>}
 
             {customerResults.length > 0 && (
-              <div className="booking-service-grid" style={{ gridTemplateColumns: "1fr" }}>
+              <div
+                className="booking-service-grid"
+                style={{ gridTemplateColumns: "1fr" }}
+              >
                 {customerResults.map((c) => (
                   <button
                     key={c.CustomerId}
                     type="button"
                     className="booking-service-card"
-                    style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 20px", width: "100%", textAlign: "left" }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 16,
+                      padding: "12px 20px",
+                      width: "100%",
+                      textAlign: "left",
+                    }}
                     onClick={() => chooseCustomer(c)}
                   >
                     <img
                       src={avatarUrl(c.AvatarUrl)}
                       alt={c.FullName}
-                      style={{ width: 50, height: 50, borderRadius: "50%", objectFit: "cover" }}
-                      onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
+                      style={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_AVATAR;
+                      }}
                     />
                     <div>
                       <h3 style={{ margin: 0 }}>{c.FullName}</h3>
-                      <p style={{ margin: "2px 0 0", color: "#666", fontSize: "0.85rem" }}>
-                        {c.Phone || "Không có SĐT"} • {c.Email || "Không có Email"}
+                      <p
+                        style={{
+                          margin: "2px 0 0",
+                          color: "#666",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        {c.Phone || "Không có SĐT"} •{" "}
+                        {c.Email || "Không có Email"}
                       </p>
                     </div>
                   </button>
@@ -634,30 +728,80 @@ export default function ReceptionistCreateAppointment() {
               </div>
             )}
 
-            {!customerLoading && customerResults.length === 0 && customerKeyword && (
-              <p className="booking-empty">Không tìm thấy khách hàng nào khớp.</p>
-            )}
+            {!customerLoading &&
+              customerResults.length === 0 &&
+              customerKeyword && (
+                <p className="booking-empty">
+                  Không tìm thấy khách hàng nào khớp.
+                </p>
+              )}
           </section>
         ) : (
           <>
             {/* Customer Selected Header Banner */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '16px 20px', borderRadius: 16, border: '1px solid rgba(184, 154, 94, 0.15)', marginBottom: 24 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "#fff",
+                padding: "16px 20px",
+                borderRadius: 16,
+                border: "1px solid rgba(184, 154, 94, 0.15)",
+                marginBottom: 24,
+              }}
+            >
               <div>
-                <span style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Khách hàng được hỗ trợ đặt lịch</span>
-                <h2 style={{ margin: '4px 0 0', fontSize: '1.25rem', fontFamily: 'Georgia, serif', color: '#17201d' }}>{selectedCustomer.FullName} ({selectedCustomer.Phone || 'N/A'})</h2>
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#b45309",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Khách hàng được hỗ trợ đặt lịch
+                </span>
+                <h2
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: "1.25rem",
+                    fontFamily: "Georgia, serif",
+                    color: "#17201d",
+                  }}
+                >
+                  {selectedCustomer.FullName} ({selectedCustomer.Phone || "N/A"}
+                  )
+                </h2>
               </div>
-              <button type="button" className="booking-tab" style={{ height: 38, padding: "0 16px", borderRadius: 8, fontSize: "0.85rem", border: "1px solid #c5ac6b", cursor: "pointer", background: "none" }} onClick={() => {
-                setSelectedCustomer(null);
-                setForm({
-                  serviceId: "",
-                  employeeId: "",
-                  appointmentDate: "",
-                  startTime: "",
-                  notes: isWalkIn ? "Walk-in customer - check-in tại quầy" : "",
-                  customerPackageId: "",
-                });
-                setStep(1);
-              }}>
+              <button
+                type="button"
+                className="booking-tab"
+                style={{
+                  height: 38,
+                  padding: "0 16px",
+                  borderRadius: 8,
+                  fontSize: "0.85rem",
+                  border: "1px solid #c5ac6b",
+                  cursor: "pointer",
+                  background: "none",
+                }}
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setForm({
+                    serviceId: "",
+                    employeeId: "",
+                    appointmentDate: "",
+                    startTime: "",
+                    notes: isWalkIn
+                      ? "Walk-in customer - check-in tại quầy"
+                      : "",
+                    customerPackageId: "",
+                  });
+                  setStep(1);
+                }}
+              >
                 Chọn khách hàng khác
               </button>
             </div>
@@ -689,9 +833,6 @@ export default function ReceptionistCreateAppointment() {
             {/* Main Booking Wizard Layout */}
             <form onSubmit={handleSubmit} className="booking-layout">
               <main className="booking-main-card">
-
-
-
                 {/* 1. SELECT SERVICE */}
                 <section className="booking-section">
                   <div className="booking-section-head">
@@ -735,7 +876,10 @@ export default function ReceptionistCreateAppointment() {
                             onClick={() => chooseService(item.ServiceId)}
                           >
                             <img
-                              src={resolveFileUrl(item.ImageUrl) || "/images/services/default-service.png"}
+                              src={
+                                resolveFileUrl(item.ImageUrl) ||
+                                "/images/services/default-service.png"
+                              }
                               alt={item.ServiceName}
                             />
                             <div className="booking-service-body">
@@ -744,12 +888,16 @@ export default function ReceptionistCreateAppointment() {
                                 <span>{item.DurationMinutes} phút</span>
                                 <strong>{formatMoney(item.Price)}</strong>
                               </div>
-                              <p>{item.Description || "Dịch vụ chăm sóc cao cấp"}</p>
+                              <p>
+                                {item.Description || "Dịch vụ chăm sóc cao cấp"}
+                              </p>
                             </div>
                           </button>
                         ))
                       ) : (
-                        <p className="booking-empty">Không tìm thấy dịch vụ phù hợp.</p>
+                        <p className="booking-empty">
+                          Không tìm thấy dịch vụ phù hợp.
+                        </p>
                       )}
                     </div>
                   )}
@@ -772,11 +920,15 @@ export default function ReceptionistCreateAppointment() {
                   />
 
                   {!form.serviceId && (
-                    <p className="booking-empty">Vui lòng chọn dịch vụ trước.</p>
+                    <p className="booking-empty">
+                      Vui lòng chọn dịch vụ trước.
+                    </p>
                   )}
 
                   {employeeLoading && (
-                    <p className="booking-empty">Đang tải kỹ thuật viên phù hợp...</p>
+                    <p className="booking-empty">
+                      Đang tải kỹ thuật viên phù hợp...
+                    </p>
                   )}
 
                   {form.serviceId && !employeeLoading && (
@@ -790,17 +942,27 @@ export default function ReceptionistCreateAppointment() {
                             onClick={() => chooseEmployee(item.EmployeeId)}
                           >
                             <img
-                              src={resolveFileUrl(item.ImageUrl) || "/images/avatars/default-avatar.png"}
+                              src={
+                                resolveFileUrl(item.ImageUrl) ||
+                                "/images/avatars/default-avatar.png"
+                              }
                               alt={item.FullName}
                             />
                             <div>
                               <strong>{item.FullName}</strong>
-                              <span>{item.Specialization || item.Position || "Kỹ thuật viên"}</span>
+                              <span>
+                                {item.Specialization ||
+                                  item.Position ||
+                                  "Kỹ thuật viên"}
+                              </span>
                             </div>
                           </button>
                         ))
                       ) : (
-                        <p className="booking-empty">Không tìm thấy kỹ thuật viên phù hợp tại chi nhánh này.</p>
+                        <p className="booking-empty">
+                          Không tìm thấy kỹ thuật viên phù hợp tại chi nhánh
+                          này.
+                        </p>
                       )}
                     </div>
                   )}
@@ -836,7 +998,10 @@ export default function ReceptionistCreateAppointment() {
                     <div className="booking-time-grid-container">
                       {slotLoading ? (
                         <p className="booking-empty">Đang tải giờ trống...</p>
-                      ) : (availableSlots.length > 0 && availableSlots.some(slot => slot.available !== false)) ? (
+                      ) : availableSlots.length > 0 &&
+                        availableSlots.some(
+                          (slot) => slot.available !== false,
+                        ) ? (
                         <div className="booking-time-grid">
                           {availableSlots.map((slot) => {
                             const isSlotAvailable = slot.available !== false;
@@ -846,26 +1011,61 @@ export default function ReceptionistCreateAppointment() {
                                 type="button"
                                 disabled={!isSlotAvailable}
                                 className={`booking-time-btn ${formatTime(form.startTime) === formatTime(slot.startTime) ? "active" : ""}`}
-                                style={!isSlotAvailable ? { opacity: 0.45, filter: "grayscale(100%)", cursor: "not-allowed", border: "1px dashed #d1d5db" } : {}}
+                                style={
+                                  !isSlotAvailable
+                                    ? {
+                                        opacity: 0.45,
+                                        filter: "grayscale(100%)",
+                                        cursor: "not-allowed",
+                                        border: "1px dashed #d1d5db",
+                                      }
+                                    : {}
+                                }
                                 onClick={() => {
                                   if (!isSlotAvailable) return;
                                   chooseTime(slot.startTime);
                                 }}
                               >
-                                {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                                {!isSlotAvailable && <span style={{ fontSize: 10, display: "block", color: "#ef4444", fontWeight: 600 }}>Bận</span>}
+                                {formatTime(slot.startTime)} -{" "}
+                                {formatTime(slot.endTime)}
+                                {!isSlotAvailable && (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      display: "block",
+                                      color: "#ef4444",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Bận
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
                         </div>
-                      ) : form.serviceId && form.employeeId && form.appointmentDate ? (
+                      ) : form.serviceId &&
+                        form.employeeId &&
+                        form.appointmentDate ? (
                         <div className="booking-no-slots-container">
                           {alternatives.length > 0 ? (
                             <div className="booking-alternatives-section">
-                              <p style={{ color: "#ef4444", fontWeight: "bold", margin: "0 0 15px 0", fontSize: "14px", textAlign: "left" }}>
-                                ⚠️ Kỹ thuật viên này đã hết lịch hẹn trong ngày. Dưới đây là các gợi ý khung giờ trống khác dành cho bạn:
+                              <p
+                                style={{
+                                  color: "#ef4444",
+                                  fontWeight: "bold",
+                                  margin: "0 0 15px 0",
+                                  fontSize: "14px",
+                                  textAlign: "left",
+                                }}
+                              >
+                                ⚠️ Kỹ thuật viên này đã hết lịch hẹn trong ngày.
+                                Dưới đây là các gợi ý khung giờ trống khác dành
+                                cho bạn:
                               </p>
-                              <h3 className="booking-alternatives-title">Gợi ý khung giờ trống khác</h3>
+                              <h3 className="booking-alternatives-title">
+                                Gợi ý khung giờ trống khác
+                              </h3>
                               <div className="booking-alternatives-grid">
                                 {alternatives.map((alt, idx) => (
                                   <div
@@ -883,30 +1083,48 @@ export default function ReceptionistCreateAppointment() {
                                   >
                                     <div className="alt-employee-info">
                                       <img
-                                        src={resolveFileUrl(alt.imageUrl) || "/images/avatars/default-avatar.png"}
+                                        src={
+                                          resolveFileUrl(alt.imageUrl) ||
+                                          "/images/avatars/default-avatar.png"
+                                        }
                                         alt={alt.employeeName}
                                         className="alt-employee-img"
                                       />
                                       <div>
-                                        <strong className="alt-employee-name">{alt.employeeName}</strong>
-                                        <p className="alt-time-label">{alt.label}</p>
+                                        <strong className="alt-employee-name">
+                                          {alt.employeeName}
+                                        </strong>
+                                        <p className="alt-time-label">
+                                          {alt.label}
+                                        </p>
                                       </div>
                                     </div>
                                     <div className="alt-time-badge">
-                                      {formatTime(alt.startTime)} - {formatTime(alt.endTime)}
+                                      {formatTime(alt.startTime)} -{" "}
+                                      {formatTime(alt.endTime)}
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             </div>
                           ) : (
-                            <p className="booking-empty" style={{ margin: "20px 0", color: "#ef4444", fontWeight: "bold" }}>
-                              Kỹ thuật viên này đã hết lịch hẹn trong ngày. Vui lòng chọn ngày khác hoặc kỹ thuật viên khác.
+                            <p
+                              className="booking-empty"
+                              style={{
+                                margin: "20px 0",
+                                color: "#ef4444",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              Kỹ thuật viên này đã hết lịch hẹn trong ngày. Vui
+                              lòng chọn ngày khác hoặc kỹ thuật viên khác.
                             </p>
                           )}
                         </div>
                       ) : (
-                        <p className="booking-empty">Vui lòng chọn dịch vụ, kỹ thuật viên và ngày hẹn.</p>
+                        <p className="booking-empty">
+                          Vui lòng chọn dịch vụ, kỹ thuật viên và ngày hẹn.
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1023,10 +1241,11 @@ export default function ReceptionistCreateAppointment() {
                             <button
                               type="button"
                               key={voucher.VoucherId}
-                              className={`booking-my-voucher-card ${String(voucherId) === String(voucher.VoucherId)
+                              className={`booking-my-voucher-card ${
+                                String(voucherId) === String(voucher.VoucherId)
                                   ? "selected"
                                   : ""
-                                }`}
+                              }`}
                               onClick={() => chooseVoucher(voucher)}
                             >
                               <div>
@@ -1037,14 +1256,17 @@ export default function ReceptionistCreateAppointment() {
                               <small>
                                 HSD:{" "}
                                 {voucher.EndDate
-                                  ? new Date(voucher.EndDate).toLocaleDateString("vi-VN")
+                                  ? new Date(
+                                      voucher.EndDate,
+                                    ).toLocaleDateString("vi-VN")
                                   : "Không hạn"}
                               </small>
                             </button>
                           ))
                         ) : (
                           <p className="booking-empty small">
-                            Không có voucher nào phù hợp với dịch vụ hoặc điều kiện hóa đơn của khách.
+                            Không có voucher nào phù hợp với dịch vụ hoặc điều
+                            kiện hóa đơn của khách.
                           </p>
                         )}
                       </div>
@@ -1072,7 +1294,9 @@ export default function ReceptionistCreateAppointment() {
                   <div className="final">
                     <span>Tổng cộng</span>
                     <strong>
-                      {form.customerPackageId ? "0đ" : formatMoney(calc.finalPrice)}
+                      {form.customerPackageId
+                        ? "0đ"
+                        : formatMoney(calc.finalPrice)}
                     </strong>
                   </div>
                 </div>
@@ -1080,24 +1304,31 @@ export default function ReceptionistCreateAppointment() {
                 <div className="booking-note-box">
                   <strong>Lưu ý</strong>
                   <p>
-                    Vui lòng đến trước giờ hẹn 10–15 phút. Hủy lịch trước ít nhất 2
-                    giờ để không mất phí.
+                    Vui lòng đến trước giờ hẹn 10–15 phút. Hủy lịch trước ít
+                    nhất 2 giờ để không mất phí.
                   </p>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={loading || !form.serviceId || !form.employeeId || !form.appointmentDate || !form.startTime}
+                  disabled={
+                    loading ||
+                    !form.serviceId ||
+                    !form.employeeId ||
+                    !form.appointmentDate ||
+                    !form.startTime
+                  }
                   className="booking-submit-btn"
                   style={{ marginTop: 18, width: "100%" }}
                 >
-                  {loading ? "Đang tiến hành đặt..." : "Xác nhận đặt lịch hỗ trợ"}
+                  {loading
+                    ? "Đang tiến hành đặt..."
+                    : "Xác nhận đặt lịch hỗ trợ"}
                 </button>
               </aside>
             </form>
           </>
         )}
-
       </div>
     </ReceptionistLayout>
   );

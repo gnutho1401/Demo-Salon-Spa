@@ -39,7 +39,10 @@ export default function ReceptionistCustomers() {
       });
       setItems(res.data.data || res.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải được danh sách khách hàng từ hệ thống");
+      setError(
+        err.response?.data?.message ||
+          "Không tải được danh sách khách hàng từ hệ thống",
+      );
     } finally {
       setLoading(false);
     }
@@ -105,7 +108,8 @@ export default function ReceptionistCustomers() {
           <div>
             <h1>Hồ sơ khách hàng</h1>
             <p>
-              Quản lý danh sách khách hàng, lịch sử dịch vụ, hóa đơn tích lũy và thẻ thành viên.
+              Quản lý danh sách khách hàng, lịch sử dịch vụ, hóa đơn tích lũy và
+              thẻ thành viên.
             </p>
           </div>
 
@@ -212,17 +216,23 @@ export default function ReceptionistCustomers() {
                   </td>
 
                   <td>
-                    <span className={`rcc-badge ${String(c.MembershipLevel || "Standard").toLowerCase() !== "standard" ? "green" : ""}`}>
+                    <span
+                      className={`rcc-badge ${String(c.MembershipLevel || "Standard").toLowerCase() !== "standard" ? "green" : ""}`}
+                    >
                       {c.MembershipLevel || "Standard"}
                     </span>
                   </td>
 
-                  <td><b>{c.Points || 0}</b> điểm</td>
+                  <td>
+                    <b>{c.Points || 0}</b> điểm
+                  </td>
                   <td>
                     <b>{c.TotalAppointments || 0}</b> lượt
                     <small>Đã xong: {c.CompletedAppointments || 0}</small>
                   </td>
-                  <td><b style={{ color: '#4a7c36' }}>{money(c.TotalSpent)}</b></td>
+                  <td>
+                    <b style={{ color: "#4a7c36" }}>{money(c.TotalSpent)}</b>
+                  </td>
 
                   <td>
                     <b>
@@ -336,7 +346,11 @@ export default function ReceptionistCustomers() {
               </div>
 
               <div className="rcc-modal-actions">
-                <button className="rcc-primary-btn" disabled={loading} type="submit">
+                <button
+                  className="rcc-primary-btn"
+                  disabled={loading}
+                  type="submit"
+                >
                   {loading ? "Đang xử lý..." : "Lưu hồ sơ"}
                 </button>
                 <button

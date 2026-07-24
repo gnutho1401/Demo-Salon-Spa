@@ -45,7 +45,11 @@ const STATUS_CONFIGS = {
 };
 
 function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIGS[status] || { text: status, color: "#6b7280", bg: "#f3f4f6" };
+  const cfg = STATUS_CONFIGS[status] || {
+    text: status,
+    color: "#6b7280",
+    bg: "#f3f4f6",
+  };
   return (
     <span
       style={{
@@ -75,7 +79,11 @@ const PAYMENT_CONFIGS = {
 };
 
 function PaymentStatusBadge({ status }) {
-  const cfg = PAYMENT_CONFIGS[status] || { text: status || "Chưa thanh toán", color: "#ef4444", bg: "#fef2f2" };
+  const cfg = PAYMENT_CONFIGS[status] || {
+    text: status || "Chưa thanh toán",
+    color: "#ef4444",
+    bg: "#fef2f2",
+  };
   return (
     <span
       style={{
@@ -153,7 +161,9 @@ export default function ReceptionistAppointments() {
       const data = res.data.data || res.data || [];
       setItems(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải được danh sách lịch hẹn");
+      setError(
+        err.response?.data?.message || "Không tải được danh sách lịch hẹn",
+      );
     } finally {
       setLoading(false);
     }
@@ -196,20 +206,28 @@ export default function ReceptionistAppointments() {
   const stats = useMemo(() => {
     return {
       total: items.length,
-      today: items.filter((x) => String(x.AppointmentDate || "").slice(0, 10) === todayStr).length,
-      pending: items.filter((x) => ["PENDING", "PENDING_PAYMENT"].includes(x.Status)).length,
+      today: items.filter(
+        (x) => String(x.AppointmentDate || "").slice(0, 10) === todayStr,
+      ).length,
+      pending: items.filter((x) =>
+        ["PENDING", "PENDING_PAYMENT"].includes(x.Status),
+      ).length,
       confirmed: items.filter((x) => x.Status === "CONFIRMED").length,
       checkedIn: items.filter((x) => x.Status === "CHECKED_IN").length,
       inProgress: items.filter((x) => x.Status === "IN_PROGRESS").length,
       completed: items.filter((x) => x.Status === "COMPLETED").length,
-      cancelled: items.filter((x) => ["CANCELLED", "NO_SHOW", "REFUND_PENDING"].includes(x.Status)).length,
+      cancelled: items.filter((x) =>
+        ["CANCELLED", "NO_SHOW", "REFUND_PENDING"].includes(x.Status),
+      ).length,
     };
   }, [items, todayStr]);
 
   const filteredItems = useMemo(() => {
     if (activeTab === "ALL") return items;
     if (activeTab === "PENDING") {
-      return items.filter((x) => ["PENDING", "PENDING_PAYMENT"].includes(x.Status));
+      return items.filter((x) =>
+        ["PENDING", "PENDING_PAYMENT"].includes(x.Status),
+      );
     }
     if (activeTab === "CONFIRMED") {
       return items.filter((x) => x.Status === "CONFIRMED");
@@ -224,7 +242,9 @@ export default function ReceptionistAppointments() {
       return items.filter((x) => x.Status === "COMPLETED");
     }
     if (activeTab === "OTHER") {
-      return items.filter((x) => ["CANCELLED", "NO_SHOW", "REFUND_PENDING"].includes(x.Status));
+      return items.filter((x) =>
+        ["CANCELLED", "NO_SHOW", "REFUND_PENDING"].includes(x.Status),
+      );
     }
     return items;
   }, [items, activeTab]);
@@ -315,11 +335,16 @@ export default function ReceptionistAppointments() {
   };
 
   const handleCancel = async (id) => {
-    const reason = window.prompt("Nhập lý do hủy lịch hẹn:", "Khách yêu cầu hủy trực tiếp");
+    const reason = window.prompt(
+      "Nhập lý do hủy lịch hẹn:",
+      "Khách yêu cầu hủy trực tiếp",
+    );
     if (reason === null) return;
     setActionId(id);
     try {
-      await axiosClient.put(`/receptionist/appointments/${id}/cancel`, { reason });
+      await axiosClient.put(`/receptionist/appointments/${id}/cancel`, {
+        reason,
+      });
       await load();
     } catch (err) {
       alert("Lỗi: " + (err.response?.data?.message || err.message));
@@ -330,21 +355,70 @@ export default function ReceptionistAppointments() {
 
   return (
     <ReceptionistLayout>
-      <div className="rx-page" style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 20px" }}>
-        <div className="rx-page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
-          <div className="rx-title-block" style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div className="rx-title-icon" style={{ fontSize: "2rem" }}>📅</div>
+      <div
+        className="rx-page"
+        style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 20px" }}
+      >
+        <div
+          className="rx-page-header"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 24,
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
+          <div
+            className="rx-title-block"
+            style={{ display: "flex", alignItems: "center", gap: 14 }}
+          >
+            <div className="rx-title-icon" style={{ fontSize: "2rem" }}>
+              📅
+            </div>
             <div>
-              <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "#3d2e26", margin: 0 }}>Lịch hẹn làm đẹp</h1>
-              <p style={{ margin: "4px 0 0 0", color: "#7c6f68", fontSize: "0.9rem" }}>Check-in, Bắt đầu liệu trình và Quản lý lịch khách hàng</p>
+              <h1
+                style={{
+                  fontSize: "1.75rem",
+                  fontWeight: 800,
+                  color: "#3d2e26",
+                  margin: 0,
+                }}
+              >
+                Lịch hẹn làm đẹp
+              </h1>
+              <p
+                style={{
+                  margin: "4px 0 0 0",
+                  color: "#7c6f68",
+                  fontSize: "0.9rem",
+                }}
+              >
+                Check-in, Bắt đầu liệu trình và Quản lý lịch khách hàng
+              </p>
             </div>
           </div>
 
-          <div className="rx-header-actions" style={{ display: "flex", gap: 10 }}>
+          <div
+            className="rx-header-actions"
+            style={{ display: "flex", gap: 10 }}
+          >
             <Link
               className="rx-primary-btn"
               to="/receptionist/appointments/create"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700, padding: "10px 18px", borderRadius: 12, background: "#a0573a", color: "#fff", textDecoration: "none", fontSize: "0.9rem" }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontWeight: 700,
+                padding: "10px 18px",
+                borderRadius: 12,
+                background: "#a0573a",
+                color: "#fff",
+                textDecoration: "none",
+                fontSize: "0.9rem",
+              }}
             >
               ➕ Lên lịch mới
             </Link>
@@ -352,7 +426,19 @@ export default function ReceptionistAppointments() {
             <Link
               className="rx-light-btn"
               to="/receptionist/appointments/create?walkin=1"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700, padding: "10px 18px", borderRadius: 12, border: "1px solid #d4c4b8", background: "#fff", color: "#3d2e26", textDecoration: "none", fontSize: "0.9rem" }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontWeight: 700,
+                padding: "10px 18px",
+                borderRadius: 12,
+                border: "1px solid #d4c4b8",
+                background: "#fff",
+                color: "#3d2e26",
+                textDecoration: "none",
+                fontSize: "0.9rem",
+              }}
             >
               🚶 Khách Walk-in
             </Link>
@@ -360,24 +446,63 @@ export default function ReceptionistAppointments() {
         </div>
 
         {/* Filter Card */}
-        <form onSubmit={onSubmit} className="rx-filter-card" style={{ background: "#fff", border: "1px solid #f4e7dd", borderRadius: 14, padding: 18, marginBottom: 24 }}>
-          <div className="rx-filter-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 16 }}>
+        <form
+          onSubmit={onSubmit}
+          className="rx-filter-card"
+          style={{
+            background: "#fff",
+            border: "1px solid #f4e7dd",
+            borderRadius: 14,
+            padding: 18,
+            marginBottom: 24,
+          }}
+        >
+          <div
+            className="rx-filter-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 16,
+              marginBottom: 16,
+            }}
+          >
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Tìm khách hàng</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>
+                Tìm khách hàng
+              </span>
               <input
                 placeholder="Nhập tên, SĐT..."
                 value={filters.customer}
-                onChange={(e) => setFilters((p) => ({ ...p, customer: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13 }}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, customer: e.target.value }))
+                }
+                style={{
+                  border: "1px solid #d4c4b8",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  outline: "none",
+                  fontSize: 13,
+                }}
               />
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Chi nhánh</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>
+                Chi nhánh
+              </span>
               <select
                 value={filters.branchId}
-                onChange={(e) => setFilters((p) => ({ ...p, branchId: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13, background: "#fff" }}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, branchId: e.target.value }))
+                }
+                style={{
+                  border: "1px solid #d4c4b8",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  outline: "none",
+                  fontSize: 13,
+                  background: "#fff",
+                }}
               >
                 <option value="">Tất cả chi nhánh</option>
                 {branches.map((b) => (
@@ -389,11 +514,22 @@ export default function ReceptionistAppointments() {
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Kỹ thuật viên (KTV)</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>
+                Kỹ thuật viên (KTV)
+              </span>
               <select
                 value={filters.technicianId}
-                onChange={(e) => setFilters((p) => ({ ...p, technicianId: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13, background: "#fff" }}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, technicianId: e.target.value }))
+                }
+                style={{
+                  border: "1px solid #d4c4b8",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  outline: "none",
+                  fontSize: 13,
+                  background: "#fff",
+                }}
               >
                 <option value="">Tất cả KTV</option>
                 {technicians.map((t) => {
@@ -408,11 +544,22 @@ export default function ReceptionistAppointments() {
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Dịch vụ</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>
+                Dịch vụ
+              </span>
               <select
                 value={filters.serviceId}
-                onChange={(e) => setFilters((p) => ({ ...p, serviceId: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13, background: "#fff" }}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, serviceId: e.target.value }))
+                }
+                style={{
+                  border: "1px solid #d4c4b8",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  outline: "none",
+                  fontSize: 13,
+                  background: "#fff",
+                }}
               >
                 <option value="">Tất cả dịch vụ</option>
                 {services.map((s) => (
@@ -424,47 +571,90 @@ export default function ReceptionistAppointments() {
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Thanh toán</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>
+                Thanh toán
+              </span>
               <select
                 value={filters.paymentStatus}
-                onChange={(e) => setFilters((p) => ({ ...p, paymentStatus: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "10px 12px", outline: "none", fontSize: 13, background: "#fff" }}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, paymentStatus: e.target.value }))
+                }
+                style={{
+                  border: "1px solid #d4c4b8",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  outline: "none",
+                  fontSize: 13,
+                  background: "#fff",
+                }}
               >
                 {paymentOptions.map((s) => (
                   <option key={s || "all-payment"} value={s}>
-                    {s ? PAYMENT_CONFIGS[s]?.text || s : "Tất cả trạng thái thanh toán"}
+                    {s
+                      ? PAYMENT_CONFIGS[s]?.text || s
+                      : "Tất cả trạng thái thanh toán"}
                   </option>
                 ))}
               </select>
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Ngày cụ thể</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>
+                Ngày cụ thể
+              </span>
               <input
                 type="date"
                 value={filters.date}
-                onChange={(e) => setFilters((p) => ({ ...p, date: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "8px 12px", outline: "none", fontSize: 13 }}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, date: e.target.value }))
+                }
+                style={{
+                  border: "1px solid #d4c4b8",
+                  borderRadius: 10,
+                  padding: "8px 12px",
+                  outline: "none",
+                  fontSize: 13,
+                }}
               />
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Từ ngày</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>
+                Từ ngày
+              </span>
               <input
                 type="date"
                 value={filters.fromDate}
-                onChange={(e) => setFilters((p) => ({ ...p, fromDate: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "8px 12px", outline: "none", fontSize: 13 }}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, fromDate: e.target.value }))
+                }
+                style={{
+                  border: "1px solid #d4c4b8",
+                  borderRadius: 10,
+                  padding: "8px 12px",
+                  outline: "none",
+                  fontSize: 13,
+                }}
               />
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>Đến ngày</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#7c6f68" }}>
+                Đến ngày
+              </span>
               <input
                 type="date"
                 value={filters.toDate}
-                onChange={(e) => setFilters((p) => ({ ...p, toDate: e.target.value }))}
-                style={{ border: "1px solid #d4c4b8", borderRadius: 10, padding: "8px 12px", outline: "none", fontSize: 13 }}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, toDate: e.target.value }))
+                }
+                style={{
+                  border: "1px solid #d4c4b8",
+                  borderRadius: 10,
+                  padding: "8px 12px",
+                  outline: "none",
+                  fontSize: 13,
+                }}
               />
             </label>
           </div>
@@ -473,7 +663,16 @@ export default function ReceptionistAppointments() {
             <button
               type="button"
               onClick={resetFilters}
-              style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #d4c4b8", background: "#fff", color: "#3d2e26", fontWeight: 600, cursor: "pointer", fontSize: 13 }}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                border: "1px solid #d4c4b8",
+                background: "#fff",
+                color: "#3d2e26",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: 13,
+              }}
             >
               ↺ Đặt lại bộ lọc
             </button>
@@ -481,7 +680,16 @@ export default function ReceptionistAppointments() {
             <button
               type="submit"
               disabled={loading}
-              style={{ padding: "8px 20px", borderRadius: 10, border: "none", background: "#a0573a", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 10,
+                border: "none",
+                background: "#a0573a",
+                color: "#fff",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: 13,
+              }}
             >
               {loading ? "Đang tải..." : "⌕ Áp dụng"}
             </button>
@@ -489,41 +697,180 @@ export default function ReceptionistAppointments() {
         </form>
 
         {error && (
-          <div style={{ padding: 12, borderRadius: 10, background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca", marginBottom: 20 }}>
+          <div
+            style={{
+              padding: 12,
+              borderRadius: 10,
+              background: "#fef2f2",
+              color: "#ef4444",
+              border: "1px solid #fecaca",
+              marginBottom: 20,
+            }}
+          >
             {error}
           </div>
         )}
 
         {/* Stats Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 24 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+            gap: 12,
+            marginBottom: 24,
+          }}
+        >
           {[
-            { label: "Tổng lịch", val: stats.total, icon: "📋", bg: "#fcf8f2", border: "#f4e7dd" },
-            { label: "Đặt Hôm Nay", val: stats.today, icon: "📆", bg: "#eff6ff", border: "#bfdbfe" },
-            { label: "Đang Chờ", val: stats.pending, icon: "⏳", bg: "#fffbeb", border: "#fef3c7" },
-            { label: "Đã Xác Nhận", val: stats.confirmed, icon: "✓", bg: "#f0fdf4", border: "#bbf7d0" },
-            { label: "Đã Check-in", val: stats.checkedIn, icon: "🎯", bg: "#f5f3ff", border: "#ddd6fe" },
-            { label: "Đang Làm", val: stats.inProgress, icon: "⚡", bg: "#ecfeff", border: "#cffafe" },
-            { label: "Hoàn Thành", val: stats.completed, icon: "🎉", bg: "#f0fdf4", border: "#bbf7d0" },
-            { label: "Hủy/Vắng", val: stats.cancelled, icon: "✕", bg: "#fef2f2", border: "#fecaca" },
+            {
+              label: "Tổng lịch",
+              val: stats.total,
+              icon: "📋",
+              bg: "#fcf8f2",
+              border: "#f4e7dd",
+            },
+            {
+              label: "Đặt Hôm Nay",
+              val: stats.today,
+              icon: "📆",
+              bg: "#eff6ff",
+              border: "#bfdbfe",
+            },
+            {
+              label: "Đang Chờ",
+              val: stats.pending,
+              icon: "⏳",
+              bg: "#fffbeb",
+              border: "#fef3c7",
+            },
+            {
+              label: "Đã Xác Nhận",
+              val: stats.confirmed,
+              icon: "✓",
+              bg: "#f0fdf4",
+              border: "#bbf7d0",
+            },
+            {
+              label: "Đã Check-in",
+              val: stats.checkedIn,
+              icon: "🎯",
+              bg: "#f5f3ff",
+              border: "#ddd6fe",
+            },
+            {
+              label: "Đang Làm",
+              val: stats.inProgress,
+              icon: "⚡",
+              bg: "#ecfeff",
+              border: "#cffafe",
+            },
+            {
+              label: "Hoàn Thành",
+              val: stats.completed,
+              icon: "🎉",
+              bg: "#f0fdf4",
+              border: "#bbf7d0",
+            },
+            {
+              label: "Hủy/Vắng",
+              val: stats.cancelled,
+              icon: "✕",
+              bg: "#fef2f2",
+              border: "#fecaca",
+            },
           ].map((s, idx) => (
-            <div key={idx} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: "14px 16px", textAlign: "center" }}>
-              <span style={{ fontSize: "1.2rem", display: "block", marginBottom: 6 }}>{s.icon}</span>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "#7c6f68" }}>{s.label}</p>
-              <b style={{ fontSize: "1.5rem", fontWeight: 800, color: "#3d2e26", display: "block", marginTop: 4 }}>{s.val}</b>
+            <div
+              key={idx}
+              style={{
+                background: s.bg,
+                border: `1px solid ${s.border}`,
+                borderRadius: 12,
+                padding: "14px 16px",
+                textAlign: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "1.2rem",
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
+                {s.icon}
+              </span>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#7c6f68",
+                }}
+              >
+                {s.label}
+              </p>
+              <b
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 800,
+                  color: "#3d2e26",
+                  display: "block",
+                  marginTop: 4,
+                }}
+              >
+                {s.val}
+              </b>
             </div>
           ))}
         </div>
 
         {/* Categorized Status Tabs */}
-        <div style={{ display: "flex", borderBottom: "2px solid #f4e7dd", marginBottom: 20, gap: 8, overflowX: "auto", paddingBottom: 2 }}>
+        <div
+          style={{
+            display: "flex",
+            borderBottom: "2px solid #f4e7dd",
+            marginBottom: 20,
+            gap: 8,
+            overflowX: "auto",
+            paddingBottom: 2,
+          }}
+        >
           {[
             { id: "ALL", label: "Tất cả", count: stats.total },
-            { id: "PENDING", label: "Chờ duyệt/thanh toán", count: stats.pending, color: "#d97706" },
-            { id: "CONFIRMED", label: "Đã xác nhận", count: stats.confirmed, color: "#3b82f6" },
-            { id: "CHECKED_IN", label: "Đã check-in", count: stats.checkedIn, color: "#8b5cf6" },
-            { id: "IN_PROGRESS", label: "Đang làm", count: stats.inProgress, color: "#06b6d4" },
-            { id: "COMPLETED", label: "Hoàn thành", count: stats.completed, color: "#10b981" },
-            { id: "OTHER", label: "Lịch hủy/Khác", count: stats.cancelled, color: "#ef4444" },
+            {
+              id: "PENDING",
+              label: "Chờ duyệt/thanh toán",
+              count: stats.pending,
+              color: "#d97706",
+            },
+            {
+              id: "CONFIRMED",
+              label: "Đã xác nhận",
+              count: stats.confirmed,
+              color: "#3b82f6",
+            },
+            {
+              id: "CHECKED_IN",
+              label: "Đã check-in",
+              count: stats.checkedIn,
+              color: "#8b5cf6",
+            },
+            {
+              id: "IN_PROGRESS",
+              label: "Đang làm",
+              count: stats.inProgress,
+              color: "#06b6d4",
+            },
+            {
+              id: "COMPLETED",
+              label: "Hoàn thành",
+              count: stats.completed,
+              color: "#10b981",
+            },
+            {
+              id: "OTHER",
+              label: "Lịch hủy/Khác",
+              count: stats.cancelled,
+              color: "#ef4444",
+            },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -533,7 +880,9 @@ export default function ReceptionistAppointments() {
                 style={{
                   padding: "10px 18px",
                   border: "none",
-                  borderBottom: isActive ? "3px solid #a0573a" : "3px solid transparent",
+                  borderBottom: isActive
+                    ? "3px solid #a0573a"
+                    : "3px solid transparent",
                   background: "transparent",
                   color: isActive ? "#a0573a" : "#7c6f68",
                   fontWeight: isActive ? 800 : 500,
@@ -565,40 +914,170 @@ export default function ReceptionistAppointments() {
         </div>
 
         {/* Appointment Table */}
-        <div style={{ background: "#fff", border: "1px solid #f4e7dd", borderRadius: 14, overflow: "hidden", boxShadow: "0 10px 30px rgba(61,45,26,0.04)" }}>
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #f4e7dd",
+            borderRadius: 14,
+            overflow: "hidden",
+            boxShadow: "0 10px 30px rgba(61,45,26,0.04)",
+          }}
+        >
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", minWidth: 1000 }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                textAlign: "left",
+                minWidth: 1000,
+              }}
+            >
               <thead>
-                <tr style={{ background: "#fffcf9", borderBottom: "2px solid #f4e7dd" }}>
-                  <th style={{ padding: "14px 18px", fontSize: 13, fontWeight: 700, color: "#7c6f68" }}>Lịch hẹn</th>
-                  <th style={{ padding: "14px 18px", fontSize: 13, fontWeight: 700, color: "#7c6f68" }}>Khách hàng</th>
-                  <th style={{ padding: "14px 18px", fontSize: 13, fontWeight: 700, color: "#7c6f68" }}>Kỹ thuật viên</th>
-                  <th style={{ padding: "14px 18px", fontSize: 13, fontWeight: 700, color: "#7c6f68" }}>Dịch vụ</th>
-                  <th style={{ padding: "14px 18px", fontSize: 13, fontWeight: 700, color: "#7c6f68" }}>Thời gian hẹn</th>
-                  <th style={{ padding: "14px 18px", fontSize: 13, fontWeight: 700, color: "#7c6f68" }}>Thanh toán</th>
-                  <th style={{ padding: "14px 18px", fontSize: 13, fontWeight: 700, color: "#7c6f68" }}>Trạng thái</th>
-                  <th style={{ padding: "14px 18px", fontSize: 13, fontWeight: 700, color: "#7c6f68", textAlign: "right" }}>Thao tác điều hành</th>
+                <tr
+                  style={{
+                    background: "#fffcf9",
+                    borderBottom: "2px solid #f4e7dd",
+                  }}
+                >
+                  <th
+                    style={{
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#7c6f68",
+                    }}
+                  >
+                    Lịch hẹn
+                  </th>
+                  <th
+                    style={{
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#7c6f68",
+                    }}
+                  >
+                    Khách hàng
+                  </th>
+                  <th
+                    style={{
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#7c6f68",
+                    }}
+                  >
+                    Kỹ thuật viên
+                  </th>
+                  <th
+                    style={{
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#7c6f68",
+                    }}
+                  >
+                    Dịch vụ
+                  </th>
+                  <th
+                    style={{
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#7c6f68",
+                    }}
+                  >
+                    Thời gian hẹn
+                  </th>
+                  <th
+                    style={{
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#7c6f68",
+                    }}
+                  >
+                    Thanh toán
+                  </th>
+                  <th
+                    style={{
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#7c6f68",
+                    }}
+                  >
+                    Trạng thái
+                  </th>
+                  <th
+                    style={{
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#7c6f68",
+                      textAlign: "right",
+                    }}
+                  >
+                    Thao tác điều hành
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.map((a) => (
-                  <tr key={a.AppointmentId} style={{ borderBottom: "1px solid #f4e7dd", transition: "all 0.2s" }} className="rx-table-row">
+                  <tr
+                    key={a.AppointmentId}
+                    style={{
+                      borderBottom: "1px solid #f4e7dd",
+                      transition: "all 0.2s",
+                    }}
+                    className="rx-table-row"
+                  >
                     {/* ID */}
                     <td style={{ padding: "14px 18px" }}>
-                      <b style={{ color: "#a0573a", fontSize: 13 }}>#{a.AppointmentId}</b>
+                      <b style={{ color: "#a0573a", fontSize: 13 }}>
+                        #{a.AppointmentId}
+                      </b>
                     </td>
 
                     {/* Customer */}
                     <td style={{ padding: "14px 18px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
                         <img
                           src={avatarUrl(a.CustomerAvatarUrl)}
                           alt={a.CustomerName}
-                          style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                          }}
                         />
                         <div>
-                          <b style={{ color: "#3d2e26", fontSize: 13, display: "block" }}>{a.CustomerName || "-"}</b>
-                          <small style={{ color: "#7c6f68", fontSize: 11, display: "block", marginTop: 2 }}>{a.CustomerPhone || "-"}</small>
+                          <b
+                            style={{
+                              color: "#3d2e26",
+                              fontSize: 13,
+                              display: "block",
+                            }}
+                          >
+                            {a.CustomerName || "-"}
+                          </b>
+                          <small
+                            style={{
+                              color: "#7c6f68",
+                              fontSize: 11,
+                              display: "block",
+                              marginTop: 2,
+                            }}
+                          >
+                            {a.CustomerPhone || "-"}
+                          </small>
                         </div>
                       </div>
                     </td>
@@ -606,41 +1085,80 @@ export default function ReceptionistAppointments() {
                     {/* Technician */}
                     <td style={{ padding: "14px 18px" }}>
                       {a.TechnicianName ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
                           <img
                             src={avatarUrl(a.TechnicianAvatarUrl)}
                             alt={a.TechnicianName}
-                            style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                            }}
                           />
-                          <span style={{ fontSize: 13, color: "#3d2e26", fontWeight: 500 }}>{a.TechnicianName}</span>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              color: "#3d2e26",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {a.TechnicianName}
+                          </span>
                         </div>
                       ) : (
-                        <span style={{ color: "#a08e84", fontSize: 13 }}>—</span>
+                        <span style={{ color: "#a08e84", fontSize: 13 }}>
+                          —
+                        </span>
                       )}
                     </td>
 
                     {/* Service */}
                     <td style={{ padding: "14px 18px" }}>
-                      <b style={{ color: "#3d2e26", fontSize: 13, display: "block" }}>{a.ServiceName || "-"}</b>
+                      <b
+                        style={{
+                          color: "#3d2e26",
+                          fontSize: 13,
+                          display: "block",
+                        }}
+                      >
+                        {a.ServiceName || "-"}
+                      </b>
                       {a.CustomerPackageId && a.CustomerPackageName && (
-                        <div style={{
-                          marginTop: '4px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '2px 6px',
-                          backgroundColor: '#f3e8ff',
-                          color: '#6b21a8',
-                          border: '1px solid #e9d5ff',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          fontWeight: '500'
-                        }}>
+                        <div
+                          style={{
+                            marginTop: "4px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            padding: "2px 6px",
+                            backgroundColor: "#f3e8ff",
+                            color: "#6b21a8",
+                            border: "1px solid #e9d5ff",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                            fontWeight: "500",
+                          }}
+                        >
                           📦 Combo: {a.CustomerPackageName}
                         </div>
                       )}
                       {a.FinalAmount !== undefined && (
-                        <small style={{ color: "#a0573a", fontWeight: 700, fontSize: 11, display: "block", marginTop: 4 }}>
+                        <small
+                          style={{
+                            color: "#a0573a",
+                            fontWeight: 700,
+                            fontSize: 11,
+                            display: "block",
+                            marginTop: 4,
+                          }}
+                        >
                           {Number(a.FinalAmount).toLocaleString("vi-VN")} đ
                         </small>
                       )}
@@ -648,10 +1166,24 @@ export default function ReceptionistAppointments() {
 
                     {/* DateTime */}
                     <td style={{ padding: "14px 18px" }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#3d2e26", display: "block" }}>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: "#3d2e26",
+                          display: "block",
+                        }}
+                      >
                         {formatDate(a.AppointmentDate)}
                       </span>
-                      <small style={{ color: "#7c6f68", fontSize: 11, display: "block", marginTop: 2 }}>
+                      <small
+                        style={{
+                          color: "#7c6f68",
+                          fontSize: 11,
+                          display: "block",
+                          marginTop: 2,
+                        }}
+                      >
                         {a.StartTime} - {a.EndTime}
                       </small>
                     </td>
@@ -668,16 +1200,42 @@ export default function ReceptionistAppointments() {
 
                     {/* Actions */}
                     <td style={{ padding: "14px 18px", textAlign: "right" }}>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 6,
+                          justifyContent: "flex-end",
+                          flexWrap: "wrap",
+                        }}
+                      >
                         {actionId === a.AppointmentId ? (
-                          <span style={{ fontSize: 12, color: "#7c6f68", fontWeight: 600 }}>Đang xử lý...</span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#7c6f68",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Đang xử lý...
+                          </span>
                         ) : (
                           <>
                             {/* CONFIRM ACTION */}
-                            {["PENDING", "PENDING_PAYMENT"].includes(a.Status) && (
+                            {["PENDING", "PENDING_PAYMENT"].includes(
+                              a.Status,
+                            ) && (
                               <button
                                 onClick={() => handleConfirm(a.AppointmentId)}
-                                style={{ padding: "5px 10px", borderRadius: 8, border: "none", background: "#f59e0b", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                style={{
+                                  padding: "5px 10px",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  background: "#f59e0b",
+                                  color: "#fff",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
                               >
                                 ✓ Duyệt
                               </button>
@@ -687,7 +1245,16 @@ export default function ReceptionistAppointments() {
                             {a.Status === "CONFIRMED" && (
                               <button
                                 onClick={() => handleCheckIn(a.AppointmentId)}
-                                style={{ padding: "5px 10px", borderRadius: 8, border: "none", background: "#10b981", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                style={{
+                                  padding: "5px 10px",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  background: "#10b981",
+                                  color: "#fff",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
                               >
                                 🎯 Check-in
                               </button>
@@ -697,7 +1264,16 @@ export default function ReceptionistAppointments() {
                             {a.Status === "CHECKED_IN" && (
                               <button
                                 onClick={() => handleStart(a.AppointmentId)}
-                                style={{ padding: "5px 10px", borderRadius: 8, border: "none", background: "#8b5cf6", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                style={{
+                                  padding: "5px 10px",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  background: "#8b5cf6",
+                                  color: "#fff",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
                               >
                                 ⚡ Bắt đầu
                               </button>
@@ -707,25 +1283,56 @@ export default function ReceptionistAppointments() {
                             {a.Status === "IN_PROGRESS" && (
                               <button
                                 onClick={() => handleComplete(a.AppointmentId)}
-                                style={{ padding: "5px 10px", borderRadius: 8, border: "none", background: "#10b981", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                style={{
+                                  padding: "5px 10px",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  background: "#10b981",
+                                  color: "#fff",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
                               >
                                 🎉 Xong
                               </button>
                             )}
 
                             {/* NO-SHOW / CANCEL FOR FUTURE APPOINTMENTS */}
-                            {["PENDING", "PENDING_PAYMENT", "CONFIRMED"].includes(a.Status) && (
+                            {[
+                              "PENDING",
+                              "PENDING_PAYMENT",
+                              "CONFIRMED",
+                            ].includes(a.Status) && (
                               <>
                                 <button
                                   onClick={() => handleNoShow(a.AppointmentId)}
-                                  style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                                  style={{
+                                    padding: "5px 10px",
+                                    borderRadius: 8,
+                                    border: "1px solid #fecaca",
+                                    background: "#fff",
+                                    color: "#ef4444",
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                  }}
                                   title="Đánh dấu vắng mặt"
                                 >
                                   No-Show
                                 </button>
                                 <button
                                   onClick={() => handleCancel(a.AppointmentId)}
-                                  style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                                  style={{
+                                    padding: "5px 10px",
+                                    borderRadius: 8,
+                                    border: "1px solid #fecaca",
+                                    background: "#fff",
+                                    color: "#ef4444",
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                  }}
                                   title="Hủy lịch hẹn"
                                 >
                                   ✕ Hủy
@@ -736,7 +1343,19 @@ export default function ReceptionistAppointments() {
                             {/* DETAIL */}
                             <Link
                               to={`/receptionist/appointments/${a.AppointmentId}`}
-                              style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #d4c4b8", background: "#fff", color: "#3d2e26", textDecoration: "none", fontSize: 11, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                              style={{
+                                padding: "5px 10px",
+                                borderRadius: 8,
+                                border: "1px solid #d4c4b8",
+                                background: "#fff",
+                                color: "#3d2e26",
+                                textDecoration: "none",
+                                fontSize: 11,
+                                fontWeight: 600,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
                             >
                               👁 Xem
                             </Link>
@@ -749,7 +1368,14 @@ export default function ReceptionistAppointments() {
 
                 {filteredItems.length === 0 && (
                   <tr>
-                    <td colSpan="8" style={{ padding: "30px 18px", textAlign: "center", color: "#7c6f68" }}>
+                    <td
+                      colSpan="8"
+                      style={{
+                        padding: "30px 18px",
+                        textAlign: "center",
+                        color: "#7c6f68",
+                      }}
+                    >
                       Không có lịch hẹn nào thuộc trạng thái này
                     </td>
                   </tr>
@@ -758,8 +1384,21 @@ export default function ReceptionistAppointments() {
             </table>
           </div>
 
-          <div style={{ padding: 14, background: "#fffcf9", borderTop: "1px solid #f4e7dd", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#7c6f68" }}>
-            <span>Hiển thị <b>{filteredItems.length}</b> lịch hẹn</span>
+          <div
+            style={{
+              padding: 14,
+              background: "#fffcf9",
+              borderTop: "1px solid #f4e7dd",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontSize: 12,
+              color: "#7c6f68",
+            }}
+          >
+            <span>
+              Hiển thị <b>{filteredItems.length}</b> lịch hẹn
+            </span>
           </div>
         </div>
       </div>

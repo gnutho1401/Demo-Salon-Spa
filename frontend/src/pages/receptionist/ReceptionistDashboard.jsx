@@ -29,7 +29,10 @@ function translateStatus(status) {
 
 function Avatar({ src, name, size = "38px" }) {
   const url = src ? resolveFileUrl(src) : "";
-  const letter = String(name || "?").trim().charAt(0).toUpperCase();
+  const letter = String(name || "?")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
 
   const style = {
     width: size,
@@ -74,8 +77,14 @@ export default function ReceptionistDashboard() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedHour, setSelectedHour] = useState("ALL");
   const [actionLoading, setActionLoading] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("vi-VN"));
-  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const [currentTime, setCurrentTime] = useState(
+    new Date().toLocaleTimeString("vi-VN"),
+  );
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
   const today = new Date();
   const todayText = today.toLocaleDateString("vi-VN", {
@@ -88,7 +97,8 @@ export default function ReceptionistDashboard() {
   // Inject Google Font dynamically on component mount
   useEffect(() => {
     const link = document.createElement("link");
-    link.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap";
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap";
     link.rel = "stylesheet";
     document.head.appendChild(link);
 
@@ -109,12 +119,15 @@ export default function ReceptionistDashboard() {
       setLoading(true);
       const [dbRes, techRes] = await Promise.all([
         axiosClient.get("/receptionist/dashboard"),
-        axiosClient.get("/receptionist/technicians")
+        axiosClient.get("/receptionist/technicians"),
       ]);
       setStats(dbRes.data.data || dbRes.data);
       setTechnicians(techRes.data.data || techRes.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải được dữ liệu bảng điều khiển lễ tân");
+      setError(
+        err.response?.data?.message ||
+          "Không tải được dữ liệu bảng điều khiển lễ tân",
+      );
     } finally {
       setLoading(false);
     }
@@ -136,7 +149,10 @@ export default function ReceptionistDashboard() {
       showToast(`Cập nhật thành công: ${actionName}`, "success");
       await loadDashboardData();
     } catch (err) {
-      showToast(err.response?.data?.message || `Thao tác thất bại: ${actionName}`, "error");
+      showToast(
+        err.response?.data?.message || `Thao tác thất bại: ${actionName}`,
+        "error",
+      );
     } finally {
       setActionLoading(false);
     }
@@ -146,12 +162,18 @@ export default function ReceptionistDashboard() {
     if (actionLoading) return;
     try {
       setActionLoading(true);
-      await axiosClient.put(`/receptionist/appointments/${appointment.AppointmentId}/complete`);
-      const isPaid = appointment.PaymentStatus === "PAID" || appointment.CustomerPackageId;
+      await axiosClient.put(
+        `/receptionist/appointments/${appointment.AppointmentId}/complete`,
+      );
+      const isPaid =
+        appointment.PaymentStatus === "PAID" || appointment.CustomerPackageId;
       if (isPaid) {
         showToast("Hoàn thành dịch vụ & Checkout thành công!", "success");
       } else {
-        showToast("Đã hoàn thành dịch vụ! Đang chuyển đến trang thanh toán...", "success");
+        showToast(
+          "Đã hoàn thành dịch vụ! Đang chuyển đến trang thanh toán...",
+          "success",
+        );
         setTimeout(() => {
           if (appointment.InvoiceId) {
             navigate(`/receptionist/invoices/${appointment.InvoiceId}`);
@@ -175,7 +197,9 @@ export default function ReceptionistDashboard() {
     let list = allAppointments;
 
     if (statusFilter !== "ALL") {
-      list = list.filter((a) => String(a.Status).toUpperCase() === statusFilter);
+      list = list.filter(
+        (a) => String(a.Status).toUpperCase() === statusFilter,
+      );
     }
 
     if (selectedHour !== "ALL") {
@@ -192,18 +216,34 @@ export default function ReceptionistDashboard() {
           a.CustomerName?.toLowerCase().includes(q) ||
           a.CustomerPhone?.includes(q) ||
           a.ServiceName?.toLowerCase().includes(q) ||
-          a.TechnicianName?.toLowerCase().includes(q)
+          a.TechnicianName?.toLowerCase().includes(q),
       );
     }
     return list;
   }, [allAppointments, searchQuery, statusFilter, selectedHour]);
 
   // Hourly booking slots density
-  const hourSlots = ["08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"];
+  const hourSlots = [
+    "08",
+    "09",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+  ];
   const hourBookingCounts = useMemo(() => {
     const counts = {};
-    hourSlots.forEach(h => { counts[h] = 0; });
-    allAppointments.forEach(a => {
+    hourSlots.forEach((h) => {
+      counts[h] = 0;
+    });
+    allAppointments.forEach((a) => {
       const startHour = String(a.StartTime || "").split(":")[0];
       if (counts[startHour] !== undefined) {
         counts[startHour]++;
@@ -214,7 +254,9 @@ export default function ReceptionistDashboard() {
 
   // Active appointments in progress
   const inProgressAppointments = useMemo(() => {
-    return allAppointments.filter(a => String(a.Status).toUpperCase() === "IN_PROGRESS");
+    return allAppointments.filter(
+      (a) => String(a.Status).toUpperCase() === "IN_PROGRESS",
+    );
   }, [allAppointments]);
 
   // Live room allocation mapping
@@ -229,13 +271,23 @@ export default function ReceptionistDashboard() {
 
   const liveRooms = useMemo(() => {
     const workingQueue = [...inProgressAppointments];
-    return rooms.map(room => {
-      const activeApp = workingQueue.find(a => {
+    return rooms.map((room) => {
+      const activeApp = workingQueue.find((a) => {
         const sName = String(a.ServiceName || "").toLowerCase();
         if (room.type === "Massage" && sName.includes("massage")) return true;
-        if (room.type === "Skincare" && (sName.includes("skin") || sName.includes("chăm sóc da") || sName.includes("mụn"))) return true;
+        if (
+          room.type === "Skincare" &&
+          (sName.includes("skin") ||
+            sName.includes("chăm sóc da") ||
+            sName.includes("mụn"))
+        )
+          return true;
         if (room.type === "Detox" && sName.includes("detox")) return true;
-        if (room.type === "Hair" && (sName.includes("gội") || sName.includes("tóc"))) return true;
+        if (
+          room.type === "Hair" &&
+          (sName.includes("gội") || sName.includes("tóc"))
+        )
+          return true;
         return false;
       });
 
@@ -259,10 +311,11 @@ export default function ReceptionistDashboard() {
 
   // Live KTV dispatch calculations
   const liveTechnicians = useMemo(() => {
-    return technicians.map(tech => {
-      const busyApp = allAppointments.find(a =>
-        a.TechnicianId === tech.TechnicianId &&
-        String(a.Status).toUpperCase() === "IN_PROGRESS"
+    return technicians.map((tech) => {
+      const busyApp = allAppointments.find(
+        (a) =>
+          a.TechnicianId === tech.TechnicianId &&
+          String(a.Status).toUpperCase() === "IN_PROGRESS",
       );
 
       if (busyApp) {
@@ -1127,10 +1180,21 @@ export default function ReceptionistDashboard() {
           <div
             className="hq-toast-banner"
             style={{
-              backgroundColor: toast.type === "success" ? "#28a745" : toast.type === "info" ? "#17a2b8" : "#dc3545",
+              backgroundColor:
+                toast.type === "success"
+                  ? "#28a745"
+                  : toast.type === "info"
+                    ? "#17a2b8"
+                    : "#dc3545",
             }}
           >
-            <span>{toast.type === "success" ? "✅" : toast.type === "info" ? "ℹ️" : "❌"}</span>
+            <span>
+              {toast.type === "success"
+                ? "✅"
+                : toast.type === "info"
+                  ? "ℹ️"
+                  : "❌"}
+            </span>
             <span>{toast.message}</span>
           </div>
         )}
@@ -1142,24 +1206,63 @@ export default function ReceptionistDashboard() {
             <p>Bảng điều khiển Lễ tân và Quản lý Salon • {todayText}</p>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <div className="hq-meta-item">
               <span>👤</span>
-              <span><strong>Ca Trực:</strong> Sáng (08:00 - 16:00)</span>
+              <span>
+                <strong>Ca Trực:</strong> Sáng (08:00 - 16:00)
+              </span>
             </div>
-            <div className="hq-digital-clock">
-              ⏰ {currentTime}
-            </div>
+            <div className="hq-digital-clock">⏰ {currentTime}</div>
           </div>
         </header>
 
         {/* Global Error Banner */}
-        {error && <div style={{ color: "#721c24", backgroundColor: "#f8d7da", padding: "12px 18px", borderRadius: "12px", border: "1px solid #f5c6cb", marginBottom: "20px", width: "100%" }}>{error}</div>}
+        {error && (
+          <div
+            style={{
+              color: "#721c24",
+              backgroundColor: "#f8d7da",
+              padding: "12px 18px",
+              borderRadius: "12px",
+              border: "1px solid #f5c6cb",
+              marginBottom: "20px",
+              width: "100%",
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         {loading && !stats ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "450px", color: "#8c7e74" }}>
-            <span style={{ fontSize: "36px", animation: "spin 1.5s linear infinite" }}>🔄</span>
-            <h4 style={{ margin: "12px 0 0 0" }}>Đang đồng bộ dữ liệu thời gian thực...</h4>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: "450px",
+              color: "#8c7e74",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "36px",
+                animation: "spin 1.5s linear infinite",
+              }}
+            >
+              🔄
+            </span>
+            <h4 style={{ margin: "12px 0 0 0" }}>
+              Đang đồng bộ dữ liệu thời gian thực...
+            </h4>
           </div>
         ) : (
           <>
@@ -1170,7 +1273,9 @@ export default function ReceptionistDashboard() {
                 <div className="hq-stats-content">
                   <h3>Tổng Đặt Lịch</h3>
                   <h2>{stats?.todayAppointmentsCount || 0}</h2>
-                  <p><strong>{stats?.pendingCount || 0}</strong> lượt chờ duyệt</p>
+                  <p>
+                    <strong>{stats?.pendingCount || 0}</strong> lượt chờ duyệt
+                  </p>
                 </div>
               </div>
 
@@ -1197,7 +1302,10 @@ export default function ReceptionistDashboard() {
                 <div className="hq-stats-content">
                   <h3>Doanh Thu</h3>
                   <h2>{money(stats?.todayRevenue)}</h2>
-                  <p>Đã thanh toán <strong>{stats?.paidInvoiceCount || 0}</strong> ca</p>
+                  <p>
+                    Đã thanh toán{" "}
+                    <strong>{stats?.paidInvoiceCount || 0}</strong> ca
+                  </p>
                 </div>
               </div>
 
@@ -1206,7 +1314,10 @@ export default function ReceptionistDashboard() {
                 <div className="hq-stats-content">
                   <h3>Đổi Trả & Hủy</h3>
                   <h2>{stats?.refundPendingCount || 0}</h2>
-                  <p>Có <strong>{stats?.cancelledCount || 0}</strong> lượt hủy lịch</p>
+                  <p>
+                    Có <strong>{stats?.cancelledCount || 0}</strong> lượt hủy
+                    lịch
+                  </p>
                 </div>
               </div>
             </section>
@@ -1215,15 +1326,19 @@ export default function ReceptionistDashboard() {
 
             {/* Main Interactive Grid Workspace */}
             <section className="hq-workspace">
-
               {/* Column 1: Timeline, Queue, and Search filters */}
               <div>
-
                 {/* Appointment timeline and operations board */}
                 <div className="hq-panel-card">
                   <div className="hq-panel-title">
                     <h3>📅 Tiến trình & Lịch trình Khách hàng đặt hẹn</h3>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                      }}
+                    >
                       <input
                         type="text"
                         placeholder="Tìm tên, sđt khách..."
@@ -1236,10 +1351,22 @@ export default function ReceptionistDashboard() {
                           fontSize: "0.74rem",
                           outline: "none",
                           width: "160px",
-                          background: "#faf8f5"
+                          background: "#faf8f5",
                         }}
                       />
-                      <button className="hq-action-btn" onClick={loadDashboardData} style={{ padding: "6px 10px", background: "#ebdcc5", color: "#1b3d2f", borderRadius: "8px", fontWeight: "bold", border: "none", cursor: "pointer" }}>
+                      <button
+                        className="hq-action-btn"
+                        onClick={loadDashboardData}
+                        style={{
+                          padding: "6px 10px",
+                          background: "#ebdcc5",
+                          color: "#1b3d2f",
+                          borderRadius: "8px",
+                          fontWeight: "bold",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                      >
                         🔄
                       </button>
                     </div>
@@ -1270,7 +1397,15 @@ export default function ReceptionistDashboard() {
 
                   {/* Status tabs row */}
                   <div className="hq-filter-bar">
-                    <span style={{ fontSize: "0.72rem", fontWeight: "800", color: "#666" }}>Lọc trạng thái:</span>
+                    <span
+                      style={{
+                        fontSize: "0.72rem",
+                        fontWeight: "800",
+                        color: "#666",
+                      }}
+                    >
+                      Lọc trạng thái:
+                    </span>
                     <div className="hq-filter-buttons">
                       {[
                         ["ALL", "Tất cả"],
@@ -1296,29 +1431,70 @@ export default function ReceptionistDashboard() {
                   {/* Scrollable list content */}
                   <div className="hq-scroll-container">
                     {appointments.length === 0 ? (
-                      <div style={{ padding: "40px", textAlign: "center", color: "#8c7e74", fontSize: "0.82rem" }}>
-                        🏝️ Không có lịch hẹn nào tương ứng với giờ hoặc trạng thái đã chọn.
+                      <div
+                        style={{
+                          padding: "40px",
+                          textAlign: "center",
+                          color: "#8c7e74",
+                          fontSize: "0.82rem",
+                        }}
+                      >
+                        🏝️ Không có lịch hẹn nào tương ứng với giờ hoặc trạng
+                        thái đã chọn.
                       </div>
                     ) : (
                       appointments.map((a) => (
                         <div className="hq-row-card" key={a.AppointmentId}>
                           <div className="hq-row-profile">
-                            <Avatar src={a.CustomerAvatarUrl} name={a.CustomerName} size="38px" />
+                            <Avatar
+                              src={a.CustomerAvatarUrl}
+                              name={a.CustomerName}
+                              size="38px"
+                            />
                             <div className="hq-row-text">
                               <h4>{a.CustomerName}</h4>
                               <p>
-                                📞 {a.CustomerPhone || "Chưa có SĐT"} • Dịch vụ: <strong>{a.ServiceName}</strong> ({a.TotalDuration}p)
+                                📞 {a.CustomerPhone || "Chưa có SĐT"} • Dịch vụ:{" "}
+                                <strong>{a.ServiceName}</strong> (
+                                {a.TotalDuration}p)
                               </p>
-                              <p style={{ display: "flex", alignItems: "center", gap: "6px", color: "#666", fontSize: "0.72rem", marginTop: "2px" }}>
-                                👤 Kỹ thuật viên: <strong style={{ color: a.TechnicianName ? "#2b231c" : "#b45309" }}>{a.TechnicianName || "Chưa chỉ định"}</strong>
+                              <p
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  color: "#666",
+                                  fontSize: "0.72rem",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                👤 Kỹ thuật viên:{" "}
+                                <strong
+                                  style={{
+                                    color: a.TechnicianName
+                                      ? "#2b231c"
+                                      : "#b45309",
+                                  }}
+                                >
+                                  {a.TechnicianName || "Chưa chỉ định"}
+                                </strong>
                               </p>
                             </div>
                           </div>
 
                           <div className="hq-row-actions-group">
                             <div className="hq-meta-block">
-                              <strong>{a.StartTime} - {a.EndTime}</strong>
-                              <span>{money(a.FinalAmount)} • <span className={`hq-badge badge-${a.Status.toLowerCase()}`}>{translateStatus(a.Status)}</span></span>
+                              <strong>
+                                {a.StartTime} - {a.EndTime}
+                              </strong>
+                              <span>
+                                {money(a.FinalAmount)} •{" "}
+                                <span
+                                  className={`hq-badge badge-${a.Status.toLowerCase()}`}
+                                >
+                                  {translateStatus(a.Status)}
+                                </span>
+                              </span>
                             </div>
 
                             {/* Direct workflows */}
@@ -1327,7 +1503,13 @@ export default function ReceptionistDashboard() {
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => executeAppointmentAction(a.AppointmentId, "confirm", "Xác nhận lịch")}
+                                    onClick={() =>
+                                      executeAppointmentAction(
+                                        a.AppointmentId,
+                                        "confirm",
+                                        "Xác nhận lịch",
+                                      )
+                                    }
                                     className="hq-action-btn primary"
                                     disabled={actionLoading}
                                   >
@@ -1335,7 +1517,13 @@ export default function ReceptionistDashboard() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => executeAppointmentAction(a.AppointmentId, "cancel", "Hủy lịch")}
+                                    onClick={() =>
+                                      executeAppointmentAction(
+                                        a.AppointmentId,
+                                        "cancel",
+                                        "Hủy lịch",
+                                      )
+                                    }
                                     className="hq-action-btn danger"
                                     disabled={actionLoading}
                                   >
@@ -1348,7 +1536,13 @@ export default function ReceptionistDashboard() {
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => executeAppointmentAction(a.AppointmentId, "check-in", "Check-in khách")}
+                                    onClick={() =>
+                                      executeAppointmentAction(
+                                        a.AppointmentId,
+                                        "check-in",
+                                        "Check-in khách",
+                                      )
+                                    }
                                     className="hq-action-btn primary"
                                     disabled={actionLoading}
                                   >
@@ -1356,7 +1550,13 @@ export default function ReceptionistDashboard() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => executeAppointmentAction(a.AppointmentId, "cancel", "Hủy lịch")}
+                                    onClick={() =>
+                                      executeAppointmentAction(
+                                        a.AppointmentId,
+                                        "cancel",
+                                        "Hủy lịch",
+                                      )
+                                    }
                                     className="hq-action-btn danger"
                                     disabled={actionLoading}
                                   >
@@ -1369,13 +1569,23 @@ export default function ReceptionistDashboard() {
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => executeAppointmentAction(a.AppointmentId, "start", "Bắt đầu dịch vụ")}
+                                    onClick={() =>
+                                      executeAppointmentAction(
+                                        a.AppointmentId,
+                                        "start",
+                                        "Bắt đầu dịch vụ",
+                                      )
+                                    }
                                     className="hq-action-btn primary"
                                     disabled={actionLoading}
                                   >
                                     ▶ Bắt đầu
                                   </button>
-                                  <Link to={`/receptionist/appointments?assign=${a.AppointmentId}`} className="hq-action-btn" style={{ textDecoration: "none" }}>
+                                  <Link
+                                    to={`/receptionist/appointments?assign=${a.AppointmentId}`}
+                                    className="hq-action-btn"
+                                    style={{ textDecoration: "none" }}
+                                  >
                                     🔄 Đổi KTV
                                   </Link>
                                 </>
@@ -1388,21 +1598,28 @@ export default function ReceptionistDashboard() {
                                   className="hq-action-btn primary"
                                   disabled={actionLoading}
                                 >
-                                  {a.PaymentStatus === "PAID" || a.CustomerPackageId
+                                  {a.PaymentStatus === "PAID" ||
+                                  a.CustomerPackageId
                                     ? "🏁 Hoàn thành & Checkout"
                                     : "🏁 Hoàn thành & Thanh toán"}
                                 </button>
                               )}
 
-                              {(a.Status === "COMPLETED" || a.Status === "PENDING_PAYMENT") && a.PaymentStatus !== "PAID" && (
-                                <Link
-                                  to={a.InvoiceId ? `/receptionist/invoices/${a.InvoiceId}` : `/receptionist/invoices`}
-                                  className="hq-action-btn primary"
-                                  style={{ textDecoration: "none" }}
-                                >
-                                  💳 Thanh toán tính tiền
-                                </Link>
-                              )}
+                              {(a.Status === "COMPLETED" ||
+                                a.Status === "PENDING_PAYMENT") &&
+                                a.PaymentStatus !== "PAID" && (
+                                  <Link
+                                    to={
+                                      a.InvoiceId
+                                        ? `/receptionist/invoices/${a.InvoiceId}`
+                                        : `/receptionist/invoices`
+                                    }
+                                    className="hq-action-btn primary"
+                                    style={{ textDecoration: "none" }}
+                                  >
+                                    💳 Thanh toán tính tiền
+                                  </Link>
+                                )}
                             </div>
                           </div>
                         </div>
@@ -1414,32 +1631,72 @@ export default function ReceptionistDashboard() {
                 {/* Queue list component */}
                 <div className="hq-panel-card">
                   <div className="hq-panel-title">
-                    <h3>⏳ Danh sách chờ Check-in tại quầy ({checkInQueue.length} khách)</h3>
+                    <h3>
+                      ⏳ Danh sách chờ Check-in tại quầy ({checkInQueue.length}{" "}
+                      khách)
+                    </h3>
                   </div>
 
-                  <div className="hq-scroll-container" style={{ maxHeight: "240px" }}>
+                  <div
+                    className="hq-scroll-container"
+                    style={{ maxHeight: "240px" }}
+                  >
                     {checkInQueue.length === 0 ? (
-                      <div style={{ padding: "30px", textAlign: "center", color: "#8c7e74", fontSize: "0.8rem" }}>
-                        ⏳ Hiện chưa có khách hàng nào xếp hàng chờ check-in tại quầy.
+                      <div
+                        style={{
+                          padding: "30px",
+                          textAlign: "center",
+                          color: "#8c7e74",
+                          fontSize: "0.8rem",
+                        }}
+                      >
+                        ⏳ Hiện chưa có khách hàng nào xếp hàng chờ check-in tại
+                        quầy.
                       </div>
                     ) : (
                       checkInQueue.map((q) => (
-                        <div className="hq-row-card" key={`queue-${q.AppointmentId}`}>
+                        <div
+                          className="hq-row-card"
+                          key={`queue-${q.AppointmentId}`}
+                        >
                           <div className="hq-row-profile">
-                            <Avatar src={q.CustomerAvatarUrl} name={q.CustomerName} size="34px" />
+                            <Avatar
+                              src={q.CustomerAvatarUrl}
+                              name={q.CustomerName}
+                              size="34px"
+                            />
                             <div className="hq-row-text">
-                              <h4 style={{ fontSize: "0.82rem" }}>{q.CustomerName}</h4>
-                              <p style={{ fontSize: "0.72rem" }}>⏱️ Đặt: {q.StartTime} - {q.EndTime} • Dịch vụ: {q.ServiceName}</p>
+                              <h4 style={{ fontSize: "0.82rem" }}>
+                                {q.CustomerName}
+                              </h4>
+                              <p style={{ fontSize: "0.72rem" }}>
+                                ⏱️ Đặt: {q.StartTime} - {q.EndTime} • Dịch vụ:{" "}
+                                {q.ServiceName}
+                              </p>
                             </div>
                           </div>
                           <div className="hq-row-actions-group">
-                            <span className="hq-badge badge-confirmed" style={{ fontSize: "0.6rem" }}>Đã đến Salon</span>
+                            <span
+                              className="hq-badge badge-confirmed"
+                              style={{ fontSize: "0.6rem" }}
+                            >
+                              Đã đến Salon
+                            </span>
                             <button
                               type="button"
-                              onClick={() => executeAppointmentAction(q.AppointmentId, "check-in", "Check-in khách hàng")}
+                              onClick={() =>
+                                executeAppointmentAction(
+                                  q.AppointmentId,
+                                  "check-in",
+                                  "Check-in khách hàng",
+                                )
+                              }
                               className="hq-action-btn primary"
                               disabled={actionLoading}
-                              style={{ padding: "5px 10px", fontSize: "0.72rem" }}
+                              style={{
+                                padding: "5px 10px",
+                                fontSize: "0.72rem",
+                              }}
                             >
                               🔑 Check-in
                             </button>
@@ -1453,7 +1710,6 @@ export default function ReceptionistDashboard() {
 
               {/* Column 2: Live Beds layout, Live KTV availability, Finance report, Quick tools */}
               <div>
-
                 {/* Section 1: Room & Bed Availability Map */}
                 <div className="hq-panel-card">
                   <div className="hq-panel-title">
@@ -1461,16 +1717,38 @@ export default function ReceptionistDashboard() {
                   </div>
                   <div className="hq-rooms-layout">
                     {liveRooms.map((room) => (
-                      <div key={room.id} className={`room-cell ${room.status === "BUSY" ? "busy" : "free"}`}>
+                      <div
+                        key={room.id}
+                        className={`room-cell ${room.status === "BUSY" ? "busy" : "free"}`}
+                      >
                         <h4>{room.name}</h4>
-                        <div style={{ marginTop: "4px", fontSize: "0.68rem", fontWeight: "bold" }}>
-                          <span className={`room-dot ${room.status === "BUSY" ? "red" : "green"}`} />
+                        <div
+                          style={{
+                            marginTop: "4px",
+                            fontSize: "0.68rem",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          <span
+                            className={`room-dot ${room.status === "BUSY" ? "red" : "green"}`}
+                          />
                           {room.status === "BUSY" ? "ĐANG SỬ DỤNG" : "TRỐNG"}
                         </div>
                         {room.status === "BUSY" && (
-                          <div style={{ marginTop: "4px", borderTop: "1px dashed #ebdcc5", paddingTop: "4px", fontSize: "0.65rem", color: "#666", textAlign: "left" }}>
-                            <strong>Khách:</strong> {room.customerName}<br />
-                            <strong>KTV:</strong> {room.technicianName}<br />
+                          <div
+                            style={{
+                              marginTop: "4px",
+                              borderTop: "1px dashed #ebdcc5",
+                              paddingTop: "4px",
+                              fontSize: "0.65rem",
+                              color: "#666",
+                              textAlign: "left",
+                            }}
+                          >
+                            <strong>Khách:</strong> {room.customerName}
+                            <br />
+                            <strong>KTV:</strong> {room.technicianName}
+                            <br />
                             <strong>Giờ:</strong> {room.time}
                           </div>
                         )}
@@ -1484,26 +1762,68 @@ export default function ReceptionistDashboard() {
                   <div className="hq-panel-title">
                     <h3>👥 Sơ đồ trạng thái Kỹ thuật viên (KTV)</h3>
                   </div>
-                  <div className="hq-scroll-container" style={{ maxHeight: "250px" }}>
+                  <div
+                    className="hq-scroll-container"
+                    style={{ maxHeight: "250px" }}
+                  >
                     <div className="hq-ktv-list">
                       {liveTechnicians.length === 0 ? (
-                        <p style={{ gridColumn: "span 2", textAlign: "center", color: "#888", fontSize: "0.78rem" }}>Chưa có danh sách KTV.</p>
+                        <p
+                          style={{
+                            gridColumn: "span 2",
+                            textAlign: "center",
+                            color: "#888",
+                            fontSize: "0.78rem",
+                          }}
+                        >
+                          Chưa có danh sách KTV.
+                        </p>
                       ) : (
                         liveTechnicians.map((tech) => (
                           <div className="ktv-card" key={tech.TechnicianId}>
-                            <Avatar src={tech.ImageUrl} name={tech.FullName} size="32px" />
+                            <Avatar
+                              src={tech.ImageUrl}
+                              name={tech.FullName}
+                              size="32px"
+                            />
                             <div className="ktv-card-text">
                               <h4>{tech.FullName}</h4>
                               <p>{tech.Specialization || "Spa KTV"}</p>
 
                               <div className="ktv-indicator">
-                                <span className="ktv-dot" style={{ backgroundColor: tech.status === "BUSY" ? "#dc3545" : "#28a745" }} />
-                                <span style={{ color: tech.status === "BUSY" ? "#dc3545" : "#28a745" }}>
-                                  {tech.status === "BUSY" ? "ĐANG LÀM" : "ĐANG RẢNH"}
+                                <span
+                                  className="ktv-dot"
+                                  style={{
+                                    backgroundColor:
+                                      tech.status === "BUSY"
+                                        ? "#dc3545"
+                                        : "#28a745",
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    color:
+                                      tech.status === "BUSY"
+                                        ? "#dc3545"
+                                        : "#28a745",
+                                  }}
+                                >
+                                  {tech.status === "BUSY"
+                                    ? "ĐANG LÀM"
+                                    : "ĐANG RẢNH"}
                                 </span>
                               </div>
                               {tech.status === "BUSY" && (
-                                <div style={{ fontSize: "0.6rem", color: "#555", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                <div
+                                  style={{
+                                    fontSize: "0.6rem",
+                                    color: "#555",
+                                    marginTop: "2px",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
                                   Khách: <strong>{tech.customerName}</strong>
                                 </div>
                               )}
@@ -1519,14 +1839,31 @@ export default function ReceptionistDashboard() {
                 <div className="hq-panel-card">
                   <div className="hq-panel-title">
                     <h3>📊 Thống kê Doanh thu & Hóa đơn hôm nay</h3>
-                    <Link to="/receptionist/invoices" style={{ fontSize: "0.78rem", color: "#1b3d2f", fontWeight: "bold", textDecoration: "none" }}>Chi tiết →</Link>
+                    <Link
+                      to="/receptionist/invoices"
+                      style={{
+                        fontSize: "0.78rem",
+                        color: "#1b3d2f",
+                        fontWeight: "bold",
+                        textDecoration: "none",
+                      }}
+                    >
+                      Chi tiết →
+                    </Link>
                   </div>
 
                   <div className="hq-finance-deck">
                     {/* SVG Donut */}
                     <div className="hq-donut-view">
                       <svg width="80" height="80" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="38" fill="none" stroke="#f1ebd9" strokeWidth="10" />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="38"
+                          fill="none"
+                          stroke="#f1ebd9"
+                          strokeWidth="10"
+                        />
                         <circle
                           cx="50"
                           cy="50"
@@ -1546,61 +1883,185 @@ export default function ReceptionistDashboard() {
                     </div>
 
                     {/* Breakdown lists */}
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.76rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                        fontSize: "0.76rem",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
                         <span>Tổng số hóa đơn:</span>
                         <strong>{invoiceCount}</strong>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ color: "#28a745" }}>✓ Đã thanh toán:</span>
-                        <strong>{paidInvoiceCount} ({paidPercent}%)</strong>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span style={{ color: "#28a745" }}>
+                          ✓ Đã thanh toán:
+                        </span>
+                        <strong>
+                          {paidInvoiceCount} ({paidPercent}%)
+                        </strong>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ color: "#d97706" }}>📄 Chưa thanh toán:</span>
-                        <strong>{unpaidInvoiceCount} ({unpaidPercent}%)</strong>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span style={{ color: "#d97706" }}>
+                          📄 Chưa thanh toán:
+                        </span>
+                        <strong>
+                          {unpaidInvoiceCount} ({unpaidPercent}%)
+                        </strong>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #ebdcc5", paddingTop: "4px", marginTop: "2px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          borderTop: "1px dashed #ebdcc5",
+                          paddingTop: "4px",
+                          marginTop: "2px",
+                        }}
+                      >
                         <strong>Doanh thu hôm nay:</strong>
-                        <strong style={{ color: "#1b3d2f" }}>{money(stats?.todayRevenue)}</strong>
+                        <strong style={{ color: "#1b3d2f" }}>
+                          {money(stats?.todayRevenue)}
+                        </strong>
                       </div>
                     </div>
                   </div>
 
                   {/* Hourly Load Graph (SVG Wave chart) */}
-                  <h5 style={{ margin: "14px 0 6px 0", fontSize: "0.72rem", color: "#8c7e74", textTransform: "uppercase", fontWeight: "bold" }}>📈 Tải lượng đặt lịch theo giờ</h5>
+                  <h5
+                    style={{
+                      margin: "14px 0 6px 0",
+                      fontSize: "0.72rem",
+                      color: "#8c7e74",
+                      textTransform: "uppercase",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    📈 Tải lượng đặt lịch theo giờ
+                  </h5>
                   <div className="hq-wave-chart">
                     <svg viewBox="0 0 300 60" width="100%" height="45">
-                      <line x1="0" y1="50" x2="300" y2="50" stroke="#ebdcc5" strokeWidth="0.5" />
-                      <line x1="0" y1="25" x2="300" y2="25" stroke="#ebdcc5" strokeWidth="0.5" strokeDasharray="3 3" />
+                      <line
+                        x1="0"
+                        y1="50"
+                        x2="300"
+                        y2="50"
+                        stroke="#ebdcc5"
+                        strokeWidth="0.5"
+                      />
+                      <line
+                        x1="0"
+                        y1="25"
+                        x2="300"
+                        y2="25"
+                        stroke="#ebdcc5"
+                        strokeWidth="0.5"
+                        strokeDasharray="3 3"
+                      />
 
                       <path
-                        d={`M 10 ${50 - ((hourBookingCounts["08"] || 0) * 12)} 
-                            L 40 ${50 - ((hourBookingCounts["09"] || 0) * 12)} 
-                            L 70 ${50 - ((hourBookingCounts["10"] || 0) * 12)} 
-                            L 100 ${50 - ((hourBookingCounts["11"] || 0) * 12)} 
-                            L 130 ${50 - ((hourBookingCounts["12"] || 0) * 12)} 
-                            L 160 ${50 - ((hourBookingCounts["13"] || 0) * 12)} 
-                            L 190 ${50 - ((hourBookingCounts["14"] || 0) * 12)} 
-                            L 220 ${50 - ((hourBookingCounts["15"] || 0) * 12)} 
-                            L 250 ${50 - ((hourBookingCounts["16"] || 0) * 12)} 
-                            L 280 ${50 - ((hourBookingCounts["17"] || 0) * 12)}`}
+                        d={`M 10 ${50 - (hourBookingCounts["08"] || 0) * 12} 
+                            L 40 ${50 - (hourBookingCounts["09"] || 0) * 12} 
+                            L 70 ${50 - (hourBookingCounts["10"] || 0) * 12} 
+                            L 100 ${50 - (hourBookingCounts["11"] || 0) * 12} 
+                            L 130 ${50 - (hourBookingCounts["12"] || 0) * 12} 
+                            L 160 ${50 - (hourBookingCounts["13"] || 0) * 12} 
+                            L 190 ${50 - (hourBookingCounts["14"] || 0) * 12} 
+                            L 220 ${50 - (hourBookingCounts["15"] || 0) * 12} 
+                            L 250 ${50 - (hourBookingCounts["16"] || 0) * 12} 
+                            L 280 ${50 - (hourBookingCounts["17"] || 0) * 12}`}
                         fill="none"
                         stroke="#1b3d2f"
                         strokeWidth="2"
                       />
 
-                      <circle cx="10" cy={50 - ((hourBookingCounts["08"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="40" cy={50 - ((hourBookingCounts["09"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="70" cy={50 - ((hourBookingCounts["10"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="100" cy={50 - ((hourBookingCounts["11"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="130" cy={50 - ((hourBookingCounts["12"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="160" cy={50 - ((hourBookingCounts["13"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="190" cy={50 - ((hourBookingCounts["14"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="220" cy={50 - ((hourBookingCounts["15"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="250" cy={50 - ((hourBookingCounts["16"] || 0) * 12)} r="2.5" fill="#ef4f83" />
-                      <circle cx="280" cy={50 - ((hourBookingCounts["17"] || 0) * 12)} r="2.5" fill="#ef4f83" />
+                      <circle
+                        cx="10"
+                        cy={50 - (hourBookingCounts["08"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="40"
+                        cy={50 - (hourBookingCounts["09"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="70"
+                        cy={50 - (hourBookingCounts["10"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="100"
+                        cy={50 - (hourBookingCounts["11"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="130"
+                        cy={50 - (hourBookingCounts["12"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="160"
+                        cy={50 - (hourBookingCounts["13"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="190"
+                        cy={50 - (hourBookingCounts["14"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="220"
+                        cy={50 - (hourBookingCounts["15"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="250"
+                        cy={50 - (hourBookingCounts["16"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
+                      <circle
+                        cx="280"
+                        cy={50 - (hourBookingCounts["17"] || 0) * 12}
+                        r="2.5"
+                        fill="#ef4f83"
+                      />
                     </svg>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.55rem", color: "#8c7e74", marginTop: "2px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "0.55rem",
+                        color: "#8c7e74",
+                        marginTop: "2px",
+                      }}
+                    >
                       <span>08:00</span>
                       <span>10:00</span>
                       <span>12:00</span>
@@ -1612,16 +2073,63 @@ export default function ReceptionistDashboard() {
 
                   {/* Pending refund request list */}
                   {pendingRefunds.length > 0 && (
-                    <div style={{ marginTop: "12px", borderTop: "1.5px solid #ebdcc5", paddingTop: "10px" }}>
-                      <h4 style={{ margin: "0 0 8px 0", fontSize: "0.78rem", color: "#dc3545", fontWeight: "bold" }}>⚠️ Duyệt hoàn tiền ({pendingRefunds.length})</h4>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        borderTop: "1.5px solid #ebdcc5",
+                        paddingTop: "10px",
+                      }}
+                    >
+                      <h4
+                        style={{
+                          margin: "0 0 8px 0",
+                          fontSize: "0.78rem",
+                          color: "#dc3545",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        ⚠️ Duyệt hoàn tiền ({pendingRefunds.length})
+                      </h4>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px",
+                        }}
+                      >
                         {pendingRefunds.map((ref) => (
-                          <div key={ref.RefundId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff5f5", border: "1px solid #f5c6cb", padding: "8px 10px", borderRadius: "10px", fontSize: "0.72rem" }}>
+                          <div
+                            key={ref.RefundId}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              background: "#fff5f5",
+                              border: "1px solid #f5c6cb",
+                              padding: "8px 10px",
+                              borderRadius: "10px",
+                              fontSize: "0.72rem",
+                            }}
+                          >
                             <div>
-                              <strong>{ref.CustomerName}</strong>: {money(ref.RefundAmount)}<br />
-                              <span style={{ color: "#666", fontSize: "0.68rem" }}>Lý do: {ref.Reason}</span>
+                              <strong>{ref.CustomerName}</strong>:{" "}
+                              {money(ref.RefundAmount)}
+                              <br />
+                              <span
+                                style={{ color: "#666", fontSize: "0.68rem" }}
+                              >
+                                Lý do: {ref.Reason}
+                              </span>
                             </div>
-                            <Link to="/receptionist/invoices" className="hq-action-btn danger" style={{ fontSize: "0.68rem", padding: "4px 8px", textDecoration: "none" }}>
+                            <Link
+                              to="/receptionist/invoices"
+                              className="hq-action-btn danger"
+                              style={{
+                                fontSize: "0.68rem",
+                                padding: "4px 8px",
+                                textDecoration: "none",
+                              }}
+                            >
                               Duyệt
                             </Link>
                           </div>
@@ -1638,23 +2146,74 @@ export default function ReceptionistDashboard() {
                   </div>
 
                   {/* Popular Services progress bars */}
-                  <h4 style={{ fontSize: "0.74rem", color: "#8c7e74", margin: "0 0 10px 0", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.3px" }}>🔥 Top dịch vụ đặt nhiều hôm nay</h4>
-                  <div style={{ background: "#faf8f5", padding: "14px", borderRadius: "16px", border: "1px solid #f1ebd9", marginBottom: "20px" }}>
+                  <h4
+                    style={{
+                      fontSize: "0.74rem",
+                      color: "#8c7e74",
+                      margin: "0 0 10px 0",
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                      letterSpacing: "0.3px",
+                    }}
+                  >
+                    🔥 Top dịch vụ đặt nhiều hôm nay
+                  </h4>
+                  <div
+                    style={{
+                      background: "#faf8f5",
+                      padding: "14px",
+                      borderRadius: "16px",
+                      border: "1px solid #f1ebd9",
+                      marginBottom: "20px",
+                    }}
+                  >
                     {popularServices.length === 0 ? (
-                      <p style={{ fontSize: "0.74rem", color: "#888", textAlign: "center", margin: 0 }}>Chưa có thống kê dịch vụ hôm nay.</p>
+                      <p
+                        style={{
+                          fontSize: "0.74rem",
+                          color: "#888",
+                          textAlign: "center",
+                          margin: 0,
+                        }}
+                      >
+                        Chưa có thống kê dịch vụ hôm nay.
+                      </p>
                     ) : (
                       popularServices.map((s, idx) => {
-                        const maxVal = Math.max(...popularServices.map((x) => Number(x.BookingCount || 0)), 1);
-                        const percentFill = Math.round((Number(s.BookingCount || 0) / maxVal) * 100);
-                        const rankClass = idx === 0 ? "hq-rank-1" : idx === 1 ? "hq-rank-2" : idx === 2 ? "hq-rank-3" : "hq-rank-other";
+                        const maxVal = Math.max(
+                          ...popularServices.map((x) =>
+                            Number(x.BookingCount || 0),
+                          ),
+                          1,
+                        );
+                        const percentFill = Math.round(
+                          (Number(s.BookingCount || 0) / maxVal) * 100,
+                        );
+                        const rankClass =
+                          idx === 0
+                            ? "hq-rank-1"
+                            : idx === 1
+                              ? "hq-rank-2"
+                              : idx === 2
+                                ? "hq-rank-3"
+                                : "hq-rank-other";
 
                         return (
-                          <div className="hq-progress-bar-container" key={s.ServiceId}>
+                          <div
+                            className="hq-progress-bar-container"
+                            key={s.ServiceId}
+                          >
                             <div className="hq-progress-row">
-                              <div className={`hq-rank-badge ${rankClass}`}>{idx + 1}</div>
+                              <div className={`hq-rank-badge ${rankClass}`}>
+                                {idx + 1}
+                              </div>
                               <div className="hq-progress-labels">
-                                <span className="hq-service-name">{s.ServiceName}</span>
-                                <span className="hq-service-count">{s.BookingCount} ca</span>
+                                <span className="hq-service-name">
+                                  {s.ServiceName}
+                                </span>
+                                <span className="hq-service-count">
+                                  {s.BookingCount} ca
+                                </span>
                               </div>
                             </div>
                             <div style={{ paddingLeft: "30px" }}>
@@ -1663,11 +2222,12 @@ export default function ReceptionistDashboard() {
                                   className="hq-progress-fill"
                                   style={{
                                     width: `${percentFill}%`,
-                                    background: idx === 0 
-                                      ? "linear-gradient(90deg, #1b3d2f 0%, #34614d 100%)" 
-                                      : idx === 1 
-                                      ? "linear-gradient(90deg, #b45309 0%, #f59e0b 100%)" 
-                                      : "linear-gradient(90deg, #ebdcc5 0%, #d4a94f 100%)",
+                                    background:
+                                      idx === 0
+                                        ? "linear-gradient(90deg, #1b3d2f 0%, #34614d 100%)"
+                                        : idx === 1
+                                          ? "linear-gradient(90deg, #b45309 0%, #f59e0b 100%)"
+                                          : "linear-gradient(90deg, #ebdcc5 0%, #d4a94f 100%)",
                                   }}
                                 />
                               </div>
@@ -1681,21 +2241,50 @@ export default function ReceptionistDashboard() {
                   {/* VIP Profile summary info */}
                   {highlightedCustomer && (
                     <>
-                      <h4 style={{ fontSize: "0.74rem", color: "#8c7e74", margin: "14px 0 10px 0", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.3px" }}>⭐ Khách hàng nổi bật trong ca</h4>
+                      <h4
+                        style={{
+                          fontSize: "0.74rem",
+                          color: "#8c7e74",
+                          margin: "14px 0 10px 0",
+                          textTransform: "uppercase",
+                          fontWeight: 700,
+                          letterSpacing: "0.3px",
+                        }}
+                      >
+                        ⭐ Khách hàng nổi bật trong ca
+                      </h4>
                       <div className="hq-vip-card">
                         <div className="hq-vip-avatar-wrapper">
-                          <Avatar src={highlightedCustomer.AvatarUrl} name={highlightedCustomer.FullName} size="42px" />
+                          <Avatar
+                            src={highlightedCustomer.AvatarUrl}
+                            name={highlightedCustomer.FullName}
+                            size="42px"
+                          />
                           <div className="hq-vip-badge">👑</div>
                         </div>
                         <div className="hq-vip-info">
-                          <span className="hq-vip-name">{highlightedCustomer.FullName}</span>
+                          <span className="hq-vip-name">
+                            {highlightedCustomer.FullName}
+                          </span>
                           <div className="hq-vip-meta">
-                            <span>SĐT: {highlightedCustomer.Phone || "Chưa gán"}</span>
+                            <span>
+                              SĐT: {highlightedCustomer.Phone || "Chưa gán"}
+                            </span>
                             <span>•</span>
-                            <span>Chi tiêu: <strong className="hq-vip-spent">{money(highlightedCustomer.TotalSpent)}</strong></span>
+                            <span>
+                              Chi tiêu:{" "}
+                              <strong className="hq-vip-spent">
+                                {money(highlightedCustomer.TotalSpent)}
+                              </strong>
+                            </span>
                           </div>
                         </div>
-                        <Link to="/receptionist/customers" className="hq-vip-btn">Hồ sơ</Link>
+                        <Link
+                          to="/receptionist/customers"
+                          className="hq-vip-btn"
+                        >
+                          Hồ sơ
+                        </Link>
                       </div>
                     </>
                   )}
@@ -1707,12 +2296,18 @@ export default function ReceptionistDashboard() {
                     <h3>⚡ Trung tâm Điều hành nhanh Lễ tân</h3>
                   </div>
                   <div className="hq-shortcuts-deck">
-                    <Link className="shortcut-node" to="/receptionist/appointments/create?walkin=1">
+                    <Link
+                      className="shortcut-node"
+                      to="/receptionist/appointments/create?walkin=1"
+                    >
                       <span className="icon">🚶</span>
                       <span className="txt">Khách Walk-in</span>
                     </Link>
 
-                    <Link className="shortcut-node" to="/receptionist/appointments/create">
+                    <Link
+                      className="shortcut-node"
+                      to="/receptionist/appointments/create"
+                    >
                       <span className="icon">📅</span>
                       <span className="txt">Đặt lịch hẹn</span>
                     </Link>
@@ -1722,7 +2317,10 @@ export default function ReceptionistDashboard() {
                       <span className="txt">Hóa đơn</span>
                     </Link>
 
-                    <Link className="shortcut-node" to="/receptionist/waiting-list">
+                    <Link
+                      className="shortcut-node"
+                      to="/receptionist/waiting-list"
+                    >
                       <span className="icon">⏳</span>
                       <span className="txt">Hàng chờ</span>
                     </Link>
@@ -1738,9 +2336,7 @@ export default function ReceptionistDashboard() {
                     </Link>
                   </div>
                 </div>
-
               </div>
-
             </section>
           </>
         )}

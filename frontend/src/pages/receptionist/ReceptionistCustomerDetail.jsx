@@ -88,7 +88,8 @@ export default function ReceptionistCustomerDetail() {
       });
     } catch (err) {
       setError(
-        err.response?.data?.message || "Không tải được chi tiết khách hàng từ hệ thống",
+        err.response?.data?.message ||
+          "Không tải được chi tiết khách hàng từ hệ thống",
       );
     } finally {
       setLoading(false);
@@ -226,7 +227,8 @@ export default function ReceptionistCustomerDetail() {
           <div>
             <h1>Chi tiết hồ sơ khách hàng #{id}</h1>
             <p>
-              Xem chi tiết hồ sơ cá nhân, lịch sử sử dụng dịch vụ, hóa đơn giao dịch và gói liệu trình.
+              Xem chi tiết hồ sơ cá nhân, lịch sử sử dụng dịch vụ, hóa đơn giao
+              dịch và gói liệu trình.
             </p>
           </div>
 
@@ -276,7 +278,9 @@ export default function ReceptionistCustomerDetail() {
                   </p>
 
                   <div className="rcc-profile-tags">
-                    <span className={`rcc-badge ${String(item.Membership?.MembershipLevel || "Standard").toLowerCase() !== "standard" ? "green" : ""}`}>
+                    <span
+                      className={`rcc-badge ${String(item.Membership?.MembershipLevel || "Standard").toLowerCase() !== "standard" ? "green" : ""}`}
+                    >
                       Hạng: {item.Membership?.MembershipLevel || "Standard"}
                     </span>
                     <span className="rcc-badge green">
@@ -346,7 +350,13 @@ export default function ReceptionistCustomerDetail() {
                     </div>
                     <div>
                       <span>Giới tính</span>
-                      <b>{profile.Gender === "Male" ? "Nam" : profile.Gender === "Female" ? "Nữ" : "Khác"}</b>
+                      <b>
+                        {profile.Gender === "Male"
+                          ? "Nam"
+                          : profile.Gender === "Female"
+                            ? "Nữ"
+                            : "Khác"}
+                      </b>
                     </div>
                     <div>
                       <span>Ngày sinh nhật</span>
@@ -442,7 +452,9 @@ export default function ReceptionistCustomerDetail() {
                 <div className="rcc-info-list">
                   <div>
                     <span>Hạng thành viên hiện tại</span>
-                    <b style={{ color: "var(--pink)" }}>{item.Membership?.MembershipLevel || "Standard"}</b>
+                    <b style={{ color: "var(--pink)" }}>
+                      {item.Membership?.MembershipLevel || "Standard"}
+                    </b>
                   </div>
                   <div>
                     <span>Điểm tích lũy</span>
@@ -450,7 +462,9 @@ export default function ReceptionistCustomerDetail() {
                   </div>
                   <div>
                     <span>Ưu đãi giảm giá (%)</span>
-                    <b style={{ color: '#2e6221' }}>Giảm {item.Membership?.DiscountPercent || 0}% trên dịch vụ</b>
+                    <b style={{ color: "#2e6221" }}>
+                      Giảm {item.Membership?.DiscountPercent || 0}% trên dịch vụ
+                    </b>
                   </div>
                   <div>
                     <span>Lần ghé salon gần nhất</span>
@@ -495,17 +509,25 @@ export default function ReceptionistCustomerDetail() {
                     {sortedAppointments.map((a) => (
                       <tr key={a.AppointmentId}>
                         <td>
-                          <Link to={`/receptionist/appointments/${a.AppointmentId}`}>
+                          <Link
+                            to={`/receptionist/appointments/${a.AppointmentId}`}
+                          >
                             #{a.AppointmentId}
                           </Link>
                         </td>
-                        <td><b>{a.ServiceNames || "-"}</b></td>
+                        <td>
+                          <b>{a.ServiceNames || "-"}</b>
+                        </td>
                         <td>{a.TechnicianName || "-"}</td>
                         <td>{date(a.AppointmentDate)}</td>
                         <td>
-                          <b>{a.StartTime} - {a.EndTime}</b>
+                          <b>
+                            {a.StartTime} - {a.EndTime}
+                          </b>
                         </td>
-                        <td><b>{money(a.FinalAmount)}</b></td>
+                        <td>
+                          <b>{money(a.FinalAmount)}</b>
+                        </td>
                         <td>
                           <span className={statusClass(a.Status)}>
                             {translateStatus(a.Status)}
@@ -549,14 +571,18 @@ export default function ReceptionistCustomerDetail() {
                         <td>{date(i.AppointmentDate)}</td>
                         <td>{money(i.TotalAmount)}</td>
                         <td>{money(i.DiscountAmount)}</td>
-                        <td><b>{money(i.FinalAmount)}</b></td>
+                        <td>
+                          <b>{money(i.FinalAmount)}</b>
+                        </td>
                         <td>
                           <span
                             className={statusClass(
                               i.PaymentStatus || i.InvoiceStatus,
                             )}
                           >
-                            {translateStatus(i.PaymentStatus || i.InvoiceStatus || "UNPAID")}
+                            {translateStatus(
+                              i.PaymentStatus || i.InvoiceStatus || "UNPAID",
+                            )}
                           </span>
                         </td>
                         <td>{date(i.CreatedAt)}</td>
@@ -587,7 +613,9 @@ export default function ReceptionistCustomerDetail() {
                             #{p.InvoiceId}
                           </Link>
                         </td>
-                        <td><b>{money(p.Amount)}</b></td>
+                        <td>
+                          <b>{money(p.Amount)}</b>
+                        </td>
                         <td>{p.PaymentMethod || "-"}</td>
                         <td>{date(p.PaidAt || p.CreatedAt)}</td>
                         <td>
@@ -616,10 +644,16 @@ export default function ReceptionistCustomerDetail() {
                   <tbody>
                     {sortedReviews.map((r) => (
                       <tr key={r.ReviewId}>
-                        <td><b>{r.ServiceName || "-"}</b></td>
+                        <td>
+                          <b>{r.ServiceName || "-"}</b>
+                        </td>
                         <td>{r.TechnicianName || "-"}</td>
-                        <td style={{ color: '#b57a13', fontWeight: 'bold' }}>⭐ {r.Rating}/5</td>
-                        <td><i>"{r.Comment || "Không để lại nhận xét viết."}"</i></td>
+                        <td style={{ color: "#b57a13", fontWeight: "bold" }}>
+                          ⭐ {r.Rating}/5
+                        </td>
+                        <td>
+                          <i>"{r.Comment || "Không để lại nhận xét viết."}"</i>
+                        </td>
                         <td>{date(r.CreatedAt)}</td>
                         <td>
                           <span className={statusClass(r.Status)}>
@@ -646,7 +680,9 @@ export default function ReceptionistCustomerDetail() {
                   <tbody>
                     {sortedFeedbacks.map((f) => (
                       <tr key={f.FeedbackId}>
-                        <td><b>{f.Subject}</b></td>
+                        <td>
+                          <b>{f.Subject}</b>
+                        </td>
                         <td>{f.Content}</td>
                         <td>{f.AdminResponse || "-"}</td>
                         <td>{date(f.CreatedAt)}</td>
@@ -676,12 +712,17 @@ export default function ReceptionistCustomerDetail() {
                   <tbody>
                     {sortedPackages.map((p) => (
                       <tr key={p.CustomerPackageId}>
-                        <td><b>{p.PackageName}</b></td>
+                        <td>
+                          <b>{p.PackageName}</b>
+                        </td>
                         <td>
                           {date(p.StartDate)} - {date(p.EndDate)}
                         </td>
                         <td>
-                          <b>{p.UsedSessions}/{p.TotalSessions}</b> buổi đã dùng (Còn <b>{p.RemainingSessions}</b>)
+                          <b>
+                            {p.UsedSessions}/{p.TotalSessions}
+                          </b>{" "}
+                          buổi đã dùng (Còn <b>{p.RemainingSessions}</b>)
                         </td>
                         <td>{money(p.SalePrice)}</td>
                         <td>
@@ -700,71 +741,219 @@ export default function ReceptionistCustomerDetail() {
                 </table>
               )}
 
-              {tab === "treatment-notes" && (
-                notesLoading ? (
+              {tab === "treatment-notes" &&
+                (notesLoading ? (
                   <div className="rcc-empty">Đang tải hồ sơ trị liệu...</div>
                 ) : treatmentNotes.length === 0 ? (
-                  <div className="rcc-empty">Chưa có ghi nhận hồ sơ trị liệu nào.</div>
+                  <div className="rcc-empty">
+                    Chưa có ghi nhận hồ sơ trị liệu nào.
+                  </div>
                 ) : (
-                  <div className="treatment-notes-timeline" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+                  <div
+                    className="treatment-notes-timeline"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "20px",
+                      padding: "10px 0",
+                    }}
+                  >
                     {treatmentNotes.map((note) => (
-                      <div key={note.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px', marginBottom: '15px' }}>
+                      <div
+                        key={note.id}
+                        style={{
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "12px",
+                          padding: "20px",
+                          backgroundColor: "#fff",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            borderBottom: "1px solid #f3f4f6",
+                            paddingBottom: "10px",
+                            marginBottom: "15px",
+                          }}
+                        >
                           <div>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#db2777', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                            <span
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                                color: "#db2777",
+                                textTransform: "uppercase",
+                                display: "block",
+                                marginBottom: "4px",
+                              }}
+                            >
                               {note.CategoryName || "Dịch vụ"}
                             </span>
-                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#1f2937' }}>
+                            <h4
+                              style={{
+                                margin: 0,
+                                fontSize: "16px",
+                                fontWeight: "bold",
+                                color: "#1f2937",
+                              }}
+                            >
                               {note.ServiceName}
                             </h4>
                           </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <span style={{ fontSize: '13px', color: '#6b7280', display: 'block' }}>
-                              🗓 {new Date(note.service_date_time).toLocaleDateString("vi-VN")}
+                          <div style={{ textAlign: "right" }}>
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                display: "block",
+                              }}
+                            >
+                              🗓{" "}
+                              {new Date(
+                                note.service_date_time,
+                              ).toLocaleDateString("vi-VN")}
                             </span>
-                            <span style={{
-                              display: 'inline-block',
-                              marginTop: '4px',
-                              padding: '2px 8px',
-                              borderRadius: '12px',
-                              fontSize: '11px',
-                              fontWeight: '600',
-                              backgroundColor: note.status === 'finalized' ? '#d1fae5' : '#fef3c7',
-                              color: note.status === 'finalized' ? '#065f46' : '#92400e'
-                            }}>
-                              {note.status === 'finalized' ? '🔒 Đã khóa' : '📝 Bản nháp'}
+                            <span
+                              style={{
+                                display: "inline-block",
+                                marginTop: "4px",
+                                padding: "2px 8px",
+                                borderRadius: "12px",
+                                fontSize: "11px",
+                                fontWeight: "600",
+                                backgroundColor:
+                                  note.status === "finalized"
+                                    ? "#d1fae5"
+                                    : "#fef3c7",
+                                color:
+                                  note.status === "finalized"
+                                    ? "#065f46"
+                                    : "#92400e",
+                              }}
+                            >
+                              {note.status === "finalized"
+                                ? "🔒 Đã khóa"
+                                : "📝 Bản nháp"}
                             </span>
                           </div>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "20px",
+                          }}
+                        >
                           <div>
-                            <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#4b5563', fontWeight: '600' }}>Tình trạng trước thực hiện:</h5>
-                            <p style={{ margin: 0, fontSize: '13px', color: '#374151', whiteSpace: 'pre-line' }}>{note.before_condition || "Chưa ghi nhận"}</p>
+                            <h5
+                              style={{
+                                margin: "0 0 6px 0",
+                                fontSize: "13px",
+                                color: "#4b5563",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Tình trạng trước thực hiện:
+                            </h5>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: "13px",
+                                color: "#374151",
+                                whiteSpace: "pre-line",
+                              }}
+                            >
+                              {note.before_condition || "Chưa ghi nhận"}
+                            </p>
                           </div>
                           <div>
-                            <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#4b5563', fontWeight: '600' }}>Kết quả sau thực hiện:</h5>
-                            <p style={{ margin: 0, fontSize: '13px', color: '#374151', whiteSpace: 'pre-line' }}>{note.after_result || "Chưa ghi nhận"}</p>
+                            <h5
+                              style={{
+                                margin: "0 0 6px 0",
+                                fontSize: "13px",
+                                color: "#4b5563",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Kết quả sau thực hiện:
+                            </h5>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: "13px",
+                                color: "#374151",
+                                whiteSpace: "pre-line",
+                              }}
+                            >
+                              {note.after_result || "Chưa ghi nhận"}
+                            </p>
                           </div>
                         </div>
 
-                        <div style={{ marginTop: '15px', borderTop: '1px solid #f3f4f6', paddingTop: '15px' }}>
-                          <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#4b5563', fontWeight: '600' }}>Chỉ định / Khuyên dùng tại nhà:</h5>
-                          <p style={{ margin: 0, fontSize: '13px', color: '#374151', whiteSpace: 'pre-line' }}>{note.recommendations || "Không có khuyên dùng đặc biệt"}</p>
+                        <div
+                          style={{
+                            marginTop: "15px",
+                            borderTop: "1px solid #f3f4f6",
+                            paddingTop: "15px",
+                          }}
+                        >
+                          <h5
+                            style={{
+                              margin: "0 0 6px 0",
+                              fontSize: "13px",
+                              color: "#4b5563",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Chỉ định / Khuyên dùng tại nhà:
+                          </h5>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "13px",
+                              color: "#374151",
+                              whiteSpace: "pre-line",
+                            }}
+                          >
+                            {note.recommendations ||
+                              "Không có khuyên dùng đặc biệt"}
+                          </p>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', padding: '8px 12px', backgroundColor: '#f9fafb', borderRadius: '8px', fontSize: '12px', color: '#6b7280' }}>
-                          <span>KTV thực hiện: <strong>{note.TechnicianName}</strong></span>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginTop: "15px",
+                            padding: "8px 12px",
+                            backgroundColor: "#f9fafb",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            color: "#6b7280",
+                          }}
+                        >
+                          <span>
+                            KTV thực hiện:{" "}
+                            <strong>{note.TechnicianName}</strong>
+                          </span>
                           <span>Thời lượng: {note.duration_minutes} phút</span>
                         </div>
                       </div>
                     ))}
                   </div>
-                )
-              )}
+                ))}
 
-              {tab !== "treatment-notes" && item?.[tab.charAt(0).toUpperCase() + tab.slice(1)]?.length ===
-                0 && <div className="rcc-empty">Hiện tại khách hàng chưa có dữ liệu ở mục này.</div>}
+              {tab !== "treatment-notes" &&
+                item?.[tab.charAt(0).toUpperCase() + tab.slice(1)]?.length ===
+                  0 && (
+                  <div className="rcc-empty">
+                    Hiện tại khách hàng chưa có dữ liệu ở mục này.
+                  </div>
+                )}
             </section>
           </>
         )}
