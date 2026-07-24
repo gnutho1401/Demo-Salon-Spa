@@ -11,6 +11,16 @@ frontend/.env
 # Build
 dist/
 build/
+coverage/
+backend/coverage/
+
+# Runtime state and private customer data
+backend/private/
+backend/uploads/
+AIauditlog/
+server.pid
+*.pid
+.runtime/
 
 # Local AI runtime and model weights
 ai-worker/hair-tryon/.venv/
@@ -25,6 +35,7 @@ ai-worker/hair-tryon/models/*.onnx
 ai-worker/hair-tryon/models/natural-hair-lora/
 ai-worker/hair-tryon/training/data-*/
 ai-worker/hair-tryon/training/source/
+ai-worker/hair-tryon/training/automatic-discovery*/
 
 # Logs
 *.log

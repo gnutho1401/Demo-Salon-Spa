@@ -135,6 +135,11 @@ describe("AI Stylist hybrid local/API", () => {
 
     expect(payload.recommendations.hairstyles.map((item) => item.code)).toContain("LAYER_FACE_FRAME");
     expect(payload.recommendations.colors.map((item) => item.code)).toEqual(expect.arrayContaining(["CHESTNUT_BROWN", "COPPER_GLOW"]));
+    expect(payload.analysis).toEqual(expect.objectContaining({
+      is_frontal: true,
+      pose: "frontal",
+      pose_score: 0.91,
+    }));
     expect(payload.booking_suggestion.recommended_service_id).toBe(10);
     expect(payload.booking_suggestion.suggested_stylist_id).toBe(7);
   });

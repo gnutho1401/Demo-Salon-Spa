@@ -346,11 +346,15 @@ async function resendVerifyCode(email) {
 
   const mailResult = await sendVerifyEmail(normalizedEmail, verifyCode);
 
+  const exposeDevCode =
+    mailResult.skipped &&
+    process.env.NODE_ENV !== "production" &&
+    process.env.EXPOSE_DEV_AUTH_TOKENS === "true";
   return {
-    message: mailResult.skipped
+    message: exposeDevCode
       ? `Đã tạo mã xác thực DEV: ${verifyCode}`
       : "Đã gửi lại mã xác thực email",
-    devVerifyCode: mailResult.skipped ? verifyCode : undefined,
+    devVerifyCode: exposeDevCode ? verifyCode : undefined,
   };
 }
 
@@ -366,7 +370,10 @@ async function login(email, password) {
   if (isBcryptHash(user.PasswordHash)) {
     isMatch = await bcrypt.compare(password, user.PasswordHash);
   } else {
-    isMatch = password === user.PasswordHash;
+    const allowLegacyPassword =
+      process.env.ALLOW_LEGACY_PLAINTEXT_PASSWORDS === "true" &&
+      process.env.NODE_ENV !== "production";
+    isMatch = allowLegacyPassword && password === user.PasswordHash;
   }
 
   if (!isMatch) throw new Error("Sai mật khẩu");
@@ -548,11 +555,15 @@ async function forgotPassword(email) {
   `);
 
   const mailResult = await sendResetPasswordEmail(user.Email, resetToken);
+  const exposeDevToken =
+    mailResult.skipped &&
+    process.env.NODE_ENV !== "production" &&
+    process.env.EXPOSE_DEV_AUTH_TOKENS === "true";
   return {
-    message: mailResult.skipped
+    message: exposeDevToken
       ? `Link DEV: ${process.env.FRONTEND_URL || "http://localhost:5173"}/reset-password?token=${resetToken}`
       : "Nếu email tồn tại, hệ thống sẽ gửi link đặt lại mật khẩu",
-    devResetToken: mailResult.skipped ? resetToken : undefined,
+    devResetToken: exposeDevToken ? resetToken : undefined,
   };
 }
 

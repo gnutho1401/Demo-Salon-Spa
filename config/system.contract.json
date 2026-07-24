@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "runtime": {
+    "websiteOrigin": "http://localhost:5173",
+    "backendOrigin": "http://localhost:5000",
+    "frontendPort": 5173,
+    "backendPort": 5000,
+    "aiWorkerOrigin": "http://127.0.0.1:8189",
+    "databasePort": 1433
+  },
+  "authentication": {
+    "tokenStorageKey": "token",
+    "userStorageKey": "user",
+    "googleClientIdBackendKey": "GOOGLE_CLIENT_ID",
+    "googleClientIdFrontendKey": "VITE_GOOGLE_CLIENT_ID",
+    "googleOriginsBackendKey": "GOOGLE_AUTHORIZED_ORIGINS",
+    "googleOriginsFrontendKey": "VITE_GOOGLE_AUTHORIZED_ORIGINS"
+  },
+  "roles": {
+    "database": [
+      "ADMIN",
+      "MANAGER",
+      "RECEPTIONIST",
+      "TECHNICIAN",
+      "CUSTOMER"
+    ],
+    "external": [
+      "GUEST",
+      "CUSTOMER"
+    ],
+    "internal": [
+      "ADMIN",
+      "MANAGER",
+      "RECEPTIONIST",
+      "TECHNICIAN"
+    ],
+    "aliases": {
+      "STYLIST": "TECHNICIAN",
+      "STAFF": "RECEPTIONIST_OR_TECHNICIAN"
+    }
+  },
+  "api": {
+    "basePath": "/api",
+    "healthPath": "/api/health",
+    "googleLoginPath": "/api/auth/google-login",
+    "aiStylistPath": "/api/ai/stylist"
+  }
+}

@@ -15,6 +15,19 @@ export function useAnalyticsDashboard(chartKeys, filter, enabled = true) {
   const [error, setError] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
   const keys = Array.isArray(chartKeys) ? chartKeys.join(",") : String(chartKeys || "");
+  const refreshMs = Number(import.meta.env.VITE_ANALYTICS_REFRESH_MS || 30000);
+
+  useEffect(() => {
+    if (!enabled || !keys || !Number.isFinite(refreshMs) || refreshMs < 5000) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        setReloadToken((value) => value + 1);
+      }
+    }, refreshMs);
+    return () => window.clearInterval(timer);
+  }, [enabled, keys, refreshMs]);
 
   useEffect(() => {
     if (!enabled || !keys) {
@@ -25,7 +38,7 @@ export function useAnalyticsDashboard(chartKeys, filter, enabled = true) {
     const controller = new AbortController();
     async function load() {
       try {
-        setLoading(true);
+        if (!data) setLoading(true);
         setError("");
         const response = await axiosClient.get("/internal-analytics/dashboard", {
           params: { ...filter, keys },

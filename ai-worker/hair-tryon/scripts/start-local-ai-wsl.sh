@@ -17,4 +17,4 @@ export HAIR_OFFLINE_MODE=true
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 cd "$ROOT"
-exec "$PYTHON" -m uvicorn app.main:app --host 127.0.0.1 --port 8189
+exec "$PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port 8189

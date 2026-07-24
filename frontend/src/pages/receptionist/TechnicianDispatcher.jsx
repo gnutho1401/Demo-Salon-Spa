@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import axiosClient from "../../api/axiosClient";
+import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import ReceptionistLayout from "../../layouts/ReceptionistLayout";
 
 const DEFAULT_AVATAR = "https://www.w3schools.com/howto/img_avatar.png";
@@ -115,8 +115,7 @@ export default function TechnicianDispatcher() {
 
   const resolveAvatar = (url) => {
     if (!url) return DEFAULT_AVATAR;
-    if (url.startsWith("http")) return url;
-    return `http://localhost:5000${url}`;
+    return resolveFileUrl(url);
   };
 
   return (

@@ -1,5 +1,5 @@
-const app = require('./app');
 const { port } = require('./config/env');
+const app = require('./app');
 const { connectDB } = require('./config/db');
 const { startAppointmentReminderScheduler } = require('./modules/notifications/notifications.service');
 const { startWaitingListHoldScheduler } = require('./modules/waiting-list/waiting-list.service');

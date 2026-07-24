@@ -10,3 +10,4 @@ transformers>=4.55,<5
 accelerate>=1.10,<2
 safetensors>=0.6,<1
 huggingface-hub>=0.34,<2
+xformers>=0.0.28,<1

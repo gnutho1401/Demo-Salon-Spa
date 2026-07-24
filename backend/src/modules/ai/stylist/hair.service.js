@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
 const { connectDB, sql } = require("../../../config/db");
+const { analyzeWithLocal } = require("../vision/face_analysis.service");
 
 const PRIVATE_IMAGE_ROOT = path.resolve(__dirname, "../../../../private/ai-hair");
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -91,16 +92,7 @@ Yêu cầu bắt buộc:
 Chỉ trả về đúng một ảnh kết quả.`;
 }
 
-function extractGeminiImage(payload) {
-  const parts = payload?.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((part) => part.inlineData?.data || part.inline_data?.data);
-  const inlineData = imagePart?.inlineData || imagePart?.inline_data;
-  if (!inlineData?.data) return null;
-  return {
-    buffer: Buffer.from(inlineData.data, "base64"),
-    mimeType: inlineData.mimeType || inlineData.mime_type || "image/png",
-  };
-}
+
 
 async function generateWithLocal(inputImage, prompt, context = {}) {
   const baseUrl = String(process.env.LOCAL_HAIR_API_URL || "http://127.0.0.1:8189").replace(/\/$/, "");
@@ -144,265 +136,21 @@ async function generateWithLocal(inputImage, prompt, context = {}) {
   };
 }
 
-async function generateWithGemini(inputImage, prompt) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY chưa được cấu hình.");
 
-  const configuredModel = String(process.env.GEMINI_IMAGE_MODEL || "").trim();
-  const models = [...new Set([
-    configuredModel,
-    "gemini-3.1-flash-image",
-    "gemini-2.5-flash-image",
-  ].filter(Boolean))];
-  const timeout = Math.max(30000, Number(process.env.AI_HAIR_JOB_TIMEOUT_MS) || 120000);
-  let lastError;
-
-  for (const model of models) {
-    try {
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-        {
-          contents: [{
-            role: "user",
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType: inputImage.mimeType, data: inputImage.buffer.toString("base64") } },
-            ],
-          }],
-          generationConfig: {
-            responseModalities: ["IMAGE"],
-          },
-        },
-        {
-          headers: {
-            "x-goog-api-key": apiKey,
-            "Content-Type": "application/json",
-          },
-          timeout,
-          maxBodyLength: 30 * 1024 * 1024,
-        },
-      );
-
-      const image = extractGeminiImage(response.data);
-      if (!image?.buffer?.length) throw new Error("Model không trả về ảnh kết quả.");
-
-      const usage = response.data?.usageMetadata || {};
-      return {
-        ...image,
-        provider: "google",
-        modelName: model,
-        providerRequestId: response.headers?.["x-request-id"] || null,
-        inputToken: Number(usage.promptTokenCount || 0) || null,
-        outputToken: Number(usage.candidatesTokenCount || 0) || null,
-      };
-    } catch (error) {
-      lastError = error;
-      console.warn(`[AI Hair Try-on] Gemini model ${model} failed:`, error.response?.data?.error?.message || error.message);
-    }
-  }
-
-  throw lastError || new Error("Không thể tạo ảnh bằng Gemini.");
-}
-
-async function generateWithReplicate(inputImage, prompt) {
-  const token = process.env.REPLICATE_API_TOKEN;
-  if (!token) throw new Error("REPLICATE_API_TOKEN chưa được cấu hình.");
-
-  const version = process.env.REPLICATE_HAIR_MODEL_VERSION ||
-    "30c1d0b916a6f8efce20493f5d61ee27491ab2a60437c13c588468b9810ec23f";
-  const timeout = Math.max(30000, Number(process.env.AI_HAIR_JOB_TIMEOUT_MS) || 120000);
-  const authorization = `Bearer ${token}`;
-  const start = await axios.post(
-    "https://api.replicate.com/v1/predictions",
-    {
-      version,
-      input: {
-        image: `data:${inputImage.mimeType};base64,${inputImage.buffer.toString("base64")}`,
-        prompt,
-        negative_prompt: "different person, changed face, face retouching, makeup, distorted face, extra person, text, watermark, illustration",
-        num_outputs: 1,
-        guidance_scale: 7.5,
-        image_guidance_scale: 1.7,
-        num_inference_steps: 35,
-      },
-    },
-    { headers: { Authorization: authorization, "Content-Type": "application/json" }, timeout: 15000, maxBodyLength: 30 * 1024 * 1024 },
-  );
-
-  let prediction = start.data;
-  const deadline = Date.now() + timeout;
-  while (!["succeeded", "failed", "canceled"].includes(prediction.status) && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const status = await axios.get(prediction.urls.get, { headers: { Authorization: authorization }, timeout: 10000 });
-    prediction = status.data;
-  }
-
-  if (prediction.status !== "succeeded") {
-    throw new Error(prediction.error || `Replicate kết thúc với trạng thái ${prediction.status || "timeout"}.`);
-  }
-
-  const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-  if (!outputUrl) throw new Error("Replicate không trả về ảnh kết quả.");
-  const imageResponse = await axios.get(outputUrl, { responseType: "arraybuffer", timeout: 30000 });
-  return {
-    buffer: Buffer.from(imageResponse.data),
-    mimeType: String(imageResponse.headers["content-type"] || "image/png").split(";")[0],
-    provider: "replicate",
-    modelName: `timothybrooks/instruct-pix2pix:${version.slice(0, 12)}`,
-    providerRequestId: prediction.id || null,
-    inputToken: null,
-    outputToken: null,
-  };
-}
-
-async function generateWithFal(inputImage, prompt) {
-  const apiKey = process.env.FAL_KEY;
-  if (!apiKey) throw new Error("FAL_KEY chưa được cấu hình.");
-
-  const model = process.env.FAL_HAIR_MODEL || "fal-ai/image-editing/hair-change";
-  const timeout = Math.max(30000, Number(process.env.AI_HAIR_JOB_TIMEOUT_MS) || 120000);
-  const response = await axios.post(
-    `https://fal.run/${model}`,
-    {
-      image_url: `data:${inputImage.mimeType};base64,${inputImage.buffer.toString("base64")}`,
-      prompt,
-      guidance_scale: 3.5,
-      num_inference_steps: 30,
-      safety_tolerance: "2",
-      output_format: "jpeg",
-      sync_mode: true,
-    },
-    {
-      headers: {
-        Authorization: `Key ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      timeout,
-      maxBodyLength: 30 * 1024 * 1024,
-    },
-  );
-
-  const output = response.data?.images?.[0];
-  if (!output?.url) throw new Error("fal.ai không trả về ảnh kết quả.");
-
-  let image;
-  if (String(output.url).startsWith("data:")) {
-    image = parseDataUrl(output.url);
-  } else {
-    const imageResponse = await axios.get(output.url, {
-      responseType: "arraybuffer",
-      timeout: Math.min(timeout, 30000),
-      maxContentLength: 20 * 1024 * 1024,
-      maxBodyLength: 20 * 1024 * 1024,
-    });
-    image = {
-      buffer: Buffer.from(imageResponse.data),
-      mimeType: String(output.content_type || imageResponse.headers["content-type"] || "image/jpeg").split(";")[0],
-    };
-  }
-
-  if (!image?.buffer?.length) throw new Error("Ảnh fal.ai trả về không hợp lệ.");
-  return {
-    ...image,
-    provider: "fal",
-    modelName: model,
-    providerRequestId: response.headers?.["x-fal-request-id"] || response.data?.request_id || null,
-    inputToken: null,
-    outputToken: null,
-    cost: Number.isFinite(Number(process.env.FAL_HAIR_COST_USD))
-      ? Number(process.env.FAL_HAIR_COST_USD)
-      : null,
-  };
-}
-
-async function generateWithOpenRouter(inputImage, prompt) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("OPENROUTER_API_KEY chưa được cấu hình.");
-  const model = process.env.OPENROUTER_IMAGE_MODEL || "google/gemini-3.1-flash-image";
-  const timeout = Math.max(30000, Number(process.env.AI_HAIR_JOB_TIMEOUT_MS) || 120000);
-  const response = await axios.post(
-    "https://openrouter.ai/api/v1/images",
-    {
-      model,
-      prompt,
-      input_references: [{
-        type: "image_url",
-        image_url: { url: `data:${inputImage.mimeType};base64,${inputImage.buffer.toString("base64")}` },
-      }],
-      n: 1,
-      resolution: "1K",
-      output_format: "jpeg",
-      output_compression: 90,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.FRONTEND_URL || "http://localhost:5173",
-        "X-Title": "Beauty Salon AI Stylist",
-      },
-      timeout,
-      maxBodyLength: 30 * 1024 * 1024,
-    },
-  );
-
-  const output = response.data?.data?.[0];
-  if (!output?.b64_json) throw new Error("OpenRouter không trả về ảnh kết quả.");
-  const usage = response.data?.usage || {};
-  return {
-    buffer: Buffer.from(output.b64_json, "base64"),
-    mimeType: output.media_type || "image/jpeg",
-    provider: "openrouter",
-    modelName: model,
-    providerRequestId: response.headers?.["x-request-id"] || null,
-    inputToken: Number(usage.prompt_tokens || 0) || null,
-    outputToken: Number(usage.completion_tokens || 0) || null,
-    cost: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
-  };
-}
-
-function summarizeProviderError(provider, error) {
-  const status = error?.response?.status;
-  const message = String(error?.response?.data?.error?.message || error?.response?.data?.detail || error?.message || "").toLowerCase();
-  if (status === 401 || /invalid.*(key|token)|authentication token/.test(message)) return `${provider}: khóa API không hợp lệ`;
-  if (status === 402 || /credit|balance|billing/.test(message)) return `${provider}: tài khoản chưa có số dư/billing`;
-  if (status === 429 || /quota|rate limit/.test(message)) return `${provider}: đã hết quota hoặc đang bị giới hạn`;
-  return `${provider}: tạm thời không khả dụng`;
-}
 
 async function generateRealHairImage(inputImage, prompt, context = {}) {
-  const failures = [];
-  const localEnabled = String(process.env.AI_HAIR_LOCAL_ENABLED || "").toLowerCase() === "true";
-  const forceLocal = String(process.env.AI_HAIR_FORCE_LOCAL || "true").toLowerCase() !== "false";
-  const providers = {
-    local: { enabled: localEnabled, label: "AI local", generate: generateWithLocal },
-    fal: { enabled: Boolean(process.env.FAL_KEY), label: "fal.ai", generate: generateWithFal },
-    gemini: { enabled: Boolean(process.env.GEMINI_API_KEY), label: "Gemini", generate: generateWithGemini },
-    openrouter: { enabled: Boolean(process.env.OPENROUTER_API_KEY), label: "OpenRouter", generate: generateWithOpenRouter },
-    replicate: { enabled: Boolean(process.env.REPLICATE_API_TOKEN), label: "Replicate", generate: generateWithReplicate },
-  };
-  const order = forceLocal
-    ? ["local"]
-    : String(process.env.AI_HAIR_PROVIDER_ORDER || "local,fal,gemini,openrouter,replicate")
-      .split(",")
-      .map((name) => name.trim().toLowerCase())
-      .filter((name, index, list) => providers[name] && list.indexOf(name) === index);
-
-  for (const name of order) {
-    const provider = providers[name];
-    if (!provider.enabled) continue;
-    try {
-      return await provider.generate(inputImage, prompt, context);
-    } catch (error) {
-      console.warn(`[AI Hair Try-on] ${provider.label} failed:`, error.response?.data?.error?.message || error.message);
-      failures.push(summarizeProviderError(provider.label, error));
-    }
+  const localEnabled = String(process.env.AI_HAIR_LOCAL_ENABLED || "true").toLowerCase() !== "false";
+  
+  if (!localEnabled) {
+    throw new Error("Chưa bật cấu hình AI Local (AI_HAIR_LOCAL_ENABLED=true).");
   }
 
-  if (failures.length === 0) {
-    throw new Error("Chưa cấu hình AI thử tóc. Có thể bật AI local miễn phí bằng AI_HAIR_LOCAL_ENABLED=true.");
+  try {
+    return await generateWithLocal(inputImage, prompt, context);
+  } catch (error) {
+    console.warn("[AI Hair Try-on] Local AI failed:", error.response?.data?.error?.message || error.response?.data?.detail || error.message);
+    throw new Error("Không thể tạo ảnh thử tóc lúc này do lỗi từ Local AI.");
   }
-  throw new Error(`Không thể tạo ảnh thử tóc lúc này. ${failures.join(" | ")}`);
 }
 
 async function getCustomer(pool, userId) {
@@ -481,6 +229,18 @@ async function getStyles({ audience, trending } = {}) {
 
 async function createTryOn({ userId, imageUrl, prompt, styleId }) {
   const inputImage = await loadInputImage(imageUrl);
+  if (String(process.env.AI_HAIR_REQUIRE_FRONTAL || "true").toLowerCase() !== "false") {
+    const pose = await analyzeWithLocal({
+      base64Data: inputImage.buffer.toString("base64"),
+      mimeType: inputImage.mimeType,
+    });
+    if (pose.is_face === false) {
+      throw new Error("Không nhận diện được khuôn mặt rõ ràng trong ảnh.");
+    }
+    if (pose.is_frontal !== true) {
+      throw new Error("Ảnh chưa chính diện. Vui lòng nhìn thẳng vào camera và để thấy rõ hai bên tóc.");
+    }
+  }
   const pool = await connectDB();
   await purgeExpiredTryOns(pool).catch((error) => {
     console.warn("[AI Hair Try-on] Không thể dọn ảnh hết hạn:", error.message);

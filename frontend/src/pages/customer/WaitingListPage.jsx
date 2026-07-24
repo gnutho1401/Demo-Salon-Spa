@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import CustomerLayout from "../../components/layout/CustomerLayout";
-import axiosClient from "../../api/axiosClient";
+import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 const STATUS = {
@@ -39,14 +39,7 @@ function money(value) {
 }
 
 function imageUrl(value) {
-  if (!value) return "";
-  if (String(value).startsWith("http")) return value;
-
-  const baseURL =
-    axiosClient.defaults.baseURL?.replace("/api", "") ||
-    "http://localhost:5000";
-
-  return `${baseURL}${String(value).startsWith("/") ? "" : "/"}${value}`;
+  return resolveFileUrl(value);
 }
 
 function dateText(value) {

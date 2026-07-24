@@ -39,35 +39,35 @@ export default function Home() {
       heading: <>Chăm sóc sắc đẹp <br /><span>chuẩn spa hiện đại</span></>,
       description: "Khách hàng có thể xem dịch vụ, chọn kỹ thuật viên, đặt lịch, thanh toán, dùng voucher, mua combo liệu trình và theo dõi lịch hẹn ngay trên hệ thống.",
       trustItems: ["💗 Tư vấn tận tâm", "💅 Dịch vụ thật", "💳 Thanh toán online"],
-      imageUrl: "http://localhost:5000/images/home/hero-girl.png"
+      imageUrl: "/images/home/hero-girl.png"
     },
     {
       badge: "💇 Premium Hair Care",
       heading: <>Tạo mẫu tóc thời thượng <br /><span>tỏa sáng khí chất</span></>,
       description: "Đội ngũ chuyên gia tạo mẫu tóc chuyên nghiệp, luôn cập nhật các xu hướng cắt, uốn, duỗi và nhuộm màu thời trang nhất giúp bạn lột xác hoàn hảo.",
       trustItems: ["✨ Stylist hàng đầu", "🧪 Thuốc nhuộm organic", "💇 Bảo hành nếp tóc"],
-      imageUrl: "http://localhost:5000/images/home/hero-hair.png"
+      imageUrl: "/images/home/hero-hair.png"
     },
     {
       badge: "💅 Luxury Nail Spa",
       heading: <>Thiết kế móng nghệ thuật <br /><span>tinh tế từng chi tiết</span></>,
       description: "Điểm tô nét duyên dáng cho đôi tay với các dịch vụ chăm sóc móng, sơn gel cao cấp và thiết kế vẽ móng đính đá nghệ thuật độc bản từ các nghệ nhân lành nghề.",
       trustItems: ["🌟 Gel nhập khẩu", "🛡️ Khử trùng 100%", "🎨 Vẽ móng nghệ thuật"],
-      imageUrl: "http://localhost:5000/images/home/hero-nails.png"
+      imageUrl: "/images/home/hero-nails.png"
     },
     {
       badge: "💆 Deep Body Wellness",
       heading: <>Massage trị liệu <br /><span>tái tạo năng lượng sống</span></>,
       description: "Đánh tan mọi mỏi mệt và căng thẳng với các liệu trình massage body đá nóng, bấm huyệt y học cổ truyền kết hợp hương thảo dược tinh dầu tự nhiên.",
       trustItems: ["🌿 Tinh dầu hữu cơ", "💆 Trị liệu chuyên sâu", "🧘 Không gian yên bình"],
-      imageUrl: "http://localhost:5000/images/home/hero-spa-interior.png"
+      imageUrl: "/images/home/hero-spa-interior.png"
     },
     {
       badge: "🤖 AI Beauty Skin Analyzer",
       heading: <>Chẩn đoán da thông minh <br /><span>phân tích 11 chỉ số AI</span></>,
       description: "Trải nghiệm công nghệ AI Skin Analyzer hiện đại nhất, chụp ảnh và phân tích tức thì 11 chỉ số sức khỏe của da để đưa ra liệu trình chăm sóc chuẩn y khoa phù hợp nhất.",
       trustItems: ["📸 Phân tích tức thì", "🔍 Chính xác vượt trội", "📈 Lịch sử chẩn đoán"],
-      imageUrl: "http://localhost:5000/images/home/hero-ai-skin.png"
+      imageUrl: "/images/home/hero-ai-skin.png"
     }
   ], []);
 
@@ -92,35 +92,35 @@ export default function Home() {
     {
       title: "Phòng Gội Đầu Dưỡng Sinh",
       desc: "Trải nghiệm gội đầu thảo dược kết hợp bấm huyệt trị liệu vai gáy trong không gian ấm cúng, thoảng hương sả chanh.",
-      imageUrl: "http://localhost:5000/images/gallery/shampoo.png",
+      imageUrl: "/images/gallery/shampoo.png",
       tag: "Dưỡng sinh",
       size: "large"
     },
     {
       title: "Khu Vực Tạo Mẫu Tóc Chuyên Nghiệp",
       desc: "Thiết kế hiện đại chuẩn Salon cao cấp với hệ thống gương LED cảm ứng và trang thiết bị uốn nhuộm tối tân nhất.",
-      imageUrl: "http://localhost:5000/images/gallery/hair.png",
+      imageUrl: "/images/gallery/hair.png",
       tag: "Hair Salon",
       size: "medium"
     },
     {
       title: "Phòng Trị Liệu VIP",
       desc: "Không gian khép kín yên tĩnh tuyệt đối dành cho các liệu trình chăm sóc da chuyên sâu và massage body đá nóng.",
-      imageUrl: "http://localhost:5000/images/gallery/vip.png",
+      imageUrl: "/images/gallery/vip.png",
       tag: "Spa Trị Liệu",
       size: "medium"
     },
     {
       title: "Lounge Chờ & Quầy Trà Thảo Mộc",
       desc: "Nơi đón tiếp khách hàng sang trọng với trà hoa cúc mật ong tự nhiên giúp bạn thư giãn trước và sau buổi làm đẹp.",
-      imageUrl: "http://localhost:5000/images/gallery/lounge.png",
+      imageUrl: "/images/gallery/lounge.png",
       tag: "Sảnh Chờ",
       size: "wide"
     },
     {
       title: "Khu Vực Nail & Foot Massage",
       desc: "Hệ thống ghế ngồi nhung bồn ngâm chân bọc đồng cao cấp, mang lại sự dễ chịu tối đa khi chăm sóc móng.",
-      imageUrl: "http://localhost:5000/images/gallery/nails.png",
+      imageUrl: "/images/gallery/nails.png",
       tag: "Nails & Foot",
       size: "small"
     }
@@ -131,40 +131,10 @@ export default function Home() {
   // Voucher saving states and handler
   const [voucherStatus, setVoucherStatus] = useState({}); // { [voucherId]: "saving" | "saved" | "error" }
 
-  // Default fallback reviews in case database is empty or offline
-  const defaultReviews = useMemo(() => [
-    {
-      ReviewId: 1,
-      CustomerName: "Nguyễn Thảo My",
-      ServiceName: "Chẩn Đoán Da AI & Trị Liệu Mụn",
-      Rating: 5,
-      Comment: "Mình cực kỳ bất ngờ với công nghệ AI Skin Analyzer của LUNA! Chỉ sau 1 phút quét mặt, hệ thống đã chỉ ra chính xác mức độ nhạy cảm của da mình và đề xuất phác đồ trị liệu. Liệu trình chăm sóc da mụn chuẩn y khoa ở đây rất dịu nhẹ, nhân viên nhẹ nhàng, sau 3 buổi da mình đã đỡ đỏ hẳn!",
-      CreatedAt: "2026-06-12"
-    },
-    {
-      ReviewId: 2,
-      CustomerName: "Trần Minh Tâm",
-      ServiceName: "Cắt Tóc & Tạo Kiểu Cùng AI Stylist",
-      Rating: 5,
-      Comment: "Lần đầu tiên đi làm tóc mà được trải nghiệm AI Stylist tư vấn kiểu tóc phù hợp với khuôn mặt! Kiểu tóc Layer Hàn Quốc sau khi cắt xong rất ưng ý, phồng tự nhiên và tôn dáng mặt. Salon rất sang trọng, trà nước tiếp đón chu đáo chuyên nghiệp.",
-      CreatedAt: "2026-06-08"
-    },
-    {
-      ReviewId: 3,
-      CustomerName: "Lê Quỳnh Chi",
-      ServiceName: "Nail Nghệ Thuật & Chăm Sóc Móng",
-      Rating: 5,
-      Comment: "Hệ thống bồn ngâm chân bọc đồng ngâm muối thảo mộc cực kỳ thư giãn! Mẫu nail vẽ đá xà cừ do kỹ thuật viên ở đây thực hiện siêu tỉ mỉ, phom móng chuẩn đẹp và giữ được rất bền màu. Chắc chắn sẽ quay lại LUNA thường xuyên!",
-      CreatedAt: "2026-06-04"
-    }
-  ], []);
-
   const [reviews, setReviews] = useState([]);
   const [currentReview, setCurrentReview] = useState(0);
 
-  const reviewsToShow = useMemo(() => {
-    return reviews.length > 0 ? reviews : defaultReviews;
-  }, [reviews, defaultReviews]);
+  const reviewsToShow = reviews;
 
   const handleReviewDotClick = (idx) => {
     setCurrentReview(idx);
@@ -280,9 +250,9 @@ export default function Home() {
 
         if (reviewsRes.status === "fulfilled") {
           const list = reviewsRes.value.data.data || reviewsRes.value.data || [];
-          setReviews(list.length > 0 ? list : defaultReviews);
+          setReviews(list);
         } else {
-          setReviews(defaultReviews);
+          setReviews([]);
         }
 
         if (token && myRes && myRes.status === "fulfilled") {
@@ -349,92 +319,11 @@ export default function Home() {
       .slice(0, 4);
   }, [techs]);
 
-  const defaultPackages = useMemo(() => [
-    {
-      PackageId: 1,
-      PackageName: "LUNA Royal Signature",
-      CategoryName: "Liệu trình Toàn diện",
-      Description: "Liệu trình chăm sóc da mặt chuyên sâu bằng vàng 24K kết hợp chăm sóc tóc thảo dược cao cấp và gội đầu trị liệu dưỡng sinh.",
-      FinalPrice: 1850000,
-      TotalSessions: 5,
-      ValidityDays: 90,
-      IsHot: true,
-      ImageUrl: "http://localhost:5000/images/gallery/vip.png"
-    },
-    {
-      PackageId: 2,
-      PackageName: "AI Beauty Hair & Skin",
-      CategoryName: "Công nghệ cao AI",
-      Description: "Quét chẩn đoán da mặt AI Skin Analyzer kèm thiết lập phác đồ trị liệu mụn/nâng cơ và tạo kiểu tóc chuyên nghiệp cùng AI Stylist.",
-      FinalPrice: 950000,
-      TotalSessions: 3,
-      ValidityDays: 30,
-      IsHot: true,
-      ImageUrl: "http://localhost:5000/images/gallery/hair.png"
-    },
-    {
-      PackageId: 3,
-      PackageName: "Zen Wellness & Spa Therapy",
-      CategoryName: "Thư giãn & Trị liệu",
-      Description: "Gói xông hơi thải độc kết hợp massage đá nóng Tây Tạng tinh dầu organic Thụy Sĩ tại phòng VIP khép kín yên bình.",
-      FinalPrice: 1200000,
-      TotalSessions: 4,
-      ValidityDays: 45,
-      IsHot: false,
-      ImageUrl: "http://localhost:5000/images/gallery/lounge.png"
-    },
-    {
-      PackageId: 4,
-      PackageName: "Princess Nails & Foot Care",
-      CategoryName: "Nails & Spa",
-      Description: "Ngâm chân thảo dược bồn bọc đồng, massage bấm huyệt chân và thiết kế vẽ nail nghệ thuật xà cừ đắp bột cao cấp.",
-      FinalPrice: 750000,
-      TotalSessions: 3,
-      ValidityDays: 30,
-      IsHot: false,
-      ImageUrl: "http://localhost:5000/images/gallery/nails.png"
-    },
-    {
-      PackageId: 5,
-      PackageName: "Gold Skin Anti-Aging Premium",
-      CategoryName: "Trẻ hóa & Nâng cơ",
-      Description: "Sử dụng tinh chất DNA cá hồi và máy sóng RF nâng cơ chống chảy xệ, trẻ hóa tầng sâu giúp khôi phục nét xuân.",
-      FinalPrice: 2500000,
-      TotalSessions: 6,
-      ValidityDays: 60,
-      IsHot: true,
-      ImageUrl: "http://localhost:5000/images/gallery/shampoo.png"
-    },
-    {
-      PackageId: 6,
-      PackageName: "Glow Skin & Acne Control",
-      CategoryName: "Trị liệu da mụn",
-      Description: "Liệu trình chăm sóc da mụn chuẩn y khoa kết hợp đắp mặt nạ sinh học cấp ẩm làm sáng mịn da sau lần đầu tiên.",
-      FinalPrice: 1100000,
-      TotalSessions: 4,
-      ValidityDays: 45,
-      IsHot: false,
-      ImageUrl: "http://localhost:5000/images/gallery/vip.png"
-    }
-  ], []);
-
   const hotPackages = useMemo(() => {
-    const list = [...packages];
-    if (list.length >= 6) {
-      return list
-        .sort((a, b) => Number(b.IsHot || 0) - Number(a.IsHot || 0))
-        .slice(0, 6);
-    } else {
-      const merged = [...list].sort((a, b) => Number(b.IsHot || 0) - Number(a.IsHot || 0));
-      for (const fallback of defaultPackages) {
-        if (merged.length >= 6) break;
-        if (!merged.some(p => p.PackageName === fallback.PackageName)) {
-          merged.push(fallback);
-        }
-      }
-      return merged;
-    }
-  }, [packages, defaultPackages]);
+    return [...packages]
+      .sort((a, b) => Number(b.IsHot || 0) - Number(a.IsHot || 0))
+      .slice(0, 6);
+  }, [packages]);
 
   const stats = useMemo(
     () => [
@@ -639,7 +528,7 @@ export default function Home() {
                 <img
                   src={safeImage(
                     item.ImageUrl,
-                    "http://localhost:5000/images/home/hero-girl.png",
+                    resolveFileUrl("/images/home/hero-girl.png"),
                   )}
                   alt={item.ServiceName}
                 />
@@ -822,7 +711,7 @@ export default function Home() {
                     <img
                       src={safeImage(
                         item.ImageUrl,
-                        "http://localhost:5000/images/home/hero-girl.png",
+                        resolveFileUrl("/images/home/hero-girl.png"),
                       )}
                       alt={item.PackageName}
                     />
@@ -958,7 +847,7 @@ export default function Home() {
                   <img
                     src={safeImage(
                       item.ImageUrl,
-                      "http://localhost:5000/images/home/hero-girl.png",
+                      resolveFileUrl("/images/home/hero-girl.png"),
                     )}
                     alt={item.FullName}
                   />

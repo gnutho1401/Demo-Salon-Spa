@@ -386,7 +386,8 @@ describe("Member 1 - Auth Service Unit Tests", () => {
     const result = await forgotPassword(email);
 
     // Assert
-    expect(result.message).toContain("reset-password");
+    expect(result.message).toContain("hệ thống sẽ gửi link đặt lại mật khẩu");
+    expect(result.devResetToken).toBeUndefined();
   });
 
   it("forgotPassword_ShouldReturnResetMessage_WhenEmailDoesNotExist", async () => {

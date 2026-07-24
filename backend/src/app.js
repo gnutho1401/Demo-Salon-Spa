@@ -1,16 +1,73 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const path = require("path");
 const errorMiddleware = require("./middlewares/error.middleware");
+const { connectDB } = require("./config/db");
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+const configuredOrigins = String(process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+const developmentOrigins = ["http://localhost:5173", "http://127.0.0.1:5173"];
+const localBackendOrigins = [
+  `http://localhost:${process.env.PORT || 5000}`,
+  `http://127.0.0.1:${process.env.PORT || 5000}`,
+];
+const allowedOrigins = new Set([
+  ...configuredOrigins,
+  ...localBackendOrigins,
+  ...(process.env.NODE_ENV === "production" ? [] : developmentOrigins),
+]);
+
+app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
+app.disable("x-powered-by");
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false,
+}));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin.replace(/\/$/, ""))) {
+      return callback(null, true);
+    }
+    // Cho phép linh hoạt trong môi trường phát triển hoặc khi dùng Cloudflare Tunnels
+    if (process.env.NODE_ENV !== "production" || origin.endsWith('.trycloudflare.com')) {
+      return callback(null, true);
+    }
+    return callback(new Error("Origin is not allowed by CORS"));
+  },
+  credentials: true,
+}));
+const jsonLimit = process.env.JSON_BODY_LIMIT || "12mb";
+app.use(express.json({ limit: jsonLimit }));
+app.use(express.urlencoded({ limit: jsonLimit, extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/images", express.static(path.join(__dirname, "../public/images")));
 
-app.get("/", (req, res) => res.json({ message: "Beauty Salon Management API" }));
+app.get("/api", (req, res) => res.json({ message: "Beauty Salon Management API" }));
+if (process.env.NODE_ENV !== "production") {
+  app.get("/", (req, res) => res.json({ message: "Beauty Salon Management API" }));
+}
+app.get("/api/health", async (req, res) => {
+  try {
+    const pool = await connectDB();
+    await pool.request().query("SELECT 1 AS Healthy");
+    return res.json({
+      status: "ok",
+      database: "connected",
+      uptimeSeconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    return res.status(503).json({
+      status: "unavailable",
+      database: "disconnected",
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 app.use("/api/auth", require("./modules/auth/auth.routes"));
 app.use("/api/customers", require("./modules/customers/customers.routes"));
@@ -48,6 +105,20 @@ app.use("/api/vouchers", require("./modules/vouchers/vouchers.routes"));
 app.use("/api/waiting-list", require("./modules/waiting-list/waiting-list.routes"));
 app.use("/api/v2/treatment-notes", require("./modules/treatment-notes-v2/treatment-notes-v2.routes"));
 app.use("/api/reschedule", require("./modules/reschedule/reschedule.routes"));
+
+if (process.env.NODE_ENV === "production") {
+  const frontendDist = path.resolve(__dirname, "../../frontend/dist");
+  app.use(express.static(frontendDist, {
+    index: false,
+    maxAge: "1d",
+    etag: true,
+  }));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
+    if (!req.accepts("html")) return next();
+    return res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
 
 app.use(errorMiddleware);
 module.exports = app;

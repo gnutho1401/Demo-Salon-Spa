@@ -98,28 +98,18 @@ export default function TechnicianDashboard() {
   const stats = useMemo(() => {
     const raw = dashboard?.stats || {};
     return {
-      todayAppointments: raw.todayAppointments || 6,
-      inProgress: raw.inProgress || 1,
-      completed: raw.completed || 4,
-      todayRevenue: raw.todayRevenue || 2450000,
-      averageRating: raw.averageRating || 5.0,
-      reviewCount: raw.reviewCount || 3,
-      newCustomers: 3 // Mocked for design parity
+      todayAppointments: raw.todayAppointments ?? 0,
+      inProgress: raw.inProgress ?? 0,
+      completed: raw.completed ?? 0,
+      todayRevenue: raw.todayRevenue ?? 0,
+      averageRating: raw.averageRating ?? 0,
+      reviewCount: raw.reviewCount ?? 0,
+      newCustomers: raw.newCustomers ?? 0
     };
   }, [dashboard]);
 
   const scheduleList = useMemo(() => {
-    if (dashboard?.todaySchedule && dashboard.todaySchedule.length > 0) {
-      return dashboard.todaySchedule;
-    }
-    // Mock data matching the mockup exactly
-    return [
-      { AppointmentId: 101, StartTime: "09:30", EndTime: "10:30", CustomerName: "Trần Thị Mai", ServiceName: "Nail Art Cao Cấp", Status: "IN_PROGRESS" },
-      { AppointmentId: 102, StartTime: "11:00", EndTime: "12:00", CustomerName: "Lê Thị Hương", ServiceName: "Sơn Gel", Status: "CONFIRMED" },
-      { AppointmentId: 103, StartTime: "13:30", EndTime: "14:30", CustomerName: "Phạm Thị Lan", ServiceName: "Đắp Bột", Status: "CONFIRMED" },
-      { AppointmentId: 104, StartTime: "15:00", EndTime: "16:00", CustomerName: "Nguyễn Thị Hoa", ServiceName: "Nail Art Basic", Status: "CONFIRMED" },
-      { AppointmentId: 105, StartTime: "16:30", EndTime: "17:30", CustomerName: "Đỗ Thị Nga", ServiceName: "Sơn Thường", Status: "CONFIRMED" },
-    ];
+    return dashboard?.todaySchedule || [];
   }, [dashboard]);
 
   const weeklyScheduleMapped = useMemo(() => {
@@ -148,8 +138,8 @@ export default function TechnicianDashboard() {
         dayNum: d.getDate(),
         fullDateLabel: d.toLocaleDateString("vi-VN", { day: 'numeric', month: 'numeric' }),
         isToday: d.toDateString() === today.toDateString(),
-        shiftName: matched ? matched.ShiftType : (dashboard?.weeklySchedule?.length > 0 ? "Nghỉ" : (i === 2 || i === 6 ? "Nghỉ" : "Ca sáng")),
-        hours: matched ? `${matched.StartTime} - ${matched.EndTime}` : (dashboard?.weeklySchedule?.length > 0 ? "" : (i === 2 || i === 6 ? "" : (i === 4 ? "13:00 - 20:00" : "08:00 - 17:00")))
+        shiftName: matched ? matched.ShiftType : "Chưa đăng ký",
+        hours: matched ? `${matched.StartTime} - ${matched.EndTime}` : ""
       });
     }
     return days;
@@ -161,21 +151,7 @@ export default function TechnicianDashboard() {
     return `${days[today.getDay()]} , ${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
   }, []);
 
-  // Monthly revenue chart data (T1 - T12)
-  const revenueChartData = [
-    { Month: "T1", Revenue: 32000000 },
-    { Month: "T2", Revenue: 34000000 },
-    { Month: "T3", Revenue: 30000000 },
-    { Month: "T4", Revenue: 38000000 },
-    { Month: "T5", Revenue: 42000000 },
-    { Month: "T6", Revenue: 45000000 },
-    { Month: "T7", Revenue: 40000000 },
-    { Month: "T8", Revenue: 44000000 },
-    { Month: "T9", Revenue: 48000000 },
-    { Month: "T10", Revenue: 42000000 },
-    { Month: "T11", Revenue: 45680000 },
-    { Month: "T12", Revenue: 49000000 },
-  ];
+  const revenueChartData = dashboard?.monthlyEarnings || [];
 
   if (error) {
     return (
@@ -201,7 +177,7 @@ export default function TechnicianDashboard() {
         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
           <div>
             <h1 style={{ margin: 0, fontSize: "1.75rem", fontWeight: "bold", color: "#2f593a", display: "flex", alignItems: "center", gap: "8px" }}>
-              Chào buổi sáng, {dashboard?.technician?.FullName || "Linh Chi"}! 🌿
+              Chào buổi sáng, {dashboard?.technician?.FullName || "Kỹ thuật viên"}! 🌿
             </h1>
             <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: "#718096" }}>
               Hôm nay là {vietnameseDate} – Chúc bạn một ngày làm việc hiệu quả!

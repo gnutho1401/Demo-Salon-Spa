@@ -1,7 +1,7 @@
 .footer {
   background: 
     linear-gradient(180deg, rgba(27, 17, 30, 0.88) 0%, rgba(12, 6, 16, 0.94) 100%),
-    url('http://localhost:5000/images/backgrounds/footer-dark-bg.png') no-repeat center center;
+    url('/images/backgrounds/footer-dark-bg.png') no-repeat center center;
   background-size: cover;
   border-top: 1px solid rgba(255, 94, 168, 0.25);
   margin-top: 108px;

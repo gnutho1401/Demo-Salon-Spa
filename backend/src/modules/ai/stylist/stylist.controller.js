@@ -62,7 +62,7 @@ async function getHistory(req, res) {
           booking_suggestion: payload.booking_suggestion,
           image_url: payload.image_url || '',
           is_fallback: payload.is_fallback || false,
-          model_name: payload.model_name || 'gemini-2.5-flash'
+          model_name: payload.model_name || 'gemini-3.5-flash'
         };
       } catch (parseErr) {
         return null;

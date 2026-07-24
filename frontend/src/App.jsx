@@ -8,7 +8,12 @@ export default function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || "not-configured";
 
   return (
-    <GoogleOAuthProvider clientId={googleClientId}>
+    <GoogleOAuthProvider
+      clientId={googleClientId}
+      onScriptLoadError={() =>
+        window.dispatchEvent(new Event("google-auth:script-error"))
+      }
+    >
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />

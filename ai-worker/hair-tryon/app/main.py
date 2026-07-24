@@ -20,6 +20,7 @@ class HairStyle(BaseModel):
     is_trending: bool = False
     lora_trigger: str | None = None
     prompt_version: str | None = None
+    thumbnail_url: str | None = None
 
 
 class TryOnRequest(BaseModel):

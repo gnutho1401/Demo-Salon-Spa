@@ -1,6 +1,6 @@
 const { sql, connectDB } = require("../../config/db");
 
-async function getDashboard() {
+async function loadDashboard() {
   const pool = await connectDB();
 
   const [
@@ -469,6 +469,29 @@ async function getDashboard() {
       };
     })(),
   };
+}
+
+let dashboardCache = null;
+let dashboardRequest = null;
+
+async function getDashboard() {
+  const cacheTtlMs = Number(process.env.ADMIN_DASHBOARD_CACHE_TTL_MS || 15000);
+  const now = Date.now();
+  if (dashboardCache && now - dashboardCache.createdAt < cacheTtlMs) {
+    return dashboardCache.data;
+  }
+  if (dashboardRequest) return dashboardRequest;
+
+  dashboardRequest = loadDashboard()
+    .then((data) => {
+      dashboardCache = { data, createdAt: Date.now() };
+      return data;
+    })
+    .finally(() => {
+      dashboardRequest = null;
+    });
+
+  return dashboardRequest;
 }
 
 module.exports = { getDashboard };

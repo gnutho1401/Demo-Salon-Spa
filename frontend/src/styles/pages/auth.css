@@ -2,7 +2,7 @@
   min-height: calc(100vh - 126px);
   display: grid;
   place-items: center;
-  background-image: url('http://localhost:5000/images/backgrounds/auth-bg.png');
+  background-image: url('/images/backgrounds/auth-bg.png');
   background-size: cover;
   background-position: center;
   position: relative;
@@ -322,6 +322,14 @@
   color: #77727a;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+.social-auth-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .muted {

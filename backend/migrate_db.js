@@ -1,6 +1,7 @@
 const sql = require("mssql");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const dbConfig = {
@@ -31,10 +32,58 @@ async function main() {
       throw new Error(`Migration file not found: ${sqlFilePath}`);
     }
     const rawSql = fs.readFileSync(sqlFilePath, "utf8");
+    const migrationName = path.basename(sqlFilePath);
+    const checksum = crypto.createHash("sha256").update(rawSql).digest("hex");
+
+    await pool.request().query(`
+      IF OBJECT_ID('dbo.SchemaMigrationHistory', 'U') IS NULL
+      BEGIN
+        CREATE TABLE dbo.SchemaMigrationHistory (
+          MigrationId INT IDENTITY(1,1) PRIMARY KEY,
+          MigrationName NVARCHAR(260) NOT NULL UNIQUE,
+          Checksum CHAR(64) NOT NULL,
+          AppliedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+        );
+      END
+    `);
+
+    const lockResult = await pool
+      .request()
+      .input("Resource", sql.NVarChar, `schema-migration:${dbConfig.database}`)
+      .query(`
+        DECLARE @LockResult INT;
+        EXEC @LockResult = sp_getapplock
+          @Resource = @Resource,
+          @LockMode = 'Exclusive',
+          @LockOwner = 'Session',
+          @LockTimeout = 30000;
+        SELECT @LockResult AS LockResult;
+      `);
+    if (Number(lockResult.recordset[0]?.LockResult) < 0) {
+      throw new Error("Could not acquire the database migration lock");
+    }
+
+    const applied = await pool
+      .request()
+      .input("MigrationName", sql.NVarChar, migrationName)
+      .query(`
+        SELECT MigrationName, Checksum, AppliedAt
+        FROM dbo.SchemaMigrationHistory
+        WHERE MigrationName = @MigrationName
+      `);
+    if (applied.recordset.length) {
+      if (applied.recordset[0].Checksum !== checksum) {
+        throw new Error(
+          `Migration ${migrationName} was already applied with a different checksum`
+        );
+      }
+      console.log(`Migration ${migrationName} was already applied; nothing to do.`);
+      return;
+    }
 
     // Split SQL by GO keyword
     const statements = rawSql
-      .split(/\bGO\b/gi)
+      .split(/^\s*GO\s*;?\s*$/gim)
       .map(s => s.trim())
       .filter(Boolean);
 
@@ -44,6 +93,15 @@ async function main() {
       console.log(`Executing statement ${i + 1}...`);
       await pool.request().query(statements[i]);
     }
+
+    await pool
+      .request()
+      .input("MigrationName", sql.NVarChar, migrationName)
+      .input("Checksum", sql.Char(64), checksum)
+      .query(`
+        INSERT INTO dbo.SchemaMigrationHistory (MigrationName, Checksum)
+        VALUES (@MigrationName, @Checksum)
+      `);
 
     console.log("Database migration completed successfully!");
   } catch (err) {

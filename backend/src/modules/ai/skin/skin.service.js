@@ -87,7 +87,7 @@ Quy tắc: Trả về chuỗi JSON thuần túy, KHÔNG bao gồm ký tự bao n
       const { base64Data, mimeType } = await downloadImageAsBase64(imageUrl);
       
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiApiKey}`,
         {
           contents: [
             {
@@ -164,31 +164,12 @@ Quy tắc: Trả về chuỗi JSON thuần túy, KHÔNG bao gồm ký tự bao n
     }
   }
 
-  // 3. Fallback mặc định nếu tất cả AI bị lỗi hoặc quá hạn API
-  console.warn('[Skin AI] All AI APIs failed, using default mock fallback data.');
+  // Never fabricate a successful medical/cosmetic analysis when providers fail.
+  console.warn('[Skin AI] All configured vision providers failed.');
   return {
-    is_face: true,
-    skin_type: 'Da hỗn hợp thiên dầu (Vùng chữ T tiết nhiều bã nhờn)',
-    acne_level: 'Nhẹ (Xuất hiện mụn đầu đen vùng mũi và vài nốt mụn cám)',
-    wrinkle_level: 'Không có (Làn da có độ đàn hồi tốt)',
-    dark_spots: 'Ít (Vài đốm nâu nhạt màu quanh gò má)',
-    redness: 'Không có',
-    pores: 'Nở rộng nhẹ (Tập trung vùng chữ T và hai bên cánh mũi)',
-    hydration: 'Thiếu ẩm nhẹ (Bề mặt da hơi khô và căng sau khi rửa mặt)',
-    sebum: 'Thừa dầu vùng chữ T (Đặc biệt vùng mũi và trán)',
-    skin_barrier: 'Tổn thương nhẹ (Dễ ửng đỏ khi thay đổi thời tiết)',
-    elasticity: 'Đàn hồi tốt săn chắc (Chưa có dấu hiệu lão hóa rõ rệt)',
-    dark_circles: 'Không có',
-    skin_score: 78,
-    summary: 'Da có tình trạng tiết dầu nhẹ ở vùng chữ T, bề mặt da tương đối khỏe mạnh tuy nhiên cần được làm sạch sâu lỗ chân lông để tránh bít tắc gây mụn thêm.',
-    routine_suggestion: 'Routine Sáng: Rửa mặt dịu nhẹ -> Toner BHA 2% (2 lần/tuần) -> Serum Niacinamide -> Kem dưỡng ẩm gel -> Kem chống nắng nâng tông.\nRoutine Tối: Nước tẩy trang -> Sữa rửa mặt tạo bọt nhẹ -> Toner cấp ẩm -> Serum phục hồi Hyaluronic Acid -> Kem dưỡng khóa ẩm.',
-    recommended_services: [
-      {
-        service_id: 1, // Mặc định dịch vụ chăm sóc da mặt của Salon
-        service_name: 'Chăm sóc da mặt chuyên sâu & Cấp ẩm phục hồi',
-        reason: 'Hỗ trợ hút sạch bã nhờn bít tắc vùng chữ T, tẩy tế bào chết sâu và phun oxy tươi phục hồi ẩm cho làn da.'
-      }
-    ]
+    is_face: false,
+    analysis_unavailable: true,
+    error: 'Không thể phân tích ảnh lúc này vì các dịch vụ AI đang tạm thời không khả dụng. Không có kết quả giả nào được lưu. Vui lòng thử lại sau.'
   };
 }
 

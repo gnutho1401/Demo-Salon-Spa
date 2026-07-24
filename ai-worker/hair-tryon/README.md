@@ -20,6 +20,8 @@ cd E:\Demo-Salon-Spa\ai-worker\hair-tryon
 .\scripts\start-local-ai.ps1
 ```
 
+Script khởi động có thể chạy lại an toàn: nếu AI Worker đã sẵn sàng, script sẽ tái sử dụng tiến trình hiện có thay vì mở Uvicorn lần thứ hai. Không chạy trực tiếp thêm lệnh `python -m uvicorn ...` khi cổng 8189 đang phục vụ.
+
 Kiểm tra dịch vụ tại `http://127.0.0.1:8189/health`. Lần tạo ảnh đầu tiên sẽ chậm hơn do nạp model. Với GPU 4 GB, ảnh 512 px thường cần vài phút; đây là đánh đổi để không mất phí API.
 
 Backend dùng cấu hình:

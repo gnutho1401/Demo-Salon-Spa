@@ -5,10 +5,22 @@ Khởi động toàn bộ hệ thống Demo-Salon-Spa và lấy tên miền Inte
 
 $ErrorActionPreference = "Stop"
 
+# Prevent Windows PowerShell 5.1 Start-Process from failing when the parent
+# environment contains both "Path" and "PATH".
+$processPath = [Environment]::GetEnvironmentVariable("Path", "Process")
+[Environment]::SetEnvironmentVariable("PATH", $null, "Process")
+[Environment]::SetEnvironmentVariable("Path", $processPath, "Process")
+
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "   KHOI DONG HE THONG DEMO-SALON-SPA          " -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host ""
+
+# 0. Don dep cac tien trinh cloudflared/node bi ket (Neu co)
+Write-Host "[0/5] Don dep moi truong..." -ForegroundColor Yellow
+Stop-Process -Name "cloudflared" -Force -ErrorAction SilentlyContinue
+Stop-Process -Name "node" -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 1
 
 # 1. Kiem tra va cai dat dependencies cho Backend
 Write-Host "[1/5] Kiem tra Backend..." -ForegroundColor Yellow
@@ -16,6 +28,8 @@ if (-not (Test-Path "backend/node_modules")) {
     Write-Host "Dang cai dat thu vien cho Backend..." -ForegroundColor Gray
     Start-Process "cmd.exe" -ArgumentList "/c cd backend && npm install" -Wait
 }
+
+
 Write-Host "Khoi dong Backend (Port 5000)..." -ForegroundColor Green
 $backendProcess = Start-Process "cmd.exe" -ArgumentList "/c title [BACKEND] && cd backend && npm start" -PassThru
 
@@ -27,17 +41,17 @@ if (Test-Path "backend-tunnel.log") { Remove-Item "backend-tunnel.log" -Force }
 # Chay cloudflared an danh (hidden) de lay URL
 $cfBackendProcess = Start-Process "cmd.exe" -ArgumentList "/c .\cloudflared.exe tunnel --url http://localhost:5000 > backend-tunnel.log 2>&1" -WindowStyle Hidden -PassThru
 
-# Doi Cloudflare cap URL (toi da 15 giay)
+# Doi Cloudflare cap URL (toi da 30 giay)
 $backendUrl = ""
 Write-Host "Dang cho Cloudflare cap phat URL Backend" -NoNewline
-for ($i = 0; $i -lt 15; $i++) {
+for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 1
     Write-Host "." -NoNewline
     if (Test-Path "backend-tunnel.log") {
-        $logContent = Get-Content "backend-tunnel.log" -ErrorAction SilentlyContinue
-        $match = $logContent | Select-String "https://[a-zA-Z0-9-]+\.trycloudflare\.com"
+        $match = Select-String -Path "backend-tunnel.log" -Pattern "https://[a-zA-Z0-9-]+\.trycloudflare\.com" -ErrorAction SilentlyContinue
         if ($match) {
-            $backendUrl = $match.Matches[0].Value
+            # Handle both MatchInfo array and single MatchInfo safely
+            $backendUrl = ($match | Select-Object -First 1).Matches[0].Value
             break
         }
     }
@@ -69,12 +83,23 @@ if ($backendUrl) {
 # 3. Kiem tra AI Worker (Optional)
 Write-Host "[3/5] Kiem tra AI Worker..." -ForegroundColor Yellow
 $aiProcess = $null
-if (Get-Command "python" -ErrorAction SilentlyContinue) {
-    Write-Host "Phat hien co cai dat Python. Khoi dong AI Worker (Port 8000)..." -ForegroundColor Green
-    # Khong the chac chan thu vien da cai, nen cu thu chay, neu loi thi thoi
-    $aiProcess = Start-Process "cmd.exe" -ArgumentList "/c title [AI-WORKER] && cd ai-worker/hair-tryon && uvicorn app.main:app --host 0.0.0.0 --port 8000" -PassThru
+$aiHealthUrl = "http://127.0.0.1:8189/health"
+$aiReady = $false
+try {
+    $aiHealth = Invoke-RestMethod -Uri $aiHealthUrl -TimeoutSec 3
+    $aiReady = $aiHealth.status -eq "ready"
+} catch {}
+
+if ($aiReady) {
+    Write-Host "AI Worker da san sang tai $aiHealthUrl. Tai su dung tien trinh hien co." -ForegroundColor Green
 } else {
-    Write-Host "Khong tim thay Python. Bo qua AI Worker." -ForegroundColor Gray
+    $aiStartScript = Join-Path $PSScriptRoot "ai-worker/hair-tryon/scripts/start-local-ai.ps1"
+    Write-Host "Khoi dong AI Worker bang trinh quan ly cong thong nhat (Port 8189)..." -ForegroundColor Green
+    $aiProcess = Start-Process `
+        -FilePath "powershell.exe" `
+        -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$aiStartScript`"" `
+        -WorkingDirectory $PSScriptRoot `
+        -PassThru
 }
 
 
@@ -94,17 +119,17 @@ if (Test-Path "frontend-tunnel.log") { Remove-Item "frontend-tunnel.log" -Force 
 
 $cfFrontendProcess = Start-Process "cmd.exe" -ArgumentList "/c .\cloudflared.exe tunnel --url http://localhost:5173 > frontend-tunnel.log 2>&1" -WindowStyle Hidden -PassThru
 
-# Doi Cloudflare cap URL (toi da 15 giay)
+# Doi Cloudflare cap URL (toi da 30 giay)
 $frontendUrl = ""
 Write-Host "Dang cho Cloudflare cap phat URL Frontend" -NoNewline
-for ($i = 0; $i -lt 15; $i++) {
+for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 1
     Write-Host "." -NoNewline
     if (Test-Path "frontend-tunnel.log") {
-        $logContent = Get-Content "frontend-tunnel.log" -ErrorAction SilentlyContinue
-        $match = $logContent | Select-String "https://[a-zA-Z0-9-]+\.trycloudflare\.com"
+        $match = Select-String -Path "frontend-tunnel.log" -Pattern "https://[a-zA-Z0-9-]+\.trycloudflare\.com" -ErrorAction SilentlyContinue
         if ($match) {
-            $frontendUrl = $match.Matches[0].Value
+            # Handle both MatchInfo array and single MatchInfo safely
+            $frontendUrl = ($match | Select-Object -First 1).Matches[0].Value
             break
         }
     }
@@ -125,6 +150,10 @@ $pids = @($backendProcess.Id, $cfBackendProcess.Id, $frontendProcess.Id, $cfFron
 if ($aiProcess) {
     $pids += $aiProcess.Id
 }
-$pids -join "," | Out-File "server.pid"
+$pids -join "," | Set-Content "server.pid"
+
+Write-Host ""
+Write-Host "Ban co the de nguyen cua so nay de xem ten mien." -ForegroundColor Cyan
+Read-Host -Prompt "Nhan Enter de thoat cua so nay (Cac may chu van se chay ngam)"
 
 Write-Host "Ghi chu: De tat server, hay chay file stop-server.ps1 hoac tat thu cong cac cua so cmd vua hien len." -ForegroundColor Gray

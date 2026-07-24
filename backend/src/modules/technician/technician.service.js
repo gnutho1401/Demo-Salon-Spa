@@ -59,7 +59,18 @@ async function getDashboard(userId) {
 
       (SELECT COUNT(*)
        FROM Reviews r
-       WHERE r.EmployeeId = @EmployeeId AND r.Status = 'APPROVED') AS reviewCount
+       WHERE r.EmployeeId = @EmployeeId AND r.Status = 'APPROVED') AS reviewCount,
+
+      (SELECT COUNT(DISTINCT a.CustomerId)
+       FROM Appointments a
+       WHERE a.EmployeeId = @EmployeeId
+         AND a.AppointmentDate = CAST(GETDATE() AS DATE)
+         AND NOT EXISTS (
+           SELECT 1
+           FROM Appointments previous
+           WHERE previous.CustomerId = a.CustomerId
+             AND previous.AppointmentDate < a.AppointmentDate
+         )) AS newCustomers
   `);
 
   const todaySchedule = await pool
@@ -86,23 +97,24 @@ async function getDashboard(userId) {
 
     UNION ALL
 
-    -- Lịch Combo hôm nay: 1 row per bước của KTV này
+    -- Lịch Combo hôm nay theo cấu trúc AppointmentServices hiện tại
     SELECT
       a.AppointmentId,
-      CONVERT(VARCHAR(5), myStep.StartTime, 108) AS StartTime,
-      CONVERT(VARCHAR(5), myStep.EndTime, 108) AS EndTime,
+      CONVERT(VARCHAR(5), a.StartTime, 108) AS StartTime,
+      CONVERT(VARCHAR(5), a.EndTime, 108) AS EndTime,
       a.Status,
       u.FullName AS CustomerName,
       u.AvatarUrl AS CustomerAvatar,
-      svc.ServiceName AS ServiceName
+      STRING_AGG(svc.ServiceName, ', ') AS ServiceName
     FROM Appointments a
     JOIN Customers c ON a.CustomerId = c.CustomerId
     JOIN Users u ON c.UserId = u.UserId
     JOIN AppointmentServices myStep ON myStep.AppointmentId = a.AppointmentId
-      AND myStep.EmployeeId = @EmployeeId
     JOIN Services svc ON myStep.ServiceId = svc.ServiceId
     WHERE a.CustomerPackageId IS NOT NULL
+      AND a.EmployeeId = @EmployeeId
       AND a.AppointmentDate = CAST(GETDATE() AS DATE)
+    GROUP BY a.AppointmentId, a.StartTime, a.EndTime, a.Status, u.FullName, u.AvatarUrl
 
     ORDER BY StartTime
   `);
@@ -133,6 +145,33 @@ async function getDashboard(userId) {
     GROUP BY a.AppointmentDate
     ORDER BY a.AppointmentDate
   `);
+
+  const monthlyEarnings = await pool
+    .request()
+    .input("EmployeeId", sql.Int, employeeId)
+    .query(`
+      SELECT
+        YEAR(a.AppointmentDate) AS [Year],
+        MONTH(a.AppointmentDate) AS [MonthNumber],
+        CONCAT('T', MONTH(a.AppointmentDate)) AS [Month],
+        ISNULL(SUM(i.FinalAmount), 0) AS Revenue
+      FROM Appointments a
+      JOIN Invoices i ON a.AppointmentId = i.AppointmentId
+      WHERE a.EmployeeId = @EmployeeId
+        AND a.AppointmentDate >= DATEADD(
+          MONTH,
+          -11,
+          DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM Payments p
+          WHERE p.InvoiceId = i.InvoiceId
+            AND p.Status = 'PAID'
+        )
+      GROUP BY YEAR(a.AppointmentDate), MONTH(a.AppointmentDate)
+      ORDER BY [Year], [MonthNumber]
+    `);
 
   const popularServices = await pool
     .request()
@@ -254,6 +293,7 @@ async function getDashboard(userId) {
     todaySchedule: todaySchedule.recordset,
     appointmentStatus: appointmentStatus.recordset,
     earnings: earnings.recordset,
+    monthlyEarnings: monthlyEarnings.recordset,
     popularServices: popularServices.recordset,
     recentReviews: recentReviews.recordset,
     reminders: reminders.recordset,

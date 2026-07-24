@@ -615,7 +615,7 @@ export default function AiStylistAdvisor() {
               <div className="ai-style-grid">
                 {filteredStyles.map((style) => (
                   <button type="button" key={style.style_id} className={`ai-style-card ${selectedStyle?.style_id === style.style_id ? "is-selected" : ""}`} onClick={() => chooseStyle(style)}>
-                    <div className="ai-style-image"><img src={resolveFileUrl(style.thumbnail_url)} alt={`Mẫu ${style.name}`} />{style.is_trending && <b className="ai-trend-badge">Hot {style.trend_year || 2026}</b>}<span style={{ background: style.accent_color || "#d6b57e" }} /></div>
+                    <div className="ai-style-image"><img src={style.thumbnail_url} alt={`Mẫu ${style.name}`} />{style.is_trending && <b className="ai-trend-badge">Hot {style.trend_year || 2026}</b>}<span style={{ background: style.accent_color || "#d6b57e" }} /></div>
                     <div className="ai-style-card-body"><small>{style.type === "COLOR" ? "Màu tóc" : style.length === "SHORT" ? "Tóc ngắn" : style.length === "LONG" ? "Tóc dài" : "Tóc trung bình"}</small><strong>{style.name}</strong><p>{style.description}</p><em>{MAINTENANCE_LABELS[style.maintenance] || "Chăm sóc vừa"}</em></div>
                     <span className="ai-style-check"><Icon name="check" size={14} /></span>
                   </button>

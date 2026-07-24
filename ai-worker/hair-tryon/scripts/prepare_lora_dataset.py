@@ -31,8 +31,17 @@ def read_manifest(path: Path) -> list[dict]:
         if not raw.strip():
             continue
         record = json.loads(raw)
-        if record.get("consent") is not True:
-            raise ValueError(f"Line {line_number}: consent=true is required.")
+        rights_basis = str(record.get("rights_basis") or "SALON_MODEL_RELEASE").upper()
+        if rights_basis == "SALON_MODEL_RELEASE" and record.get("consent") is not True:
+            raise ValueError(f"Line {line_number}: consent=true is required for salon photos.")
+        if record.get("training_approved") is not True:
+            raise ValueError(f"Line {line_number}: training_approved=true is required.")
+        if record.get("rights_verified") is not True:
+            raise ValueError(f"Line {line_number}: rights_verified=true is required.")
+        if rights_basis == "OPEN_LICENSE_DISCOVERY" and record.get("personality_rights_verified") is not True:
+            raise ValueError(f"Line {line_number}: personality_rights_verified=true is required for internet photos.")
+        if rights_basis == "OPEN_LICENSE_DISCOVERY" and record.get("style_verified") is not True:
+            raise ValueError(f"Line {line_number}: style_verified=true is required for discovered internet photos.")
         if not str(record.get("license") or "").strip():
             raise ValueError(f"Line {line_number}: license/source permission is required.")
         audience = str(record.get("audience") or "").upper()
@@ -60,6 +69,13 @@ def prepare_record(record: dict, index: int, output: Path, size: int) -> dict:
     image = ImageOps.pad(image, (size, size), method=Image.Resampling.LANCZOS, color=(224, 220, 216))
     ENGINE.ensure_segmenter_loaded()
     labels = ENGINE._parse_face(image)  # The trainer and runtime intentionally share the exact segmenter.
+    face = ENGINE._largest_component(np.isin(labels, np.arange(1, 14)).astype(np.uint8))
+    face_ratio = float(cv2.countNonZero(face) / max(1, size * size))
+    is_frontal, pose_score = ENGINE._estimate_frontal(labels, face)
+    if face_ratio < 0.012:
+        raise ValueError(f"Image {record['source']} does not contain a sufficiently clear face.")
+    if not is_frontal:
+        raise ValueError(f"Image {record['source']} is not frontal enough (score={pose_score:.3f}).")
     hair = (labels == 17).astype(np.uint8) * 255
     ratio = float(cv2.countNonZero(hair) / max(1, size * size))
     if ratio < 0.008:
@@ -84,8 +100,16 @@ def prepare_record(record: dict, index: int, output: Path, size: int) -> dict:
         "audience": record["audience"],
         "style_code": record.get("style_code"),
         "license": record["license"],
+        "license_url": record.get("license_url"),
+        "source_url": record.get("source_url"),
+        "creator": record.get("creator"),
+        "attribution": record.get("attribution"),
+        "rights_basis": record.get("rights_basis"),
         "source_id": record.get("source_id"),
         "hair_ratio": round(ratio, 4),
+        "face_ratio": round(face_ratio, 4),
+        "is_frontal": True,
+        "pose_score": round(pose_score, 4),
     }
 
 

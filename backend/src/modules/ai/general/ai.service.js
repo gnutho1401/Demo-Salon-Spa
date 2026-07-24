@@ -789,7 +789,7 @@ Hãy đề xuất các hành động cụ thể, thiết thực và chuyên nghi
       .input('FeatureName', sql.NVarChar, 'Customer Churn Prediction')
       .input('Prompt', sql.NVarChar, 'Phân tích rủi ro churn dựa trên dữ liệu khách hàng')
       .input('AIResponse', sql.NVarChar, JSON.stringify(resultPayload))
-      .input('ModelName', sql.NVarChar, isFallback ? 'rule-based-fallback' : 'gemini-2.5-flash')
+      .input('ModelName', sql.NVarChar, isFallback ? 'rule-based-fallback' : 'gemini-3.5-flash')
       .input('InputToken', sql.Int, 1200)
       .input('OutputToken', sql.Int, 800)
       .input('Cost', sql.Decimal(18, 4), isFallback ? 0 : 0.0150)

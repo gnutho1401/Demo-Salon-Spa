@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source code
 COPY . .
 
-# Expose port (RunPod/EC2 often use 8000 for FastAPI)
-EXPOSE 8000
+# Keep the worker port consistent across Windows, WSL and containers.
+EXPOSE 8189
 
 # Start the application using Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8189"]

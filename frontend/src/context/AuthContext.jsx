@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
 
 const AuthContext = createContext(null);
@@ -21,6 +21,12 @@ function readStoredUser() {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(readStoredUser);
+
+  useEffect(() => {
+    const handleSessionExpired = () => setUser(null);
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, []);
 
   const login = (data) => {
     if (!data?.token || !data?.user || typeof data.user !== 'object') {

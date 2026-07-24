@@ -17,8 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT.parents[1]
 MODEL_CACHE = Path(os.getenv("HAIR_MODEL_CACHE", PROJECT_ROOT / ".ai-models")).resolve()
 FACE_MODEL = Path(os.getenv("HAIR_FACE_MODEL", ROOT / "models" / "resnet18.onnx")).resolve()
-MODEL_ID = os.getenv("HAIR_DIFFUSION_MODEL", "sd2-community/stable-diffusion-2-inpainting")
-MODEL_REVISION = os.getenv("HAIR_MODEL_REVISION", "5f74973cbb64c8568780732c17f43eb269d63a0d")
+MODEL_ID = os.getenv("HAIR_DIFFUSION_MODEL", "diffusers/stable-diffusion-xl-1.0-inpainting-0.1")
 LORA_PATH = Path(os.getenv("HAIR_LORA_PATH", ROOT / "models" / "natural-hair-lora")).resolve()
 LORA_WEIGHT = max(0.0, min(1.5, float(os.getenv("HAIR_LORA_WEIGHT", "0.75"))))
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
@@ -45,13 +44,47 @@ STYLE_PROMPTS = {
     "MODERN_BUZZ_2026": "male modern buzz cut with subtle layered top, softly tapered sides, natural scalp coverage",
     "NATURAL_CURL_TAPER_2026": "male natural curl taper hairstyle, soft defined curls on top, low tapered sides, realistic curl clusters",
     "COPPER_ROSE_2026": "keep the exact hairstyle and recolor only the hair sun-warmed copper rose brunette with dimensional lowlights and natural roots",
+    "BOX_BOB_2026": "female 2026 box bob haircut, chin-length clean geometric outline, full healthy ends, subtle natural movement",
+    "BUTTERFLY_BOB_2026": "female butterfly bob haircut, cheek-framing feathered layers, soft rounded volume, airy flipped ends",
+    "CURVED_BOB_2026": "female curved bob haircut, jaw-skimming softly rounded silhouette, subtle inward bend, healthy dimensional shine",
+    "FRAGMENTED_BOB_2026": "female fragmented bob haircut, softly disconnected choppy ends, airy piecey texture, relaxed movement",
+    "MODERN_RACHEL_2026": "female modern Rachel haircut, heart-shaped face-framing layers, bouncy cheekbone volume, healthy dense lengths",
+    "COLLARBONE_LOB_2026": "female collarbone lob haircut, strong shoulder-skimming outline, minimal invisible layers, healthy full ends",
+    "COWBOY_BOB_2026": "female cowboy bob haircut, relaxed jaw-length shaggy layers, soft long fringe, lived-in texture",
+    "HEARTTHROB_FLOW_2026": "male 2026 heartthrob flow haircut, medium 1990s layered shape, softly parted falling fringe",
+    "HIGH_TOP_FADE_2026": "male modern high-top fade, structured natural textured top, clean graduated sides, realistic coily density",
+    "CREW_CUT_TAPER_2026": "male modern crew cut with low taper, short textured top, softly graduated sides",
+    "TEXTURED_BOWL_2026": "male modern textured bowl cut, softened rounded fringe, broken-up layered perimeter, subtle taper",
+    "BRO_FLOW_2026": "male natural bro flow haircut, medium swept-back layers, relaxed air-dried waves, open forehead",
+    "CHAMPAGNE_BRUNETTE_2026": "keep the exact hairstyle and recolor only the hair champagne brunette with natural roots melting into muted beige highlights",
+    "CHERRY_MOCHA_2026": "keep the exact hairstyle and recolor only the hair deep cherry mocha brunette with a subtle red-copper undertone",
+    "TOASTED_COPPER_2026": "keep the exact hairstyle and recolor only the hair toasted copper with soft balayage highlights and a subtle brunette root melt",
+    "WOLF_CUT_2026": "female modern wolf cut, heavily layered shaggy texture, curtain bangs framing the cheekbones, longer piecey back, effortless edgy movement",
+    "HIME_CUT_2026": "female modern hime cut, blunt cheek-length side fringes, straight long back hair, sharp geometric face framing, sleek and polished",
+    "GHOST_LAYERS_2026": "female long hair with ghost layers, seamless invisible internal layers, thick healthy ends, effortless natural volume and movement",
+    "SOFT_CASCADES_2026": "female long soft cascades haircut, flowing long layers, natural air-dried waves, zero-styling effortless flow",
+    "BIRKIN_BANGS_2026": "female haircut with Birkin bangs, wispy eyebrow-grazing slightly uneven fringe, soft 1960s aesthetic, face framing",
+    "TEXTURED_CROP_2026": "male textured crop haircut, short choppy natural top, low fade or taper on sides, messy lived-in look",
+    "WARRIOR_CUT_2026": "male warrior cut, short clean sides with longer textured layered top, rugged masculine appeal, swept back naturally",
+    "POLISHED_POMPADOUR_2026": "male modern polished pompadour, voluminous swept-back top, gentlemanly neat appearance, cropped tapered sides",
+    "ESPRESSO_BROWN_2026": "keep the exact hairstyle and recolor only the hair rich espresso brown, deep dimensional coffee tones, natural healthy shine",
+    "LIVED_IN_BLONDE_2026": "keep the exact hairstyle and recolor only the hair lived-in blonde, natural shadow root melting into bright sunny blonde, soft balayage highlights",
+    "BUTTERFLY_CUT_HOT": "female butterfly haircut, long face-framing feathered layers, bouncy voluminous blowout, natural movement",
+    "ITALIAN_BOB_HOT": "female Italian bob, chin-grazing blunt cut, voluminous and sophisticated, healthy thick hair",
+    "CURTAIN_BANGS_HOT": "female curtain bangs, soft sweeping parted fringe, long layers framing the face, effortless 70s vibe",
+    "NEO_QUIFF_HOT": "male neo-quiff, voluminous brushed up top, clean tapered fade sides, modern professional",
+    "TWO_BLOCK_HOT": "male Korean two block cut, disconnected undercut, soft textured longer top, K-pop idol aesthetic",
+    "MODERN_MULLET_HOT": "male modern mullet, buzzed sides, textured wavy top, slightly grown-out back, edgy wearable look",
+    "COPPER_RENAISSANCE_HOT": "keep the exact hairstyle and recolor only the hair rich cinnamon copper, vibrant apricot highlights, warm dimensional rust tones",
+    "ASH_BLONDE_HOT": "keep the exact hairstyle and recolor only the hair cool ash blonde, platinum silver undertones, high contrast modern look",
 }
 
 NEGATIVE_PROMPT = (
     "changed face, different person, altered facial features, beauty filter, makeup, "
     "deformed eyes, distorted face, duplicate person, wig cap, plastic hair, blurry hair, "
     "helmet hair, painted hair, hard mask edge, halo around hair, floating strands, repeated curls, "
-    "uniform strand pattern, fake shine, oversaturated hair, illustration, painting, text, watermark, logo"
+    "uniform strand pattern, fake shine, oversaturated hair, illustration, painting, text, watermark, logo, "
+    "changed clothes, different background, morphed body, unnatural neck"
 )
 
 
@@ -105,25 +138,62 @@ class HairTryOnEngine:
 
     def _load_pipeline(self):
         import torch
-        from diffusers import StableDiffusionInpaintPipeline
+        from diffusers import AutoPipelineForInpainting, LCMScheduler
 
         if not torch.cuda.is_available():
-            raise RuntimeError("Không phát hiện CUDA. AI thử tóc local cần NVIDIA CUDA để đạt tốc độ sử dụng được.")
+            print("[Engine] CẢNH BÁO: Không phát hiện CUDA. Chuyển sang chạy bằng CPU (rất chậm).")
+            # fallback to CPU
+            self._device = "cpu"
+        else:
+            self._device = "cuda"
 
         MODEL_CACHE.mkdir(parents=True, exist_ok=True)
-        self._pipeline = StableDiffusionInpaintPipeline.from_pretrained(
+        # Use torch.float32 for CPU, float16 for CUDA
+        dtype = torch.float16 if self._device == "cuda" else torch.float32
+        
+        self._pipeline = AutoPipelineForInpainting.from_pretrained(
             MODEL_ID,
-            revision=MODEL_REVISION,
             cache_dir=str(MODEL_CACHE),
-            torch_dtype=torch.float16,
+            torch_dtype=dtype,
             variant=os.getenv("HAIR_MODEL_VARIANT", "fp16"),
             use_safetensors=True,
             local_files_only=os.getenv("HAIR_OFFLINE_MODE", "true").lower() == "true",
         )
-        self._pipeline.enable_model_cpu_offload()
-        self._pipeline.enable_attention_slicing("max")
-        self._pipeline.enable_vae_slicing()
-        self._pipeline.enable_vae_tiling()
+        if self._device == "cuda":
+            self._pipeline.enable_model_cpu_offload()
+            self._pipeline.enable_attention_slicing("max")
+            self._pipeline.enable_vae_slicing()
+            self._pipeline.enable_vae_tiling()
+            
+            # Try enabling xformers for massive memory reduction and speedup
+            try:
+                self._pipeline.enable_xformers_memory_efficient_attention()
+                print("[Engine] xformers memory efficient attention enabled.")
+            except Exception as e:
+                print("[Engine] xformers not available, using standard attention.")
+        
+        # Use LCMScheduler for blazing fast 4-step generation
+        self._pipeline.scheduler = LCMScheduler.from_config(self._pipeline.scheduler.config)
+        
+        # Load IP-Adapter
+        try:
+            print("[Engine] Loading IP-Adapter...")
+            # We temporarily bypass local_files_only for IP-Adapter if it's missing locally
+            self._pipeline.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter_sdxl.bin", local_files_only=False)
+            self._pipeline.set_ip_adapter_scale(0.65)
+            self._ip_adapter_loaded = True
+            print("[Engine] IP-Adapter loaded successfully.")
+        except Exception as e:
+            print(f"[Engine] Failed to load IP-Adapter: {e}")
+            self._ip_adapter_loaded = False
+
+        
+        # Load LCM-LoRA for SDXL
+        lcm_lora_id = "latent-consistency/lcm-lora-sdxl"
+        print(f"[Engine] Loading LCM-LoRA: {lcm_lora_id}")
+        self._pipeline.load_lora_weights(lcm_lora_id, adapter_name="lcm")
+        
+        # Load user hair LoRA if exists
         if LORA_PATH.exists():
             adapter_name = "salon-natural-hair"
             if LORA_PATH.is_file():
@@ -134,9 +204,13 @@ class HairTryOnEngine:
                 )
             else:
                 self._pipeline.load_lora_weights(str(LORA_PATH), adapter_name=adapter_name)
-            self._pipeline.set_adapters([adapter_name], adapter_weights=[LORA_WEIGHT])
+            self._pipeline.set_adapters(["lcm", adapter_name], adapter_weights=[1.0, LORA_WEIGHT])
             self._lora_loaded = True
-            self._lora_name = f"{adapter_name}@{LORA_WEIGHT:.2f}"
+            self._lora_name = f"lcm+user_lora@{LORA_WEIGHT:.2f}"
+        else:
+            self._pipeline.set_adapters(["lcm"], adapter_weights=[1.0])
+            self._lora_loaded = False
+            self._lora_name = "lcm"
 
     def ensure_segmenter_loaded(self) -> None:
         if self._segmenter is not None:
@@ -358,7 +432,7 @@ class HairTryOnEngine:
         return cv2.resize(labels, image.size, interpolation=cv2.INTER_NEAREST)
 
     @staticmethod
-    def _build_mask(labels: np.ndarray, style: dict[str, Any] | None) -> Image.Image:
+    def _build_mask(labels: np.ndarray, rgb: np.ndarray, style: dict[str, Any] | None) -> Image.Image:
         height, width = labels.shape
         hair = (labels == 17).astype(np.uint8) * 255
         if cv2.countNonZero(hair) < max(128, int(width * height * 0.002)):
@@ -367,35 +441,100 @@ class HairTryOnEngine:
         style_type = str((style or {}).get("type") or "CUT").upper()
         hair_length = str((style or {}).get("length") or "").upper()
         base = min(width, height)
-        expansion = 0.012 if style_type == "COLOR" else 0.035
-        if hair_length == "LONG":
-            expansion = 0.055
-        kernel_size = max(5, int(base * expansion))
-        if kernel_size % 2 == 0:
-            kernel_size += 1
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-        expanded = cv2.dilate(hair, kernel, iterations=1)
+        
+        if style_type == "COLOR":
+            # For color, we need PERFECT edges (SAM-level precision) without bleeding into clothes.
+            # Since SAM would consume 2GB VRAM and crash a 4GB GPU alongside SDXL, 
+            # we use OpenCV GrabCut (Edge-Aware Matting) based on the BiseNet seed.
+            
+            # Create GrabCut mask
+            gc_mask = np.full((height, width), cv2.GC_BGD, dtype=np.uint8)
+            
+            # 1. Definite background: Everything that is not hair or near hair
+            # 2. Definite foreground: The deep core of the hair
+            kernel_erode = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+            sure_fg = cv2.erode(hair, kernel_erode, iterations=1)
+            
+            # 3. Probable foreground: The original BiseNet hair mask + slight dilation
+            kernel_dilate = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+            prob_fg = cv2.dilate(hair, kernel_dilate, iterations=1)
+            
+            gc_mask[prob_fg > 0] = cv2.GC_PR_FGD
+            gc_mask[sure_fg > 0] = cv2.GC_FGD
+            
+            # Protect face explicitly as Definite Background
+            face_labels = np.isin(labels, np.arange(1, 14)).astype(np.uint8) * 255
+            gc_mask[face_labels > 0] = cv2.GC_BGD
+            
+            # Run GrabCut
+            bgdModel = np.zeros((1, 65), np.float64)
+            fgdModel = np.zeros((1, 65), np.float64)
+            
+            # Use OpenCV GrabCut
+            cv2.grabCut(rgb, gc_mask, None, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_MASK)
+            
+            # Extract the final foreground mask
+            expanded = np.where((gc_mask == cv2.GC_FGD) | (gc_mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+            
+            # Expand slightly (1px) to prevent thin uncolored lines at the very edge of the hair
+            expanded = cv2.dilate(expanded, np.ones((3, 3), np.uint8), iterations=1)
+        else:
+            # Smart Volumetric Masking for CUT/TEXTURE
+            # 1. Upward & Outward expansion (for volume and completely new shapes)
+            upward_expansion = 0.25 # Increased significantly to allow completely new hairstyles
+            side_expansion = 0.40 # Increased significantly to allow completely new hairstyles
+            
+            k_up_h = max(5, int(height * upward_expansion))
+            k_side_w = max(5, int(width * side_expansion))
+            if k_up_h % 2 == 0: k_up_h += 1
+            if k_side_w % 2 == 0: k_side_w += 1
+            
+            kernel_vol = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_side_w, k_up_h))
+            expanded_vol = cv2.dilate(hair, kernel_vol, iterations=1)
+            
+            # 2. Downward expansion based on target length (preserve background above)
+            downward_expansion = 0.15 # Minimal down expansion for SHORT
+            if hair_length == "LONG":
+                downward_expansion = 0.55 # Expand down by 55% of image height
+            elif hair_length == "MEDIUM":
+                downward_expansion = 0.35 # Expand down by 35% of image height
+                
+            k_down_h = max(5, int(height * downward_expansion))
+            k_down_w = max(5, int(width * 0.55)) # Cover shoulders completely
+            if k_down_h % 2 == 0: k_down_h += 1
+            if k_down_w % 2 == 0: k_down_w += 1
+            
+            kernel_down = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_down_w, k_down_h))
+            # Set anchor at top-center to only dilate downwards
+            anchor = (k_down_w // 2, 0)
+            expanded_down = cv2.dilate(hair, kernel_down, anchor=anchor, iterations=1)
+            
+            expanded = cv2.bitwise_or(expanded_vol, expanded_down)
 
         # Color changes preserve the full face. Haircut changes may overlap only the upper
         # forehead so bangs and a new hairline can be formed without touching eyes/nose/mouth.
         if style_type == "COLOR":
             protected_face = np.isin(labels, np.arange(1, 14)).astype(np.uint8) * 255
         else:
+            # Protect eyes, brows, nose, mouth completely (labels 2 to 13)
             protected_face = np.isin(labels, np.arange(2, 14)).astype(np.uint8) * 255
+            # For skin (label 1), we allow the top forehead to be painted (for bangs)
             face_skin = (labels == 1).astype(np.uint8) * 255
             face_points = cv2.findNonZero(face_skin)
             if face_points is not None:
                 face_x, face_y, face_width, face_height = cv2.boundingRect(face_points)
                 forehead_limit = face_y + int(face_height * 0.28)
-                protected_face[forehead_limit : face_y + face_height, face_x : face_x + face_width] = np.maximum(
-                    protected_face[forehead_limit : face_y + face_height, face_x : face_x + face_width],
-                    face_skin[forehead_limit : face_y + face_height, face_x : face_x + face_width],
-                )
+                lower_skin = face_skin.copy()
+                lower_skin[0:forehead_limit, :] = 0
+                protected_face = cv2.bitwise_or(protected_face, lower_skin)
+                
         protect_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
         protected_face = cv2.dilate(protected_face, protect_kernel, iterations=1)
         expanded[protected_face > 0] = 0
 
-        expanded = cv2.morphologyEx(expanded, cv2.MORPH_CLOSE, kernel)
+        # Optional closing to smooth mask edges
+        close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        expanded = cv2.morphologyEx(expanded, cv2.MORPH_CLOSE, close_kernel)
         return Image.fromarray(expanded, mode="L")
 
     @staticmethod
@@ -416,9 +555,10 @@ class HairTryOnEngine:
             desired_hair = f"{lora_trigger}, {desired_hair}"
         return (
             f"Professional photorealistic salon portrait, {desired_hair}. "
-            "Natural strand-by-strand variation, believable density, realistic scalp and hairline transition, "
-            "subtle flyaway hairs, physically plausible highlights, soft contact shadows around forehead and ears, "
-            "coherent salon lighting, no wig-like edge. "
+            "Creates a completely new flattering hairstyle matching the description, natural strand-by-strand variation, "
+            "believable density, realistic scalp and hairline transition, subtle flyaway hairs, "
+            "physically plausible highlights, soft contact shadows around forehead and ears, "
+            "coherent salon lighting, perfectly blended with the person. "
             "Keep the person's exact identity, facial geometry, expression, skin, pose, clothes and background unchanged."
         )
 
@@ -437,9 +577,62 @@ class HairTryOnEngine:
         if min(source.size) < 256:
             raise ValueError("Ảnh quá nhỏ. Cần ảnh có cạnh ngắn tối thiểu 256 px.")
 
-        self.ensure_loaded()
+        self.ensure_segmenter_loaded()
         labels = self._parse_face(source)
-        full_mask = self._build_mask(labels, style)
+        face_mask = self._largest_component(np.isin(labels, np.arange(1, 14)).astype(np.uint8))
+        face_ratio = float(np.count_nonzero(face_mask) / max(1, labels.size))
+        if face_ratio < 0.012:
+            raise ValueError(
+                "Không nhận diện được khuôn mặt rõ ràng. "
+                "Hãy dùng ảnh chính diện, đủ sáng và thấy rõ toàn bộ đầu."
+            )
+        is_frontal, pose_score = self._estimate_frontal(labels, face_mask)
+        if not is_frontal:
+            raise ValueError(
+                f"Ảnh chưa chính diện (điểm tư thế {pose_score:.3f}). "
+                "Vui lòng nhìn thẳng vào camera và để thấy rõ hai bên tóc."
+            )
+
+        self.ensure_loaded()
+
+        # Load IP-Adapter image if available
+        ip_image = None
+        if getattr(self, "_ip_adapter_loaded", False) and style and style.get("thumbnail_url"):
+            from pathlib import Path
+            # Assuming standard path structure
+            frontend_dir = Path(os.environ.get("FRONTEND_DIR", "e:/Demo-Salon-Spa/frontend/public"))
+            thumb_path = frontend_dir / style.get("thumbnail_url").lstrip("/")
+            if thumb_path.exists():
+                try:
+                    ip_image = Image.open(thumb_path).convert("RGB")
+                    print(f"[Engine] Loaded IP-Adapter image from {thumb_path}")
+                except Exception as e:
+                    print(f"[Engine] Failed to load IP-Adapter image: {e}")
+
+        prompt_with_lora = prompt
+        # Modify negative prompt based on hair length to avoid afro/huge hair
+        hair_length_tgt = str(style.get("length") or "").upper() if style else ""
+        if hair_length_tgt == "SHORT":
+            negative_prompt = (
+                "huge hair, large afro, long hair, messy, disproportionate, ugly, deformed, blurry, "
+                "bad anatomy, artifacts, poorly drawn face, artificial, text, watermark, signature"
+            )
+            # Add background hint to positive prompt to fill the large mask with empty space
+            if "background" not in prompt.lower():
+                prompt_with_lora += ", empty background above head, clean background"
+        else:
+            negative_prompt = (
+                "ugly, deformed, blurry, bad anatomy, artifacts, poorly drawn face, artificial, "
+                "text, watermark, signature, disjointed hair, floating hair"
+            )
+
+        if self._lora_loaded and style and style.get("lora_trigger"):
+            trigger = style["lora_trigger"]
+            if trigger.lower() not in prompt_with_lora.lower():
+                prompt_with_lora = f"{prompt_with_lora}, {trigger}"
+
+        rgb = np.asarray(source, dtype=np.uint8)
+        full_mask = self._build_mask(labels, rgb, style)
         model_image = self._fit_for_model(source)
         model_mask = full_mask.resize(model_image.size, Image.Resampling.LANCZOS)
         actual_seed = seed if seed is not None else secrets.randbelow(2_147_483_647)
@@ -447,25 +640,22 @@ class HairTryOnEngine:
         import torch
 
         generator = torch.Generator(device="cpu").manual_seed(actual_seed)
-        steps = max(20, min(45, int(os.getenv("HAIR_INFERENCE_STEPS", "32"))))
-        guidance = max(4.0, min(10.0, float(os.getenv("HAIR_GUIDANCE_SCALE", "7.5"))))
-        style_type = str((style or {}).get("type") or "CUT").upper()
-        strength_defaults = {"COLOR": 0.58, "TEXTURE": 0.76, "CUT": 0.88}
-        strength = max(0.45, min(0.96, float(os.getenv(
-            f"HAIR_{style_type}_STRENGTH",
-            str(strength_defaults.get(style_type, 0.86)),
-        ))))
+        
+        pipeline_kwargs = {
+            "prompt": self._build_prompt(None, prompt_with_lora),
+            "negative_prompt": f"{NEGATIVE_PROMPT}, {negative_prompt}",
+            "image": model_image,
+            "mask_image": model_mask,
+            "num_inference_steps": max(3, min(8, int(os.getenv("HAIR_INFERENCE_STEPS", "4")))),
+            "guidance_scale": max(1.0, min(3.0, float(os.getenv("HAIR_GUIDANCE_SCALE", "1.5")))),
+            "strength": 0.99,
+            "generator": generator,
+        }
+        if ip_image:
+            pipeline_kwargs["ip_adapter_image"] = ip_image
+
         with torch.inference_mode():
-            generated = self._pipeline(
-                prompt=self._build_prompt(style, prompt),
-                negative_prompt=NEGATIVE_PROMPT,
-                image=model_image,
-                mask_image=model_mask,
-                strength=strength,
-                guidance_scale=guidance,
-                num_inference_steps=steps,
-                generator=generator,
-            ).images[0].convert("RGB")
+            generated = self._pipeline(**pipeline_kwargs).images[0].convert("RGB")
 
         # Restore the untouched pixels from the original at full resolution.
         generated = generated.resize(source.size, Image.Resampling.LANCZOS)

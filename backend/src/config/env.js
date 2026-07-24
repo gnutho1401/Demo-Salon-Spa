@@ -1,4 +1,49 @@
 require('dotenv').config();
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+function readOrCreateProductionJwtSecret() {
+  const inlineSecret = String(process.env.JWT_SECRET || '').trim();
+  if (inlineSecret.length >= 32 && inlineSecret !== 'dev_secret_key') {
+    return inlineSecret;
+  }
+
+  const configuredPath = String(process.env.JWT_SECRET_FILE || '').trim();
+  const secretPath = configuredPath
+    ? path.resolve(process.cwd(), configuredPath)
+    : path.resolve(__dirname, '../../../.runtime/jwt-secret');
+
+  fs.mkdirSync(path.dirname(secretPath), { recursive: true });
+
+  try {
+    const existingSecret = fs.readFileSync(secretPath, 'utf8').trim();
+    if (existingSecret.length >= 32) return existingSecret;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+
+  const generatedSecret = crypto.randomBytes(48).toString('base64url');
+  try {
+    fs.writeFileSync(secretPath, generatedSecret, {
+      encoding: 'utf8',
+      mode: 0o600,
+      flag: 'wx',
+    });
+    return generatedSecret;
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    const concurrentSecret = fs.readFileSync(secretPath, 'utf8').trim();
+    if (concurrentSecret.length >= 32) return concurrentSecret;
+    throw new Error('JWT secret file exists but is invalid');
+  }
+}
+
+const jwtSecret = isProduction
+  ? readOrCreateProductionJwtSecret()
+  : process.env.JWT_SECRET || 'dev_secret_key';
 
 function toBool(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -7,7 +52,8 @@ function toBool(value, fallback = false) {
 
 module.exports = {
   port: process.env.PORT || 5000,
-  jwtSecret: process.env.JWT_SECRET || 'dev_secret_key',
+  jwtSecret,
+  isProduction,
   db: {
     connectionString: process.env.DATABASE_URL
   },

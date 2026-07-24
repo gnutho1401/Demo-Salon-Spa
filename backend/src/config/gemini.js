@@ -30,7 +30,7 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
     try {
       console.log('[AI] Attempting call to direct Google Gemini API...');
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
         {
           systemInstruction: {
             parts: [{ text: systemPrompt }]
@@ -44,7 +44,13 @@ async function generateContent(systemPrompt, userMessage, options = {}) {
           generationConfig: {
             maxOutputTokens: maxTokens,
             ...(jsonMode ? { responseMimeType: 'application/json' } : {})
-          }
+          },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+          ]
         },
         {
           headers: { 'Content-Type': 'application/json' },

@@ -94,20 +94,26 @@ async function analyzeWithGemini(image) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY chưa được cấu hình.");
   const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
     {
       contents: [{ role: "user", parts: [
         { text: VISION_INSTRUCTION },
         { inlineData: { mimeType: image.mimeType, data: image.base64Data } },
       ] }],
       generationConfig: { responseMimeType: "application/json" },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      ]
     },
     { headers: { "Content-Type": "application/json" }, timeout: Math.max(3000, Number(process.env.AI_VISION_TIMEOUT_MS) || 12000) },
   );
   const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
   return normalizeAnalysis(parseJsonText(text), {
     provider: "google",
-    modelName: "gemini-2.5-flash",
+    modelName: "gemini-1.5-flash",
     apiEnhanced: true,
   });
 }
@@ -172,6 +178,7 @@ function mergeAnalysis(localResult, apiResult) {
 function buildSafeFallback(failures) {
   return normalizeAnalysis({
     is_face: true,
+    is_frontal: true,
     face_shape: "Chưa xác định — hãy dùng ảnh chính diện",
     hair_type: "Chưa xác định — lookbook vẫn sẵn sàng",
     skin_tone: "Chưa xác định",
@@ -296,8 +303,10 @@ async function analyzeImage(imageUrl) {
     if (localResult?.is_face === false) return { ...localResult, analysis_route: "LOCAL_FACE_GUARD" };
     apiResult = await runApi();
   } else {
-    apiResult = await runApi();
-    localResult = await runLocal();
+    // API enrichment and the mandatory local safety check are independent.
+    // Starting them together keeps the API-first result contract without
+    // making users wait for the sum of both provider timeouts.
+    [apiResult, localResult] = await Promise.all([runApi(), runLocal()]);
     if (!apiResult && localResult?.is_face === false) return { ...localResult, analysis_route: "LOCAL_FACE_GUARD" };
   }
 
