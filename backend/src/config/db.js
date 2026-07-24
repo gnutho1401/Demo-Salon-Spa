@@ -1,4 +1,4 @@
-const mssql = require('mssql');
+const mssql = require("mssql");
 let mssqlPool;
 
 class MssqlTransaction {
@@ -40,7 +40,7 @@ class MssqlRequest {
   }
   async query(sqlText) {
     let mssqlSql = sqlText;
-    
+
     // Dịch PostgreSQL LIMIT sang SQL Server OFFSET FETCH (đòi hỏi có ORDER BY, nếu không tự động chèn ORDER BY (SELECT NULL))
     mssqlSql = mssqlSql.replace(/LIMIT\s+(\d+)/gi, (match, limitNum) => {
       if (/ORDER\s+BY/i.test(mssqlSql)) {
@@ -49,32 +49,47 @@ class MssqlRequest {
         return `ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT ${limitNum} ROWS ONLY`;
       }
     });
-    
+
     // Dịch LEFT((col)::text, n) hoặc LEFT(col::text, n) sang LEFT(CONVERT(VARCHAR(30), col), n) cho SQL Server
-    mssqlSql = mssqlSql.replace(/LEFT\s*\(\s*\(([^)]+)\)::text\s*,\s*(\d+)\s*\)/gi, 'LEFT(CONVERT(VARCHAR(30), $1), $2)');
-    mssqlSql = mssqlSql.replace(/LEFT\s*\(\s*([^)]+)::text\s*,\s*(\d+)\s*\)/gi, 'LEFT(CONVERT(VARCHAR(30), $1), $2)');
-    
+    mssqlSql = mssqlSql.replace(
+      /LEFT\s*\(\s*\(([^)]+)\)::text\s*,\s*(\d+)\s*\)/gi,
+      "LEFT(CONVERT(VARCHAR(30), $1), $2)",
+    );
+    mssqlSql = mssqlSql.replace(
+      /LEFT\s*\(\s*([^)]+)::text\s*,\s*(\d+)\s*\)/gi,
+      "LEFT(CONVERT(VARCHAR(30), $1), $2)",
+    );
+
     // Dịch ép kiểu ::text trực tiếp sang CONVERT(VARCHAR(MAX), ...)
-    mssqlSql = mssqlSql.replace(/([a-zA-Z0-9_.]+)::text/gi, 'CONVERT(VARCHAR(MAX), $1)');
+    mssqlSql = mssqlSql.replace(
+      /([a-zA-Z0-9_.]+)::text/gi,
+      "CONVERT(VARCHAR(MAX), $1)",
+    );
 
     // Dịch phép nối chuỗi (||) của PostgreSQL sang (+) của SQL Server
-    mssqlSql = mssqlSql.replace(/\|\|/g, '+');
+    mssqlSql = mssqlSql.replace(/\|\|/g, "+");
 
     // Dịch kiểu CAST(... AS TEXT) của PostgreSQL sang VARCHAR(MAX) của SQL Server
-    mssqlSql = mssqlSql.replace(/\bAS\s+TEXT\b/gi, 'AS VARCHAR(MAX)');
+    mssqlSql = mssqlSql.replace(/\bAS\s+TEXT\b/gi, "AS VARCHAR(MAX)");
 
     // Dịch unnest(string_to_array(expr, delim)) của PostgreSQL sang value FROM STRING_SPLIT(expr, delim) của SQL Server
-    mssqlSql = mssqlSql.replace(/unnest\s*\(\s*string_to_array\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)\s*\)(?:::[a-zA-Z0-9_]+)?/gi, 'value FROM STRING_SPLIT($1, $2)');
+    mssqlSql = mssqlSql.replace(
+      /unnest\s*\(\s*string_to_array\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)\s*\)(?:::[a-zA-Z0-9_]+)?/gi,
+      "value FROM STRING_SPLIT($1, $2)",
+    );
 
     // Dịch phép cộng trừ ngày PostgreSQL CAST(... AS DATE) + n hoặc + CAST(... AS INT) sang DATEADD của SQL Server
-    mssqlSql = mssqlSql.replace(/CAST\s*\(\s*(.+?)\s*AS\s*DATE\s*\)\s*([+-])\s*(CAST\s*\([^)]+\)|\d+|@[a-zA-Z0-9_]+)/gi, (match, expr, sign, rhs) => {
-      const trimmedRhs = rhs.trim();
-      if (sign === '-') {
-        return `DATEADD(day, -(${trimmedRhs}), CAST(${expr} AS DATE))`;
-      } else {
-        return `DATEADD(day, ${trimmedRhs}, CAST(${expr} AS DATE))`;
-      }
-    });
+    mssqlSql = mssqlSql.replace(
+      /CAST\s*\(\s*(.+?)\s*AS\s*DATE\s*\)\s*([+-])\s*(CAST\s*\([^)]+\)|\d+|@[a-zA-Z0-9_]+)/gi,
+      (match, expr, sign, rhs) => {
+        const trimmedRhs = rhs.trim();
+        if (sign === "-") {
+          return `DATEADD(day, -(${trimmedRhs}), CAST(${expr} AS DATE))`;
+        } else {
+          return `DATEADD(day, ${trimmedRhs}, CAST(${expr} AS DATE))`;
+        }
+      },
+    );
 
     return await this.req.query(mssqlSql);
   }
@@ -104,7 +119,7 @@ async function connectDB() {
     options: {
       encrypt: process.env.DB_ENCRYPT === "true",
       trustServerCertificate: process.env.DB_TRUST_CERT === "true",
-    }
+    },
   };
 
   try {
@@ -120,10 +135,10 @@ async function connectDB() {
 const wrappedMssql = {
   ...mssql,
   Request: MssqlRequest,
-  Transaction: MssqlTransaction
+  Transaction: MssqlTransaction,
 };
 
 module.exports = {
   sql: wrappedMssql,
-  connectDB
+  connectDB,
 };

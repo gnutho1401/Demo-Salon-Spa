@@ -10,7 +10,9 @@ let payosPayoutInstance = null;
 function getPayOS() {
   if (!payosInstance) {
     if (!clientId || !apiKey || !checksumKey) {
-      throw new Error("Thiếu cấu hình PayOS (PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY)");
+      throw new Error(
+        "Thiếu cấu hình PayOS (PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY)",
+      );
     }
     payosInstance = new PayOS(clientId, apiKey, checksumKey);
   }
@@ -21,12 +23,17 @@ function getPayOSPayout() {
   if (!payosPayoutInstance) {
     const payoutClientId = process.env.PAYOS_PAYOUT_CLIENT_ID || clientId;
     const payoutApiKey = process.env.PAYOS_PAYOUT_API_KEY || apiKey;
-    const payoutChecksumKey = process.env.PAYOS_PAYOUT_CHECKSUM_KEY || checksumKey;
+    const payoutChecksumKey =
+      process.env.PAYOS_PAYOUT_CHECKSUM_KEY || checksumKey;
 
     if (!payoutClientId || !payoutApiKey || !payoutChecksumKey) {
       throw new Error("Thiếu cấu hình PayOS Payout");
     }
-    payosPayoutInstance = new PayOS(payoutClientId, payoutApiKey, payoutChecksumKey);
+    payosPayoutInstance = new PayOS(
+      payoutClientId,
+      payoutApiKey,
+      payoutChecksumKey,
+    );
   }
   return payosPayoutInstance;
 }
