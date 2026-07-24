@@ -10,7 +10,11 @@ const STATUS_COLORS = {
 };
 
 function Badge({ status }) {
-  const info = STATUS_COLORS[status] || { bg: "#f3f4f6", color: "#6b7280", text: status };
+  const info = STATUS_COLORS[status] || {
+    bg: "#f3f4f6",
+    color: "#6b7280",
+    text: status,
+  };
   return (
     <span
       style={{
@@ -52,7 +56,10 @@ export default function PackageApprovalPage() {
       const res = await axiosClient.get(`/packages/approvals?status=${filter}`);
       setRequests(res.data.data || res.data || []);
     } catch (err) {
-      setMessage("❌ " + (err.response?.data?.message || "Không tải được danh sách yêu cầu"));
+      setMessage(
+        "❌ " +
+          (err.response?.data?.message || "Không tải được danh sách yêu cầu"),
+      );
     }
     setLoading(false);
   };
@@ -63,7 +70,8 @@ export default function PackageApprovalPage() {
 
   const handleProcess = async (requestType, requestId, action) => {
     const actionText = action === "APPROVED" ? "duyệt" : "từ chối";
-    if (!window.confirm(`Bạn chắc chắn muốn ${actionText} yêu cầu này?`)) return;
+    if (!window.confirm(`Bạn chắc chắn muốn ${actionText} yêu cầu này?`))
+      return;
 
     setProcessingId(requestId);
     try {
@@ -74,7 +82,9 @@ export default function PackageApprovalPage() {
       setMessage(`✅ Đã ${actionText} yêu cầu thành công!`);
       load();
     } catch (err) {
-      setMessage("❌ " + (err.response?.data?.message || `Lỗi ${actionText} yêu cầu`));
+      setMessage(
+        "❌ " + (err.response?.data?.message || `Lỗi ${actionText} yêu cầu`),
+      );
     }
     setProcessingId(null);
   };
@@ -89,7 +99,9 @@ export default function PackageApprovalPage() {
             <h1>
               Duyệt yêu cầu liệu trình <span>📋</span>
             </h1>
-            <p>Quản lý các yêu cầu gia hạn và đóng băng liệu trình từ khách hàng</p>
+            <p>
+              Quản lý các yêu cầu gia hạn và đóng băng liệu trình từ khách hàng
+            </p>
           </div>
         </header>
 
@@ -141,7 +153,10 @@ export default function PackageApprovalPage() {
               style={{
                 padding: "8px 20px",
                 borderRadius: 10,
-                border: filter === tab.value ? "2px solid #a0573a" : "1px solid #d4c4b8",
+                border:
+                  filter === tab.value
+                    ? "2px solid #a0573a"
+                    : "1px solid #d4c4b8",
                 background: filter === tab.value ? "#fffaf5" : "#fff",
                 color: filter === tab.value ? "#a0573a" : "#3d2e26",
                 fontWeight: filter === tab.value ? 700 : 500,
@@ -213,7 +228,9 @@ export default function PackageApprovalPage() {
                     gap: 8,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                  >
                     <span style={{ fontSize: "1.3rem" }}>
                       {r.RequestType === "EXTENSION" ? "📐" : "❄️"}
                     </span>
@@ -289,7 +306,13 @@ export default function PackageApprovalPage() {
 
                 {/* Actions */}
                 {r.Status === "PENDING" && (
-                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      justifyContent: "flex-end",
+                    }}
+                  >
                     <button
                       onClick={() =>
                         handleProcess(r.RequestType, r.RequestId, "REJECTED")
@@ -324,7 +347,9 @@ export default function PackageApprovalPage() {
                         fontSize: "0.85rem",
                       }}
                     >
-                      {processingId === r.RequestId ? "Đang xử lý..." : "✓ Duyệt"}
+                      {processingId === r.RequestId
+                        ? "Đang xử lý..."
+                        : "✓ Duyệt"}
                     </button>
                   </div>
                 )}

@@ -20,10 +20,16 @@ export default function ServiceList() {
       try {
         const [servicesRes, favRes] = await Promise.all([
           axiosClient.get("/services"),
-          user ? axiosClient.get("/customers/me/favorites/services") : Promise.resolve({ data: { data: [] } }),
+          user
+            ? axiosClient.get("/customers/me/favorites/services")
+            : Promise.resolve({ data: { data: [] } }),
         ]);
         setServices(servicesRes.data.data || servicesRes.data || []);
-        setFavoriteIds(new Set((favRes.data.data || []).map((item) => Number(item.ServiceId))));
+        setFavoriteIds(
+          new Set(
+            (favRes.data.data || []).map((item) => Number(item.ServiceId)),
+          ),
+        );
         setError("");
       } catch {
         setError("Không tải được danh sách dịch vụ");
@@ -48,7 +54,10 @@ export default function ServiceList() {
       return;
     }
     try {
-      const res = await axiosClient.post("/customers/me/favorites/services/toggle", { serviceId });
+      const res = await axiosClient.post(
+        "/customers/me/favorites/services/toggle",
+        { serviceId },
+      );
       setFavoriteIds((prev) => {
         const next = new Set(prev);
         if (res.data.data?.favorited) next.add(Number(serviceId));
@@ -479,11 +488,23 @@ export default function ServiceList() {
       {/* Hero Section */}
       <div className="services-hero">
         <div>
-          <div style={{ textTransform: "uppercase", fontSize: "12px", fontWeight: 800, color: "#ff4778", letterSpacing: "1.5px", marginBottom: "8px" }}>
+          <div
+            style={{
+              textTransform: "uppercase",
+              fontSize: "12px",
+              fontWeight: 800,
+              color: "#ff4778",
+              letterSpacing: "1.5px",
+              marginBottom: "8px",
+            }}
+          >
             Trị Liệu & Làm Đẹp
           </div>
           <h1>Chọn dịch vụ phù hợp</h1>
-          <p>Khám phá hệ thống các liệu pháp chăm sóc da, phục hồi tóc, nail nghệ thuật chuẩn y khoa.</p>
+          <p>
+            Khám phá hệ thống các liệu pháp chăm sóc da, phục hồi tóc, nail nghệ
+            thuật chuẩn y khoa.
+          </p>
         </div>
 
         <Link className="btn-book-top" to="/customer/booking">
@@ -538,15 +559,30 @@ export default function ServiceList() {
         </select>
       </div>
 
-      {error && <div className="alert error" style={{ maxWidth: 1200, margin: "0 auto 24px", borderRadius: "16px" }}>{error}</div>}
+      {error && (
+        <div
+          className="alert error"
+          style={{
+            maxWidth: 1200,
+            margin: "0 auto 24px",
+            borderRadius: "16px",
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       {/* Main Grid content */}
       {loading ? (
-        <p style={{ textAlign: "center", padding: "40px 0", color: "#8c7c85" }}>Đang tải dịch vụ...</p>
+        <p style={{ textAlign: "center", padding: "40px 0", color: "#8c7c85" }}>
+          Đang tải dịch vụ...
+        </p>
       ) : filteredServices.length === 0 ? (
         <div className="services-empty-card">
           <h3>Không tìm thấy dịch vụ nào</h3>
-          <p className="muted">Thử thay đổi từ khóa hoặc thiết lập bộ lọc khác.</p>
+          <p className="muted">
+            Thử thay đổi từ khóa hoặc thiết lập bộ lọc khác.
+          </p>
         </div>
       ) : (
         <div className="services-grid-container">
@@ -558,7 +594,9 @@ export default function ServiceList() {
                   <button
                     type="button"
                     onClick={() => toggleFavoriteService(s.ServiceId)}
-                    aria-label={isFavorite ? "Bỏ yêu thích" : "Yêu thích dịch vụ"}
+                    aria-label={
+                      isFavorite ? "Bỏ yêu thích" : "Yêu thích dịch vụ"
+                    }
                     className={`btn-fav-floating ${isFavorite ? "active" : "inactive"}`}
                   >
                     {isFavorite ? "❤" : "♡"}
@@ -569,7 +607,9 @@ export default function ServiceList() {
                 <div className="services-card-body">
                   <div className="services-card-tag">{s.CategoryName}</div>
                   <h3>{s.ServiceName}</h3>
-                  <p className="desc">{s.Description || "Không có mô tả chi tiết."}</p>
+                  <p className="desc">
+                    {s.Description || "Không có mô tả chi tiết."}
+                  </p>
 
                   <div className="services-card-meta">
                     <span className="services-card-duration">
@@ -590,8 +630,14 @@ export default function ServiceList() {
                       {isFavorite ? "♥" : "♡"}
                     </button>
 
-                    <Link to={`/services/${s.ServiceId}`} style={{ flex: 1, display: "flex" }}>
-                      <button className="btn-card-action secondary" style={{ width: "100%" }}>
+                    <Link
+                      to={`/services/${s.ServiceId}`}
+                      style={{ flex: 1, display: "flex" }}
+                    >
+                      <button
+                        className="btn-card-action secondary"
+                        style={{ width: "100%" }}
+                      >
                         Chi tiết
                       </button>
                     </Link>
@@ -601,9 +647,17 @@ export default function ServiceList() {
                       className="btn-card-action primary"
                       onClick={() => {
                         if (!user) {
-                          localStorage.setItem("bookingServiceId", String(s.ServiceId));
-                          localStorage.setItem("bookingRedirectUrl", `/customer/booking?serviceId=${s.ServiceId}`);
-                          navigate(`/login?redirectUrl=${encodeURIComponent(`/customer/booking?serviceId=${s.ServiceId}`)}&serviceId=${s.ServiceId}`);
+                          localStorage.setItem(
+                            "bookingServiceId",
+                            String(s.ServiceId),
+                          );
+                          localStorage.setItem(
+                            "bookingRedirectUrl",
+                            `/customer/booking?serviceId=${s.ServiceId}`,
+                          );
+                          navigate(
+                            `/login?redirectUrl=${encodeURIComponent(`/customer/booking?serviceId=${s.ServiceId}`)}&serviceId=${s.ServiceId}`,
+                          );
                           return;
                         }
                         navigate(`/customer/booking?serviceId=${s.ServiceId}`);
