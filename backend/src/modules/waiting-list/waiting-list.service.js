@@ -1,6 +1,14 @@
 const { sql, connectDB } = require("../../config/db");
 
-const VALID_STATUS = ["WAITING", "MATCHED", "SKIPPED", "EXPIRED", "NOTIFIED", "BOOKED", "CANCELLED"];
+const VALID_STATUS = [
+  "WAITING",
+  "MATCHED",
+  "SKIPPED",
+  "EXPIRED",
+  "NOTIFIED",
+  "BOOKED",
+  "CANCELLED",
+];
 const ACTIVE_STATUS = ["WAITING", "MATCHED", "NOTIFIED"];
 const VALID_PRIORITY = ["NORMAL", "HIGH", "URGENT"];
 const VALID_CONTACT = ["PHONE", "EMAIL", "ZALO", "SMS"];
@@ -9,9 +17,9 @@ const VALID_SLOT = ["ANY", "MORNING", "AFTERNOON", "EVENING", "CUSTOM"];
 function formatTimeOnly(val) {
   if (!val) return null;
   if (val instanceof Date) {
-    const hh = String(val.getUTCHours()).padStart(2, '0');
-    const mm = String(val.getUTCMinutes()).padStart(2, '0');
-    const ss = String(val.getUTCSeconds()).padStart(2, '0');
+    const hh = String(val.getUTCHours()).padStart(2, "0");
+    const mm = String(val.getUTCMinutes()).padStart(2, "0");
+    const ss = String(val.getUTCSeconds()).padStart(2, "0");
     return `${hh}:${mm}:${ss}`;
   }
   if (typeof val === "object") {
@@ -92,7 +100,9 @@ function validateFutureDate(date) {
   if (selected.getTime() === today.getTime()) {
     const now = new Date();
     if (now.getHours() >= 21) {
-      throw new Error("Thời gian hoạt động trong ngày đã kết thúc. Vui lòng chọn ngày khác.");
+      throw new Error(
+        "Thời gian hoạt động trong ngày đã kết thúc. Vui lòng chọn ngày khác.",
+      );
     }
   }
 }
@@ -109,9 +119,10 @@ function estimateResponse(priorityLevel, position, preferredDate) {
   if (!preferredDate) return "Trong ngày hẹn (trước 20:00)";
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const dateStrNormalized = preferredDate instanceof Date
-    ? preferredDate.toISOString().slice(0, 10)
-    : String(preferredDate).slice(0, 10);
+  const dateStrNormalized =
+    preferredDate instanceof Date
+      ? preferredDate.toISOString().slice(0, 10)
+      : String(preferredDate).slice(0, 10);
 
   if (dateStrNormalized === todayStr) {
     return "Trong ngày hôm nay (trước 20:00)";
@@ -119,8 +130,8 @@ function estimateResponse(priorityLevel, position, preferredDate) {
 
   // Format to DD/MM/YYYY
   const dateObj = new Date(preferredDate);
-  const day = String(dateObj.getDate()).padStart(2, '0');
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
   const year = dateObj.getFullYear();
 
   return `Trong ngày ${day}/${month}/${year} (trước 20:00)`;
@@ -388,13 +399,23 @@ function parsePayload(data = {}, existed = {}) {
   const reason = nullableText(data.reason || data.Reason || existed.Reason);
   const note = nullableText(data.note || data.Note || existed.Note);
 
-  const acceptOtherTechnician = data.acceptOtherTechnician !== undefined
-    ? (data.acceptOtherTechnician ? 1 : 0)
-    : (existed.AcceptOtherTechnician ? 1 : 0);
+  const acceptOtherTechnician =
+    data.acceptOtherTechnician !== undefined
+      ? data.acceptOtherTechnician
+        ? 1
+        : 0
+      : existed.AcceptOtherTechnician
+        ? 1
+        : 0;
 
-  const acceptOtherTimeSlots = data.acceptOtherTimeSlots !== undefined
-    ? (data.acceptOtherTimeSlots ? 1 : 0)
-    : (existed.AcceptOtherTimeSlots ? 1 : 0);
+  const acceptOtherTimeSlots =
+    data.acceptOtherTimeSlots !== undefined
+      ? data.acceptOtherTimeSlots
+        ? 1
+        : 0
+      : existed.AcceptOtherTimeSlots
+        ? 1
+        : 0;
 
   if (!serviceId) throw new Error("Vui lòng chọn dịch vụ.");
   if (!VALID_PRIORITY.includes(priorityLevel)) {
@@ -438,7 +459,11 @@ function enrichItem(item) {
 
   return {
     ...item,
-    EstimatedResponseTime: estimateResponse(item.PriorityLevel, position, item.PreferredDate),
+    EstimatedResponseTime: estimateResponse(
+      item.PriorityLevel,
+      position,
+      item.PreferredDate,
+    ),
   };
 }
 
@@ -670,8 +695,7 @@ async function create(userId, data = {}) {
       .request()
       .input("CustomerId", sql.Int, customer.CustomerId)
       .input("ServiceId", sql.Int, payload.serviceId)
-      .input("PreferredDate", sql.VarChar, payload.preferredDate)
-      .query(`
+      .input("PreferredDate", sql.VarChar, payload.preferredDate).query(`
         SELECT TOP 1 a.AppointmentId
         FROM Appointments a
         INNER JOIN AppointmentServices asvc ON asvc.AppointmentId = a.AppointmentId
@@ -706,8 +730,11 @@ async function create(userId, data = {}) {
     .input("Note", sql.NVarChar, payload.note)
     .input("AcceptOtherTechnician", sql.Bit, payload.acceptOtherTechnician)
     .input("AcceptOtherTimeSlots", sql.Bit, payload.acceptOtherTimeSlots)
-    .input("ExpireAt", sql.DateTime, payload.preferredDate ? `${payload.preferredDate} 20:00:00` : null)
-    .query(`
+    .input(
+      "ExpireAt",
+      sql.DateTime,
+      payload.preferredDate ? `${payload.preferredDate} 20:00:00` : null,
+    ).query(`
       INSERT INTO WaitingList
       (
         CustomerId,
@@ -760,10 +787,13 @@ async function create(userId, data = {}) {
   const inserted = result.recordset[0];
 
   if (inserted && inserted.PreferredDate) {
-    const newDateStr = inserted.PreferredDate instanceof Date
-      ? inserted.PreferredDate.toISOString().slice(0, 10)
-      : String(inserted.PreferredDate).slice(0, 10);
-    runAutoMatch(newDateStr).catch(err => console.error("Auto match failed after create:", err.message));
+    const newDateStr =
+      inserted.PreferredDate instanceof Date
+        ? inserted.PreferredDate.toISOString().slice(0, 10)
+        : String(inserted.PreferredDate).slice(0, 10);
+    runAutoMatch(newDateStr).catch((err) =>
+      console.error("Auto match failed after create:", err.message),
+    );
   }
 
   return inserted;
@@ -838,8 +868,7 @@ async function update(userId, waitingId, data = {}) {
       .request()
       .input("CustomerId", sql.Int, customer.CustomerId)
       .input("ServiceId", sql.Int, payload.serviceId)
-      .input("PreferredDate", sql.VarChar, payload.preferredDate)
-      .query(`
+      .input("PreferredDate", sql.VarChar, payload.preferredDate).query(`
         SELECT TOP 1 a.AppointmentId
         FROM Appointments a
         INNER JOIN AppointmentServices asvc ON asvc.AppointmentId = a.AppointmentId
@@ -875,8 +904,11 @@ async function update(userId, waitingId, data = {}) {
     .input("Note", sql.NVarChar, payload.note)
     .input("AcceptOtherTechnician", sql.Bit, payload.acceptOtherTechnician)
     .input("AcceptOtherTimeSlots", sql.Bit, payload.acceptOtherTimeSlots)
-    .input("ExpireAt", sql.DateTime, payload.preferredDate ? `${payload.preferredDate} 20:00:00` : null)
-    .query(`
+    .input(
+      "ExpireAt",
+      sql.DateTime,
+      payload.preferredDate ? `${payload.preferredDate} 20:00:00` : null,
+    ).query(`
       UPDATE WaitingList
       SET
         ServiceId = @ServiceId,
@@ -912,18 +944,24 @@ async function update(userId, waitingId, data = {}) {
 
   const updated = result.recordset[0];
 
-  if (oldMatchedDate && (oldStatus === 'MATCHED' || oldStatus === 'NOTIFIED')) {
-    const oldDateStr = oldMatchedDate instanceof Date
-      ? oldMatchedDate.toISOString().slice(0, 10)
-      : String(oldMatchedDate).slice(0, 10);
-    runAutoMatch(oldDateStr).catch(err => console.error("Auto match failed on old date after update:", err.message));
+  if (oldMatchedDate && (oldStatus === "MATCHED" || oldStatus === "NOTIFIED")) {
+    const oldDateStr =
+      oldMatchedDate instanceof Date
+        ? oldMatchedDate.toISOString().slice(0, 10)
+        : String(oldMatchedDate).slice(0, 10);
+    runAutoMatch(oldDateStr).catch((err) =>
+      console.error("Auto match failed on old date after update:", err.message),
+    );
   }
 
   if (updated && updated.PreferredDate) {
-    const newDateStr = updated.PreferredDate instanceof Date
-      ? updated.PreferredDate.toISOString().slice(0, 10)
-      : String(updated.PreferredDate).slice(0, 10);
-    runAutoMatch(newDateStr).catch(err => console.error("Auto match failed on new date after update:", err.message));
+    const newDateStr =
+      updated.PreferredDate instanceof Date
+        ? updated.PreferredDate.toISOString().slice(0, 10)
+        : String(updated.PreferredDate).slice(0, 10);
+    runAutoMatch(newDateStr).catch((err) =>
+      console.error("Auto match failed on new date after update:", err.message),
+    );
   }
 
   return updated;
@@ -986,12 +1024,17 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
     return s.slice(0, 10);
   };
   const date = normalizeDateOnly(dateStr);
-  console.log(`[AutoMatch] Starting auto-match engine for date: ${date}`, canceledSlot ? `(Canceled slot: ${canceledSlot.startTime || canceledSlot.StartTime} - ${canceledSlot.endTime || canceledSlot.EndTime})` : "");
+  console.log(
+    `[AutoMatch] Starting auto-match engine for date: ${date}`,
+    canceledSlot
+      ? `(Canceled slot: ${canceledSlot.startTime || canceledSlot.StartTime} - ${canceledSlot.endTime || canceledSlot.EndTime})`
+      : "",
+  );
   const pool = await connectDB();
 
-  const candidatesResult = await pool.request()
-    .input("PreferredDate", sql.VarChar, date)
-    .query(`
+  const candidatesResult = await pool
+    .request()
+    .input("PreferredDate", sql.VarChar, date).query(`
       SELECT w.*, s.ServiceName, s.DurationMinutes, u.UserId, u.FullName AS CustomerName, u.Email
       FROM WaitingList w
       INNER JOIN Services s ON s.ServiceId = w.ServiceId
@@ -1020,17 +1063,23 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
   const employees = employeesResult.recordset;
 
   const canDoService = (empId, svcId) => {
-    return qualifications.some(q => q.EmployeeId === empId && q.ServiceId === svcId);
+    return qualifications.some(
+      (q) => q.EmployeeId === empId && q.ServiceId === svcId,
+    );
   };
 
   const appointmentsService = require("../appointments/appointments.service");
-  const serviceIds = [...new Set(candidates.map(c => c.ServiceId))];
+  const serviceIds = [...new Set(candidates.map((c) => c.ServiceId))];
 
-  const targetStartTime = canceledSlot ? formatTimeOnly(canceledSlot.startTime || canceledSlot.StartTime) : null;
+  const targetStartTime = canceledSlot
+    ? formatTimeOnly(canceledSlot.startTime || canceledSlot.StartTime)
+    : null;
 
   for (const svcId of serviceIds) {
-    const serviceCandidates = candidates.filter(c => c.ServiceId === svcId);
-    const qualifiedEmps = employees.filter(e => canDoService(e.EmployeeId, svcId));
+    const serviceCandidates = candidates.filter((c) => c.ServiceId === svcId);
+    const qualifiedEmps = employees.filter((e) =>
+      canDoService(e.EmployeeId, svcId),
+    );
 
     const potentialMatches = [];
 
@@ -1041,9 +1090,9 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
           employeeId: emp.EmployeeId,
           serviceId: svcId,
           appointmentDate: date,
-          includeAlternatives: false
+          includeAlternatives: false,
         });
-        freeSlots = Array.isArray(res) ? res : (res.slots || []);
+        freeSlots = Array.isArray(res) ? res : res.slots || [];
       } catch (err) {
         continue;
       }
@@ -1052,27 +1101,41 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
         const startTime = `${slot.startTime}:00`;
         const endTime = `${slot.endTime}:00`;
 
-        if (targetStartTime && slot.startTime.slice(0, 5) !== targetStartTime.slice(0, 5)) {
+        if (
+          targetStartTime &&
+          slot.startTime.slice(0, 5) !== targetStartTime.slice(0, 5)
+        ) {
           continue;
         }
 
         for (const cand of serviceCandidates) {
-          if (cand.Status !== 'WAITING') continue;
+          if (cand.Status !== "WAITING") continue;
 
           const isPreferredTech = cand.PreferredEmployeeId === emp.EmployeeId;
-          const techOk = !cand.PreferredEmployeeId || isPreferredTech || cand.AcceptOtherTechnician;
+          const techOk =
+            !cand.PreferredEmployeeId ||
+            isPreferredTech ||
+            cand.AcceptOtherTechnician;
 
           if (!techOk) continue;
 
           // Branch validation: Employee's branch must match the candidate's preferred branch (if set)
-          const branchOk = !cand.PreferredBranchId || String(emp.BranchId) === String(cand.PreferredBranchId);
+          const branchOk =
+            !cand.PreferredBranchId ||
+            String(emp.BranchId) === String(cand.PreferredBranchId);
           if (!branchOk) continue;
 
           let isExactTime = false;
           let timeOk = false;
 
-          const prefFrom = cand.PreferredTimeFrom ? formatTimeOnly(cand.PreferredTimeFrom) : (cand.PreferredTime ? formatTimeOnly(cand.PreferredTime) : null);
-          const prefTo = cand.PreferredTimeTo ? formatTimeOnly(cand.PreferredTimeTo) : null;
+          const prefFrom = cand.PreferredTimeFrom
+            ? formatTimeOnly(cand.PreferredTimeFrom)
+            : cand.PreferredTime
+              ? formatTimeOnly(cand.PreferredTime)
+              : null;
+          const prefTo = cand.PreferredTimeTo
+            ? formatTimeOnly(cand.PreferredTimeTo)
+            : null;
 
           if (prefFrom && prefTo) {
             if (startTime >= prefFrom && endTime <= prefTo) {
@@ -1080,7 +1143,10 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
               timeOk = true;
             }
           } else if (prefFrom) {
-            if (startTime.slice(0, 5) === prefFrom.slice(0, 5) || (startTime >= prefFrom && (!prefTo || endTime <= prefTo))) {
+            if (
+              startTime.slice(0, 5) === prefFrom.slice(0, 5) ||
+              (startTime >= prefFrom && (!prefTo || endTime <= prefTo))
+            ) {
               isExactTime = true;
               timeOk = true;
             }
@@ -1094,7 +1160,9 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
             timeOk = true;
           }
 
-          const isCanceledSlotMatch = targetStartTime && startTime.slice(0, 5) === targetStartTime.slice(0, 5);
+          const isCanceledSlotMatch =
+            targetStartTime &&
+            startTime.slice(0, 5) === targetStartTime.slice(0, 5);
 
           if (techOk && timeOk) {
             potentialMatches.push({
@@ -1106,7 +1174,12 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
               isCanceledSlotMatch: isCanceledSlotMatch ? 1 : 0,
               isExactTime: isExactTime ? 1 : 0,
               isExactTech: isPreferredTech ? 1 : 0,
-              priorityWeight: cand.PriorityLevel === 'URGENT' ? 3 : (cand.PriorityLevel === 'HIGH' ? 2 : 1)
+              priorityWeight:
+                cand.PriorityLevel === "URGENT"
+                  ? 3
+                  : cand.PriorityLevel === "HIGH"
+                    ? 2
+                    : 1,
             });
           }
         }
@@ -1139,7 +1212,7 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
     const assignedSlots = new Set();
 
     for (const match of potentialMatches) {
-      if (match.cand.Status !== 'WAITING') continue;
+      if (match.cand.Status !== "WAITING") continue;
       if (assignedCandidateIds.has(match.cand.WaitingId)) continue;
 
       const slotKey = `${match.emp.EmployeeId}_${match.slot.startTime}`;
@@ -1151,19 +1224,21 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
       const startTime = match.startTime;
       const endTime = match.endTime;
 
-      console.log(`[AutoMatch] Matching candidate ${best.CustomerName} (WaitingId: ${best.WaitingId}) to KTV ${emp.FullName} at ${slot.startTime} on ${date} (Exact Time: ${match.isExactTime}, Exact Tech: ${match.isExactTech})`);
+      console.log(
+        `[AutoMatch] Matching candidate ${best.CustomerName} (WaitingId: ${best.WaitingId}) to KTV ${emp.FullName} at ${slot.startTime} on ${date} (Exact Time: ${match.isExactTime}, Exact Tech: ${match.isExactTech})`,
+      );
 
       const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
       try {
-        await pool.request()
+        await pool
+          .request()
           .input("WaitingId", sql.Int, best.WaitingId)
           .input("MatchedEmployeeId", sql.Int, emp.EmployeeId)
           .input("MatchedDate", sql.Date, date)
           .input("MatchedStartTime", sql.VarChar, startTime)
           .input("MatchedEndTime", sql.VarChar, endTime)
-          .input("HoldExpiresAt", sql.DateTime, holdExpiresAt)
-          .query(`
+          .input("HoldExpiresAt", sql.DateTime, holdExpiresAt).query(`
             UPDATE WaitingList
             SET Status = 'MATCHED',
                 MatchedEmployeeId = @MatchedEmployeeId,
@@ -1175,7 +1250,7 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
             WHERE WaitingId = @WaitingId
           `);
 
-        best.Status = 'MATCHED';
+        best.Status = "MATCHED";
         assignedCandidateIds.add(best.WaitingId);
         assignedSlots.add(slotKey);
 
@@ -1188,13 +1263,14 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
           userId: best.UserId,
           title: "Đã tìm thấy lịch phù hợp từ hàng chờ",
           content: content,
-          type: "WAITING_LIST_MATCH"
+          type: "WAITING_LIST_MATCH",
         });
 
         if (best.Email) {
           try {
             const { sendMail } = require("../../utils/sendMail");
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const frontendUrl =
+              process.env.FRONTEND_URL || "http://localhost:5173";
             const confirmUrl = `${frontendUrl}/customer/waiting-list`;
             await sendMail({
               to: best.Email,
@@ -1218,15 +1294,23 @@ async function runAutoMatch(dateStr, canceledSlot = null) {
                   </p>
                   <p style="color:#777;font-size:12px;margin-top:30px;">Nếu bạn không xác nhận trong vòng 15 phút, yêu cầu hàng chờ sẽ tự động quay trở lại danh sách chờ ghép.</p>
                 </div>
-              `
+              `,
             });
-            console.log(`[AutoMatch] Notification email sent to ${best.Email} for WaitingId ${best.WaitingId}`);
+            console.log(
+              `[AutoMatch] Notification email sent to ${best.Email} for WaitingId ${best.WaitingId}`,
+            );
           } catch (mailErr) {
-            console.error(`[AutoMatch] Failed to send notification email to ${best.Email}:`, mailErr.message);
+            console.error(
+              `[AutoMatch] Failed to send notification email to ${best.Email}:`,
+              mailErr.message,
+            );
           }
         }
       } catch (err) {
-        console.error(`[AutoMatch] Failed to save match for WaitingId ${best.WaitingId}:`, err.message);
+        console.error(
+          `[AutoMatch] Failed to save match for WaitingId ${best.WaitingId}:`,
+          err.message,
+        );
       }
     }
   }
@@ -1309,8 +1393,11 @@ async function confirmMatch(userId, waitingId) {
       .input("AppointmentDate", sql.Date, item.MatchedDate)
       .input("StartTime", sql.VarChar, formatTimeOnly(item.MatchedStartTime))
       .input("EndTime", sql.VarChar, formatTimeOnly(item.MatchedEndTime))
-      .input("Notes", sql.NVarChar, `Được đặt tự động từ hàng chờ. Ghi chú: ${item.Note || ""}`)
-      .query(`
+      .input(
+        "Notes",
+        sql.NVarChar,
+        `Được đặt tự động từ hàng chờ. Ghi chú: ${item.Note || ""}`,
+      ).query(`
         INSERT INTO Appointments (CustomerId, EmployeeId, BranchId, AppointmentDate, StartTime, EndTime, Status, Notes)
         OUTPUT INSERTED.AppointmentId, INSERTED.Status
         VALUES (@CustomerId, @EmployeeId, @BranchId, @AppointmentDate, @StartTime, @EndTime, 'PENDING_PAYMENT', @Notes)
@@ -1323,8 +1410,7 @@ async function confirmMatch(userId, waitingId) {
       .input("AppointmentId", sql.Int, newAppointmentId)
       .input("TotalAmount", sql.Decimal(18, 2), item.Price)
       .input("DiscountAmount", sql.Decimal(18, 2), 0)
-      .input("FinalAmount", sql.Decimal(18, 2), item.Price)
-      .query(`
+      .input("FinalAmount", sql.Decimal(18, 2), item.Price).query(`
         INSERT INTO Invoices (AppointmentId, TotalAmount, DiscountAmount, FinalAmount, Status)
         OUTPUT INSERTED.InvoiceId
         VALUES (@AppointmentId, @TotalAmount, @DiscountAmount, @FinalAmount, 'UNPAID')
@@ -1333,8 +1419,7 @@ async function confirmMatch(userId, waitingId) {
     await new sql.Request(transaction)
       .input("AppointmentId", sql.Int, newAppointmentId)
       .input("ServiceId", sql.Int, item.ServiceId)
-      .input("Price", sql.Decimal(18, 2), item.Price)
-      .query(`
+      .input("Price", sql.Decimal(18, 2), item.Price).query(`
         INSERT INTO AppointmentServices (AppointmentId, ServiceId, Price)
         VALUES (@AppointmentId, @ServiceId, @Price)
       `);
@@ -1344,16 +1429,14 @@ async function confirmMatch(userId, waitingId) {
       .input("OldStatus", sql.NVarChar, null)
       .input("NewStatus", sql.NVarChar, "PENDING_PAYMENT")
       .input("ChangedBy", sql.Int, userId)
-      .input("Reason", sql.NVarChar, "Đặt lịch tự động từ hàng chờ")
-      .query(`
+      .input("Reason", sql.NVarChar, "Đặt lịch tự động từ hàng chờ").query(`
         INSERT INTO AppointmentStatusHistory (AppointmentId, OldStatus, NewStatus, ChangedBy, Reason)
         VALUES (@AppointmentId, @OldStatus, @NewStatus, @ChangedBy, @Reason)
       `);
 
     await new sql.Request(transaction)
       .input("WaitingId", sql.Int, id)
-      .input("ConvertedAppointmentId", sql.Int, newAppointmentId)
-      .query(`
+      .input("ConvertedAppointmentId", sql.Int, newAppointmentId).query(`
         UPDATE WaitingList
         SET Status = 'BOOKED',
             ConvertedAppointmentId = @ConvertedAppointmentId,
@@ -1395,9 +1478,7 @@ async function rejectMatch(userId, waitingId) {
     throw new Error("Yêu cầu hàng chờ không ở trạng thái được ghép lịch.");
   }
 
-  await pool.request()
-    .input("WaitingId", sql.Int, id)
-    .query(`
+  await pool.request().input("WaitingId", sql.Int, id).query(`
       UPDATE WaitingList
       SET Status = 'CANCELLED',
           CancelReason = N'Khách từ chối lịch đã ghép',
@@ -1406,9 +1487,13 @@ async function rejectMatch(userId, waitingId) {
       WHERE WaitingId = @WaitingId
     `);
 
-  const dateStr = item.MatchedDate ? item.MatchedDate.toISOString().slice(0, 10) : null;
+  const dateStr = item.MatchedDate
+    ? item.MatchedDate.toISOString().slice(0, 10)
+    : null;
   if (dateStr) {
-    runAutoMatch(dateStr).catch(err => console.error("Auto match failed after rejection:", err.message));
+    runAutoMatch(dateStr).catch((err) =>
+      console.error("Auto match failed after rejection:", err.message),
+    );
   }
 
   return { success: true };
@@ -1428,9 +1513,7 @@ function startWaitingListHoldScheduler(intervalMs = 60 * 1000) {
 
       for (const row of expiredHoldsResult.recordset) {
         console.log(`[Scheduler] Hold expired for WaitingId: ${row.WaitingId}`);
-        await pool.request()
-          .input("WaitingId", sql.Int, row.WaitingId)
-          .query(`
+        await pool.request().input("WaitingId", sql.Int, row.WaitingId).query(`
             UPDATE WaitingList
             SET Status = 'SKIPPED',
                 HoldExpiresAt = NULL,
@@ -1438,11 +1521,14 @@ function startWaitingListHoldScheduler(intervalMs = 60 * 1000) {
             WHERE WaitingId = @WaitingId
           `);
 
-        const dateStr = row.MatchedDate instanceof Date
-          ? row.MatchedDate.toISOString().slice(0, 10)
-          : String(row.MatchedDate).slice(0, 10);
+        const dateStr =
+          row.MatchedDate instanceof Date
+            ? row.MatchedDate.toISOString().slice(0, 10)
+            : String(row.MatchedDate).slice(0, 10);
 
-        runAutoMatch(dateStr).catch(err => console.error("Auto match failed after hold expiry:", err.message));
+        runAutoMatch(dateStr).catch((err) =>
+          console.error("Auto match failed after hold expiry:", err.message),
+        );
       }
 
       await pool.request().query(`
@@ -1452,7 +1538,6 @@ function startWaitingListHoldScheduler(intervalMs = 60 * 1000) {
         WHERE Status = 'WAITING'
           AND ExpireAt <= GETUTCDATE()
       `);
-
     } catch (err) {
       console.error("[Scheduler] Waiting list hold job failed:", err.message);
     }
@@ -1473,5 +1558,5 @@ module.exports = {
   runAutoMatch,
   confirmMatch,
   rejectMatch,
-  startWaitingListHoldScheduler
+  startWaitingListHoldScheduler,
 };

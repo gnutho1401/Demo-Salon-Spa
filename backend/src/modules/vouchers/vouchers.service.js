@@ -12,20 +12,22 @@ function scaleVoucher(v) {
   if (!v) return v;
   const code = String(v.Code || "").toUpperCase();
   const isFree = code.startsWith("FREE");
-  
+
   const minOrder = Number(v.MinOrderAmount || 0) / 10;
-  const maxDiscount = v.MaxDiscountAmount ? Number(v.MaxDiscountAmount) / 10 : null;
-  
+  const maxDiscount = v.MaxDiscountAmount
+    ? Number(v.MaxDiscountAmount) / 10
+    : null;
+
   let discountValue = Number(v.DiscountValue || 0);
   if (!isFree && String(v.DiscountType).toUpperCase() === "AMOUNT") {
     discountValue = discountValue / 10;
   }
-  
+
   return {
     ...v,
     MinOrderAmount: minOrder,
     MaxDiscountAmount: maxDiscount,
-    DiscountValue: discountValue
+    DiscountValue: discountValue,
   };
 }
 
@@ -113,11 +115,11 @@ async function getMine(userId, customerId = null) {
 
   const appts = apptsRes.recordset;
 
-  return vouchers.map(v => {
-    const usages = appts.filter(a => a.VoucherId === v.VoucherId);
+  return vouchers.map((v) => {
+    const usages = appts.filter((a) => a.VoucherId === v.VoucherId);
     return {
       ...scaleVoucher(v),
-      Usages: usages
+      Usages: usages,
     };
   });
 }
@@ -148,13 +150,20 @@ async function saveVoucher(userId, voucherId) {
       const matchPattern = `C${custIdStr}R`;
       const discountVal = parseInt(voucherRecord.DiscountValue || 0);
       const matchPatternOld = `CRM${discountVal}${custIdStr}`;
-      if (!codeStr.includes(matchPattern) && !codeStr.includes(matchPatternOld)) {
-        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể lưu");
+      if (
+        !codeStr.includes(matchPattern) &&
+        !codeStr.includes(matchPatternOld)
+      ) {
+        throw new Error(
+          "Voucher này dành riêng cho khách hàng khác và không thể lưu",
+        );
       }
     } else if (isFreeGift) {
       const customerPart = codeStr.slice(6);
       if (!customerPart.startsWith(custIdStr)) {
-        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể lưu");
+        throw new Error(
+          "Voucher này dành riêng cho khách hàng khác và không thể lưu",
+        );
       }
     }
   }
@@ -227,7 +236,9 @@ async function validateVoucher(userId, data, customerId = null) {
 
   const minOrder = Number(voucher.MinOrderAmount || 0);
   if (minOrder > 0 && totalAmount < minOrder) {
-    throw new Error(`Đơn hàng tối thiểu ${minOrder.toLocaleString('vi-VN')}đ để sử dụng voucher này`);
+    throw new Error(
+      `Đơn hàng tối thiểu ${minOrder.toLocaleString("vi-VN")}đ để sử dụng voucher này`,
+    );
   }
 
   let customer;
@@ -249,13 +260,20 @@ async function validateVoucher(userId, data, customerId = null) {
       const matchPattern = `C${custIdStr}R`;
       const discountVal = parseInt(voucher.DiscountValue || 0);
       const matchPatternOld = `CRM${discountVal}${custIdStr}`;
-      if (!codeUpper.includes(matchPattern) && !codeUpper.includes(matchPatternOld)) {
-        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể sử dụng");
+      if (
+        !codeUpper.includes(matchPattern) &&
+        !codeUpper.includes(matchPatternOld)
+      ) {
+        throw new Error(
+          "Voucher này dành riêng cho khách hàng khác và không thể sử dụng",
+        );
       }
     } else if (isFreeGift) {
       const customerPart = codeUpper.slice(6);
       if (!customerPart.startsWith(custIdStr)) {
-        throw new Error("Voucher này dành riêng cho khách hàng khác và không thể sử dụng");
+        throw new Error(
+          "Voucher này dành riêng cho khách hàng khác và không thể sử dụng",
+        );
       }
     }
   }
@@ -264,17 +282,26 @@ async function validateVoucher(userId, data, customerId = null) {
     if (!data.serviceId) {
       throw new Error("Vui lòng chọn dịch vụ phù hợp để áp dụng voucher này");
     }
-    const serviceRes = await pool.request()
+    const serviceRes = await pool
+      .request()
       .input("ServiceId", sql.Int, data.serviceId)
       .query("SELECT ServiceName FROM Services WHERE ServiceId = @ServiceId");
     if (serviceRes.recordset.length === 0) {
       throw new Error("Dịch vụ không tồn tại");
     }
     const serviceName = String(serviceRes.recordset[0].ServiceName || "");
-    if (codeUpper.startsWith("FREEPH") && serviceName !== "Phục hồi tóc hư tổn") {
-      throw new Error("Voucher này chỉ áp dụng cho dịch vụ Phục hồi tóc hư tổn");
+    if (
+      codeUpper.startsWith("FREEPH") &&
+      serviceName !== "Phục hồi tóc hư tổn"
+    ) {
+      throw new Error(
+        "Voucher này chỉ áp dụng cho dịch vụ Phục hồi tóc hư tổn",
+      );
     }
-    if (codeUpper.startsWith("FREEMS") && serviceName !== "Massage cổ vai gáy") {
+    if (
+      codeUpper.startsWith("FREEMS") &&
+      serviceName !== "Massage cổ vai gáy"
+    ) {
       throw new Error("Voucher này chỉ áp dụng cho dịch vụ Massage cổ vai gáy");
     }
     if (codeUpper.startsWith("FREEGD") && !serviceName.includes("Gội đầu")) {
@@ -282,10 +309,10 @@ async function validateVoucher(userId, data, customerId = null) {
     }
   }
 
-  const useCheck = await pool.request()
+  const useCheck = await pool
+    .request()
     .input("CustomerId", sql.Int, customer.CustomerId)
-    .input("VoucherId", sql.Int, voucher.VoucherId)
-    .query(`
+    .input("VoucherId", sql.Int, voucher.VoucherId).query(`
       SELECT UsedStatus 
       FROM CustomerVouchers 
       WHERE CustomerId = @CustomerId AND VoucherId = @VoucherId
@@ -295,10 +322,10 @@ async function validateVoucher(userId, data, customerId = null) {
     throw new Error("Vui lòng lưu voucher này trước khi sử dụng");
   }
 
-  const countRes = await pool.request()
+  const countRes = await pool
+    .request()
     .input("CustomerId", sql.Int, customer.CustomerId)
-    .input("VoucherId", sql.Int, voucher.VoucherId)
-    .query(`
+    .input("VoucherId", sql.Int, voucher.VoucherId).query(`
       SELECT COUNT(*) AS UseCount
       FROM Invoices i
       JOIN Appointments a ON i.AppointmentId = a.AppointmentId

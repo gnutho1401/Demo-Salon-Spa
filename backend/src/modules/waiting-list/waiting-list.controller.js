@@ -70,7 +70,7 @@ async function confirmMatch(req, res) {
   try {
     const data = await waitingListService.confirmMatch(
       req.user.userId,
-      req.params.id
+      req.params.id,
     );
     return success(res, data, "Đã xác nhận lịch hẹn ghép.");
   } catch (err) {
@@ -82,7 +82,7 @@ async function rejectMatch(req, res) {
   try {
     const data = await waitingListService.rejectMatch(
       req.user.userId,
-      req.params.id
+      req.params.id,
     );
     return success(res, data, "Đã từ chối lịch hẹn ghép.");
   } catch (err) {
