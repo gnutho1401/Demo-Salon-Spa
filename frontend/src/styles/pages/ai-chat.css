@@ -107,8 +107,15 @@
 }
 
 @keyframes ai-pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 8px 28px rgba(255, 71, 120, 0.3); }
-  50% { transform: scale(1.06); box-shadow: 0 12px 36px rgba(255, 71, 120, 0.45); }
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 8px 28px rgba(255, 71, 120, 0.3);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 12px 36px rgba(255, 71, 120, 0.45);
+  }
 }
 
 .ai-welcome h3 {
@@ -134,8 +141,14 @@
 }
 
 @keyframes ai-fade-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .ai-msg.user {
@@ -265,8 +278,16 @@
 }
 
 @keyframes ai-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-8px); opacity: 1; }
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
 }
 
 /* Input area */
@@ -292,7 +313,9 @@
   font-family: var(--font-body);
   outline: none;
   background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .ai-chat-form input:focus {
@@ -317,7 +340,9 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 16px rgba(255, 71, 120, 0.3);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   flex-shrink: 0;
 }
 
@@ -997,7 +1022,7 @@
   border-radius: 50%;
   object-fit: cover;
   border: 1.5px solid #fff;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
 }
 
 .ai-widget-stylist-details h4 {
@@ -1236,7 +1261,7 @@
   font-size: 13px;
   line-height: 1.5;
   border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .ai-chat-msg.user .ai-chat-msg-text {
@@ -1289,9 +1314,15 @@
 }
 
 @keyframes ai-dot-blink {
-  0% { opacity: .2; }
-  20% { opacity: 1; }
-  100% { opacity: .2; }
+  0% {
+    opacity: 0.2;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
 }
 
 /* Suggestions chips */
@@ -1331,7 +1362,7 @@
   max-width: 100%;
   margin: 0;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   border: 1px solid #f5edf0;
 }
 

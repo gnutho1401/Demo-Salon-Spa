@@ -1,22 +1,43 @@
 /* TREATMENT NOTES CUSTOM PREMIUM STYLES */
 
 @keyframes gold-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(229, 169, 59, 0.5); }
-  70% { box-shadow: 0 0 0 10px rgba(229, 169, 59, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(229, 169, 59, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(229, 169, 59, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(229, 169, 59, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(229, 169, 59, 0);
+  }
 }
 
 @keyframes green-pulse {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  50% { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(0.9); opacity: 0.7; }
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
 }
 
 .treatment-notes-container {
   padding: 24px 30px;
   background-color: #fbfaf7;
   color: #2c3e50;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   min-height: 100vh;
 }
 
@@ -30,7 +51,9 @@
   font-size: 0.9rem;
   font-weight: 600;
   margin-bottom: 12px;
-  transition: transform 0.2s, color 0.2s;
+  transition:
+    transform 0.2s,
+    color 0.2s;
   cursor: pointer;
 }
 
@@ -715,10 +738,22 @@
 }
 
 /* Grid colors */
-.tn-pre-condition .tn-grid-icon-wrap { background-color: #f3ebf7; color: #805ad5; }
-.tn-procedure .tn-grid-icon-wrap { background-color: #ebf4f9; color: #3182ce; }
-.tn-post-condition .tn-grid-icon-wrap { background-color: #edf7f0; color: #38a169; }
-.tn-recommendations .tn-grid-icon-wrap { background-color: #fff6eb; color: #dd6b20; }
+.tn-pre-condition .tn-grid-icon-wrap {
+  background-color: #f3ebf7;
+  color: #805ad5;
+}
+.tn-procedure .tn-grid-icon-wrap {
+  background-color: #ebf4f9;
+  color: #3182ce;
+}
+.tn-post-condition .tn-grid-icon-wrap {
+  background-color: #edf7f0;
+  color: #38a169;
+}
+.tn-recommendations .tn-grid-icon-wrap {
+  background-color: #fff6eb;
+  color: #dd6b20;
+}
 
 .tn-edit-icon-btn {
   background: none;
@@ -787,16 +822,24 @@
   border: 1px solid #c7dff3;
   color: #2b6cb0;
 }
-.tn-note-personal .tn-note-label { color: #2b6cb0; }
-.tn-note-personal .tn-note-desc { color: #2d3748; }
+.tn-note-personal .tn-note-label {
+  color: #2b6cb0;
+}
+.tn-note-personal .tn-note-desc {
+  color: #2d3748;
+}
 
 .tn-note-special {
   background-color: #fffaf0;
   border: 1px solid #feebc8;
   color: #dd6b20;
 }
-.tn-note-special .tn-note-label { color: #c05621; }
-.tn-note-special .tn-note-desc { color: #2d3748; }
+.tn-note-special .tn-note-label {
+  color: #c05621;
+}
+.tn-note-special .tn-note-desc {
+  color: #2d3748;
+}
 
 .tn-note-icon {
   font-size: 1.3rem;
@@ -929,8 +972,14 @@
 }
 
 @keyframes slideUp {
-  from { transform: translate(-50%, 100px); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
+  from {
+    transform: translate(-50%, 100px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }
 
 .tn-edit-toolbar-text {
@@ -1000,8 +1049,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .tn-modal {
@@ -1016,8 +1069,14 @@
 }
 
 @keyframes scaleIn {
-  from { transform: scale(0.9); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .tn-modal-header {
@@ -1206,9 +1265,9 @@
     background: #ffffff !important;
     color: #000000 !important;
   }
-  
+
   /* Hide sidebars and action elements */
-  .technician-layout-sidebar, 
+  .technician-layout-sidebar,
   .tn-back-link,
   .tn-actions,
   .tn-view-more-btn,
@@ -1223,17 +1282,17 @@
   footer {
     display: none !important;
   }
-  
+
   .treatment-notes-container {
     padding: 0 !important;
     background: #ffffff !important;
   }
-  
+
   .tn-main-content {
     grid-template-columns: 1fr !important;
     gap: 15px !important;
   }
-  
+
   .tn-profile-card,
   .tn-card,
   .tn-grid-card,
@@ -1244,18 +1303,18 @@
     box-shadow: none !important;
     page-break-inside: avoid;
   }
-  
+
   .tn-profile-left {
     border-right: none !important;
     padding-right: 0 !important;
   }
-  
+
   .tn-profile-card {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 15px !important;
   }
-  
+
   .tn-profile-right-grid {
     grid-template-columns: repeat(3, 1fr) !important;
     width: 100% !important;

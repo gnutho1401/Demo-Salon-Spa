@@ -13,7 +13,15 @@ export default function TechnicianReviews() {
   const [data, setData] = useState({
     reviews: [],
     services: [],
-    summary: { TotalCount: 0, AvgRating: 0, Stars5: 0, Stars4: 0, Stars3: 0, Stars2: 0, Stars1: 0 },
+    summary: {
+      TotalCount: 0,
+      AvgRating: 0,
+      Stars5: 0,
+      Stars4: 0,
+      Stars3: 0,
+      Stars2: 0,
+      Stars1: 0,
+    },
     monthlyStats: [],
   });
 
@@ -54,7 +62,8 @@ export default function TechnicianReviews() {
 
   // Calculate percentages for rating bars
   const totalRatings = summary.TotalCount || 1;
-  const getPercentage = (count) => Math.round(((count || 0) / totalRatings) * 100);
+  const getPercentage = (count) =>
+    Math.round(((count || 0) / totalRatings) * 100);
 
   // Helper to render stars
   const renderStars = (rating) => {
@@ -569,7 +578,10 @@ export default function TechnicianReviews() {
         <header className="header-section">
           <div>
             <h1>Đánh giá khách hàng</h1>
-            <p>Theo dõi chất lượng tay nghề và các ý kiến đóng góp từ khách hàng của bạn.</p>
+            <p>
+              Theo dõi chất lượng tay nghề và các ý kiến đóng góp từ khách hàng
+              của bạn.
+            </p>
           </div>
         </header>
 
@@ -578,9 +590,15 @@ export default function TechnicianReviews() {
           {/* Card 1: Score */}
           <section className="stat-card">
             <div className="avg-score-wrapper">
-              <div className="big-score">{Number(summary.AvgRating || 0).toFixed(1)}</div>
-              <div className="big-stars">{"★".repeat(Math.round(summary.AvgRating || 0))}</div>
-              <div className="total-lbl">{summary.TotalCount} lượt đánh giá</div>
+              <div className="big-score">
+                {Number(summary.AvgRating || 0).toFixed(1)}
+              </div>
+              <div className="big-stars">
+                {"★".repeat(Math.round(summary.AvgRating || 0))}
+              </div>
+              <div className="total-lbl">
+                {summary.TotalCount} lượt đánh giá
+              </div>
             </div>
           </section>
 
@@ -594,7 +612,10 @@ export default function TechnicianReviews() {
                 <div key={stars} className="dist-row">
                   <span className="dist-label">{stars} ★</span>
                   <div className="dist-bar-bg">
-                    <div className="dist-bar-fill" style={{ width: `${pct}%` }}></div>
+                    <div
+                      className="dist-bar-fill"
+                      style={{ width: `${pct}%` }}
+                    ></div>
                   </div>
                   <span className="dist-percent">{pct}%</span>
                 </div>
@@ -605,23 +626,48 @@ export default function TechnicianReviews() {
           {/* Card 3: Monthly Trend Visual Graph */}
           <section className="stat-card trend-chart-card">
             <div className="chart-header">
-              <h4 className="dist-title" style={{ margin: 0 }}>Xu hướng 6 tháng qua</h4>
-              <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#2f593a" }}>Rating TB theo tháng</span>
+              <h4 className="dist-title" style={{ margin: 0 }}>
+                Xu hướng 6 tháng qua
+              </h4>
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: "700",
+                  color: "#2f593a",
+                }}
+              >
+                Rating TB theo tháng
+              </span>
             </div>
-            
+
             <div className="chart-body">
               {monthlyStats.length === 0 ? (
-                <div style={{ fontSize: "0.85rem", color: "#a0aec0", margin: "auto" }}>Chưa có dữ liệu xu hướng</div>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#a0aec0",
+                    margin: "auto",
+                  }}
+                >
+                  Chưa có dữ liệu xu hướng
+                </div>
               ) : (
                 monthlyStats.map((item, idx) => {
-                  const barHeight = Math.min(100, Math.round((item.AvgRating / 5) * 100));
+                  const barHeight = Math.min(
+                    100,
+                    Math.round((item.AvgRating / 5) * 100),
+                  );
                   return (
                     <div key={idx} className="chart-col">
                       <div className="chart-tooltip">
-                        ⭐ {Number(item.AvgRating).toFixed(1)} ({item.ReviewCount} lượt)
+                        ⭐ {Number(item.AvgRating).toFixed(1)} (
+                        {item.ReviewCount} lượt)
                       </div>
                       <div className="chart-bar-wrapper">
-                        <div className="chart-bar" style={{ height: `${barHeight}%` }}></div>
+                        <div
+                          className="chart-bar"
+                          style={{ height: `${barHeight}%` }}
+                        ></div>
                       </div>
                       <div className="chart-lbl">T.{item.MonthVal}</div>
                     </div>
@@ -726,13 +772,18 @@ export default function TechnicianReviews() {
                   <div className="rating-badge-col">
                     {renderStars(rev.Rating)}
                     <div>
-                      <span className="service-tag">{rev.ServiceName || "Dịch vụ"}</span>
+                      <span className="service-tag">
+                        {rev.ServiceName || "Dịch vụ"}
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 <p className="review-body">
-                  &ldquo;{rev.Comment || "Khách hàng không để lại nhận xét bằng lời, chỉ đánh giá xếp hạng."}&rdquo;
+                  &ldquo;
+                  {rev.Comment ||
+                    "Khách hàng không để lại nhận xét bằng lời, chỉ đánh giá xếp hạng."}
+                  &rdquo;
                 </p>
 
                 {rev.Images && rev.Images.length > 0 && (
@@ -757,8 +808,18 @@ export default function TechnicianReviews() {
 
                 {/* If there is detailed technician rating score available, show it as subtext */}
                 {rev.TechnicianRating && (
-                  <div style={{ marginTop: "10px", fontSize: "0.75rem", color: "#718096", display: "flex", gap: "8px" }}>
-                    <span>Tay nghề KTV: <b>{rev.TechnicianRating}/5 ★</b></span>
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      fontSize: "0.75rem",
+                      color: "#718096",
+                      display: "flex",
+                      gap: "8px",
+                    }}
+                  >
+                    <span>
+                      Tay nghề KTV: <b>{rev.TechnicianRating}/5 ★</b>
+                    </span>
                   </div>
                 )}
 
@@ -769,7 +830,9 @@ export default function TechnicianReviews() {
                       <span>✦ Phản hồi từ Quản lý chi nhánh:</span>
                     </div>
                     <p className="reply-content">
-                      Cảm ơn bạn đã phản hồi về dịch vụ. Chúng tôi đã ghi nhận phản ánh và sẽ phối hợp với KTV để nâng cao chất lượng dịch vụ cho các lần tiếp theo.
+                      Cảm ơn bạn đã phản hồi về dịch vụ. Chúng tôi đã ghi nhận
+                      phản ánh và sẽ phối hợp với KTV để nâng cao chất lượng
+                      dịch vụ cho các lần tiếp theo.
                     </p>
                   </div>
                 )}

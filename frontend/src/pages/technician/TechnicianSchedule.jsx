@@ -205,7 +205,10 @@ export default function TechnicianSchedule() {
 
         const updated = nextData.appointments?.find((a) => {
           if (current.AppointmentServiceId && a.AppointmentServiceId) {
-            return Number(a.AppointmentServiceId) === Number(current.AppointmentServiceId);
+            return (
+              Number(a.AppointmentServiceId) ===
+              Number(current.AppointmentServiceId)
+            );
           }
           return Number(a.AppointmentId) === Number(current.AppointmentId);
         });
@@ -280,7 +283,10 @@ export default function TechnicianSchedule() {
 
       await axiosClient.patch(
         `/technician/appointments/${selected.AppointmentId}/start`,
-        { appointmentServiceId: selected.AppointmentServiceId, serviceId: selected.ServiceId }
+        {
+          appointmentServiceId: selected.AppointmentServiceId,
+          serviceId: selected.ServiceId,
+        },
       );
 
       await loadSchedule();
@@ -301,7 +307,7 @@ export default function TechnicianSchedule() {
       if (selected.CustomerPackageId) {
         await axiosClient.patch(
           `/technician/appointments/${selected.AppointmentId}/complete-step`,
-          { appointmentServiceId: selected.AppointmentServiceId }
+          { appointmentServiceId: selected.AppointmentServiceId },
         );
       } else {
         await axiosClient.patch(
@@ -341,23 +347,35 @@ export default function TechnicianSchedule() {
 
   // Với Combo: canStart = bước của mình còn PENDING và chưa IN_PROGRESS
   // Với lịch thường: dựa vào appointment status
-  const canStart = selected && (() => {
-    if (selected.CustomerPackageId) {
-      // Combo: chỉ có thể bắt đầu nếu bước này còn PENDING
-      return selected.MyStepStatus === 'PENDING' && ['CONFIRMED','PAID','CHECKED_IN','IN_PROGRESS'].includes(selected.Status);
-    }
-    return ['CONFIRMED', 'PAID', 'CHECKED_IN'].includes(selected.Status);
-  })();
+  const canStart =
+    selected &&
+    (() => {
+      if (selected.CustomerPackageId) {
+        // Combo: chỉ có thể bắt đầu nếu bước này còn PENDING
+        return (
+          selected.MyStepStatus === "PENDING" &&
+          ["CONFIRMED", "PAID", "CHECKED_IN", "IN_PROGRESS"].includes(
+            selected.Status,
+          )
+        );
+      }
+      return ["CONFIRMED", "PAID", "CHECKED_IN"].includes(selected.Status);
+    })();
 
-  const canComplete = selected && (() => {
-    if (selected.CustomerPackageId) {
-      // Combo: chỉ hoàn thành được khi bước này đang IN_PROGRESS
-      return selected.MyStepStatus === 'IN_PROGRESS';
-    }
-    return selected.Status === 'IN_PROGRESS';
-  })();
+  const canComplete =
+    selected &&
+    (() => {
+      if (selected.CustomerPackageId) {
+        // Combo: chỉ hoàn thành được khi bước này đang IN_PROGRESS
+        return selected.MyStepStatus === "IN_PROGRESS";
+      }
+      return selected.Status === "IN_PROGRESS";
+    })();
 
-  const canNoShow = selected && !selected.CustomerPackageId && ['CONFIRMED', 'PAID', 'CHECKED_IN'].includes(selected.Status);
+  const canNoShow =
+    selected &&
+    !selected.CustomerPackageId &&
+    ["CONFIRMED", "PAID", "CHECKED_IN"].includes(selected.Status);
 
   return (
     <TechnicianLayout>
@@ -837,7 +855,6 @@ export default function TechnicianSchedule() {
         `}</style>
 
         <header className="tech-page-head">
-
           <div>
             <h1>Lịch trình của tôi 🗓️</h1>
             <p>Quản lý các ca trực và lịch hẹn trị liệu của bạn</p>
@@ -1024,8 +1041,10 @@ export default function TechnicianSchedule() {
                       cursor: "pointer",
                       padding: "4px 8px",
                       borderRadius: "6px",
-                      background: isSelectedDay ? "rgba(45, 106, 79, 0.15)" : "transparent",
-                      transition: "all 0.2s"
+                      background: isSelectedDay
+                        ? "rgba(45, 106, 79, 0.15)"
+                        : "transparent",
+                      transition: "all 0.2s",
                     }}
                   >
                     <b style={{ color: isSelectedDay ? "#2d6a4f" : undefined }}>
@@ -1033,16 +1052,19 @@ export default function TechnicianSchedule() {
                         weekday: view === "month" ? "short" : "long",
                       })}
                     </b>
-                    <span style={{
-                      fontWeight: isSelectedDay ? 700 : 400,
-                      color: isSelectedDay ? "#2d6a4f" : undefined,
-                      textDecoration: isSelectedDay ? "underline" : "none"
-                    }}>{d}</span>
+                    <span
+                      style={{
+                        fontWeight: isSelectedDay ? 700 : 400,
+                        color: isSelectedDay ? "#2d6a4f" : undefined,
+                        textDecoration: isSelectedDay ? "underline" : "none",
+                      }}
+                    >
+                      {d}
+                    </span>
                   </div>
                 );
               })}
             </div>
-
 
             {view === "month" ? (
               <div className="month-list">
@@ -1059,20 +1081,35 @@ export default function TechnicianSchedule() {
                       onClick={() => setBaseDate(d)}
                       style={{
                         cursor: "pointer",
-                        border: isSelectedDay ? "2px solid #2d6a4f" : "1px solid #e5e7eb",
-                        boxShadow: isSelectedDay ? "0 4px 12px rgba(45, 106, 79, 0.15)" : "none",
+                        border: isSelectedDay
+                          ? "2px solid #2d6a4f"
+                          : "1px solid #e5e7eb",
+                        boxShadow: isSelectedDay
+                          ? "0 4px 12px rgba(45, 106, 79, 0.15)"
+                          : "none",
                         background: isSelectedDay ? "#f4fcf9" : undefined,
-                        transition: "all 0.2s"
+                        transition: "all 0.2s",
                       }}
                     >
-                      <div className="month-day-head" style={{
-                        background: isSelectedDay ? "#2d6a4f" : undefined,
-                        color: isSelectedDay ? "#fff" : undefined,
-                        padding: "6px 8px",
-                        borderRadius: isSelectedDay ? "4px 4px 0 0" : undefined
-                      }}>
-                        <b style={{ color: isSelectedDay ? "#fff" : undefined }}>{d.slice(8, 10)}</b>
-                        <span style={{ color: isSelectedDay ? "#fff" : undefined }}>
+                      <div
+                        className="month-day-head"
+                        style={{
+                          background: isSelectedDay ? "#2d6a4f" : undefined,
+                          color: isSelectedDay ? "#fff" : undefined,
+                          padding: "6px 8px",
+                          borderRadius: isSelectedDay
+                            ? "4px 4px 0 0"
+                            : undefined,
+                        }}
+                      >
+                        <b
+                          style={{ color: isSelectedDay ? "#fff" : undefined }}
+                        >
+                          {d.slice(8, 10)}
+                        </b>
+                        <span
+                          style={{ color: isSelectedDay ? "#fff" : undefined }}
+                        >
                           {new Date(d).toLocaleDateString("vi-VN", {
                             weekday: "short",
                           })}
@@ -1084,9 +1121,15 @@ export default function TechnicianSchedule() {
                       ) : (
                         dayAppointments.map((a) => (
                           <button
-                            key={a.AppointmentServiceId ? `${a.AppointmentId}-${a.AppointmentServiceId}` : a.AppointmentId}
+                            key={
+                              a.AppointmentServiceId
+                                ? `${a.AppointmentId}-${a.AppointmentServiceId}`
+                                : a.AppointmentId
+                            }
                             className={`appointment-block ${String(
-                              a.CustomerPackageId ? (a.MyStepStatus || a.Status) : a.Status,
+                              a.CustomerPackageId
+                                ? a.MyStepStatus || a.Status
+                                : a.Status,
                             ).toLowerCase()}`}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1101,8 +1144,14 @@ export default function TechnicianSchedule() {
                           >
                             <b>{a.StartTime}</b>
                             <span>{a.CustomerName}</span>
-                            <small>{a.MyStepServiceName || a.ServiceName}</small>
-                            {a.CustomerPackageId && <small style={{color:'#ec4899'}}>📦 Combo</small>}
+                            <small>
+                              {a.MyStepServiceName || a.ServiceName}
+                            </small>
+                            {a.CustomerPackageId && (
+                              <small style={{ color: "#ec4899" }}>
+                                📦 Combo
+                              </small>
+                            )}
                           </button>
                         ))
                       )}
@@ -1110,7 +1159,6 @@ export default function TechnicianSchedule() {
                   );
                 })}
               </div>
-
             ) : (
               <>
                 {hours.map((hour) => (
@@ -1127,9 +1175,15 @@ export default function TechnicianSchedule() {
                       <div className="calendar-cell" key={d + hour}>
                         {byDateHour(d, hour).map((a) => (
                           <button
-                            key={a.AppointmentServiceId ? `${a.AppointmentId}-${a.AppointmentServiceId}` : a.AppointmentId}
+                            key={
+                              a.AppointmentServiceId
+                                ? `${a.AppointmentId}-${a.AppointmentServiceId}`
+                                : a.AppointmentId
+                            }
                             className={`appointment-block ${String(
-                              a.CustomerPackageId ? (a.MyStepStatus || a.Status) : a.Status,
+                              a.CustomerPackageId
+                                ? a.MyStepStatus || a.Status
+                                : a.Status,
                             ).toLowerCase()}`}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1144,18 +1198,25 @@ export default function TechnicianSchedule() {
                           >
                             <b>{a.StartTime}</b>
                             <span>{a.CustomerName}</span>
-                            <small>{a.MyStepServiceName || a.ServiceName}</small>
-                            {a.CustomerPackageId && <small style={{color:'#ec4899'}}>📦 Combo</small>}
+                            <small>
+                              {a.MyStepServiceName || a.ServiceName}
+                            </small>
+                            {a.CustomerPackageId && (
+                              <small style={{ color: "#ec4899" }}>
+                                📦 Combo
+                              </small>
+                            )}
                           </button>
                         ))}
                       </div>
-
                     ))}
                   </div>
                 ))}
 
                 {data.appointments.length === 0 && !loading && (
-                  <p className="tech-empty">Không có lịch hẹn nào trong lịch trình</p>
+                  <p className="tech-empty">
+                    Không có lịch hẹn nào trong lịch trình
+                  </p>
                 )}
               </>
             )}
@@ -1202,18 +1263,57 @@ export default function TechnicianSchedule() {
                 <div className="detail-list">
                   <p>
                     <b>Dịch vụ</b>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      {selected.MyStepServiceName || selected.ServiceName || "Không có dịch vụ"}
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {selected.MyStepServiceName ||
+                        selected.ServiceName ||
+                        "Không có dịch vụ"}
                       {selected.CustomerPackageId && (
-                        <span style={{ background: '#fce7f3', color: '#831843', borderRadius: '6px', padding: '1px 6px', fontSize: '0.72rem', fontWeight: 700 }}>📦 Gói Combo</span>
+                        <span
+                          style={{
+                            background: "#fce7f3",
+                            color: "#831843",
+                            borderRadius: "6px",
+                            padding: "1px 6px",
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                          }}
+                        >
+                          📦 Gói Combo
+                        </span>
                       )}
                       {selected.CustomerPackageId && selected.MyStepStatus && (
-                        <span style={{
-                          background: selected.MyStepStatus === 'COMPLETED' ? '#dcfce7' : selected.MyStepStatus === 'IN_PROGRESS' ? '#fef9c3' : '#f1f5f9',
-                          color: selected.MyStepStatus === 'COMPLETED' ? '#15803d' : selected.MyStepStatus === 'IN_PROGRESS' ? '#92400e' : '#64748b',
-                          borderRadius: '6px', padding: '1px 6px', fontSize: '0.72rem', fontWeight: 700
-                        }}>
-                          {selected.MyStepStatus === 'COMPLETED' ? '✓ Bước hoàn thành' : selected.MyStepStatus === 'IN_PROGRESS' ? '▶ Đang thực hiện' : '○ Chờ thực hiện'}
+                        <span
+                          style={{
+                            background:
+                              selected.MyStepStatus === "COMPLETED"
+                                ? "#dcfce7"
+                                : selected.MyStepStatus === "IN_PROGRESS"
+                                  ? "#fef9c3"
+                                  : "#f1f5f9",
+                            color:
+                              selected.MyStepStatus === "COMPLETED"
+                                ? "#15803d"
+                                : selected.MyStepStatus === "IN_PROGRESS"
+                                  ? "#92400e"
+                                  : "#64748b",
+                            borderRadius: "6px",
+                            padding: "1px 6px",
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {selected.MyStepStatus === "COMPLETED"
+                            ? "✓ Bước hoàn thành"
+                            : selected.MyStepStatus === "IN_PROGRESS"
+                              ? "▶ Đang thực hiện"
+                              : "○ Chờ thực hiện"}
                         </span>
                       )}
                     </span>
@@ -1222,12 +1322,16 @@ export default function TechnicianSchedule() {
                   <p>
                     <b>Ngày & Giờ</b>
                     <span
-                      onClick={() => setBaseDate(String(selected.AppointmentDate).slice(0, 10))}
+                      onClick={() =>
+                        setBaseDate(
+                          String(selected.AppointmentDate).slice(0, 10),
+                        )
+                      }
                       style={{
                         cursor: "pointer",
                         color: "#2d6a4f",
                         fontWeight: 600,
-                        textDecoration: "underline"
+                        textDecoration: "underline",
                       }}
                       title="Click để nhảy đến ngày này"
                     >
@@ -1260,7 +1364,9 @@ export default function TechnicianSchedule() {
 
                   <p>
                     <b>Thanh toán</b>
-                    <span>{statusLabel(selected.PaymentStatus || "UNPAID")}</span>
+                    <span>
+                      {statusLabel(selected.PaymentStatus || "UNPAID")}
+                    </span>
                   </p>
 
                   <p>
@@ -1292,27 +1398,53 @@ export default function TechnicianSchedule() {
 
                   <button
                     className="note"
-                    disabled={selected.CustomerPackageId
-                      ? !['IN_PROGRESS','COMPLETED'].includes(selected.MyStepStatus || '')
-                      : !["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase())}
+                    disabled={
+                      selected.CustomerPackageId
+                        ? !["IN_PROGRESS", "COMPLETED"].includes(
+                            selected.MyStepStatus || "",
+                          )
+                        : !["IN_PROGRESS", "COMPLETED"].includes(
+                            String(selected?.Status).toUpperCase(),
+                          )
+                    }
                     onClick={() => {
                       const ok = selected.CustomerPackageId
-                        ? ['IN_PROGRESS','COMPLETED'].includes(selected.MyStepStatus || '')
-                        : ["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase());
+                        ? ["IN_PROGRESS", "COMPLETED"].includes(
+                            selected.MyStepStatus || "",
+                          )
+                        : ["IN_PROGRESS", "COMPLETED"].includes(
+                            String(selected?.Status).toUpperCase(),
+                          );
                       if (!ok) {
-                        alert("Chỉ được viết và xem ghi chú điều trị khi bước dịch vụ đang thực hiện hoặc hoàn thành.");
+                        alert(
+                          "Chỉ được viết và xem ghi chú điều trị khi bước dịch vụ đang thực hiện hoặc hoàn thành.",
+                        );
                         return;
                       }
                       const svcId = selected.ServiceId || "";
-                      navigate(`/technician/treatment-notes?appointmentId=${selected.AppointmentId}${svcId ? `&serviceId=${svcId}` : ""}`);
+                      navigate(
+                        `/technician/treatment-notes?appointmentId=${selected.AppointmentId}${svcId ? `&serviceId=${svcId}` : ""}`,
+                      );
                     }}
                     style={(() => {
                       const disabled = selected.CustomerPackageId
-                        ? !['IN_PROGRESS','COMPLETED'].includes(selected.MyStepStatus || '')
-                        : !["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase());
-                      return disabled ? { opacity: 0.5, cursor: "not-allowed" } : {};
+                        ? !["IN_PROGRESS", "COMPLETED"].includes(
+                            selected.MyStepStatus || "",
+                          )
+                        : !["IN_PROGRESS", "COMPLETED"].includes(
+                            String(selected?.Status).toUpperCase(),
+                          );
+                      return disabled
+                        ? { opacity: 0.5, cursor: "not-allowed" }
+                        : {};
                     })()}
-                    title={!["IN_PROGRESS", "COMPLETED"].includes(String(selected?.Status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
+                    title={
+                      !["IN_PROGRESS", "COMPLETED"].includes(
+                        String(selected?.Status).toUpperCase(),
+                      )
+                        ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành"
+                        : ""
+                    }
                   >
                     📝 Ghi chú điều trị
                   </button>
@@ -1331,9 +1463,7 @@ export default function TechnicianSchedule() {
                 </div>
               </>
             ) : (
-              <p className="empty-detail">
-                Chọn một lịch hẹn để xem chi tiết
-              </p>
+              <p className="empty-detail">Chọn một lịch hẹn để xem chi tiết</p>
             )}
           </aside>
         </section>

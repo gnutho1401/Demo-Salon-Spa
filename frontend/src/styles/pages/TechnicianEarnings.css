@@ -1,22 +1,22 @@
 /* System Variables matching Luna Salon Green-Gold Luxury Spa Theme */
 :root {
-  --primary-color: #0e2013;       /* Deep Forest Green */
-  --primary-medium: #1b4332;      /* Medium Forest Green */
-  --primary-light: #2d6a4f;       /* Light Forest Green */
+  --primary-color: #0e2013; /* Deep Forest Green */
+  --primary-medium: #1b4332; /* Medium Forest Green */
+  --primary-light: #2d6a4f; /* Light Forest Green */
   --primary-xlight: rgba(45, 106, 79, 0.08);
-  
-  --accent-color: #d8b56d;        /* Warm Gold */
-  --accent-light: #eed39b;        /* Soft Gold */
-  --accent-dark: #b89047;         /* Deep Gold */
-  
-  --bg-sand: #faf6f0;             /* Warm Beige Background */
+
+  --accent-color: #d8b56d; /* Warm Gold */
+  --accent-light: #eed39b; /* Soft Gold */
+  --accent-dark: #b89047; /* Deep Gold */
+
+  --bg-sand: #faf6f0; /* Warm Beige Background */
   --bg-white: #ffffff;
   --bg-card: rgba(255, 255, 255, 0.85);
-  
-  --text-dark: #1b241e;           /* Rich Dark Slate-Green */
-  --text-medium: #4e5a52;         /* Charcoal with green hint */
-  --text-muted: #8c9c90;          /* Muted Sage */
-  
+
+  --text-dark: #1b241e; /* Rich Dark Slate-Green */
+  --text-medium: #4e5a52; /* Charcoal with green hint */
+  --text-muted: #8c9c90; /* Muted Sage */
+
   --success: #2e7d32;
   --success-bg: rgba(46, 125, 50, 0.1);
   --warning: #d97706;
@@ -25,14 +25,14 @@
   --danger-bg: rgba(220, 38, 38, 0.1);
   --info: #2563eb;
   --info-bg: rgba(37, 99, 235, 0.1);
-  
+
   --border-color: rgba(226, 220, 208, 0.6);
   --border-color-gold: rgba(216, 181, 109, 0.35);
-  
+
   --shadow-sm: 0 4px 10px rgba(80, 60, 20, 0.03);
   --shadow-md: 0 10px 24px rgba(80, 60, 20, 0.06);
   --shadow-lg: 0 20px 40px rgba(80, 60, 20, 0.1);
-  
+
   --radius-sm: 8px;
   --radius-md: 16px;
   --radius-lg: 24px;
@@ -51,18 +51,33 @@
 }
 
 @keyframes pulseGold {
-  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(216, 181, 109, 0.4)); }
-  50% { transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(216, 181, 109, 0.8)); }
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgba(216, 181, 109, 0.4));
+  }
+  50% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(216, 181, 109, 0.8));
+  }
 }
 
 @keyframes progressShimmer {
-  0% { background-position: -200px 0; }
-  100% { background-position: calc(100% + 200px) 0; }
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(100% + 200px) 0;
+  }
 }
 
 /* Base Page Wrapper */
 .earning-page-v2 {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
   color: var(--text-dark);
   background-color: var(--bg-sand);
   min-height: 100vh;
@@ -140,7 +155,9 @@
 
 .earning-search-v2 input:focus {
   border-color: var(--primary-medium);
-  box-shadow: 0 0 0 3px rgba(27, 67, 50, 0.15), var(--shadow-md);
+  box-shadow:
+    0 0 0 3px rgba(27, 67, 50, 0.15),
+    var(--shadow-md);
 }
 
 /* Export Button */
@@ -270,11 +287,26 @@
 }
 
 /* Card variant icon colors */
-.stat-card-v2:nth-child(2) .stat-icon-wrapper { background: rgba(141, 123, 74, 0.1); color: #8d7b4a; }
-.stat-card-v2:nth-child(3) .stat-icon-wrapper { background: rgba(217, 107, 67, 0.1); color: #d96b43; }
-.stat-card-v2:nth-child(4) .stat-icon-wrapper { background: var(--info-bg); color: var(--info); }
-.stat-card-v2:nth-child(5) .stat-icon-wrapper { background: rgba(217, 164, 65, 0.1); color: #d9a441; }
-.stat-card-v2:nth-child(6) .stat-icon-wrapper { background: var(--success-bg); color: var(--success); }
+.stat-card-v2:nth-child(2) .stat-icon-wrapper {
+  background: rgba(141, 123, 74, 0.1);
+  color: #8d7b4a;
+}
+.stat-card-v2:nth-child(3) .stat-icon-wrapper {
+  background: rgba(217, 107, 67, 0.1);
+  color: #d96b43;
+}
+.stat-card-v2:nth-child(4) .stat-icon-wrapper {
+  background: var(--info-bg);
+  color: var(--info);
+}
+.stat-card-v2:nth-child(5) .stat-icon-wrapper {
+  background: rgba(217, 164, 65, 0.1);
+  color: #d9a441;
+}
+.stat-card-v2:nth-child(6) .stat-icon-wrapper {
+  background: var(--success-bg);
+  color: var(--success);
+}
 
 .stat-card-v2 p.stat-label {
   margin: 0 0 6px;
@@ -308,11 +340,21 @@
   opacity: 0.85;
 }
 
-.stat-card-v2:nth-child(2) .card-indicator { background: #8d7b4a; }
-.stat-card-v2:nth-child(3) .card-indicator { background: #d96b43; }
-.stat-card-v2:nth-child(4) .card-indicator { background: var(--info); }
-.stat-card-v2:nth-child(5) .card-indicator { background: #d9a441; }
-.stat-card-v2:nth-child(6) .card-indicator { background: var(--success); }
+.stat-card-v2:nth-child(2) .card-indicator {
+  background: #8d7b4a;
+}
+.stat-card-v2:nth-child(3) .card-indicator {
+  background: #d96b43;
+}
+.stat-card-v2:nth-child(4) .card-indicator {
+  background: var(--info);
+}
+.stat-card-v2:nth-child(5) .card-indicator {
+  background: #d9a441;
+}
+.stat-card-v2:nth-child(6) .card-indicator {
+  background: var(--success);
+}
 
 /* Main Section Split Layout */
 .earning-main-split {
@@ -573,7 +615,11 @@
 }
 
 .payout-balance-box {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-medium) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--primary-medium) 100%
+  );
   border: 1px solid var(--accent-color);
   border-radius: 16px;
   padding: 18px;
@@ -728,9 +774,15 @@
   text-transform: uppercase;
 }
 
-.payout-history-item span.payout-status.paid { color: var(--success); }
-.payout-history-item span.payout-status.pending { color: var(--warning); }
-.payout-history-item span.payout-status.rejected { color: var(--danger); }
+.payout-history-item span.payout-status.paid {
+  color: var(--success);
+}
+.payout-history-item span.payout-status.pending {
+  color: var(--warning);
+}
+.payout-history-item span.payout-status.rejected {
+  color: var(--danger);
+}
 
 .payout-history-item strong {
   text-align: right;
@@ -814,16 +866,23 @@
 
 .goal-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-color) 0%, var(--primary-medium) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-color) 0%,
+    var(--primary-medium) 100%
+  );
   border-radius: 4px;
   position: relative;
   transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .goal-progress-fill::after {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0; left: 0; bottom: 0; right: 0;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
   background-image: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,

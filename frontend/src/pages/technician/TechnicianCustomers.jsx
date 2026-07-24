@@ -113,7 +113,7 @@ export default function TechnicianCustomers() {
     serviceId: "",
     appointmentDate: new Date().toISOString().slice(0, 10),
     startTime: "",
-    note: ""
+    note: "",
   });
 
   const loadTechServices = async () => {
@@ -135,18 +135,23 @@ export default function TechnicianCustomers() {
       setAvailableSlots([]);
       return;
     }
-    const selectedService = techServices.find(s => s.ServiceId === Number(bookingForm.serviceId));
+    const selectedService = techServices.find(
+      (s) => s.ServiceId === Number(bookingForm.serviceId),
+    );
     const duration = selectedService ? selectedService.Duration : 60;
 
     const fetchSlots = async () => {
       try {
         setSlotsLoading(true);
-        const res = await axiosClient.get("/technician/schedule/available-slots", {
-          params: {
-            date: bookingForm.appointmentDate,
-            duration: duration
-          }
-        });
+        const res = await axiosClient.get(
+          "/technician/schedule/available-slots",
+          {
+            params: {
+              date: bookingForm.appointmentDate,
+              duration: duration,
+            },
+          },
+        );
         setAvailableSlots(res.data?.data || []);
       } catch (err) {
         console.error("Load slots failed:", err);
@@ -172,7 +177,7 @@ export default function TechnicianCustomers() {
         startTime: bookingForm.startTime,
         note: bookingForm.note,
         paymentStatus: "UNPAID",
-        paymentMethod: "CASH"
+        paymentMethod: "CASH",
       };
       await axiosClient.post("/technician/appointments", payload);
       alert("Đặt lịch dịch vụ thành công!");
@@ -317,7 +322,9 @@ export default function TechnicianCustomers() {
             <h1>
               Khách hàng <span>👥</span>
             </h1>
-            <p>Quản lý hồ sơ chi tiết, lịch sử trị liệu và thông tin khách hàng</p>
+            <p>
+              Quản lý hồ sơ chi tiết, lịch sử trị liệu và thông tin khách hàng
+            </p>
           </div>
 
           <form
@@ -535,9 +542,11 @@ export default function TechnicianCustomers() {
                                     customerId: c.CustomerId,
                                     customerName: c.FullName || "Khách hàng",
                                     serviceId: techServices[0]?.ServiceId || "",
-                                    appointmentDate: new Date().toISOString().slice(0, 10),
+                                    appointmentDate: new Date()
+                                      .toISOString()
+                                      .slice(0, 10),
                                     startTime: "",
-                                    note: ""
+                                    note: "",
                                   });
                                   setShowBookModal(true);
                                 }}
@@ -555,7 +564,8 @@ export default function TechnicianCustomers() {
 
               <div className="customer-pagination">
                 <span>
-                  Hiển thị {customers.length} trên tổng số {pagination.total || 0} khách hàng
+                  Hiển thị {customers.length} trên tổng số{" "}
+                  {pagination.total || 0} khách hàng
                 </span>
 
                 <div>
@@ -621,7 +631,9 @@ export default function TechnicianCustomers() {
                       <p>📞 {safeText(detailCustomer.Phone, "Chưa có SĐT")}</p>
                       <p>✉ {safeText(detailCustomer.Email, "Chưa có Email")}</p>
                       <p>🎂 {shortDate(detailCustomer.DateOfBirth)}</p>
-                      <p>📍 {safeText(detailCustomer.Address, "Chưa có địa chỉ")}</p>
+                      <p>
+                        📍 {safeText(detailCustomer.Address, "Chưa có địa chỉ")}
+                      </p>
                     </div>
 
                     <div className="customer-id-box">
@@ -644,7 +656,9 @@ export default function TechnicianCustomers() {
                           {shortDate(nextAppointment.AppointmentDate)} •{" "}
                           {nextAppointment.StartTime}
                         </h4>
-                        <p>{nextAppointment.ServiceName || "Không có dịch vụ"}</p>
+                        <p>
+                          {nextAppointment.ServiceName || "Không có dịch vụ"}
+                        </p>
                       </div>
 
                       <button
@@ -690,7 +704,9 @@ export default function TechnicianCustomers() {
                             `/technician/appointments/${nextAppointment.AppointmentId}`,
                           );
                         } else {
-                          navigate(`/technician/treatment-notes?customerId=${detailCustomer.CustomerId}`);
+                          navigate(
+                            `/technician/treatment-notes?customerId=${detailCustomer.CustomerId}`,
+                          );
                         }
                       }}
                     >
@@ -809,7 +825,9 @@ export default function TechnicianCustomers() {
                         <h4>Thông tin thành viên</h4>
 
                         <div className="membership-box">
-                          <b>{getMembershipLabel(detailCustomer.MembershipLevel)}</b>
+                          <b>
+                            {getMembershipLabel(detailCustomer.MembershipLevel)}
+                          </b>
                           <p>
                             Điểm tích lũy: {detailCustomer.LoyaltyPoints || 0}
                           </p>
@@ -864,7 +882,9 @@ export default function TechnicianCustomers() {
                         <h4>Dịch vụ yêu thích</h4>
 
                         {preferences.length === 0 ? (
-                          <p className="muted-line">Chưa có dịch vụ yêu thích</p>
+                          <p className="muted-line">
+                            Chưa có dịch vụ yêu thích
+                          </p>
                         ) : (
                           preferences.map((p, index) => (
                             <p key={`${p.ServiceName}-${index}`}>
@@ -908,7 +928,9 @@ export default function TechnicianCustomers() {
                         <h4>Lịch hẹn sắp tới</h4>
 
                         {upcoming.length === 0 ? (
-                          <p className="muted-line">Không có lịch hẹn sắp tới</p>
+                          <p className="muted-line">
+                            Không có lịch hẹn sắp tới
+                          </p>
                         ) : (
                           upcoming.map((item) => (
                             <div className="mini-note" key={item.AppointmentId}>
@@ -917,7 +939,9 @@ export default function TechnicianCustomers() {
                                 {shortDate(item.AppointmentDate)} •{" "}
                                 {item.StartTime} - {item.EndTime}
                               </p>
-                              <small>{item.ServiceName || "Không có dịch vụ"}</small>
+                              <small>
+                                {item.ServiceName || "Không có dịch vụ"}
+                              </small>
                             </div>
                           ))
                         )}
@@ -927,14 +951,18 @@ export default function TechnicianCustomers() {
                         <h4>Ghi chú trị liệu gần đây</h4>
 
                         {notes.length === 0 ? (
-                          <p className="muted-line">Không có ghi chú trị liệu</p>
+                          <p className="muted-line">
+                            Không có ghi chú trị liệu
+                          </p>
                         ) : (
                           notes.slice(0, 3).map((n, index) => (
                             <div
                               className="mini-note"
                               key={n.NoteId || `${n.CreatedAt}-${index}`}
                             >
-                              <b>{n.Title || n.NoteType || "Ghi chú trị liệu"}</b>
+                              <b>
+                                {n.Title || n.NoteType || "Ghi chú trị liệu"}
+                              </b>
                               <p>{n.Content || "Không có nội dung"}</p>
                               <small>{shortDate(n.CreatedAt)}</small>
                             </div>
@@ -983,7 +1011,8 @@ export default function TechnicianCustomers() {
                                 </span>
                                 <p>{money(v.FinalAmount)}</p>
                                 <small>
-                                  Thanh toán: {getApptStatusLabel(v.PaymentStatus)}
+                                  Thanh toán:{" "}
+                                  {getApptStatusLabel(v.PaymentStatus)}
                                 </small>
                               </div>
 
@@ -1012,7 +1041,9 @@ export default function TechnicianCustomers() {
                         <button
                           type="button"
                           onClick={() =>
-                            navigate(`/technician/treatment-notes?customerId=${detailCustomer.CustomerId}`)
+                            navigate(
+                              `/technician/treatment-notes?customerId=${detailCustomer.CustomerId}`,
+                            )
                           }
                         >
                           + Thêm ghi chú
@@ -1078,17 +1109,24 @@ export default function TechnicianCustomers() {
                       <h4>Dòng thời gian hoạt động</h4>
 
                       {timeline.length === 0 ? (
-                        <p className="muted-line">Không có dữ liệu dòng thời gian</p>
+                        <p className="muted-line">
+                          Không có dữ liệu dòng thời gian
+                        </p>
                       ) : (
                         <div className="customer-history-list">
                           {timeline.map((item, index) => (
                             <div className="history-item" key={index}>
                               <div>
                                 <b>
-                                  {item.type === "APPOINTMENT" && "📅 Lượt hẹn: "}
+                                  {item.type === "APPOINTMENT" &&
+                                    "📅 Lượt hẹn: "}
                                   {item.type === "NOTE" && "📝 Ghi chú: "}
                                   {item.type === "REVIEW" && "⭐ Đánh giá: "}
-                                  {item.title === "Appointment" ? "Lịch hẹn" : item.title === "Treatment note" ? "Ghi chú trị liệu" : item.title}
+                                  {item.title === "Appointment"
+                                    ? "Lịch hẹn"
+                                    : item.title === "Treatment note"
+                                      ? "Ghi chú trị liệu"
+                                      : item.title}
                                 </b>
                                 <p>{safeText(item.subtitle, "")}</p>
                                 <small>{shortDate(item.date)}</small>
@@ -1157,33 +1195,53 @@ export default function TechnicianCustomers() {
         </section>
 
         {showBookModal && (
-          <div style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(12px)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 9999,
-            padding: "20px"
-          }}>
-            <div style={{
-              backgroundColor: "#16161e",
-              border: "1px solid rgba(212, 175, 55, 0.35)",
-              borderRadius: "16px",
-              padding: "28px",
-              width: "100%",
-              maxWidth: "520px",
-              boxShadow: "0 10px 40px rgba(212, 175, 55, 0.15)",
-              position: "relative"
-            }}>
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(12px)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 9999,
+              padding: "20px",
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#16161e",
+                border: "1px solid rgba(212, 175, 55, 0.35)",
+                borderRadius: "16px",
+                padding: "28px",
+                width: "100%",
+                maxWidth: "520px",
+                boxShadow: "0 10px 40px rgba(212, 175, 55, 0.15)",
+                position: "relative",
+              }}
+            >
               {/* Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" }}>
-                <h3 style={{ margin: 0, color: "#d4af37", fontSize: "1.3rem", fontWeight: "bold" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "20px",
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  paddingBottom: "12px",
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    color: "#d4af37",
+                    fontSize: "1.3rem",
+                    fontWeight: "bold",
+                  }}
+                >
                   📅 Đặt lịch dịch vụ cho ${bookingForm.customerName}
                 </h3>
                 <button
@@ -1195,7 +1253,7 @@ export default function TechnicianCustomers() {
                     color: "#9ca3af",
                     fontSize: "1.5rem",
                     cursor: "pointer",
-                    outline: "none"
+                    outline: "none",
                   }}
                 >
                   &times;
@@ -1206,12 +1264,25 @@ export default function TechnicianCustomers() {
               <form onSubmit={handleBookAppointment}>
                 {/* Service Selection */}
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", color: "#9ca3af", fontSize: "0.85rem", marginBottom: "6px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      color: "#9ca3af",
+                      fontSize: "0.85rem",
+                      marginBottom: "6px",
+                    }}
+                  >
                     Chọn dịch vụ thực hiện
                   </label>
                   <select
                     value={bookingForm.serviceId}
-                    onChange={e => setBookingForm({ ...bookingForm, serviceId: e.target.value, startTime: "" })}
+                    onChange={(e) =>
+                      setBookingForm({
+                        ...bookingForm,
+                        serviceId: e.target.value,
+                        startTime: "",
+                      })
+                    }
                     style={{
                       width: "100%",
                       backgroundColor: "#22222b",
@@ -1219,12 +1290,14 @@ export default function TechnicianCustomers() {
                       color: "white",
                       padding: "10px",
                       borderRadius: "8px",
-                      outline: "none"
+                      outline: "none",
                     }}
                     required
                   >
-                    <option value="" disabled>-- Chọn dịch vụ --</option>
-                    {techServices.map(s => (
+                    <option value="" disabled>
+                      -- Chọn dịch vụ --
+                    </option>
+                    {techServices.map((s) => (
                       <option key={s.ServiceId} value={s.ServiceId}>
                         {s.ServiceName} ({s.Duration} phút)
                       </option>
@@ -1234,13 +1307,26 @@ export default function TechnicianCustomers() {
 
                 {/* Date Selection */}
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", color: "#9ca3af", fontSize: "0.85rem", marginBottom: "6px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      color: "#9ca3af",
+                      fontSize: "0.85rem",
+                      marginBottom: "6px",
+                    }}
+                  >
                     Chọn ngày hẹn
                   </label>
                   <input
                     type="date"
                     value={bookingForm.appointmentDate}
-                    onChange={e => setBookingForm({ ...bookingForm, appointmentDate: e.target.value, startTime: "" })}
+                    onChange={(e) =>
+                      setBookingForm({
+                        ...bookingForm,
+                        appointmentDate: e.target.value,
+                        startTime: "",
+                      })
+                    }
                     min={new Date().toISOString().slice(0, 10)}
                     style={{
                       width: "100%",
@@ -1249,7 +1335,7 @@ export default function TechnicianCustomers() {
                       color: "white",
                       padding: "10px",
                       borderRadius: "8px",
-                      outline: "none"
+                      outline: "none",
                     }}
                     required
                   />
@@ -1257,39 +1343,72 @@ export default function TechnicianCustomers() {
 
                 {/* Available Slots suggestions */}
                 <div style={{ marginBottom: "20px" }}>
-                  <label style={{ display: "block", color: "#9ca3af", fontSize: "0.85rem", marginBottom: "8px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      color: "#9ca3af",
+                      fontSize: "0.85rem",
+                      marginBottom: "8px",
+                    }}
+                  >
                     Gợi ý khung giờ khả dụng (Không bị trùng lắp)
                   </label>
 
                   {slotsLoading ? (
-                    <div style={{ color: "#d4af37", fontSize: "0.9rem", fontStyle: "italic", textAlign: "center", padding: "10px 0" }}>
+                    <div
+                      style={{
+                        color: "#d4af37",
+                        fontSize: "0.9rem",
+                        fontStyle: "italic",
+                        textAlign: "center",
+                        padding: "10px 0",
+                      }}
+                    >
                       🌀 Đang tìm các khung giờ trống...
                     </div>
                   ) : availableSlots.length === 0 ? (
-                    <div style={{ color: "#ef4444", fontSize: "0.85rem", fontStyle: "italic", textAlign: "center", padding: "10px 0" }}>
-                      ❌ Kỹ thuật viên không có ca làm việc hoặc không còn giờ trống trong ngày đã chọn.
+                    <div
+                      style={{
+                        color: "#ef4444",
+                        fontSize: "0.85rem",
+                        fontStyle: "italic",
+                        textAlign: "center",
+                        padding: "10px 0",
+                      }}
+                    >
+                      ❌ Kỹ thuật viên không có ca làm việc hoặc không còn giờ
+                      trống trong ngày đã chọn.
                     </div>
                   ) : (
-                    <div style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "8px",
-                      maxHeight: "150px",
-                      overflowY: "auto",
-                      backgroundColor: "#22222b",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      border: "1px solid rgba(255,255,255,0.05)"
-                    }}>
-                      {availableSlots.map(slot => {
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                        maxHeight: "150px",
+                        overflowY: "auto",
+                        backgroundColor: "#22222b",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        border: "1px solid rgba(255,255,255,0.05)",
+                      }}
+                    >
+                      {availableSlots.map((slot) => {
                         const isSelected = bookingForm.startTime === slot;
                         return (
                           <button
                             key={slot}
                             type="button"
-                            onClick={() => setBookingForm({ ...bookingForm, startTime: slot })}
+                            onClick={() =>
+                              setBookingForm({
+                                ...bookingForm,
+                                startTime: slot,
+                              })
+                            }
                             style={{
-                              backgroundColor: isSelected ? "#d4af37" : "#1a1a24",
+                              backgroundColor: isSelected
+                                ? "#d4af37"
+                                : "#1a1a24",
                               color: isSelected ? "black" : "#e5e7eb",
                               border: `1px solid ${isSelected ? "#d4af37" : "rgba(255,255,255,0.1)"}`,
                               padding: "6px 12px",
@@ -1298,7 +1417,7 @@ export default function TechnicianCustomers() {
                               fontWeight: isSelected ? "bold" : "normal",
                               cursor: "pointer",
                               textAlign: "center",
-                              transition: "all 0.2s ease"
+                              transition: "all 0.2s ease",
                             }}
                           >
                             {slot}
@@ -1311,12 +1430,21 @@ export default function TechnicianCustomers() {
 
                 {/* Notes Input */}
                 <div style={{ marginBottom: "24px" }}>
-                  <label style={{ display: "block", color: "#9ca3af", fontSize: "0.85rem", marginBottom: "6px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      color: "#9ca3af",
+                      fontSize: "0.85rem",
+                      marginBottom: "6px",
+                    }}
+                  >
                     Ghi chú đặc biệt
                   </label>
                   <textarea
                     value={bookingForm.note}
-                    onChange={e => setBookingForm({ ...bookingForm, note: e.target.value })}
+                    onChange={(e) =>
+                      setBookingForm({ ...bookingForm, note: e.target.value })
+                    }
                     placeholder="Khách có yêu cầu đặc biệt gì không..."
                     style={{
                       width: "100%",
@@ -1327,13 +1455,19 @@ export default function TechnicianCustomers() {
                       borderRadius: "8px",
                       outline: "none",
                       height: "60px",
-                      resize: "none"
+                      resize: "none",
                     }}
                   />
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "12px",
+                    justifyContent: "flex-end",
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => setShowBookModal(false)}
@@ -1344,7 +1478,7 @@ export default function TechnicianCustomers() {
                       padding: "10px 20px",
                       borderRadius: "8px",
                       fontWeight: "bold",
-                      cursor: "pointer"
+                      cursor: "pointer",
                     }}
                   >
                     HỦY
@@ -1358,7 +1492,7 @@ export default function TechnicianCustomers() {
                       borderRadius: "8px",
                       fontWeight: "bold",
                       border: "none",
-                      cursor: "pointer"
+                      cursor: "pointer",
                     }}
                   >
                     XÁC NHẬN ĐẶT LỊCH

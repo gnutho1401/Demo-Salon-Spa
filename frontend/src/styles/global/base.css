@@ -4,7 +4,11 @@ body {
   background: linear-gradient(90deg, #fff 0%, #fff7fb 100%);
 }
 
-h1, h2, .section-title { font-family: var(--font-heading); }
+h1,
+h2,
+.section-title {
+  font-family: var(--font-heading);
+}
 
 .container {
   max-width: 1210px;
@@ -12,7 +16,9 @@ h1, h2, .section-title { font-family: var(--font-heading); }
   padding: 0 24px;
 }
 
-.section { padding: 76px 0; }
+.section {
+  padding: 76px 0;
+}
 
 .section-head {
   display: flex;
@@ -30,6 +36,6 @@ h1, h2, .section-title { font-family: var(--font-heading); }
   color: var(--pink);
   font-size: 13px;
   font-weight: 800;
-  letter-spacing: .9px;
+  letter-spacing: 0.9px;
   text-transform: uppercase;
 }

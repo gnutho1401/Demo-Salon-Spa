@@ -7,7 +7,10 @@
   align-items: center;
 }
 
-.field small { display: block; color: #777; }
+.field small {
+  display: block;
+  color: #777;
+}
 .field select,
 .field input {
   border: 0;

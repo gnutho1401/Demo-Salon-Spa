@@ -55,7 +55,9 @@
   place-items: center;
   border-radius: 17px;
   background: rgba(255, 255, 255, 0.2);
-  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.4s ease;
+  transition:
+    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.4s ease;
 }
 
 .customer-pink-brand:hover .customer-pink-brand-icon {
@@ -278,7 +280,9 @@
     transform: translateX(-104%);
     visibility: hidden;
     box-shadow: 28px 0 64px rgba(60, 35, 49, 0.2);
-    transition: transform 220ms ease, visibility 0s linear 220ms;
+    transition:
+      transform 220ms ease,
+      visibility 0s linear 220ms;
   }
 
   .customer-pink-sidebar.is-open {
@@ -440,7 +444,8 @@
 @keyframes animAppointmentsIn {
   0% {
     opacity: 0;
-    transform: perspective(1000px) rotateY(-4deg) translateX(15px) translateZ(-15px);
+    transform: perspective(1000px) rotateY(-4deg) translateX(15px)
+      translateZ(-15px);
   }
   100% {
     opacity: 1;
@@ -661,7 +666,11 @@
 .customer-pink-shell .rf-item,
 .customer-pink-shell .waiting-cancel-btn,
 .customer-pink-shell .profile-info-list div {
-  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease, background-color 0.25s ease, color 0.25s ease !important;
+  transition:
+    transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    box-shadow 0.25s ease,
+    background-color 0.25s ease,
+    color 0.25s ease !important;
 }
 
 /* Tactile scale-down click feedback */
@@ -691,4 +700,3 @@
 .customer-pink-nav-link:active {
   background-color: #fff0f6 !important;
 }
-

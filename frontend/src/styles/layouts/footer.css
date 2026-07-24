@@ -1,7 +1,11 @@
 .footer {
-  background: 
-    linear-gradient(180deg, rgba(27, 17, 30, 0.88) 0%, rgba(12, 6, 16, 0.94) 100%),
-    url('/images/backgrounds/footer-dark-bg.png') no-repeat center center;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(27, 17, 30, 0.88) 0%,
+      rgba(12, 6, 16, 0.94) 100%
+    ),
+    url("/images/backgrounds/footer-dark-bg.png") no-repeat center center;
   background-size: cover;
   border-top: 1px solid rgba(255, 94, 168, 0.25);
   margin-top: 108px;
@@ -109,7 +113,7 @@
 }
 
 .footer-col h4::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   bottom: 0;
@@ -138,7 +142,7 @@
 }
 
 .footer-links a::before {
-  content: '🌸';
+  content: "🌸";
   font-size: 11px;
   margin-right: 8px;
   opacity: 0;

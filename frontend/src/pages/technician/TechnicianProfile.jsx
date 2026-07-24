@@ -116,12 +116,17 @@ export default function TechnicianProfile() {
             <h1>
               Hồ sơ của tôi <span>♙</span>
             </h1>
-            <p>Xem thông tin chi tiết cá nhân, ca trực, chuyên môn và tài liệu của bạn</p>
+            <p>
+              Xem thông tin chi tiết cá nhân, ca trực, chuyên môn và tài liệu
+              của bạn
+            </p>
           </div>
         </header>
 
         {loading && (
-          <div className="profile-card profile-loading">Đang tải hồ sơ kỹ thuật viên...</div>
+          <div className="profile-card profile-loading">
+            Đang tải hồ sơ kỹ thuật viên...
+          </div>
         )}
 
         {!loading && error && (
@@ -162,7 +167,9 @@ export default function TechnicianProfile() {
                 <p className="profile-status">
                   <b>● {getStatusText(employeeStatus)}</b>
                   <small>
-                    {profile.IsVerified === false ? "Chưa xác minh" : "Đã xác minh"}
+                    {profile.IsVerified === false
+                      ? "Chưa xác minh"
+                      : "Đã xác minh"}
                   </small>
                 </p>
 
@@ -244,7 +251,8 @@ export default function TechnicianProfile() {
                       </div>
 
                       <small>
-                        Đã thực hiện {Number(skill.totalAppointments || 0)} lịch hẹn
+                        Đã thực hiện {Number(skill.totalAppointments || 0)} lịch
+                        hẹn
                       </small>
                     </div>
                   );
@@ -264,12 +272,20 @@ export default function TechnicianProfile() {
               </div>
 
               {workingHours.length === 0 ? (
-                <p className="profile-empty-text">Chưa phân ca làm việc cố định</p>
+                <p className="profile-empty-text">
+                  Chưa phân ca làm việc cố định
+                </p>
               ) : (
                 workingHours.map((item, index) => (
                   <p key={`${item.day}-${index}`}>
                     <span>{item.day || "N/A"}</span>
-                    <b className={item.time === "Day off" || item.time === "Nghỉ" ? "day-off" : ""}>
+                    <b
+                      className={
+                        item.time === "Day off" || item.time === "Nghỉ"
+                          ? "day-off"
+                          : ""
+                      }
+                    >
                       {item.time === "Day off" ? "Nghỉ ca" : item.time || "N/A"}
                     </b>
                   </p>
@@ -281,7 +297,9 @@ export default function TechnicianProfile() {
               <h3>▧ Tài liệu đính kèm điều trị gần đây</h3>
 
               {documents.length === 0 ? (
-                <p className="profile-empty-text">Chưa có tài liệu hoặc chứng chỉ đính kèm</p>
+                <p className="profile-empty-text">
+                  Chưa có tài liệu hoặc chứng chỉ đính kèm
+                </p>
               ) : (
                 documents.map((doc, index) => (
                   <div

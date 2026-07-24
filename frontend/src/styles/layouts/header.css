@@ -5,7 +5,9 @@
   width: 100%;
   z-index: 1000;
   background: #fff6f9;
-  transition: transform 0.3s ease, background 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    background 0.3s ease;
 }
 
 /* Topbar - Vibrant pink gradient matching the primary brand colors */
@@ -67,7 +69,11 @@
   box-sizing: border-box;
   background: #fff6f9;
   border-bottom: 1px solid #ffe3ec;
-  transition: height 0.3s ease, background 0.3s ease, box-shadow 0.3s ease, border-bottom 0.3s ease;
+  transition:
+    height 0.3s ease,
+    background 0.3s ease,
+    box-shadow 0.3s ease,
+    border-bottom 0.3s ease;
 }
 
 .logo {
@@ -77,7 +83,7 @@
   font-weight: 800;
   font-size: 28px;
   text-decoration: none;
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   color: #ef4f83;
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
@@ -90,22 +96,34 @@
 .logo span.logo-icon {
   font-size: 34px;
   filter: drop-shadow(0 2px 6px rgba(239, 79, 131, 0.15));
-  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.4s ease;
+  transition:
+    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.4s ease;
   display: inline-block;
 }
 
 .logo:hover span.logo-icon {
   transform: rotate(360deg) scale(1.25);
-  filter: drop-shadow(0 0 12px rgba(255, 94, 168, 0.8)) drop-shadow(0 0 25px rgba(255, 224, 235, 0.6));
+  filter: drop-shadow(0 0 12px rgba(255, 94, 168, 0.8))
+    drop-shadow(0 0 25px rgba(255, 224, 235, 0.6));
 }
 
 .logo div {
   line-height: 1.1;
-  background: linear-gradient(120deg, #ef4f83 0%, #ff5ea8 30%, #ffb7b2 50%, #ff5ea8 70%, #ef4f83 100%);
+  background: linear-gradient(
+    120deg,
+    #ef4f83 0%,
+    #ff5ea8 30%,
+    #ffb7b2 50%,
+    #ff5ea8 70%,
+    #ef4f83 100%
+  );
   background-size: 200% auto;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  transition: background-position 0.6s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    background-position 0.6s ease,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .logo:hover div {
@@ -121,7 +139,10 @@
   color: #e96a95;
   -webkit-text-fill-color: #e96a95;
   margin-top: 2px;
-  transition: color 0.4s ease, -webkit-text-fill-color 0.4s ease, letter-spacing 0.4s ease;
+  transition:
+    color 0.4s ease,
+    -webkit-text-fill-color 0.4s ease,
+    letter-spacing 0.4s ease;
 }
 
 .logo:hover div span {
@@ -148,7 +169,7 @@
 }
 
 .nav-links a:not(.btn)::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -209,14 +230,12 @@
   transform: translateY(-2px);
 }
 
-
 /* ------------------------------------------------
    STATE 1: TRANSPARENT / DEFAULT (At the top)
    ------------------------------------------------ */
 .is-transparent {
   background: #fff6f9;
 }
-
 
 /* ------------------------------------------------
    STATE 2: SCROLLED (Sticky frosted pink glass)
@@ -234,7 +253,6 @@
   background: #ffffff;
   border: 1.5px solid #ef4f83;
 }
-
 
 /* Responsive styles */
 @media (max-width: 1024px) {

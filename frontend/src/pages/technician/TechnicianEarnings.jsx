@@ -238,14 +238,16 @@ export default function TechnicianEarnings() {
   return (
     <TechnicianLayout>
       <div className="earning-page-v2">
-        
         {/* HEADER SECTION */}
         <header className="earning-header-v2">
           <div className="earning-title-area">
             <h1>
               Báo cáo Thu nhập <span className="gold-icon">💰</span>
             </h1>
-            <p>Theo dõi doanh thu, tiền hoa hồng & lịch sử yêu cầu rút tiền của bạn</p>
+            <p>
+              Theo dõi doanh thu, tiền hoa hồng & lịch sử yêu cầu rút tiền của
+              bạn
+            </p>
           </div>
 
           <div className="earning-search-v2">
@@ -354,7 +356,9 @@ export default function TechnicianEarnings() {
               <div className="stat-icon-wrapper">◷</div>
             </div>
             <p className="stat-label">Thời gian làm</p>
-            <h2 className="stat-value">{formatMinutes(overview.WorkingMinutes)}</h2>
+            <h2 className="stat-value">
+              {formatMinutes(overview.WorkingMinutes)}
+            </h2>
             <small className="stat-desc">Tổng thời lượng làm trị liệu</small>
             <div className="card-indicator" />
           </div>
@@ -362,10 +366,8 @@ export default function TechnicianEarnings() {
 
         {/* SPLIT LAYOUT (LEFT: MAIN REPORTS, RIGHT: SIDEBAR OPERATIONS) */}
         <div className="earning-main-split">
-          
           {/* LEFT SIDE CONTENT */}
           <div className="earning-content-left">
-            
             {/* CHARTS CONTAINER */}
             <div className="premium-card">
               <div className="premium-card-head">
@@ -374,7 +376,6 @@ export default function TechnicianEarnings() {
               </div>
 
               <div className="charts-split-grid">
-                
                 {/* Column 1: Trend Bar Chart */}
                 <div style={{ height: 260 }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -383,13 +384,41 @@ export default function TechnicianEarnings() {
                       margin={{ top: 10, right: 10, left: -20, bottom: 5 }}
                     >
                       <defs>
-                        <linearGradient id="barTotalEarnings" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#1b4332" stopOpacity={0.9} />
-                          <stop offset="100%" stopColor="#2d6a4f" stopOpacity={0.7} />
+                        <linearGradient
+                          id="barTotalEarnings"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="#1b4332"
+                            stopOpacity={0.9}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="#2d6a4f"
+                            stopOpacity={0.7}
+                          />
                         </linearGradient>
-                        <linearGradient id="barCommission" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#d8b56d" stopOpacity={0.9} />
-                          <stop offset="100%" stopColor="#eed39b" stopOpacity={0.7} />
+                        <linearGradient
+                          id="barCommission"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="#d8b56d"
+                            stopOpacity={0.9}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="#eed39b"
+                            stopOpacity={0.7}
+                          />
                         </linearGradient>
                       </defs>
                       <XAxis
@@ -427,8 +456,18 @@ export default function TechnicianEarnings() {
                         }
                         wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
                       />
-                      <Bar dataKey="TotalEarnings" fill="url(#barTotalEarnings)" radius={[4, 4, 0, 0]} barSize={12} />
-                      <Bar dataKey="Commission" fill="url(#barCommission)" radius={[4, 4, 0, 0]} barSize={12} />
+                      <Bar
+                        dataKey="TotalEarnings"
+                        fill="url(#barTotalEarnings)"
+                        radius={[4, 4, 0, 0]}
+                        barSize={12}
+                      />
+                      <Bar
+                        dataKey="Commission"
+                        fill="url(#barCommission)"
+                        radius={[4, 4, 0, 0]}
+                        barSize={12}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -447,13 +486,18 @@ export default function TechnicianEarnings() {
                           paddingAngle={3}
                         >
                           {categories.map((_, index) => (
-                            <Cell key={index} fill={colorPalette[index % colorPalette.length]} />
+                            <Cell
+                              key={index}
+                              fill={colorPalette[index % colorPalette.length]}
+                            />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => [money(value), "Doanh thu"]} />
+                        <Tooltip
+                          formatter={(value) => [money(value), "Doanh thu"]}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
-                    
+
                     <div className="chart-center-info">
                       <span>Tổng cộng</span>
                       <b>{money(overview.TotalEarnings)}</b>
@@ -462,29 +506,43 @@ export default function TechnicianEarnings() {
 
                   <div className="donut-legend-list">
                     {categories.length === 0 ? (
-                      <p style={{ fontSize: "12px", color: "var(--text-muted)", textAlign: "center" }}>
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--text-muted)",
+                          textAlign: "center",
+                        }}
+                      >
                         Chưa có dữ liệu danh mục
                       </p>
                     ) : (
                       categories.map((item, index) => (
-                        <div key={item.CategoryName} className="donut-legend-item">
+                        <div
+                          key={item.CategoryName}
+                          className="donut-legend-item"
+                        >
                           <span className="donut-legend-label">
                             <i
                               className="donut-legend-color-dot"
-                              style={{ background: colorPalette[index % colorPalette.length] }}
+                              style={{
+                                background:
+                                  colorPalette[index % colorPalette.length],
+                              }}
                             />
                             {item.CategoryName}
                           </span>
                           <div>
                             <b>{percent(item.Amount, totalCategoryAmount)}%</b>
-                            <span className="legend-value"> ({money(item.Amount)})</span>
+                            <span className="legend-value">
+                              {" "}
+                              ({money(item.Amount)})
+                            </span>
                           </div>
                         </div>
                       ))
                     )}
                   </div>
                 </div>
-
               </div>
             </div>
 
@@ -492,7 +550,9 @@ export default function TechnicianEarnings() {
             <div className="premium-card">
               <div className="premium-card-head">
                 <h3>Bảng kê chi tiết thu nhập</h3>
-                <span className="premium-badge-info">{filteredDaily.length} ngày ghi nhận</span>
+                <span className="premium-badge-info">
+                  {filteredDaily.length} ngày ghi nhận
+                </span>
               </div>
 
               <div className="breakdown-table-wrapper">
@@ -528,7 +588,14 @@ export default function TechnicianEarnings() {
 
                       {filteredDaily.length === 0 && (
                         <tr>
-                          <td colSpan="7" style={{ textAlign: "center", padding: "30px", color: "var(--text-muted)" }}>
+                          <td
+                            colSpan="7"
+                            style={{
+                              textAlign: "center",
+                              padding: "30px",
+                              color: "var(--text-muted)",
+                            }}
+                          >
                             Không có dữ liệu thu nhập trong khoảng này
                           </td>
                         </tr>
@@ -538,19 +605,40 @@ export default function TechnicianEarnings() {
                         <tr className="summary-row-v2">
                           <td>Tổng cộng</td>
                           <td>
-                            {filteredDaily.reduce((s, x) => s + Number(x.Appointments || 0), 0)}
+                            {filteredDaily.reduce(
+                              (s, x) => s + Number(x.Appointments || 0),
+                              0,
+                            )}
                           </td>
                           <td>
-                            {filteredDaily.reduce((s, x) => s + Number(x.Services || 0), 0)}
+                            {filteredDaily.reduce(
+                              (s, x) => s + Number(x.Services || 0),
+                              0,
+                            )}
                           </td>
                           <td>
-                            {money(filteredDaily.reduce((s, x) => s + Number(x.Commission || 0), 0))}
+                            {money(
+                              filteredDaily.reduce(
+                                (s, x) => s + Number(x.Commission || 0),
+                                0,
+                              ),
+                            )}
                           </td>
                           <td>
-                            {money(filteredDaily.reduce((s, x) => s + Number(x.Tips || 0), 0))}
+                            {money(
+                              filteredDaily.reduce(
+                                (s, x) => s + Number(x.Tips || 0),
+                                0,
+                              ),
+                            )}
                           </td>
                           <td>
-                            {money(filteredDaily.reduce((s, x) => s + Number(x.TotalEarnings || 0), 0))}
+                            {money(
+                              filteredDaily.reduce(
+                                (s, x) => s + Number(x.TotalEarnings || 0),
+                                0,
+                              ),
+                            )}
                           </td>
                           <td>—</td>
                         </tr>
@@ -560,16 +648,29 @@ export default function TechnicianEarnings() {
                 </div>
               </div>
             </div>
-
           </div>
 
           {/* RIGHT SIDEBAR OPERATIONS */}
           <aside className="earning-sidebar-right">
-            
             {/* PAYOUT REQUEST CARD */}
             <div className="payout-card-v2">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 800, color: "var(--primary-color)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "14px",
+                    fontWeight: 800,
+                    color: "var(--primary-color)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                  }}
+                >
                   Yêu cầu rút tiền
                 </h3>
                 <button
@@ -593,7 +694,9 @@ export default function TechnicianEarnings() {
                   <b>{money(payout.lastPayout)}</b>
                 </div>
                 <span className="recent-date">
-                  {payout.lastProcessedAt ? shortDate(payout.lastProcessedAt) : "Chưa có giao dịch"}
+                  {payout.lastProcessedAt
+                    ? shortDate(payout.lastProcessedAt)
+                    : "Chưa có giao dịch"}
                 </span>
               </div>
 
@@ -617,18 +720,31 @@ export default function TechnicianEarnings() {
               {showHistory && (
                 <div className="payout-history-list">
                   {payoutHistory.length === 0 ? (
-                    <p style={{ textAlign: "center", fontSize: "12px", color: "var(--text-muted)" }}>
+                    <p
+                      style={{
+                        textAlign: "center",
+                        fontSize: "12px",
+                        color: "var(--text-muted)",
+                      }}
+                    >
                       Chưa có lịch sử rút tiền
                     </p>
                   ) : (
                     payoutHistory.map((item) => (
-                      <div className="payout-history-item" key={item.PayoutRequestId}>
+                      <div
+                        className="payout-history-item"
+                        key={item.PayoutRequestId}
+                      >
                         <b>#{item.PayoutRequestId}</b>
-                        <span className={`payout-status ${String(item.Status).toLowerCase()}`}>
+                        <span
+                          className={`payout-status ${String(item.Status).toLowerCase()}`}
+                        >
                           {statusText(item.Status)}
                         </span>
                         <strong>{money(item.Amount)}</strong>
-                        <small>Yêu cầu lúc: {shortDate(item.RequestedAt)}</small>
+                        <small>
+                          Yêu cầu lúc: {shortDate(item.RequestedAt)}
+                        </small>
                       </div>
                     ))
                   )}
@@ -638,77 +754,128 @@ export default function TechnicianEarnings() {
 
             {/* MONTHLY GOAL CARD */}
             <div className="goal-card-v2">
-              <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 800, color: "var(--primary-color)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  fontWeight: 800,
+                  color: "var(--primary-color)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                }}
+              >
                 Mục tiêu thu nhập
               </h3>
-              
+
               <div className="goal-input-box">
                 <input
                   value={goalInput}
                   onChange={(e) => setGoalInput(e.target.value)}
                   placeholder="Nhập số tiền mục tiêu..."
                 />
-                <button type="button" onClick={handleSaveGoal}>Lưu</button>
+                <button type="button" onClick={handleSaveGoal}>
+                  Lưu
+                </button>
               </div>
 
               <div style={{ marginTop: "4px" }}>
-                <p style={{ margin: "0 0 4px", fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: "bold" }}>
+                <p
+                  style={{
+                    margin: "0 0 4px",
+                    fontSize: "11px",
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    fontWeight: "bold",
+                  }}
+                >
                   Mục tiêu tháng này
                 </p>
                 <h2>{money(goal)}</h2>
               </div>
 
               <div className="goal-progress-bar">
-                <div className="goal-progress-fill" style={{ width: `${goalPercent}%` }} />
+                <div
+                  className="goal-progress-fill"
+                  style={{ width: `${goalPercent}%` }}
+                />
               </div>
 
               <div className="goal-numbers">
-                <span>Đạt được: <b>{money(earned)}</b></span>
+                <span>
+                  Đạt được: <b>{money(earned)}</b>
+                </span>
                 <b>{goalPercent}% mục tiêu</b>
               </div>
             </div>
 
             {/* TOP SERVICES CARD */}
             <div className="payout-card-v2">
-              <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 800, color: "var(--primary-color)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  fontWeight: 800,
+                  color: "var(--primary-color)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                }}
+              >
                 Top dịch vụ hiệu quả
               </h3>
 
               <div className="top-services-list-v2">
                 {topServices.slice(0, 5).map((item, index) => {
-                  const servicePercent = percent(item.Amount, overview.TotalEarnings);
+                  const servicePercent = percent(
+                    item.Amount,
+                    overview.TotalEarnings,
+                  );
                   return (
                     <div className="top-service-item-v2" key={item.ServiceName}>
                       <div className="top-service-meta-v2">
                         <span className="top-service-name-v2">
-                          <span className="top-service-rank-v2">{index + 1}</span>
+                          <span className="top-service-rank-v2">
+                            {index + 1}
+                          </span>
                           {item.ServiceName}
                         </span>
-                        <span className="top-service-value-v2">{money(item.Amount)}</span>
+                        <span className="top-service-value-v2">
+                          {money(item.Amount)}
+                        </span>
                       </div>
                       <div className="top-service-bar-container-v2">
-                        <div className="top-service-bar-v2" style={{ width: `${servicePercent}%` }} />
+                        <div
+                          className="top-service-bar-v2"
+                          style={{ width: `${servicePercent}%` }}
+                        />
                       </div>
                     </div>
                   );
                 })}
 
                 {topServices.length === 0 && (
-                  <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "12px", padding: "10px 0" }}>
+                  <p
+                    style={{
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                      fontSize: "12px",
+                      padding: "10px 0",
+                    }}
+                  >
                     Chưa có dữ liệu dịch vụ
                   </p>
                 )}
               </div>
             </div>
-
           </aside>
-
         </div>
 
         {/* YEARLY SUMMARY (FULL-WIDTH CARD) */}
         <section className="premium-card yearly-summary-v2">
           <div className="premium-card-head">
-            <h3>Tổng kết doanh số năm ({year.YearNumber || new Date().getFullYear()})</h3>
+            <h3>
+              Tổng kết doanh số năm (
+              {year.YearNumber || new Date().getFullYear()})
+            </h3>
             <span className="premium-badge-info">Lũy kế năm</span>
           </div>
 
@@ -744,7 +911,6 @@ export default function TechnicianEarnings() {
             </div>
           </div>
         </section>
-
       </div>
     </TechnicianLayout>
   );

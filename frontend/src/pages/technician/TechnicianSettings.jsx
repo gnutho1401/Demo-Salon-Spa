@@ -220,7 +220,12 @@ export default function TechnicianSettings() {
 
                   <label>
                     Địa chỉ Email
-                    <input value={form.email} disabled title="Không thể thay đổi email đăng nhập" style={{ cursor: "not-allowed" }} />
+                    <input
+                      value={form.email}
+                      disabled
+                      title="Không thể thay đổi email đăng nhập"
+                      style={{ cursor: "not-allowed" }}
+                    />
                   </label>
 
                   <label>
@@ -268,7 +273,8 @@ export default function TechnicianSettings() {
 
                   <div>
                     <label className="quick-setting-btn">
-                      📷 {uploading ? "Đang tải ảnh..." : "Thay đổi ảnh đại diện"}
+                      📷{" "}
+                      {uploading ? "Đang tải ảnh..." : "Thay đổi ảnh đại diện"}
                       <input
                         type="file"
                         accept="image/*"
@@ -305,7 +311,11 @@ export default function TechnicianSettings() {
 
                 <p>
                   <span>Trạng thái xác minh</span>
-                  <b>{profile.IsVerified === false ? "Chưa xác minh" : "Đã xác minh"}</b>
+                  <b>
+                    {profile.IsVerified === false
+                      ? "Chưa xác minh"
+                      : "Đã xác minh"}
+                  </b>
                 </p>
               </div>
             </aside>
