@@ -569,9 +569,23 @@ export default function ReceptionistProfile() {
 
         <header className="rc-header">
           <div>
-            <p style={{ color: "#c9235e", fontSize: "11px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 4px 0" }}>Receptionist Workspace</p>
+            <p
+              style={{
+                color: "#c9235e",
+                fontSize: "11px",
+                fontWeight: "800",
+                textTransform: "uppercase",
+                letterSpacing: "1.5px",
+                margin: "0 0 4px 0",
+              }}
+            >
+              Receptionist Workspace
+            </p>
             <h1>Không gian làm việc Lễ tân</h1>
-            <p>Theo dõi thông tin nhân sự, số liệu tiếp đón và xử lý lịch hẹn của khách hàng.</p>
+            <p>
+              Theo dõi thông tin nhân sự, số liệu tiếp đón và xử lý lịch hẹn của
+              khách hàng.
+            </p>
           </div>
 
           <div className="rc-btn-group">
@@ -591,11 +605,45 @@ export default function ReceptionistProfile() {
         {loading && <div className="rc-empty">Đang tải hồ sơ nhân viên...</div>}
 
         {error && !loading && (
-          <div style={{ padding: "30px", background: "#fef2f2", border: "1px solid #fee2e2", borderRadius: "16px", textAlign: "center" }}>
-            <span style={{ fontSize: "2rem", display: "block", marginBottom: "10px" }}>⚠️</span>
-            <b style={{ color: "#991b1b", display: "block", marginBottom: "6px" }}>Không tải được dữ liệu</b>
-            <p style={{ color: "#7f1d1d", fontSize: "0.85rem", margin: "0 0 16px 0" }}>{error}</p>
-            <button className="rc-btn rc-btn-secondary" onClick={loadProfile}>Thử lại</button>
+          <div
+            style={{
+              padding: "30px",
+              background: "#fef2f2",
+              border: "1px solid #fee2e2",
+              borderRadius: "16px",
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "2rem",
+                display: "block",
+                marginBottom: "10px",
+              }}
+            >
+              ⚠️
+            </span>
+            <b
+              style={{
+                color: "#991b1b",
+                display: "block",
+                marginBottom: "6px",
+              }}
+            >
+              Không tải được dữ liệu
+            </b>
+            <p
+              style={{
+                color: "#7f1d1d",
+                fontSize: "0.85rem",
+                margin: "0 0 16px 0",
+              }}
+            >
+              {error}
+            </p>
+            <button className="rc-btn rc-btn-secondary" onClick={loadProfile}>
+              Thử lại
+            </button>
           </div>
         )}
 
@@ -620,8 +668,12 @@ export default function ReceptionistProfile() {
                     {translateRole(profile.RoleName)}
                   </span>
 
-                  <h2 className="rc-name">{profile.FullName || "Chưa thiết lập"}</h2>
-                  <p className="rc-title">{profile.Position || "Lễ tân quầy đón tiếp"}</p>
+                  <h2 className="rc-name">
+                    {profile.FullName || "Chưa thiết lập"}
+                  </h2>
+                  <p className="rc-title">
+                    {profile.Position || "Lễ tân quầy đón tiếp"}
+                  </p>
 
                   <div className="rc-contacts">
                     <span>📧 {profile.Email || "-"}</span>
@@ -742,9 +794,14 @@ export default function ReceptionistProfile() {
                     <h3>Lịch trực & Ca làm việc</h3>
                   </div>
 
-                  <div className="rc-list-items" style={{ maxHeight: "200px", overflowY: "auto" }}>
+                  <div
+                    className="rc-list-items"
+                    style={{ maxHeight: "200px", overflowY: "auto" }}
+                  >
                     {shifts.length === 0 ? (
-                      <p className="rc-empty">Không có ca trực nào được xếp lịch.</p>
+                      <p className="rc-empty">
+                        Không có ca trực nào được xếp lịch.
+                      </p>
                     ) : (
                       shifts.map((s, idx) => (
                         <div
@@ -757,7 +814,13 @@ export default function ReceptionistProfile() {
                             <span>{date(s.ShiftDate)}</span>
                           </div>
 
-                          <span style={{ fontSize: "0.8rem", color: "#c9235e", fontWeight: "700" }}>
+                          <span
+                            style={{
+                              fontSize: "0.8rem",
+                              color: "#c9235e",
+                              fontWeight: "700",
+                            }}
+                          >
                             {s.StartTime} - {s.EndTime}
                           </span>
                         </div>
@@ -772,25 +835,37 @@ export default function ReceptionistProfile() {
                   </div>
 
                   <div className="rc-action-grid">
-                    <Link className="rc-action-card" to="/receptionist/appointments/create">
+                    <Link
+                      className="rc-action-card"
+                      to="/receptionist/appointments/create"
+                    >
                       <span className="rc-action-icon">📅</span>
                       <b>Đặt lịch hẹn</b>
                       <p>Tiếp nhận và đặt chỗ cho khách hàng</p>
                     </Link>
 
-                    <Link className="rc-action-card" to="/receptionist/customers">
+                    <Link
+                      className="rc-action-card"
+                      to="/receptionist/customers"
+                    >
                       <span className="rc-action-icon">👥</span>
                       <b>Khách hàng</b>
                       <p>Tra cứu hồ sơ khách tại Salon</p>
                     </Link>
 
-                    <Link className="rc-action-card" to="/receptionist/invoices">
+                    <Link
+                      className="rc-action-card"
+                      to="/receptionist/invoices"
+                    >
                       <span className="rc-action-icon">🧾</span>
                       <b>Thanh toán</b>
                       <p>Xuất hóa đơn và thu tiền khách hàng</p>
                     </Link>
 
-                    <Link className="rc-action-card" to="/receptionist/waiting-list">
+                    <Link
+                      className="rc-action-card"
+                      to="/receptionist/waiting-list"
+                    >
                       <span className="rc-action-icon">⏳</span>
                       <b>Waiting List</b>
                       <p>Sắp xếp khách hàng trong hàng chờ</p>
@@ -807,9 +882,14 @@ export default function ReceptionistProfile() {
                     <Link to="/receptionist/appointments">Xem tất cả</Link>
                   </div>
 
-                  <div className="rc-list-items" style={{ maxHeight: "360px", overflowY: "auto" }}>
+                  <div
+                    className="rc-list-items"
+                    style={{ maxHeight: "360px", overflowY: "auto" }}
+                  >
                     {recentAppointments.length === 0 ? (
-                      <p className="rc-empty">Chưa có hoạt động đặt lịch nào.</p>
+                      <p className="rc-empty">
+                        Chưa có hoạt động đặt lịch nào.
+                      </p>
                     ) : (
                       recentAppointments.map((item) => (
                         <Link
@@ -819,9 +899,13 @@ export default function ReceptionistProfile() {
                           style={{ marginBottom: "8px" }}
                         >
                           <div className="rc-row-info">
-                            <b>#{item.AppointmentId} - {item.CustomerName || "Khách vãng lai"}</b>
+                            <b>
+                              #{item.AppointmentId} -{" "}
+                              {item.CustomerName || "Khách vãng lai"}
+                            </b>
                             <span>
-                              {date(item.AppointmentDate)} · {item.StartTime || "--:--"}
+                              {date(item.AppointmentDate)} ·{" "}
+                              {item.StartTime || "--:--"}
                             </span>
                           </div>
 
@@ -840,9 +924,14 @@ export default function ReceptionistProfile() {
                     <Link to="/receptionist/invoices">Xem tất cả</Link>
                   </div>
 
-                  <div className="rc-list-items" style={{ maxHeight: "360px", overflowY: "auto" }}>
+                  <div
+                    className="rc-list-items"
+                    style={{ maxHeight: "360px", overflowY: "auto" }}
+                  >
                     {recentInvoices.length === 0 ? (
-                      <p className="rc-empty">Chưa có giao dịch thu tiền gần đây.</p>
+                      <p className="rc-empty">
+                        Chưa có giao dịch thu tiền gần đây.
+                      </p>
                     ) : (
                       recentInvoices.map((item) => (
                         <Link
@@ -852,8 +941,16 @@ export default function ReceptionistProfile() {
                           style={{ marginBottom: "8px" }}
                         >
                           <div className="rc-row-info">
-                            <b>#{item.InvoiceId} - {item.CustomerName || "Khách hàng"}</b>
-                            <span>Tổng tiền: <strong style={{ color: "#c9235e" }}>{money(item.FinalAmount)}</strong></span>
+                            <b>
+                              #{item.InvoiceId} -{" "}
+                              {item.CustomerName || "Khách hàng"}
+                            </b>
+                            <span>
+                              Tổng tiền:{" "}
+                              <strong style={{ color: "#c9235e" }}>
+                                {money(item.FinalAmount)}
+                              </strong>
+                            </span>
                           </div>
 
                           <span className={statusClass(item.Status)}>

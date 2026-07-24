@@ -35,7 +35,6 @@ function getRatingDesc(rating) {
   return "Rất kém (1/5)";
 }
 
-
 function statusLabel(status) {
   const map = {
     PENDING: "Chờ duyệt",
@@ -75,7 +74,6 @@ export default function ReceptionistReviews() {
   const [error, setError] = useState("");
   const [selectedReview, setSelectedReview] = useState(null);
 
-
   async function load(nextFilters = filters) {
     try {
       setLoading(true);
@@ -102,7 +100,8 @@ export default function ReceptionistReviews() {
       });
     } catch (err) {
       setError(
-        err.response?.data?.message || "Không tải được danh sách đánh giá từ hệ thống",
+        err.response?.data?.message ||
+          "Không tải được danh sách đánh giá từ hệ thống",
       );
     } finally {
       setLoading(false);
@@ -165,9 +164,12 @@ export default function ReceptionistReviews() {
           <div className="rx-title-block">
             <div className="rx-title-icon">⭐</div>
             <div>
-              <h1 style={{ fontFamily: 'var(--font-heading), Georgia, serif' }}>Theo dõi Đánh giá Khách hàng</h1>
+              <h1 style={{ fontFamily: "var(--font-heading), Georgia, serif" }}>
+                Theo dõi Đánh giá Khách hàng
+              </h1>
               <p>
-                Quản lý phản hồi khách hàng, điểm đánh giá trung bình và các nhận xét mới nhất.
+                Quản lý phản hồi khách hàng, điểm đánh giá trung bình và các
+                nhận xét mới nhất.
               </p>
             </div>
           </div>
@@ -222,7 +224,11 @@ export default function ReceptionistReviews() {
           <section className="rx-table-card" style={{ marginBottom: 24 }}>
             <div className="rx-table-header">
               <div>
-                <h2 style={{ fontFamily: 'var(--font-heading), Georgia, serif' }}>Nhận xét mới nhất hôm nay</h2>
+                <h2
+                  style={{ fontFamily: "var(--font-heading), Georgia, serif" }}
+                >
+                  Nhận xét mới nhất hôm nay
+                </h2>
                 <p>Đánh giá gần đây nhất vừa được gửi từ khách hàng</p>
               </div>
             </div>
@@ -236,16 +242,37 @@ export default function ReceptionistReviews() {
 
               <div>
                 <h3>{latest.CustomerName || "-"}</h3>
-                <p style={{ margin: "4px 0", fontSize: "13px", color: "#8c7b74" }}>
+                <p
+                  style={{
+                    margin: "4px 0",
+                    fontSize: "13px",
+                    color: "#8c7b74",
+                  }}
+                >
                   Dịch vụ: <b>{latest.ServiceName || "-"}</b> • KTV thực hiện:{" "}
                   <b>{latest.TechnicianName || "Chưa có KTV"}</b>
                 </p>
-                <div className="rx-stars" style={{ margin: "6px 0" }}>{stars(latest.Rating)}</div>
-                <p style={{ fontStyle: "italic", color: "#3d2e26", fontSize: "15px" }}>
+                <div className="rx-stars" style={{ margin: "6px 0" }}>
+                  {stars(latest.Rating)}
+                </div>
+                <p
+                  style={{
+                    fontStyle: "italic",
+                    color: "#3d2e26",
+                    fontSize: "15px",
+                  }}
+                >
                   "{latest.Comment || "Không có nội dung đánh giá"}"
                 </p>
                 {latest.Images && latest.Images.length > 0 && (
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", margin: "12px 0" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                      margin: "12px 0",
+                    }}
+                  >
                     {latest.Images.map((img) => (
                       <a
                         key={img.ReviewImageId}
@@ -269,7 +296,9 @@ export default function ReceptionistReviews() {
                     ))}
                   </div>
                 )}
-                <small style={{ display: "block", marginTop: "6px" }}>Thời gian gửi: {dateText(latest.CreatedAt)}</small>
+                <small style={{ display: "block", marginTop: "6px" }}>
+                  Thời gian gửi: {dateText(latest.CreatedAt)}
+                </small>
               </div>
             </div>
           </section>
@@ -401,38 +430,50 @@ export default function ReceptionistReviews() {
         <section className="rx-table-card" style={{ marginBottom: 24 }}>
           <div className="rx-table-header">
             <div>
-              <h2 style={{ fontFamily: 'var(--font-heading), Georgia, serif' }}>Thống kê theo dịch vụ thực tế</h2>
-              <p>Thống kê số lượng đánh giá và điểm trung bình cho từng dịch vụ</p>
+              <h2 style={{ fontFamily: "var(--font-heading), Georgia, serif" }}>
+                Thống kê theo dịch vụ thực tế
+              </h2>
+              <p>
+                Thống kê số lượng đánh giá và điểm trung bình cho từng dịch vụ
+              </p>
             </div>
           </div>
 
           <div className="rx-service-review-grid">
             {(data.ServiceStats || []).map((s) => {
-              const isActive = String(filters.serviceId) === String(s.ServiceId);
+              const isActive =
+                String(filters.serviceId) === String(s.ServiceId);
               return (
                 <div
                   className={`rx-service-review-card ${isActive ? "active" : ""}`}
                   key={s.ServiceId}
                   onClick={() => {
                     const nextServiceId = isActive ? "" : String(s.ServiceId);
-                    const nextFilters = { ...filters, serviceId: nextServiceId };
+                    const nextFilters = {
+                      ...filters,
+                      serviceId: nextServiceId,
+                    };
                     setFilters(nextFilters);
                     load(nextFilters);
                   }}
                 >
                   <b>{s.ServiceName}</b>
                   <span>Có {Number(s.ReviewCount || 0)} lượt đánh giá</span>
-                  <strong>Trung bình: {Number(s.AverageRating || 0).toFixed(1)} ⭐</strong>
+                  <strong>
+                    Trung bình: {Number(s.AverageRating || 0).toFixed(1)} ⭐
+                  </strong>
                 </div>
               );
             })}
           </div>
         </section>
- 
+
         <div className="rx-table-card">
           <div className="rx-table-header">
             <div>
-              <h2 style={{ fontFamily: 'var(--font-heading), Georgia, serif' }}>Danh sách tất cả đánh giá</h2>
+              <h2 style={{ fontFamily: "var(--font-heading), Georgia, serif" }}>
+                Danh sách tất cả đánh giá
+              </h2>
               <p>Hiển thị chi tiết {reviews.length} đánh giá khách hàng</p>
             </div>
           </div>
@@ -467,15 +508,24 @@ export default function ReceptionistReviews() {
                       <div>
                         <b>{r.CustomerName || "-"}</b>
                         <small>{r.CustomerPhone || "-"}</small>
-                        <small style={{ color: '#a89a85' }}>{r.CustomerEmail || "-"}</small>
+                        <small style={{ color: "#a89a85" }}>
+                          {r.CustomerEmail || "-"}
+                        </small>
                       </div>
                     </div>
                   </td>
 
                   <td>
                     <b>{r.ServiceName || "-"}</b>
-                    <small style={{ display: 'block', color: '#7b7264', marginTop: '2px' }}>
-                      Ngày hẹn: {dateText(r.AppointmentDate)} {timeText(r.StartTime)}
+                    <small
+                      style={{
+                        display: "block",
+                        color: "#7b7264",
+                        marginTop: "2px",
+                      }}
+                    >
+                      Ngày hẹn: {dateText(r.AppointmentDate)}{" "}
+                      {timeText(r.StartTime)}
                     </small>
                   </td>
 
@@ -483,17 +533,37 @@ export default function ReceptionistReviews() {
 
                   <td>
                     <div className="rx-stars">{stars(r.Rating)}</div>
-                    <small style={{ display: 'block', color: '#a89a85', marginTop: '2px' }}>
+                    <small
+                      style={{
+                        display: "block",
+                        color: "#a89a85",
+                        marginTop: "2px",
+                      }}
+                    >
                       KTV: {stars(r.TechnicianRating)}
                     </small>
                   </td>
 
                   <td>
-                    <p className="rx-review-comment" title={r.Comment} style={{ marginBottom: r.Images && r.Images.length > 0 ? "6px" : "0" }}>
+                    <p
+                      className="rx-review-comment"
+                      title={r.Comment}
+                      style={{
+                        marginBottom:
+                          r.Images && r.Images.length > 0 ? "6px" : "0",
+                      }}
+                    >
                       {r.Comment || "Không có nội dung nhận xét."}
                     </p>
                     {r.Images && r.Images.length > 0 && (
-                      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "4px",
+                          flexWrap: "wrap",
+                          marginTop: "6px",
+                        }}
+                      >
                         {r.Images.map((img) => (
                           <a
                             key={img.ReviewImageId}
@@ -579,8 +649,14 @@ export default function ReceptionistReviews() {
         </div>
 
         {selectedReview && (
-          <div className="rx-modal-backdrop" onClick={() => setSelectedReview(null)}>
-            <div className="rx-modal rx-review-detail-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="rx-modal-backdrop"
+            onClick={() => setSelectedReview(null)}
+          >
+            <div
+              className="rx-modal rx-review-detail-modal"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 className="rx-modal-close-btn"
                 onClick={() => setSelectedReview(null)}
@@ -589,26 +665,53 @@ export default function ReceptionistReviews() {
                 &times;
               </button>
 
-              <h3 style={{ fontFamily: 'var(--font-heading), Georgia, serif', marginBottom: '8px' }}>
+              <h3
+                style={{
+                  fontFamily: "var(--font-heading), Georgia, serif",
+                  marginBottom: "8px",
+                }}
+              >
                 Chi tiết đánh giá khách hàng #{selectedReview.ReviewId}
               </h3>
-              <p style={{ color: '#7b7264', fontSize: '13px', marginBottom: '20px' }}>
-                Gửi vào lúc {new Date(selectedReview.CreatedAt).toLocaleString("vi-VN")}
+              <p
+                style={{
+                  color: "#7b7264",
+                  fontSize: "13px",
+                  marginBottom: "20px",
+                }}
+              >
+                Gửi vào lúc{" "}
+                {new Date(selectedReview.CreatedAt).toLocaleString("vi-VN")}
               </p>
 
               <div className="rx-review-stars-section">
-                <div className="stars-display" style={{ color: '#b8860b' }}>
+                <div className="stars-display" style={{ color: "#b8860b" }}>
                   {stars(selectedReview.Rating)}
                 </div>
-                <div className="rating-desc">{getRatingDesc(selectedReview.Rating)}</div>
+                <div className="rating-desc">
+                  {getRatingDesc(selectedReview.Rating)}
+                </div>
               </div>
 
               <div className="rx-review-quote">
-                <p>"{selectedReview.Comment || "Khách hàng không để lại nhận xét bằng văn bản."}"</p>
+                <p>
+                  "
+                  {selectedReview.Comment ||
+                    "Khách hàng không để lại nhận xét bằng văn bản."}
+                  "
+                </p>
               </div>
 
               {selectedReview.Images && selectedReview.Images.length > 0 && (
-                <div className="rx-review-images" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "24px" }}>
+                <div
+                  className="rx-review-images"
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                    marginBottom: "24px",
+                  }}
+                >
                   {selectedReview.Images.map((img) => (
                     <a
                       key={img.ReviewImageId}
@@ -630,8 +733,12 @@ export default function ReceptionistReviews() {
                           transition: "transform 0.2s ease",
                           cursor: "zoom-in",
                         }}
-                        onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-                        onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
+                        onMouseOver={(e) =>
+                          (e.currentTarget.style.transform = "scale(1.05)")
+                        }
+                        onMouseOut={(e) =>
+                          (e.currentTarget.style.transform = "scale(1)")
+                        }
                       />
                     </a>
                   ))}
@@ -641,16 +748,27 @@ export default function ReceptionistReviews() {
               <div className="rx-detail-grid-modal">
                 <div className="rx-detail-col">
                   <h4>👤 Thông tin khách hàng</h4>
-                  <div className="rx-user-cell" style={{ marginBottom: '14px' }}>
+                  <div
+                    className="rx-user-cell"
+                    style={{ marginBottom: "14px" }}
+                  >
                     <img
                       className="rx-mini-avatar"
                       src={avatarUrl(selectedReview.CustomerAvatarUrl)}
                       alt={selectedReview.CustomerName}
-                      style={{ width: '48px', height: '48px', borderRadius: '12px' }}
+                      style={{
+                        width: "48px",
+                        height: "48px",
+                        borderRadius: "12px",
+                      }}
                     />
                     <div>
-                      <b style={{ fontSize: '14px' }}>{selectedReview.CustomerName}</b>
-                      <small style={{ display: 'block', color: '#7b7264' }}>Mã KH: #{selectedReview.CustomerId}</small>
+                      <b style={{ fontSize: "14px" }}>
+                        {selectedReview.CustomerName}
+                      </b>
+                      <small style={{ display: "block", color: "#7b7264" }}>
+                        Mã KH: #{selectedReview.CustomerId}
+                      </small>
                     </div>
                   </div>
                   <div className="rx-detail-item">
@@ -659,12 +777,18 @@ export default function ReceptionistReviews() {
                   </div>
                   <div className="rx-detail-item">
                     <span>Địa chỉ Email:</span>
-                    <b style={{ fontSize: '12px' }}>{selectedReview.CustomerEmail || "-"}</b>
+                    <b style={{ fontSize: "12px" }}>
+                      {selectedReview.CustomerEmail || "-"}
+                    </b>
                   </div>
-                  <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                  <div style={{ marginTop: "16px", textAlign: "right" }}>
                     <Link
                       className="rx-light-btn"
-                      style={{ height: '36px', padding: '0 14px', fontSize: '12px' }}
+                      style={{
+                        height: "36px",
+                        padding: "0 14px",
+                        fontSize: "12px",
+                      }}
                       to={`/receptionist/customers/${selectedReview.CustomerId}`}
                       onClick={() => setSelectedReview(null)}
                     >
@@ -685,7 +809,10 @@ export default function ReceptionistReviews() {
                   </div>
                   <div className="rx-detail-item">
                     <span>Điểm KTV nhận được:</span>
-                    <b style={{ color: '#b57a13' }}>{stars(selectedReview.TechnicianRating)} ({selectedReview.TechnicianRating}/5)</b>
+                    <b style={{ color: "#b57a13" }}>
+                      {stars(selectedReview.TechnicianRating)} (
+                      {selectedReview.TechnicianRating}/5)
+                    </b>
                   </div>
                   <div className="rx-detail-item">
                     <span>Ngày thực hiện hẹn:</span>
@@ -697,10 +824,14 @@ export default function ReceptionistReviews() {
                       {statusLabel(selectedReview.Status)}
                     </span>
                   </div>
-                  <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                  <div style={{ marginTop: "16px", textAlign: "right" }}>
                     <Link
                       className="rx-light-btn"
-                      style={{ height: '36px', padding: '0 14px', fontSize: '12px' }}
+                      style={{
+                        height: "36px",
+                        padding: "0 14px",
+                        fontSize: "12px",
+                      }}
                       to={`/receptionist/appointments/${selectedReview.AppointmentId}`}
                       onClick={() => setSelectedReview(null)}
                     >
@@ -716,13 +847,24 @@ export default function ReceptionistReviews() {
                   <p>{selectedReview.AdminResponse}</p>
                 </div>
               ) : (
-                <div className="rx-review-response" style={{ background: '#faf8f5', borderColor: '#eadbc8' }}>
-                  <h4 style={{ color: '#8b735f' }}>💬 Phản hồi từ Salon</h4>
-                  <p style={{ color: '#8a7563', fontStyle: 'italic' }}>Chưa có phản hồi chính thức cho đánh giá này.</p>
+                <div
+                  className="rx-review-response"
+                  style={{ background: "#faf8f5", borderColor: "#eadbc8" }}
+                >
+                  <h4 style={{ color: "#8b735f" }}>💬 Phản hồi từ Salon</h4>
+                  <p style={{ color: "#8a7563", fontStyle: "italic" }}>
+                    Chưa có phản hồi chính thức cho đánh giá này.
+                  </p>
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: "12px",
+                }}
+              >
                 <button
                   className="rx-primary-btn"
                   onClick={() => setSelectedReview(null)}

@@ -10,7 +10,15 @@ function avatarUrl(url) {
   return resolveFileUrl(url) || DEFAULT_AVATAR;
 }
 
-const statusOptions = ["", "PAID", "UNPAID", "PENDING", "FAILED", "REFUND_PENDING", "REFUNDED"];
+const statusOptions = [
+  "",
+  "PAID",
+  "UNPAID",
+  "PENDING",
+  "FAILED",
+  "REFUND_PENDING",
+  "REFUNDED",
+];
 
 function money(value) {
   return `${Number(value || 0).toLocaleString("vi-VN")}đ`;
@@ -85,9 +93,14 @@ export default function ReceptionistInvoices() {
     setKeyword("");
     setTimeout(() => {
       setLoading(true);
-      axiosClient.get("/receptionist/invoices")
-        .then(res => setItems(res.data.data || res.data || []))
-        .catch(err => setError(err.response?.data?.message || "Không tải được danh sách hóa đơn"))
+      axiosClient
+        .get("/receptionist/invoices")
+        .then((res) => setItems(res.data.data || res.data || []))
+        .catch((err) =>
+          setError(
+            err.response?.data?.message || "Không tải được danh sách hóa đơn",
+          ),
+        )
         .finally(() => setLoading(false));
     }, 0);
   };
@@ -101,14 +114,18 @@ export default function ReceptionistInvoices() {
             <div>
               <h1>Quản lý hóa đơn khách hàng</h1>
               <p>
-                Theo dõi lịch sử thanh toán, cập nhật trạng thái hóa đơn tại quầy, và xử lý hoàn tiền trực tuyến.
+                Theo dõi lịch sử thanh toán, cập nhật trạng thái hóa đơn tại
+                quầy, và xử lý hoàn tiền trực tuyến.
               </p>
             </div>
           </div>
         </div>
 
         {/* Dashboard Statistics Widget */}
-        <div className="rx-stat-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 20 }}>
+        <div
+          className="rx-stat-grid"
+          style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 20 }}
+        >
           <div className="rx-stat-card pink">
             <span>📁</span>
             <div>
@@ -144,7 +161,10 @@ export default function ReceptionistInvoices() {
 
         {/* Advanced Filters Panel */}
         <div className="rx-filter-card">
-          <div className="rx-filter-grid" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
+          <div
+            className="rx-filter-grid"
+            style={{ gridTemplateColumns: "2fr 1fr 1fr" }}
+          >
             <label>
               <span>🔍 Tìm kiếm khách hàng</span>
               <input
@@ -153,7 +173,7 @@ export default function ReceptionistInvoices() {
                 placeholder="Tên, số điện thoại hoặc email..."
               />
             </label>
-            
+
             <label>
               <span>📅 Ngày tạo hóa đơn</span>
               <input
@@ -162,7 +182,7 @@ export default function ReceptionistInvoices() {
                 onChange={(e) => setDate(e.target.value)}
               />
             </label>
-            
+
             <label>
               <span>⚙ Trạng thái thanh toán</span>
               <select
@@ -197,7 +217,11 @@ export default function ReceptionistInvoices() {
           </div>
         </div>
 
-        {error && <div className="rx-error" style={{ marginBottom: 15 }}>{error}</div>}
+        {error && (
+          <div className="rx-error" style={{ marginBottom: 15 }}>
+            {error}
+          </div>
+        )}
 
         {/* Invoice List Table */}
         <div className="rx-table-card">
@@ -219,19 +243,35 @@ export default function ReceptionistInvoices() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="9" style={{ textAlign: "center", padding: "40px", color: "#6f766f" }}>
+                    <td
+                      colSpan="9"
+                      style={{
+                        textAlign: "center",
+                        padding: "40px",
+                        color: "#6f766f",
+                      }}
+                    >
                       Đang tải danh sách hóa đơn...
                     </td>
                   </tr>
                 ) : items.length === 0 ? (
                   <tr>
-                    <td colSpan="9" style={{ textAlign: "center", padding: "40px", color: "#6f766f" }}>
+                    <td
+                      colSpan="9"
+                      style={{
+                        textAlign: "center",
+                        padding: "40px",
+                        color: "#6f766f",
+                      }}
+                    >
                       Không tìm thấy hóa đơn nào phù hợp.
                     </td>
                   </tr>
                 ) : (
                   items.map((i) => {
-                    const currentStatus = String(i.Status || i.PaymentStatus || "UNPAID").toUpperCase();
+                    const currentStatus = String(
+                      i.Status || i.PaymentStatus || "UNPAID",
+                    ).toUpperCase();
                     return (
                       <tr key={i.InvoiceId}>
                         <td>
@@ -254,28 +294,47 @@ export default function ReceptionistInvoices() {
                           </div>
                         </td>
                         <td>
-                          <Link to={`/receptionist/appointments/${i.AppointmentId}`}>
+                          <Link
+                            to={`/receptionist/appointments/${i.AppointmentId}`}
+                          >
                             #{i.AppointmentId}
                           </Link>
                         </td>
                         <td>{money(i.Total)}</td>
-                        <td style={{ color: "#d91f68" }}>-{money(i.Discount)}</td>
+                        <td style={{ color: "#d91f68" }}>
+                          -{money(i.Discount)}
+                        </td>
                         <td>
                           <b>{money(i.FinalAmount)}</b>
                         </td>
                         <td>
-                          <span className={`rx-badge status-${currentStatus.toLowerCase()}`}>
+                          <span
+                            className={`rx-badge status-${currentStatus.toLowerCase()}`}
+                          >
                             {statusLabel(currentStatus)}
                           </span>
                         </td>
                         <td>
-                          {i.CreatedAt ? String(i.CreatedAt).slice(0, 10).split("-").reverse().join("/") : "-"}
+                          {i.CreatedAt
+                            ? String(i.CreatedAt)
+                                .slice(0, 10)
+                                .split("-")
+                                .reverse()
+                                .join("/")
+                            : "-"}
                         </td>
                         <td>
                           <Link
                             className="rx-outline-pink-btn"
                             to={`/receptionist/invoices/${i.InvoiceId}`}
-                            style={{ padding: "6px 12px", borderRadius: "8px", textDecoration: "none", fontSize: "12px", display: "inline-block", fontWeight: "bold" }}
+                            style={{
+                              padding: "6px 12px",
+                              borderRadius: "8px",
+                              textDecoration: "none",
+                              fontSize: "12px",
+                              display: "inline-block",
+                              fontWeight: "bold",
+                            }}
                           >
                             👁 Chi tiết
                           </Link>

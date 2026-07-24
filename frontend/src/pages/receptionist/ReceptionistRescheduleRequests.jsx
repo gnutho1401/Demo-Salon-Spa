@@ -18,10 +18,15 @@ export default function ReceptionistRescheduleRequests() {
     try {
       setLoading(true);
       setError("");
-      const res = await axiosClient.get("/reschedule/receptionist/reschedule-requests");
+      const res = await axiosClient.get(
+        "/reschedule/receptionist/reschedule-requests",
+      );
       setRequests(res.data.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải được danh sách yêu cầu đổi lịch");
+      setError(
+        err.response?.data?.message ||
+          "Không tải được danh sách yêu cầu đổi lịch",
+      );
     } finally {
       setLoading(false);
     }
@@ -32,12 +37,16 @@ export default function ReceptionistRescheduleRequests() {
   }, []);
 
   async function handleApprove(id) {
-    const ok = window.confirm("Bạn có chắc chắn muốn duyệt và cập nhật lịch hẹn sang thời gian mới?");
+    const ok = window.confirm(
+      "Bạn có chắc chắn muốn duyệt và cập nhật lịch hẹn sang thời gian mới?",
+    );
     if (!ok) return;
 
     try {
       setSubmitting(true);
-      await axiosClient.put(`/reschedule/receptionist/reschedule-requests/${id}/approve`);
+      await axiosClient.put(
+        `/reschedule/receptionist/reschedule-requests/${id}/approve`,
+      );
       alert("Đã duyệt yêu cầu đổi lịch thành công!");
       await loadRequests();
     } catch (err) {
@@ -56,9 +65,12 @@ export default function ReceptionistRescheduleRequests() {
 
     try {
       setSubmitting(true);
-      await axiosClient.put(`/reschedule/receptionist/reschedule-requests/${selectedRequest.RequestId}/reject`, {
-        notes: rejectNotes
-      });
+      await axiosClient.put(
+        `/reschedule/receptionist/reschedule-requests/${selectedRequest.RequestId}/reject`,
+        {
+          notes: rejectNotes,
+        },
+      );
       alert("Đã từ chối yêu cầu đổi lịch thành công!");
       setShowRejectModal(false);
       setSelectedRequest(null);
@@ -71,18 +83,21 @@ export default function ReceptionistRescheduleRequests() {
     }
   }
 
-  const pendingRequests = requests.filter(r => r.Status === "PENDING");
-  const historyRequests = requests.filter(r => r.Status !== "PENDING");
-  const displayedRequests = activeTab === "PENDING" ? pendingRequests : historyRequests;
+  const pendingRequests = requests.filter((r) => r.Status === "PENDING");
+  const historyRequests = requests.filter((r) => r.Status !== "PENDING");
+  const displayedRequests =
+    activeTab === "PENDING" ? pendingRequests : historyRequests;
 
   const countPending = pendingRequests.length;
-  const countApproved = requests.filter(r => r.Status === "APPROVED").length;
-  const countRejected = requests.filter(r => r.Status === "REJECTED").length;
+  const countApproved = requests.filter((r) => r.Status === "APPROVED").length;
+  const countRejected = requests.filter((r) => r.Status === "REJECTED").length;
 
   return (
     <ReceptionistLayout>
-      <div className="rx-resched-page" style={{ padding: "24px", fontFamily: "var(--font-body, sans-serif)" }}>
-        
+      <div
+        className="rx-resched-page"
+        style={{ padding: "24px", fontFamily: "var(--font-body, sans-serif)" }}
+      >
         {/* Style block for local styling overrides */}
         <style>{`
           .rx-resched-page h1 {
@@ -311,13 +326,21 @@ export default function ReceptionistRescheduleRequests() {
 
         <header>
           <h1>Duyệt yêu cầu đổi lịch</h1>
-          <p>Danh sách các yêu cầu dời lịch hẹn, đổi giờ làm việc từ đội ngũ kỹ thuật viên.</p>
+          <p>
+            Danh sách các yêu cầu dời lịch hẹn, đổi giờ làm việc từ đội ngũ kỹ
+            thuật viên.
+          </p>
         </header>
 
         {/* Stats Row */}
         <section className="rx-stats-row">
           <div className="rx-stat-card">
-            <div className="rx-stat-icon" style={{ background: "#feebc8", color: "#dd6b20" }}>📅</div>
+            <div
+              className="rx-stat-icon"
+              style={{ background: "#feebc8", color: "#dd6b20" }}
+            >
+              📅
+            </div>
             <div>
               <div className="rx-stat-val">{countPending}</div>
               <div className="rx-stat-lbl">Chờ phê duyệt</div>
@@ -325,7 +348,12 @@ export default function ReceptionistRescheduleRequests() {
           </div>
 
           <div className="rx-stat-card">
-            <div className="rx-stat-icon" style={{ background: "#c6f6d5", color: "#38a169" }}>✓</div>
+            <div
+              className="rx-stat-icon"
+              style={{ background: "#c6f6d5", color: "#38a169" }}
+            >
+              ✓
+            </div>
             <div>
               <div className="rx-stat-val">{countApproved}</div>
               <div className="rx-stat-lbl">Đã đồng ý</div>
@@ -333,7 +361,12 @@ export default function ReceptionistRescheduleRequests() {
           </div>
 
           <div className="rx-stat-card">
-            <div className="rx-stat-icon" style={{ background: "#fed7d7", color: "#e53e3e" }}>✕</div>
+            <div
+              className="rx-stat-icon"
+              style={{ background: "#fed7d7", color: "#e53e3e" }}
+            >
+              ✕
+            </div>
             <div>
               <div className="rx-stat-val">{countRejected}</div>
               <div className="rx-stat-lbl">Đã từ chối</div>
@@ -348,50 +381,109 @@ export default function ReceptionistRescheduleRequests() {
             className={`rx-tab-btn ${activeTab === "PENDING" ? "active" : ""}`}
             onClick={() => setActiveTab("PENDING")}
           >
-            Đang chờ duyệt <span className="rx-badge-count">{countPending}</span>
+            Đang chờ duyệt{" "}
+            <span className="rx-badge-count">{countPending}</span>
           </button>
           <button
             type="button"
             className={`rx-tab-btn ${activeTab === "HISTORY" ? "active" : ""}`}
             onClick={() => setActiveTab("HISTORY")}
           >
-            Lịch sử đã duyệt/từ chối <span className="rx-badge-count">{countApproved + countRejected}</span>
+            Lịch sử đã duyệt/từ chối{" "}
+            <span className="rx-badge-count">
+              {countApproved + countRejected}
+            </span>
           </button>
         </nav>
 
         {/* Main Content Area */}
         {loading ? (
-          <div style={{ textAlign: "center", padding: "50px 0", color: "#718096" }}>Đang tải danh sách yêu cầu...</div>
+          <div
+            style={{ textAlign: "center", padding: "50px 0", color: "#718096" }}
+          >
+            Đang tải danh sách yêu cầu...
+          </div>
         ) : error ? (
-          <div style={{ background: "#fff5f5", border: "1px solid #fed7d7", color: "#c53030", padding: "16px", borderRadius: "12px" }}>{error}</div>
+          <div
+            style={{
+              background: "#fff5f5",
+              border: "1px solid #fed7d7",
+              color: "#c53030",
+              padding: "16px",
+              borderRadius: "12px",
+            }}
+          >
+            {error}
+          </div>
         ) : displayedRequests.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 0", background: "#ffffff", borderRadius: "16px", border: "1px solid #e2e8f0" }}>
-            <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "12px" }}>📂</span>
-            <h4 style={{ margin: "0 0 6px 0", color: "#4a5568", fontWeight: "700" }}>Không tìm thấy yêu cầu nào</h4>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "60px 0",
+              background: "#ffffff",
+              borderRadius: "16px",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "2.5rem",
+                display: "block",
+                marginBottom: "12px",
+              }}
+            >
+              📂
+            </span>
+            <h4
+              style={{
+                margin: "0 0 6px 0",
+                color: "#4a5568",
+                fontWeight: "700",
+              }}
+            >
+              Không tìm thấy yêu cầu nào
+            </h4>
             <p style={{ margin: 0 }}>Danh sách hiện đang trống.</p>
           </div>
         ) : (
           <div className="rx-cards-list">
             {displayedRequests.map((req) => {
-              const reqDate = new Date(req.RequestedDate).toLocaleDateString("vi-VN");
-              const origDate = new Date(req.OriginalDate).toLocaleDateString("vi-VN");
-              const createdAtDate = new Date(req.CreatedAt).toLocaleString("vi-VN");
+              const reqDate = new Date(req.RequestedDate).toLocaleDateString(
+                "vi-VN",
+              );
+              const origDate = new Date(req.OriginalDate).toLocaleDateString(
+                "vi-VN",
+              );
+              const createdAtDate = new Date(req.CreatedAt).toLocaleString(
+                "vi-VN",
+              );
 
               return (
                 <article key={req.RequestId} className="rx-card">
                   <div className="rx-card-header">
                     <div>
-                      <h3 className="rx-card-title">Yêu cầu đổi lịch #{req.RequestId}</h3>
-                      <span style={{ fontSize: "0.75rem", color: "#a0aec0" }}>Gửi lúc: {createdAtDate}</span>
+                      <h3 className="rx-card-title">
+                        Yêu cầu đổi lịch #{req.RequestId}
+                      </h3>
+                      <span style={{ fontSize: "0.75rem", color: "#a0aec0" }}>
+                        Gửi lúc: {createdAtDate}
+                      </span>
                     </div>
 
-                    <span className={`rx-card-badge rx-badge-${String(req.Status).toLowerCase().replaceAll("_", "-")}`}>
-                      {req.Status === "PENDING" ? "Chờ duyệt"
-                        : req.Status === "APPROVED" ? "Đã duyệt"
-                        : req.Status === "AWAITING_CUSTOMER" ? "Chờ KH xác nhận"
-                        : req.Status === "CUSTOMER_REJECTED" ? "KH từ chối"
-                        : req.Status === "SYSTEM_CANCELLED" ? "Tự động hủy (Trùng lịch)"
-                        : "Bị từ chối"}
+                    <span
+                      className={`rx-card-badge rx-badge-${String(req.Status).toLowerCase().replaceAll("_", "-")}`}
+                    >
+                      {req.Status === "PENDING"
+                        ? "Chờ duyệt"
+                        : req.Status === "APPROVED"
+                          ? "Đã duyệt"
+                          : req.Status === "AWAITING_CUSTOMER"
+                            ? "Chờ KH xác nhận"
+                            : req.Status === "CUSTOMER_REJECTED"
+                              ? "KH từ chối"
+                              : req.Status === "SYSTEM_CANCELLED"
+                                ? "Tự động hủy (Trùng lịch)"
+                                : "Bị từ chối"}
                     </span>
                   </div>
 
@@ -399,32 +491,80 @@ export default function ReceptionistRescheduleRequests() {
                     <div className="rx-time-comparison">
                       <div className="rx-time-item">
                         <span style={{ color: "#718096" }}>Khách hàng:</span>
-                        <strong style={{ color: "#2d3748" }}>{req.CustomerName}</strong>
+                        <strong style={{ color: "#2d3748" }}>
+                          {req.CustomerName}
+                        </strong>
                       </div>
                       <div className="rx-time-item">
                         <span style={{ color: "#718096" }}>Kỹ thuật viên:</span>
-                        <strong style={{ color: "#2d3748" }}>{req.TechName}</strong>
+                        <strong style={{ color: "#2d3748" }}>
+                          {req.TechName}
+                        </strong>
                       </div>
-                      <div className="rx-time-item" style={{ borderTop: "1px solid #e2e8f0", paddingTop: "6px", marginTop: "6px" }}>
+                      <div
+                        className="rx-time-item"
+                        style={{
+                          borderTop: "1px solid #e2e8f0",
+                          paddingTop: "6px",
+                          marginTop: "6px",
+                        }}
+                      >
                         <span style={{ color: "#718096" }}>Thời gian gốc:</span>
-                        <strong style={{ color: "#718096" }}>{origDate} {req.OriginalStartTime}</strong>
+                        <strong style={{ color: "#718096" }}>
+                          {origDate} {req.OriginalStartTime}
+                        </strong>
                       </div>
                       <div className="rx-time-item">
-                        <span style={{ color: "#1e3a29", fontWeight: "600" }}>Đề xuất mới:</span>
-                        <strong style={{ color: "#2f593a", fontWeight: "700" }}>{reqDate} {req.RequestedStartTime} - {req.RequestedEndTime}</strong>
+                        <span style={{ color: "#1e3a29", fontWeight: "600" }}>
+                          Đề xuất mới:
+                        </span>
+                        <strong style={{ color: "#2f593a", fontWeight: "700" }}>
+                          {reqDate} {req.RequestedStartTime} -{" "}
+                          {req.RequestedEndTime}
+                        </strong>
                       </div>
                     </div>
 
                     <div className="rx-reason-box">
                       <strong>Lý do từ KTV:</strong>
-                      <p style={{ margin: "0 0 12px 0", fontStyle: "italic", color: "#4a5568" }}>
+                      <p
+                        style={{
+                          margin: "0 0 12px 0",
+                          fontStyle: "italic",
+                          color: "#4a5568",
+                        }}
+                      >
                         &ldquo;{req.Reason || "Không có lý do chi tiết."}&rdquo;
                       </p>
 
                       {req.Notes && (
-                        <div style={{ marginTop: "12px", background: "#f7fafc", padding: "10px", borderRadius: "8px", borderLeft: "3px solid #cbd5e0" }}>
-                          <strong style={{ margin: 0, fontSize: "0.75rem", color: "#718096" }}>Phản hồi từ lễ tân:</strong>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "0.85rem", color: "#4a5568" }}>{req.Notes}</p>
+                        <div
+                          style={{
+                            marginTop: "12px",
+                            background: "#f7fafc",
+                            padding: "10px",
+                            borderRadius: "8px",
+                            borderLeft: "3px solid #cbd5e0",
+                          }}
+                        >
+                          <strong
+                            style={{
+                              margin: 0,
+                              fontSize: "0.75rem",
+                              color: "#718096",
+                            }}
+                          >
+                            Phản hồi từ lễ tân:
+                          </strong>
+                          <p
+                            style={{
+                              margin: "2px 0 0 0",
+                              fontSize: "0.85rem",
+                              color: "#4a5568",
+                            }}
+                          >
+                            {req.Notes}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -461,29 +601,48 @@ export default function ReceptionistRescheduleRequests() {
 
         {/* Reject Dialog Modal */}
         {showRejectModal && (
-          <div style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.4)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000
-          }}>
-            <div style={{
-              backgroundColor: "#ffffff",
-              borderRadius: "20px",
-              padding: "24px",
-              width: "100%",
-              maxWidth: "420px",
-              boxShadow: "0 8px 30px rgba(0, 0, 0, 0.15)"
-            }}>
-              <h3 style={{ margin: "0 0 12px 0", color: "#1e3a29", fontWeight: "700" }}>Từ chối yêu cầu đổi lịch</h3>
-              <p style={{ fontSize: "0.85rem", color: "#718096", margin: "0 0 16px 0" }}>
-                Vui lòng nhập phản hồi hoặc lý do từ chối cho KTV biết lý do không đồng ý đề xuất này.
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#ffffff",
+                borderRadius: "20px",
+                padding: "24px",
+                width: "100%",
+                maxWidth: "420px",
+                boxShadow: "0 8px 30px rgba(0, 0, 0, 0.15)",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 12px 0",
+                  color: "#1e3a29",
+                  fontWeight: "700",
+                }}
+              >
+                Từ chối yêu cầu đổi lịch
+              </h3>
+              <p
+                style={{
+                  fontSize: "0.85rem",
+                  color: "#718096",
+                  margin: "0 0 16px 0",
+                }}
+              >
+                Vui lòng nhập phản hồi hoặc lý do từ chối cho KTV biết lý do
+                không đồng ý đề xuất này.
               </p>
 
               <form onSubmit={handleRejectSubmit}>
@@ -503,11 +662,17 @@ export default function ReceptionistRescheduleRequests() {
                     fontSize: "0.9rem",
                     resize: "none",
                     marginBottom: "20px",
-                    boxSizing: "border-box"
+                    boxSizing: "border-box",
                   }}
                 />
 
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: "10px",
+                  }}
+                >
                   <button
                     type="button"
                     className="rx-btn rx-btn-secondary"
