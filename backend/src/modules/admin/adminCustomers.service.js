@@ -1,6 +1,8 @@
 const { sql, connectDB } = require("../../config/db");
 const bcrypt = require("bcryptjs");
-const { updateCustomerMembershipLevel } = require("../../utils/membershipDiscount");
+const {
+  updateCustomerMembershipLevel,
+} = require("../../utils/membershipDiscount");
 
 function text(v) {
   return String(v || "").trim();
@@ -104,8 +106,9 @@ async function list(filters = {}) {
 async function getById(id) {
   const pool = await connectDB();
 
-  const detailsResult = await pool.request().input("UserId", sql.Int, Number(id))
-    .query(`
+  const detailsResult = await pool
+    .request()
+    .input("UserId", sql.Int, Number(id)).query(`
       SELECT
         u.UserId,
         u.FullName,
@@ -143,8 +146,9 @@ async function getById(id) {
   if (!customer) throw new Error("Không tìm thấy khách hàng");
 
   // Load appointments
-  const appointmentsResult = await pool.request().input("CustomerId", sql.Int, customer.CustomerId)
-    .query(`
+  const appointmentsResult = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
       SELECT
         a.AppointmentId,
         a.AppointmentDate,
@@ -169,8 +173,9 @@ async function getById(id) {
     `);
 
   // Load packages
-  const packagesResult = await pool.request().input("CustomerId", sql.Int, customer.CustomerId)
-    .query(`
+  const packagesResult = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
       SELECT
         cp.CustomerPackageId,
         p.PackageName,
@@ -189,8 +194,9 @@ async function getById(id) {
     `);
 
   // Load feedbacks & reviews
-  const feedsResult = await pool.request().input("CustomerId", sql.Int, customer.CustomerId)
-    .query(`
+  const feedsResult = await pool
+    .request()
+    .input("CustomerId", sql.Int, customer.CustomerId).query(`
       SELECT
         'review' AS ItemType,
         r.ReviewId AS Id,
@@ -264,14 +270,18 @@ async function create(data) {
   if (!fullName) throw new Error("Họ tên không được để trống");
   if (!email) throw new Error("Email không được để trống");
   if (!emailRegex.test(email)) throw new Error("Email không đúng định dạng");
-  if (phone && !phoneRegex.test(phone)) throw new Error("Số điện thoại phải từ 9 đến 15 chữ số");
-  if (!password || password.length < 6) throw new Error("Mật khẩu mới phải từ 6 ký tự");
+  if (phone && !phoneRegex.test(phone))
+    throw new Error("Số điện thoại phải từ 9 đến 15 chữ số");
+  if (!password || password.length < 6)
+    throw new Error("Mật khẩu mới phải từ 6 ký tự");
 
   const pool = await connectDB();
   await ensureUnique(pool, email, phone);
 
   // Get Customer role
-  const roleRes = await pool.request().query("SELECT RoleId FROM Roles WHERE RoleName = 'CUSTOMER'");
+  const roleRes = await pool
+    .request()
+    .query("SELECT RoleId FROM Roles WHERE RoleName = 'CUSTOMER'");
   const roleId = roleRes.recordset[0]?.RoleId;
   if (!roleId) throw new Error("Không tìm thấy vai trò CUSTOMER trên hệ thống");
 
@@ -302,7 +312,8 @@ async function create(data) {
     const defaultLevelRes = await new sql.Request(transaction).query(`
       SELECT TOP 1 MembershipLevelId FROM MembershipLevels ORDER BY MinPoints ASC
     `);
-    const defaultLevelId = defaultLevelRes.recordset[0]?.MembershipLevelId || null;
+    const defaultLevelId =
+      defaultLevelRes.recordset[0]?.MembershipLevelId || null;
 
     const customerResult = await new sql.Request(transaction)
       .input("UserId", sql.Int, userId)
@@ -331,20 +342,44 @@ async function update(id, data) {
   const current = await getById(id);
   const pool = await connectDB();
 
-  const fullName = data.FullName !== undefined ? text(data.FullName) : current.profile.FullName;
-  const email = data.Email !== undefined ? text(data.Email).toLowerCase() : current.profile.Email;
-  const phone = data.Phone !== undefined ? defNullable(data.Phone) : current.profile.Phone;
-  const gender = data.Gender !== undefined ? defNullable(data.Gender) : current.profile.Gender;
-  const dateOfBirth = data.DateOfBirth !== undefined ? defNullable(data.DateOfBirth) : current.profile.DateOfBirth;
-  const address = data.Address !== undefined ? defNullable(data.Address) : current.profile.Address;
-  const userStatus = data.Status !== undefined ? status(data.Status) : current.profile.Status;
-  const isVerified = data.IsVerified !== undefined ? toBit(data.IsVerified) : current.profile.IsVerified;
-  const membershipLevelId = data.MembershipLevelId !== undefined ? toInt(data.MembershipLevelId) : current.profile.MembershipLevelId;
+  const fullName =
+    data.FullName !== undefined
+      ? text(data.FullName)
+      : current.profile.FullName;
+  const email =
+    data.Email !== undefined
+      ? text(data.Email).toLowerCase()
+      : current.profile.Email;
+  const phone =
+    data.Phone !== undefined ? defNullable(data.Phone) : current.profile.Phone;
+  const gender =
+    data.Gender !== undefined
+      ? defNullable(data.Gender)
+      : current.profile.Gender;
+  const dateOfBirth =
+    data.DateOfBirth !== undefined
+      ? defNullable(data.DateOfBirth)
+      : current.profile.DateOfBirth;
+  const address =
+    data.Address !== undefined
+      ? defNullable(data.Address)
+      : current.profile.Address;
+  const userStatus =
+    data.Status !== undefined ? status(data.Status) : current.profile.Status;
+  const isVerified =
+    data.IsVerified !== undefined
+      ? toBit(data.IsVerified)
+      : current.profile.IsVerified;
+  const membershipLevelId =
+    data.MembershipLevelId !== undefined
+      ? toInt(data.MembershipLevelId)
+      : current.profile.MembershipLevelId;
 
   if (!fullName) throw new Error("Họ tên không được để trống");
   if (!email) throw new Error("Email không được để trống");
   if (!emailRegex.test(email)) throw new Error("Email không đúng định dạng");
-  if (phone && !phoneRegex.test(phone)) throw new Error("Số điện thoại phải từ 9 đến 15 chữ số");
+  if (phone && !phoneRegex.test(phone))
+    throw new Error("Số điện thoại phải từ 9 đến 15 chữ số");
 
   await ensureUnique(pool, email, phone, Number(id));
 
@@ -383,7 +418,10 @@ async function update(id, data) {
         WHERE UserId = @UserId
       `);
 
-    await updateCustomerMembershipLevel(transaction, current.profile.CustomerId);
+    await updateCustomerMembershipLevel(
+      transaction,
+      current.profile.CustomerId,
+    );
 
     await transaction.commit();
     return getById(id);
@@ -397,7 +435,8 @@ async function update(id, data) {
 
 async function adjustPoints(id, data = {}) {
   const pointsDelta = toInt(data.Points ?? data.points, 0);
-  const note = text(data.Note ?? data.note) || "Điều chỉnh điểm bởi quản trị viên";
+  const note =
+    text(data.Note ?? data.note) || "Điều chỉnh điểm bởi quản trị viên";
 
   if (pointsDelta === 0) throw new Error("Số điểm điều chỉnh phải khác 0");
 
@@ -405,7 +444,8 @@ async function adjustPoints(id, data = {}) {
   const currentPoints = toInt(current.profile.LoyaltyPoints, 0);
   const nextPoints = currentPoints + pointsDelta;
 
-  if (nextPoints < 0) throw new Error("Tổng điểm tích lũy sau điều chỉnh không được nhỏ hơn 0");
+  if (nextPoints < 0)
+    throw new Error("Tổng điểm tích lũy sau điều chỉnh không được nhỏ hơn 0");
 
   const pool = await connectDB();
   const transaction = new sql.Transaction(pool);
@@ -432,7 +472,10 @@ async function adjustPoints(id, data = {}) {
           (@CustomerId, @Type, @Points, @Note)
       `);
 
-    await updateCustomerMembershipLevel(transaction, current.profile.CustomerId);
+    await updateCustomerMembershipLevel(
+      transaction,
+      current.profile.CustomerId,
+    );
 
     await transaction.commit();
     return getById(id);

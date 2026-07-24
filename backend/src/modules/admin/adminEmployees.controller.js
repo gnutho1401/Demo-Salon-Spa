@@ -124,7 +124,10 @@ async function getAssignedServices(req, res) {
 async function updateAssignedServices(req, res) {
   try {
     const before = await service.getAssignedServices(req.params.id);
-    const result = await service.updateAssignedServices(req.params.id, req.body.serviceIds);
+    const result = await service.updateAssignedServices(
+      req.params.id,
+      req.body.serviceIds,
+    );
 
     await logs.writeLog({
       userId: currentUser(req),

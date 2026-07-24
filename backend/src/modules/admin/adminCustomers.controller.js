@@ -89,8 +89,14 @@ async function adjustPoints(req, res) {
       actionType: "UPDATE",
       description: `Adjusted points for customer ${result?.profile?.FullName}. Points change: ${req.body.Points || req.body.points || 0}. Note: ${req.body.Note || req.body.note || ""}`,
       ipAddress: req.ip,
-      oldValue: JSON.stringify({ LoyaltyPoints: before.profile.LoyaltyPoints, MembershipLevelName: before.profile.MembershipLevelName }),
-      newValue: JSON.stringify({ LoyaltyPoints: result.profile.LoyaltyPoints, MembershipLevelName: result.profile.MembershipLevelName }),
+      oldValue: JSON.stringify({
+        LoyaltyPoints: before.profile.LoyaltyPoints,
+        MembershipLevelName: before.profile.MembershipLevelName,
+      }),
+      newValue: JSON.stringify({
+        LoyaltyPoints: result.profile.LoyaltyPoints,
+        MembershipLevelName: result.profile.MembershipLevelName,
+      }),
     });
 
     return success(res, result);

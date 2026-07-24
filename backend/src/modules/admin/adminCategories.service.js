@@ -10,15 +10,17 @@ function normalizeNullableText(value) {
 }
 
 function normalizeStatus(value, fallback = "ACTIVE") {
-  return String(value || fallback).trim().toUpperCase();
+  return String(value || fallback)
+    .trim()
+    .toUpperCase();
 }
 
 async function ensureUniqueName(pool, name, excludeId = null) {
   if (!name) return;
-  const result = await pool.request()
+  const result = await pool
+    .request()
     .input("CategoryName", sql.NVarChar, name)
-    .input("ExcludeId", sql.Int, excludeId)
-    .query(`
+    .input("ExcludeId", sql.Int, excludeId).query(`
       SELECT TOP 1 CategoryId
       FROM ServiceCategories
       WHERE UPPER(TRIM(CategoryName)) = UPPER(TRIM(@CategoryName))
@@ -34,10 +36,10 @@ async function list(filters = {}) {
   const keyword = normalizeText(filters.keyword);
   const status = filters.status ? normalizeStatus(filters.status) : null;
 
-  const result = await pool.request()
+  const result = await pool
+    .request()
     .input("Keyword", sql.NVarChar, keyword ? `%${keyword}%` : null)
-    .input("Status", sql.NVarChar, status)
-    .query(`
+    .input("Status", sql.NVarChar, status).query(`
       SELECT
         c.CategoryId,
         c.CategoryName,
@@ -85,26 +87,31 @@ async function getById(id) {
 
   const row = result.recordset[0];
   if (!row) throw new Error("Không tìm thấy category");
-  return { ...row, IsActive: String(row.Status || "").toUpperCase() === "ACTIVE" };
+  return {
+    ...row,
+    IsActive: String(row.Status || "").toUpperCase() === "ACTIVE",
+  };
 }
 
 async function create(data) {
   const pool = await connectDB();
   const categoryName = normalizeText(data.CategoryName || data.categoryName);
-  const description = normalizeNullableText(data.Description || data.description);
+  const description = normalizeNullableText(
+    data.Description || data.description,
+  );
   const imageUrl = normalizeNullableText(data.ImageUrl || data.imageUrl);
   const status = normalizeStatus(data.Status || data.status || "ACTIVE");
 
   if (!categoryName) throw new Error("CategoryName không được để trống");
-  
+
   await ensureUniqueName(pool, categoryName);
 
-  const result = await pool.request()
+  const result = await pool
+    .request()
     .input("CategoryName", sql.NVarChar, categoryName)
     .input("Description", sql.NVarChar, description)
     .input("ImageUrl", sql.NVarChar, imageUrl)
-    .input("Status", sql.NVarChar, status)
-    .query(`
+    .input("Status", sql.NVarChar, status).query(`
       INSERT INTO ServiceCategories (CategoryName, Description, ImageUrl, Status)
       OUTPUT INSERTED.CategoryId
       VALUES (@CategoryName, @Description, @ImageUrl, @Status)
@@ -116,22 +123,31 @@ async function create(data) {
 async function update(id, data) {
   const pool = await connectDB();
   const current = await getById(id);
-  const categoryName = data.CategoryName !== undefined ? normalizeText(data.CategoryName || data.categoryName) : current.CategoryName;
-  const description = data.Description !== undefined ? normalizeNullableText(data.Description || data.description) : current.Description;
-  const imageUrl = data.ImageUrl !== undefined ? normalizeNullableText(data.ImageUrl || data.imageUrl) : current.ImageUrl;
+  const categoryName =
+    data.CategoryName !== undefined
+      ? normalizeText(data.CategoryName || data.categoryName)
+      : current.CategoryName;
+  const description =
+    data.Description !== undefined
+      ? normalizeNullableText(data.Description || data.description)
+      : current.Description;
+  const imageUrl =
+    data.ImageUrl !== undefined
+      ? normalizeNullableText(data.ImageUrl || data.imageUrl)
+      : current.ImageUrl;
   const status = normalizeStatus(data.Status || data.status || current.Status);
 
   if (!categoryName) throw new Error("CategoryName không được để trống");
-  
+
   await ensureUniqueName(pool, categoryName, id);
 
-  await pool.request()
+  await pool
+    .request()
     .input("CategoryId", sql.Int, id)
     .input("CategoryName", sql.NVarChar, categoryName)
     .input("Description", sql.NVarChar, description)
     .input("ImageUrl", sql.NVarChar, imageUrl)
-    .input("Status", sql.NVarChar, status)
-    .query(`
+    .input("Status", sql.NVarChar, status).query(`
       UPDATE ServiceCategories
       SET CategoryName = @CategoryName,
           Description = @Description,
@@ -164,10 +180,10 @@ async function toggleActive(id) {
   const current = await getById(id);
   const next = current.IsActive ? "INACTIVE" : "ACTIVE";
 
-  await pool.request()
+  await pool
+    .request()
     .input("CategoryId", sql.Int, id)
-    .input("Status", sql.NVarChar, next)
-    .query(`
+    .input("Status", sql.NVarChar, next).query(`
       UPDATE ServiceCategories
       SET Status = @Status
       WHERE CategoryId = @CategoryId
@@ -177,4 +193,3 @@ async function toggleActive(id) {
 }
 
 module.exports = { list, getById, create, update, remove, toggleActive };
-
