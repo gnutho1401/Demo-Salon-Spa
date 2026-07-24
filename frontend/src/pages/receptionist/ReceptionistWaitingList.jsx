@@ -68,7 +68,10 @@ function HoldCountdown({ expiresAt, onTimeout }) {
       let expObj = new Date(expiresAt);
       // Nếu thời gian hết hạn lớn hơn thời gian hiện tại quá 30 phút (do lệch múi giờ UTC vs Local)
       if (expObj.getTime() - Date.now() > 30 * 60 * 1000) {
-        const cleanStr = typeof expiresAt === "string" ? expiresAt.replace(/Z$/, "") : expiresAt;
+        const cleanStr =
+          typeof expiresAt === "string"
+            ? expiresAt.replace(/Z$/, "")
+            : expiresAt;
         expObj = new Date(cleanStr);
       }
       const exp = expObj.getTime();
@@ -83,7 +86,9 @@ function HoldCountdown({ expiresAt, onTimeout }) {
 
       const mins = Math.floor(diff / 60000);
       const secs = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(`${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`);
+      setTimeLeft(
+        `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`,
+      );
     }
 
     update();
@@ -91,7 +96,14 @@ function HoldCountdown({ expiresAt, onTimeout }) {
     return () => clearInterval(interval);
   }, [expiresAt]);
 
-  return <span className="hold-countdown" style={{ color: "#db2777", fontWeight: "bold" }}>{timeLeft}</span>;
+  return (
+    <span
+      className="hold-countdown"
+      style={{ color: "#db2777", fontWeight: "bold" }}
+    >
+      {timeLeft}
+    </span>
+  );
 }
 
 export default function ReceptionistWaitingList() {
@@ -215,7 +227,11 @@ export default function ReceptionistWaitingList() {
   }, [items]);
 
   const selectedConvertEmp = useMemo(() => {
-    return convertTechnicians.find((t) => String(t.EmployeeId || t.TechnicianId) === String(convertForm.technicianId));
+    return convertTechnicians.find(
+      (t) =>
+        String(t.EmployeeId || t.TechnicianId) ===
+        String(convertForm.technicianId),
+    );
   }, [convertTechnicians, convertForm.technicianId]);
 
   async function createWaiting(e) {
@@ -270,7 +286,7 @@ export default function ReceptionistWaitingList() {
   async function cancelWaiting(waitingId) {
     const reason = window.prompt(
       "Nhập lý do hủy (không bắt buộc):",
-      "Khách hàng muốn hủy yêu cầu"
+      "Khách hàng muốn hủy yêu cầu",
     );
     if (reason === null) return; // User clicked Cancel in prompt
 
@@ -325,14 +341,20 @@ export default function ReceptionistWaitingList() {
     const isMatched = item.Status === "MATCHED";
 
     const appointmentDate = isMatched
-      ? (item.MatchedDate ? String(item.MatchedDate).slice(0, 10) : "")
-      : (item.PreferredDate ? String(item.PreferredDate).slice(0, 10) : "");
+      ? item.MatchedDate
+        ? String(item.MatchedDate).slice(0, 10)
+        : ""
+      : item.PreferredDate
+        ? String(item.PreferredDate).slice(0, 10)
+        : "";
 
     const technicianId = isMatched
-      ? (item.MatchedEmployeeId || "")
-      : (item.PreferredEmployeeId || item.EmployeeId || item.TechnicianId || "");
+      ? item.MatchedEmployeeId || ""
+      : item.PreferredEmployeeId || item.EmployeeId || item.TechnicianId || "";
 
-    const startTime = isMatched ? String(item.MatchedStartTime || "").slice(0, 5) : "";
+    const startTime = isMatched
+      ? String(item.MatchedStartTime || "").slice(0, 5)
+      : "";
 
     const next = {
       waitingId: item.WaitingId,
@@ -346,7 +368,9 @@ export default function ReceptionistWaitingList() {
     setConvertTechnicians([]);
 
     try {
-      const res = await axiosClient.get(`/employees/by-service/${item.ServiceId}`);
+      const res = await axiosClient.get(
+        `/employees/by-service/${item.ServiceId}`,
+      );
       setConvertTechnicians(res.data?.data || []);
     } catch (err) {
       console.error("Lỗi tải KTV theo dịch vụ:", err);
@@ -767,9 +791,30 @@ export default function ReceptionistWaitingList() {
               </label>
 
               {selectedConvertEmp && (
-                <div style={{ marginTop: "4px", background: "#fffaf4", border: "1px solid #fce8d5", padding: "12px", borderRadius: "12px", display: "flex", flexDirection: "column", gap: "4px", gridColumn: "span 2", width: "100%", boxSizing: "border-box" }}>
-                  <span style={{ fontSize: "0.85rem", color: "#85583f", fontWeight: "bold" }}>
-                    Chi nhánh chuyên viên: {selectedConvertEmp.BranchName || "Chi nhánh chính"}
+                <div
+                  style={{
+                    marginTop: "4px",
+                    background: "#fffaf4",
+                    border: "1px solid #fce8d5",
+                    padding: "12px",
+                    borderRadius: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                    gridColumn: "span 2",
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#85583f",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Chi nhánh chuyên viên:{" "}
+                    {selectedConvertEmp.BranchName || "Chi nhánh chính"}
                   </span>
                   {selectedConvertEmp.BranchAddress && (
                     <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
@@ -777,7 +822,14 @@ export default function ReceptionistWaitingList() {
                     </span>
                   )}
                   {selectedConvertEmp.BranchAddress && (
-                    <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #e5e7eb", marginTop: "6px" }}>
+                    <div
+                      style={{
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        border: "1px solid #e5e7eb",
+                        marginTop: "6px",
+                      }}
+                    >
                       <iframe
                         title="Bản đồ chuyên viên chuyển lịch"
                         src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedConvertEmp.BranchAddress)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
@@ -821,7 +873,11 @@ export default function ReceptionistWaitingList() {
               <label className="wl-col-2">
                 <span>Slot trống</span>
                 <select
-                  value={convertForm.startTime && convertForm.technicianId ? `${convertForm.startTime}|${convertForm.technicianId}` : ""}
+                  value={
+                    convertForm.startTime && convertForm.technicianId
+                      ? `${convertForm.startTime}|${convertForm.technicianId}`
+                      : ""
+                  }
                   onChange={(e) => {
                     const val = e.target.value;
                     if (!val) {
@@ -918,16 +974,32 @@ export default function ReceptionistWaitingList() {
                               <img
                                 src={avatarUrl(item.CustomerAvatarUrl)}
                                 alt={item.CustomerName}
-                                style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                }}
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                   if (e.currentTarget.nextSibling) {
-                                    e.currentTarget.nextSibling.style.display = "flex";
+                                    e.currentTarget.nextSibling.style.display =
+                                      "flex";
                                   }
                                 }}
                               />
                             ) : null}
-                            <span style={{ display: item.CustomerAvatarUrl ? "none" : "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
+                            <span
+                              style={{
+                                display: item.CustomerAvatarUrl
+                                  ? "none"
+                                  : "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: "100%",
+                                height: "100%",
+                              }}
+                            >
                               {(item.CustomerName || "?").charAt(0)}
                             </span>
                           </div>
@@ -944,7 +1016,9 @@ export default function ReceptionistWaitingList() {
                         <b>{item.ServiceName}</b>
                         <small>{formatMoney(item.Price)}</small>
                         {item.Status === "MATCHED" ? (
-                          <small style={{ color: "#c9235e", fontWeight: "bold" }}>
+                          <small
+                            style={{ color: "#c9235e", fontWeight: "bold" }}
+                          >
                             Ghép KTV: {item.MatchedEmployeeName}
                           </small>
                         ) : item.PreferredEmployeeName ? (
@@ -958,22 +1032,40 @@ export default function ReceptionistWaitingList() {
                         {item.Status === "MATCHED" ? (
                           <div style={{ color: "#db2777" }}>
                             <b>⚡ Ghép: {formatDate(item.MatchedDate)}</b>
-                            <small style={{ color: "#c9235e", fontWeight: "bold", display: "block" }}>
+                            <small
+                              style={{
+                                color: "#c9235e",
+                                fontWeight: "bold",
+                                display: "block",
+                              }}
+                            >
                               {item.MatchedStartTime} - {item.MatchedEndTime}
                             </small>
-                            <small style={{ fontSize: "11px", marginTop: "4px", display: "block" }}>
-                              Còn: <HoldCountdown expiresAt={item.HoldExpiresAt} onTimeout={() => load()} />
+                            <small
+                              style={{
+                                fontSize: "11px",
+                                marginTop: "4px",
+                                display: "block",
+                              }}
+                            >
+                              Còn:{" "}
+                              <HoldCountdown
+                                expiresAt={item.HoldExpiresAt}
+                                onTimeout={() => load()}
+                              />
                             </small>
                           </div>
                         ) : (
                           <>
                             <b>{formatDate(item.PreferredDate)}</b>
                             <small style={{ display: "block" }}>
-                              {item.FlexibleTimeSlot && item.FlexibleTimeSlot !== "CUSTOM"
-                                ? (TIME_SLOT_MAP[item.FlexibleTimeSlot] || "Linh hoạt cả ngày")
-                                : (item.PreferredTimeFrom && item.PreferredTimeTo
+                              {item.FlexibleTimeSlot &&
+                              item.FlexibleTimeSlot !== "CUSTOM"
+                                ? TIME_SLOT_MAP[item.FlexibleTimeSlot] ||
+                                  "Linh hoạt cả ngày"
+                                : item.PreferredTimeFrom && item.PreferredTimeTo
                                   ? `${String(item.PreferredTimeFrom).slice(0, 5)} - ${String(item.PreferredTimeTo).slice(0, 5)}`
-                                  : (item.PreferredTime || "Linh hoạt"))}
+                                  : item.PreferredTime || "Linh hoạt"}
                             </small>
                           </>
                         )}
@@ -1008,7 +1100,10 @@ export default function ReceptionistWaitingList() {
                             <button
                               type="button"
                               className="wl-mini-btn warning"
-                              style={{ backgroundColor: "#d97706", color: "#fff" }}
+                              style={{
+                                backgroundColor: "#d97706",
+                                color: "#fff",
+                              }}
                               onClick={() =>
                                 updateStatus(item.WaitingId, "SKIPPED")
                               }
@@ -1018,7 +1113,9 @@ export default function ReceptionistWaitingList() {
                             </button>
                           )}
 
-                          {["WAITING", "NOTIFIED", "MATCHED"].includes(item.Status) && (
+                          {["WAITING", "NOTIFIED", "MATCHED"].includes(
+                            item.Status,
+                          ) && (
                             <button
                               type="button"
                               className="wl-mini-btn primary"

@@ -21,18 +21,38 @@ export default function ReceptionistSettings() {
   });
 
   // Local preferences states saved to localStorage
-  const [language, setLanguage] = useState(() => localStorage.getItem("rc_lang") || "vi");
-  const [timezone, setTimezone] = useState(() => localStorage.getItem("rc_tz") || "gmt_7");
-  const [dateFormat, setDateFormat] = useState(() => localStorage.getItem("rc_date_fmt") || "dd_mm_yyyy");
-  const [timeFormat, setTimeFormat] = useState(() => localStorage.getItem("rc_time_fmt") || "24h");
-  const [theme, setTheme] = useState(() => localStorage.getItem("rc_theme") || "light");
-  const [twoFA, setTwoFA] = useState(() => localStorage.getItem("rc_2fa") === "true");
-  
+  const [language, setLanguage] = useState(
+    () => localStorage.getItem("rc_lang") || "vi",
+  );
+  const [timezone, setTimezone] = useState(
+    () => localStorage.getItem("rc_tz") || "gmt_7",
+  );
+  const [dateFormat, setDateFormat] = useState(
+    () => localStorage.getItem("rc_date_fmt") || "dd_mm_yyyy",
+  );
+  const [timeFormat, setTimeFormat] = useState(
+    () => localStorage.getItem("rc_time_fmt") || "24h",
+  );
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("rc_theme") || "light",
+  );
+  const [twoFA, setTwoFA] = useState(
+    () => localStorage.getItem("rc_2fa") === "true",
+  );
+
   // Notification states
-  const [notifEmail, setNotifEmail] = useState(() => localStorage.getItem("rc_notif_email") !== "false");
-  const [notifSMS, setNotifSMS] = useState(() => localStorage.getItem("rc_notif_sms") !== "false");
-  const [notifSystem, setNotifSystem] = useState(() => localStorage.getItem("rc_notif_sys") !== "false");
-  const [notifAppointment, setNotifAppointment] = useState(() => localStorage.getItem("rc_notif_appt") !== "false");
+  const [notifEmail, setNotifEmail] = useState(
+    () => localStorage.getItem("rc_notif_email") !== "false",
+  );
+  const [notifSMS, setNotifSMS] = useState(
+    () => localStorage.getItem("rc_notif_sms") !== "false",
+  );
+  const [notifSystem, setNotifSystem] = useState(
+    () => localStorage.getItem("rc_notif_sys") !== "false",
+  );
+  const [notifAppointment, setNotifAppointment] = useState(
+    () => localStorage.getItem("rc_notif_appt") !== "false",
+  );
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,7 +84,10 @@ export default function ReceptionistSettings() {
         bio: profile.Bio || "",
       });
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải được cấu hình tài khoản từ hệ thống");
+      setError(
+        err.response?.data?.message ||
+          "Không tải được cấu hình tài khoản từ hệ thống",
+      );
     } finally {
       setLoading(false);
     }
@@ -102,13 +125,17 @@ export default function ReceptionistSettings() {
       const updatedData = res.data.data;
       setData(updatedData);
 
-      if (updatedData && updatedData.profile && typeof updateUser === "function") {
+      if (
+        updatedData &&
+        updatedData.profile &&
+        typeof updateUser === "function"
+      ) {
         updateUser({
           ...user,
           FullName: updatedData.profile.FullName || user?.FullName,
         });
       }
-      
+
       // Save local preferences
       localStorage.setItem("rc_lang", language);
       localStorage.setItem("rc_tz", timezone);
@@ -116,7 +143,7 @@ export default function ReceptionistSettings() {
       localStorage.setItem("rc_time_fmt", timeFormat);
       localStorage.setItem("rc_theme", theme);
       localStorage.setItem("rc_2fa", String(twoFA));
-      
+
       localStorage.setItem("rc_notif_email", String(notifEmail));
       localStorage.setItem("rc_notif_sms", String(notifSMS));
       localStorage.setItem("rc_notif_sys", String(notifSystem));
@@ -124,7 +151,9 @@ export default function ReceptionistSettings() {
 
       setMessage("Cập nhật thông tin hệ thống và tùy chọn cá nhân thành công!");
     } catch (err) {
-      setError(err.response?.data?.message || "Không lưu được thay đổi cấu hình");
+      setError(
+        err.response?.data?.message || "Không lưu được thay đổi cấu hình",
+      );
     } finally {
       setSaving(false);
     }
@@ -153,7 +182,11 @@ export default function ReceptionistSettings() {
       const updatedData = res.data.data;
       setData(updatedData);
 
-      if (updatedData && updatedData.profile && typeof updateUser === "function") {
+      if (
+        updatedData &&
+        updatedData.profile &&
+        typeof updateUser === "function"
+      ) {
         updateUser({
           ...user,
           AvatarUrl: updatedData.profile.AvatarUrl || user?.AvatarUrl,
@@ -161,7 +194,9 @@ export default function ReceptionistSettings() {
       }
       setMessage("Cập nhật ảnh đại diện thành công!");
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải lên được ảnh đại diện mới");
+      setError(
+        err.response?.data?.message || "Không tải lên được ảnh đại diện mới",
+      );
     } finally {
       setUploading(false);
     }
@@ -714,10 +749,20 @@ export default function ReceptionistSettings() {
           <p>Quản lý thông tin tài khoản và các tùy chọn cá nhân của bạn.</p>
         </header>
 
-        {error && <div className="rc-alert rc-alert-error"><span>⚠️</span> {error}</div>}
-        {message && <div className="rc-alert rc-alert-success"><span>✓</span> {message}</div>}
+        {error && (
+          <div className="rc-alert rc-alert-error">
+            <span>⚠️</span> {error}
+          </div>
+        )}
+        {message && (
+          <div className="rc-alert rc-alert-success">
+            <span>✓</span> {message}
+          </div>
+        )}
 
-        {loading && <div className="rc-empty">Đang tải thông tin cấu hình...</div>}
+        {loading && (
+          <div className="rc-empty">Đang tải thông tin cấu hình...</div>
+        )}
 
         {!loading && (
           <>
@@ -761,14 +806,20 @@ export default function ReceptionistSettings() {
                       <input
                         value={form.fullName}
                         placeholder="Nhập họ và tên..."
-                        onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, fullName: e.target.value })
+                        }
                         required
                       />
                     </div>
 
                     <div className="form-field">
                       <label>Email</label>
-                      <input value={form.email} disabled title="Địa chỉ email tài khoản không thể sửa đổi" />
+                      <input
+                        value={form.email}
+                        disabled
+                        title="Địa chỉ email tài khoản không thể sửa đổi"
+                      />
                     </div>
 
                     <div className="form-field">
@@ -776,7 +827,9 @@ export default function ReceptionistSettings() {
                       <input
                         value={form.phone}
                         placeholder="Số điện thoại..."
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, phone: e.target.value })
+                        }
                       />
                     </div>
 
@@ -785,16 +838,26 @@ export default function ReceptionistSettings() {
                       <input
                         value={form.position}
                         placeholder="Chức danh công tác..."
-                        onChange={(e) => setForm({ ...form, position: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, position: e.target.value })
+                        }
                       />
                     </div>
 
                     {/* Actions Inside Profile Info */}
                     <div className="form-actions">
-                      <button className="btn-action btn-save" onClick={saveSettings} disabled={saving}>
+                      <button
+                        className="btn-action btn-save"
+                        onClick={saveSettings}
+                        disabled={saving}
+                      >
                         {saving ? "Đang lưu..." : "✓ Lưu thay đổi"}
                       </button>
-                      <button className="btn-action btn-undo" type="button" onClick={handleUndo}>
+                      <button
+                        className="btn-action btn-undo"
+                        type="button"
+                        onClick={handleUndo}
+                      >
                         ↺ Hoàn tác
                       </button>
                     </div>
@@ -806,7 +869,10 @@ export default function ReceptionistSettings() {
               <section className="settings-card">
                 <h3 className="card-title">Thao tác nhanh</h3>
                 <div className="settings-list">
-                  <div className="list-item list-item-hoverable" onClick={() => setShowPasswordModal(true)}>
+                  <div
+                    className="list-item list-item-hoverable"
+                    onClick={() => setShowPasswordModal(true)}
+                  >
                     <div className="list-item-left">
                       <div className="icon-wrapper">🔑</div>
                       <div className="item-info">
@@ -869,7 +935,10 @@ export default function ReceptionistSettings() {
                 <div className="pref-grid">
                   <div className="form-field">
                     <label>Ngôn ngữ hiển thị</label>
-                    <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+                    <select
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
+                    >
                       <option value="vi">🌐 Tiếng Việt</option>
                       <option value="en">🌐 English</option>
                     </select>
@@ -877,15 +946,25 @@ export default function ReceptionistSettings() {
 
                   <div className="form-field">
                     <label>Múi giờ</label>
-                    <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
-                      <option value="gmt_7">⏰ (GMT+07:00) Bangkok, Hanoi</option>
-                      <option value="gmt_8">⏰ (GMT+08:00) Singapore, Beijing</option>
+                    <select
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                    >
+                      <option value="gmt_7">
+                        ⏰ (GMT+07:00) Bangkok, Hanoi
+                      </option>
+                      <option value="gmt_8">
+                        ⏰ (GMT+08:00) Singapore, Beijing
+                      </option>
                     </select>
                   </div>
 
                   <div className="form-field">
                     <label>Định dạng ngày</label>
-                    <select value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
+                    <select
+                      value={dateFormat}
+                      onChange={(e) => setDateFormat(e.target.value)}
+                    >
                       <option value="dd_mm_yyyy">📅 DD/MM/YYYY</option>
                       <option value="mm_dd_yyyy">📅 MM/DD/YYYY</option>
                     </select>
@@ -893,7 +972,10 @@ export default function ReceptionistSettings() {
 
                   <div className="form-field">
                     <label>Định dạng giờ</label>
-                    <select value={timeFormat} onChange={(e) => setTimeFormat(e.target.value)}>
+                    <select
+                      value={timeFormat}
+                      onChange={(e) => setTimeFormat(e.target.value)}
+                    >
                       <option value="24h">24 giờ (14:30)</option>
                       <option value="12h">12 giờ (02:30 PM)</option>
                     </select>
@@ -901,7 +983,17 @@ export default function ReceptionistSettings() {
                 </div>
 
                 <div style={{ marginTop: "14px" }}>
-                  <label style={{ fontSize: "0.75rem", fontWeight: "700", color: "#4A3E30", textTransform: "uppercase", letterSpacing: "0.02em" }}>Chủ đề giao diện</label>
+                  <label
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: "700",
+                      color: "#4A3E30",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    Chủ đề giao diện
+                  </label>
                   <div className="theme-selector">
                     <div
                       className={`theme-card ${theme === "light" ? "theme-card-selected" : ""}`}
@@ -942,7 +1034,10 @@ export default function ReceptionistSettings() {
                         <span>Cập nhật lần cuối: 15/05/2024</span>
                       </div>
                     </div>
-                    <button className="btn-security-action" onClick={() => setShowPasswordModal(true)}>
+                    <button
+                      className="btn-security-action"
+                      onClick={() => setShowPasswordModal(true)}
+                    >
                       Đổi mật khẩu
                     </button>
                   </div>
@@ -1059,21 +1154,60 @@ export default function ReceptionistSettings() {
 
         {/* Change Password Inline Modal */}
         {showPasswordModal && (
-          <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
+          <div
+            className="modal-overlay"
+            onClick={() => setShowPasswordModal(false)}
+          >
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h3 className="card-title" style={{ borderBottom: "none", marginBottom: "14px" }}>Thay đổi mật khẩu đăng nhập</h3>
-              
-              {pwErr && <div className="rc-alert rc-alert-error" style={{ padding: "8px 12px", fontSize: "0.8rem", marginBottom: "12px" }}>{pwErr}</div>}
-              {pwMsg && <div className="rc-alert rc-alert-success" style={{ padding: "8px 12px", fontSize: "0.8rem", marginBottom: "12px" }}>{pwMsg}</div>}
+              <h3
+                className="card-title"
+                style={{ borderBottom: "none", marginBottom: "14px" }}
+              >
+                Thay đổi mật khẩu đăng nhập
+              </h3>
 
-              <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {pwErr && (
+                <div
+                  className="rc-alert rc-alert-error"
+                  style={{
+                    padding: "8px 12px",
+                    fontSize: "0.8rem",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {pwErr}
+                </div>
+              )}
+              {pwMsg && (
+                <div
+                  className="rc-alert rc-alert-success"
+                  style={{
+                    padding: "8px 12px",
+                    fontSize: "0.8rem",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {pwMsg}
+                </div>
+              )}
+
+              <form
+                onSubmit={handleChangePassword}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                }}
+              >
                 <div className="form-field">
                   <label>Mật khẩu hiện tại</label>
                   <input
                     type="password"
                     required
                     value={pwForm.oldPw}
-                    onChange={(e) => setPwForm({ ...pwForm, oldPw: e.target.value })}
+                    onChange={(e) =>
+                      setPwForm({ ...pwForm, oldPw: e.target.value })
+                    }
                     placeholder="Nhập mật khẩu cũ..."
                   />
                 </div>
@@ -1084,7 +1218,9 @@ export default function ReceptionistSettings() {
                     type="password"
                     required
                     value={pwForm.newPw}
-                    onChange={(e) => setPwForm({ ...pwForm, newPw: e.target.value })}
+                    onChange={(e) =>
+                      setPwForm({ ...pwForm, newPw: e.target.value })
+                    }
                     placeholder="Tối thiểu 6 ký tự..."
                   />
                 </div>
@@ -1095,16 +1231,33 @@ export default function ReceptionistSettings() {
                     type="password"
                     required
                     value={pwForm.confirmPw}
-                    onChange={(e) => setPwForm({ ...pwForm, confirmPw: e.target.value })}
+                    onChange={(e) =>
+                      setPwForm({ ...pwForm, confirmPw: e.target.value })
+                    }
                     placeholder="Nhập lại mật khẩu mới..."
                   />
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
-                  <button className="btn-action btn-undo" type="button" onClick={() => setShowPasswordModal(false)}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: "10px",
+                    marginTop: "10px",
+                  }}
+                >
+                  <button
+                    className="btn-action btn-undo"
+                    type="button"
+                    onClick={() => setShowPasswordModal(false)}
+                  >
                     Hủy bỏ
                   </button>
-                  <button className="btn-action btn-save" type="submit" disabled={pwSaving}>
+                  <button
+                    className="btn-action btn-save"
+                    type="submit"
+                    disabled={pwSaving}
+                  >
                     {pwSaving ? "Đang lưu..." : "Xác nhận"}
                   </button>
                 </div>

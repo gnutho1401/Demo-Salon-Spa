@@ -29,16 +29,16 @@ const STATUS = [
 
 const translateStatus = (status) => {
   const statusMap = {
-    'PENDING_PAYMENT': 'Chờ thanh toán',
-    'PENDING': 'Đang chờ',
-    'PAID': 'Đã thanh toán',
-    'CONFIRMED': 'Đã xác nhận',
-    'CHECKED_IN': 'Đã check-in',
-    'IN_PROGRESS': 'Đang thực hiện',
-    'COMPLETED': 'Đã hoàn thành',
-    'CANCELLED': 'Đã hủy',
-    'REFUND_PENDING': 'Chờ hoàn tiền',
-    'NO_SHOW': 'Khách không đến'
+    PENDING_PAYMENT: "Chờ thanh toán",
+    PENDING: "Đang chờ",
+    PAID: "Đã thanh toán",
+    CONFIRMED: "Đã xác nhận",
+    CHECKED_IN: "Đã check-in",
+    IN_PROGRESS: "Đang thực hiện",
+    COMPLETED: "Đã hoàn thành",
+    CANCELLED: "Đã hủy",
+    REFUND_PENDING: "Chờ hoàn tiền",
+    NO_SHOW: "Khách không đến",
   };
   return statusMap[String(status).toUpperCase()] || status;
 };
@@ -119,7 +119,9 @@ export default function TechnicianAppointments() {
       );
     } catch (err) {
       setAppointments([]);
-      setError(err.response?.data?.message || "Không thể tải danh sách lịch hẹn");
+      setError(
+        err.response?.data?.message || "Không thể tải danh sách lịch hẹn",
+      );
     } finally {
       setLoading(false);
     }
@@ -161,10 +163,17 @@ export default function TechnicianAppointments() {
     }
   };
 
-  const completeAppointment = async (id, serviceId = null, customerPackageId = null) => {
+  const completeAppointment = async (
+    id,
+    serviceId = null,
+    customerPackageId = null,
+  ) => {
     try {
       if (customerPackageId) {
-        await axiosClient.patch(`/technician/appointments/${id}/complete-step`, { appointmentServiceId: serviceId });
+        await axiosClient.patch(
+          `/technician/appointments/${id}/complete-step`,
+          { appointmentServiceId: serviceId },
+        );
       } else {
         await axiosClient.patch(`/technician/appointments/${id}/complete`);
       }
@@ -175,7 +184,6 @@ export default function TechnicianAppointments() {
     }
   };
 
-
   const markNoShow = async (id) => {
     if (!window.confirm("Đánh dấu khách hàng này không đến (No-show)?")) return;
 
@@ -183,7 +191,9 @@ export default function TechnicianAppointments() {
       await axiosClient.patch(`/technician/appointments/${id}/no-show`);
       await refreshPage();
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể đánh dấu khách không đến");
+      alert(
+        err.response?.data?.message || "Không thể đánh dấu khách không đến",
+      );
     }
   };
 
@@ -210,7 +220,6 @@ export default function TechnicianAppointments() {
   return (
     <TechnicianLayout>
       <div className="tech-appointments-page">
-
         <style>{`
           /* Premium Style Upgrades for Technician Appointments */
           .tech-appointments-page {
@@ -664,12 +673,14 @@ export default function TechnicianAppointments() {
           }
         `}</style>
 
-
         <header className="tech-page-head" style={{ marginBottom: "28px" }}>
-
           <div>
-            <h1 style={{ fontSize: "32px", margin: 0, color: "#1f1a13" }}>Danh sách Lịch hẹn 🗓️</h1>
-            <p style={{ margin: "6px 0 0", color: "#6f665b" }}>Xem và xử lý các lịch hẹn chăm sóc làm đẹp được phân công cho bạn</p>
+            <h1 style={{ fontSize: "32px", margin: 0, color: "#1f1a13" }}>
+              Danh sách Lịch hẹn 🗓️
+            </h1>
+            <p style={{ margin: "6px 0 0", color: "#6f665b" }}>
+              Xem và xử lý các lịch hẹn chăm sóc làm đẹp được phân công cho bạn
+            </p>
           </div>
 
           <button
@@ -680,9 +691,34 @@ export default function TechnicianAppointments() {
           </button>
         </header>
 
-        <section className="appt-filter-bar" style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 1.5fr", gap: "16px", marginBottom: "24px" }}>
-          <div className="appt-filter-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <span style={{ fontSize: "12px", fontWeight: "bold", color: "#8a7d6b", textTransform: "uppercase", marginBottom: "4px" }}>📅 Khoảng ngày</span>
+        <section
+          className="appt-filter-bar"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.2fr 0.8fr 1.5fr",
+            gap: "16px",
+            marginBottom: "24px",
+          }}
+        >
+          <div
+            className="appt-filter-card"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: "bold",
+                color: "#8a7d6b",
+                textTransform: "uppercase",
+                marginBottom: "4px",
+              }}
+            >
+              📅 Khoảng ngày
+            </span>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <input
                 type="date"
@@ -691,7 +727,14 @@ export default function TechnicianAppointments() {
                   setStartDate(e.target.value);
                   setPage(1);
                 }}
-                style={{ border: "none", outline: "none", fontWeight: "bold", background: "transparent", color: "#102616", fontSize: "14px" }}
+                style={{
+                  border: "none",
+                  outline: "none",
+                  fontWeight: "bold",
+                  background: "transparent",
+                  color: "#102616",
+                  fontSize: "14px",
+                }}
               />
               <span style={{ color: "#8a7d6b" }}>→</span>
               <input
@@ -701,13 +744,37 @@ export default function TechnicianAppointments() {
                   setEndDate(e.target.value);
                   setPage(1);
                 }}
-                style={{ border: "none", outline: "none", fontWeight: "bold", background: "transparent", color: "#102616", fontSize: "14px" }}
+                style={{
+                  border: "none",
+                  outline: "none",
+                  fontWeight: "bold",
+                  background: "transparent",
+                  color: "#102616",
+                  fontSize: "14px",
+                }}
               />
             </div>
           </div>
 
-          <div className="appt-filter-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <span style={{ fontSize: "12px", fontWeight: "bold", color: "#8a7d6b", textTransform: "uppercase", marginBottom: "4px" }}>🛡 Trạng thái</span>
+          <div
+            className="appt-filter-card"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: "bold",
+                color: "#8a7d6b",
+                textTransform: "uppercase",
+                marginBottom: "4px",
+              }}
+            >
+              🛡 Trạng thái
+            </span>
             <select
               value={status}
               onChange={(e) => {
@@ -715,7 +782,16 @@ export default function TechnicianAppointments() {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              style={{ border: "none", outline: "none", fontWeight: "bold", background: "transparent", color: "#102616", fontSize: "14px", width: "100%", cursor: "pointer" }}
+              style={{
+                border: "none",
+                outline: "none",
+                fontWeight: "bold",
+                background: "transparent",
+                color: "#102616",
+                fontSize: "14px",
+                width: "100%",
+                cursor: "pointer",
+              }}
             >
               {STATUS.map((x) => (
                 <option key={x} value={x}>
@@ -732,7 +808,11 @@ export default function TechnicianAppointments() {
               setPage(1);
               loadAppointments();
             }}
-            style={{ display: "flex", alignItems: "center", position: "relative" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              position: "relative",
+            }}
           >
             <input
               value={search}
@@ -741,15 +821,43 @@ export default function TechnicianAppointments() {
                 setPage(1);
               }}
               placeholder="Tìm khách hàng, số điện thoại, mã lịch hẹn..."
-              style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontWeight: "bold", color: "#102616", fontSize: "14px" }}
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontWeight: "bold",
+                color: "#102616",
+                fontSize: "14px",
+              }}
             />
-            <button type="submit" style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "16px" }}>🔍</button>
+            <button
+              type="submit"
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                fontSize: "16px",
+              }}
+            >
+              🔍
+            </button>
           </form>
         </section>
 
         <section className="appointments-layout">
           <main>
-            <div className="appt-tabs" style={{ display: "flex", gap: "8px", background: "rgba(255, 252, 246, 0.85)", borderRadius: "18px 18px 0 0", padding: "10px", borderBottom: "none" }}>
+            <div
+              className="appt-tabs"
+              style={{
+                display: "flex",
+                gap: "8px",
+                background: "rgba(255, 252, 246, 0.85)",
+                borderRadius: "18px 18px 0 0",
+                padding: "10px",
+                borderBottom: "none",
+              }}
+            >
               <button
                 className={activeTab === "ALL" ? "active" : ""}
                 onClick={() => {
@@ -758,7 +866,20 @@ export default function TechnicianAppointments() {
                   setPage(1);
                 }}
               >
-                Tất cả lịch hẹn <span style={{ marginLeft: "6px", background: activeTab === "ALL" ? "rgba(255,255,255,0.2)" : "#efe3c4", color: activeTab === "ALL" ? "white" : "#173516", padding: "2px 8px", borderRadius: "999px", fontSize: "12px" }}>{pagination.total || 0}</span>
+                Tất cả lịch hẹn{" "}
+                <span
+                  style={{
+                    marginLeft: "6px",
+                    background:
+                      activeTab === "ALL" ? "rgba(255,255,255,0.2)" : "#efe3c4",
+                    color: activeTab === "ALL" ? "white" : "#173516",
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    fontSize: "12px",
+                  }}
+                >
+                  {pagination.total || 0}
+                </span>
               </button>
 
               <button
@@ -800,8 +921,20 @@ export default function TechnicianAppointments() {
 
             {error && <div className="tech-error">{error}</div>}
 
-            <div className="appointments-table-card" style={{ background: "rgba(255, 252, 246, 0.96)", border: "1px solid rgba(222, 203, 166, 0.55)", borderRadius: "0 0 22px 22px", boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)", overflow: "hidden" }}>
-              <table className="appointments-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div
+              className="appointments-table-card"
+              style={{
+                background: "rgba(255, 252, 246, 0.96)",
+                border: "1px solid rgba(222, 203, 166, 0.55)",
+                borderRadius: "0 0 22px 22px",
+                boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)",
+                overflow: "hidden",
+              }}
+            >
+              <table
+                className="appointments-table"
+                style={{ width: "100%", borderCollapse: "collapse" }}
+              >
                 <thead>
                   <tr style={{ background: "rgba(244, 234, 218, 0.3)" }}>
                     <th>Mã lịch hẹn</th>
@@ -817,25 +950,55 @@ export default function TechnicianAppointments() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: "center", padding: "40px", color: "#6f665b" }}>Đang tải lịch hẹn...</td>
+                      <td
+                        colSpan="7"
+                        style={{
+                          textAlign: "center",
+                          padding: "40px",
+                          color: "#6f665b",
+                        }}
+                      >
+                        Đang tải lịch hẹn...
+                      </td>
                     </tr>
                   ) : appointments.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: "center", padding: "40px", color: "#6f665b" }}>Không tìm thấy lịch hẹn nào trong thời gian này</td>
+                      <td
+                        colSpan="7"
+                        style={{
+                          textAlign: "center",
+                          padding: "40px",
+                          color: "#6f665b",
+                        }}
+                      >
+                        Không tìm thấy lịch hẹn nào trong thời gian này
+                      </td>
                     </tr>
                   ) : (
                     appointments.map((a) => {
                       const service = serviceText(a.ServiceName);
 
                       return (
-                        <tr key={a.AppointmentId} style={{ transition: "all 0.2s ease" }}>
+                        <tr
+                          key={a.AppointmentId}
+                          style={{ transition: "all 0.2s ease" }}
+                        >
                           <td>
                             <div className="appt-code-cell">
                               <div>
                                 <b style={{ color: "#102616" }}>
-                                  {a.AppointmentCode || `#APT-${a.AppointmentId}`}
+                                  {a.AppointmentCode ||
+                                    `#APT-${a.AppointmentId}`}
                                 </b>
-                                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6f665b" }}>{String(a.StartTime || "").slice(0, 5)}</p>
+                                <p
+                                  style={{
+                                    margin: "2px 0 0",
+                                    fontSize: "12px",
+                                    color: "#6f665b",
+                                  }}
+                                >
+                                  {String(a.StartTime || "").slice(0, 5)}
+                                </p>
                               </div>
                             </div>
                           </td>
@@ -846,7 +1009,10 @@ export default function TechnicianAppointments() {
                                 <img
                                   src={avatar(a.CustomerAvatar)}
                                   alt={a.CustomerName || "Khách hàng"}
-                                  style={{ borderRadius: "50%", objectFit: "cover" }}
+                                  style={{
+                                    borderRadius: "50%",
+                                    objectFit: "cover",
+                                  }}
                                   onError={(e) => {
                                     e.currentTarget.src = DEFAULT_AVATAR;
                                   }}
@@ -854,9 +1020,29 @@ export default function TechnicianAppointments() {
                               </div>
 
                               <div>
-                                <b style={{ color: "#102616" }}>{a.CustomerName || "Khách vãng lai"}</b>
-                                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6f665b" }}>{a.CustomerPhone || "Không có SĐT"}</p>
-                                <small style={{ display: "inline-block", marginTop: "4px", fontSize: "10px", background: "#f5e5c7", color: "#8b651e", padding: "2px 6px", borderRadius: "6px" }}>
+                                <b style={{ color: "#102616" }}>
+                                  {a.CustomerName || "Khách vãng lai"}
+                                </b>
+                                <p
+                                  style={{
+                                    margin: "2px 0 0",
+                                    fontSize: "12px",
+                                    color: "#6f665b",
+                                  }}
+                                >
+                                  {a.CustomerPhone || "Không có SĐT"}
+                                </p>
+                                <small
+                                  style={{
+                                    display: "inline-block",
+                                    marginTop: "4px",
+                                    fontSize: "10px",
+                                    background: "#f5e5c7",
+                                    color: "#8b651e",
+                                    padding: "2px 6px",
+                                    borderRadius: "6px",
+                                  }}
+                                >
                                   {a.MembershipLevel || "Hội viên thường"}
                                 </small>
                               </div>
@@ -865,14 +1051,30 @@ export default function TechnicianAppointments() {
 
                           <td>
                             <b style={{ color: "#102616" }}>{service.main}</b>
-                            {service.more && <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#8b651e" }}>{service.more}</p>}
+                            {service.more && (
+                              <p
+                                style={{
+                                  margin: "2px 0 0",
+                                  fontSize: "12px",
+                                  color: "#8b651e",
+                                }}
+                              >
+                                {service.more}
+                              </p>
+                            )}
                           </td>
 
                           <td>
                             <b style={{ color: "#102616" }}>
                               {safeDateString(a.AppointmentDate)}
                             </b>
-                            <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#6f665b" }}>
+                            <p
+                              style={{
+                                margin: "2px 0 0",
+                                fontSize: "12px",
+                                color: "#6f665b",
+                              }}
+                            >
                               {String(a.StartTime || "").slice(0, 5)} -{" "}
                               {String(a.EndTime || "").slice(0, 5)}
                             </p>
@@ -891,7 +1093,10 @@ export default function TechnicianAppointments() {
                           </td>
 
                           <td>
-                            <div className="appt-actions" style={{ display: "flex", gap: "4px" }}>
+                            <div
+                              className="appt-actions"
+                              style={{ display: "flex", gap: "4px" }}
+                            >
                               <button
                                 title="Chi tiết lịch hẹn"
                                 onClick={() =>
@@ -899,9 +1104,12 @@ export default function TechnicianAppointments() {
                                     `/technician/appointments/${a.AppointmentId}?serviceId=${a.ServiceId || a.AppointmentServiceId || ""}`,
                                   )
                                 }
-                                style={{ border: "1px solid #eadfca", background: "white", cursor: "pointer" }}
+                                style={{
+                                  border: "1px solid #eadfca",
+                                  background: "white",
+                                  cursor: "pointer",
+                                }}
                               >
-
                                 👁
                               </button>
 
@@ -913,7 +1121,12 @@ export default function TechnicianAppointments() {
                                   onClick={() =>
                                     startAppointment(a.AppointmentId)
                                   }
-                                  style={{ border: "none", background: "#24431f", color: "white", cursor: "pointer" }}
+                                  style={{
+                                    border: "none",
+                                    background: "#24431f",
+                                    color: "white",
+                                    cursor: "pointer",
+                                  }}
                                 >
                                   ▶
                                 </button>
@@ -923,14 +1136,22 @@ export default function TechnicianAppointments() {
                                 <button
                                   title="Hoàn thành dịch vụ"
                                   onClick={() =>
-                                    completeAppointment(a.AppointmentId, a.ServiceId || a.AppointmentServiceId, a.CustomerPackageId)
+                                    completeAppointment(
+                                      a.AppointmentId,
+                                      a.ServiceId || a.AppointmentServiceId,
+                                      a.CustomerPackageId,
+                                    )
                                   }
-                                  style={{ border: "none", background: "#e5aa3d", color: "white", cursor: "pointer" }}
+                                  style={{
+                                    border: "none",
+                                    background: "#e5aa3d",
+                                    color: "white",
+                                    cursor: "pointer",
+                                  }}
                                 >
                                   ✅
                                 </button>
                               )}
-
 
                               {["CONFIRMED", "PAID", "CHECKED_IN"].includes(
                                 a.Status,
@@ -938,7 +1159,12 @@ export default function TechnicianAppointments() {
                                 <button
                                   title="Khách không đến"
                                   onClick={() => markNoShow(a.AppointmentId)}
-                                  style={{ border: "1px solid #e46d5b", background: "#fff8f6", color: "#c73628", cursor: "pointer" }}
+                                  style={{
+                                    border: "1px solid #e46d5b",
+                                    background: "#fff8f6",
+                                    color: "#c73628",
+                                    cursor: "pointer",
+                                  }}
                                 >
                                   🚫
                                 </button>
@@ -952,23 +1178,51 @@ export default function TechnicianAppointments() {
                 </tbody>
               </table>
 
-
-              <div className="appt-pagination" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", borderTop: "1px solid #eadfca" }}>
+              <div
+                className="appt-pagination"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "16px",
+                  borderTop: "1px solid #eadfca",
+                }}
+              >
                 <span style={{ fontSize: "14px", color: "#6f665b" }}>
-                  Hiển thị {appointments.length} trên tổng số {pagination.total || 0}{" "}
-                  lịch hẹn
+                  Hiển thị {appointments.length} trên tổng số{" "}
+                  {pagination.total || 0} lịch hẹn
                 </span>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                >
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                    style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #eadfca", background: "white", cursor: page <= 1 ? "not-allowed" : "pointer", opacity: page <= 1 ? 0.5 : 1 }}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #eadfca",
+                      background: "white",
+                      cursor: page <= 1 ? "not-allowed" : "pointer",
+                      opacity: page <= 1 ? 0.5 : 1,
+                    }}
                   >
                     ‹
                   </button>
 
-                  <b style={{ padding: "6px 12px", borderRadius: "8px", background: "#173516", color: "white", minWidth: "32px", textAlign: "center" }}>{page}</b>
+                  <b
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "8px",
+                      background: "#173516",
+                      color: "white",
+                      minWidth: "32px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {page}
+                  </b>
 
                   <button
                     disabled={page >= (pagination.totalPages || 1)}
@@ -977,7 +1231,17 @@ export default function TechnicianAppointments() {
                         Math.min(prev + 1, pagination.totalPages || 1),
                       )
                     }
-                    style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #eadfca", background: "white", cursor: page >= (pagination.totalPages || 1) ? "not-allowed" : "pointer", opacity: page >= (pagination.totalPages || 1) ? 0.5 : 1 }}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #eadfca",
+                      background: "white",
+                      cursor:
+                        page >= (pagination.totalPages || 1)
+                          ? "not-allowed"
+                          : "pointer",
+                      opacity: page >= (pagination.totalPages || 1) ? 0.5 : 1,
+                    }}
                   >
                     ›
                   </button>
@@ -986,44 +1250,158 @@ export default function TechnicianAppointments() {
             </div>
           </main>
 
-          <aside className="appointments-side" style={{ display: "grid", gap: "18px" }}>
-            <div className="appt-side-card" style={{ background: "rgba(255, 252, 246, 0.96)", border: "1px solid rgba(222, 203, 166, 0.55)", borderRadius: "22px", padding: "20px", boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)" }}>
-              <div className="side-title" style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
-                <h3 style={{ margin: 0, fontSize: "18px" }}>Tóm tắt lịch hẹn</h3>
-                <span style={{ fontSize: "12px", color: "#8b651e" }}>Thời gian chọn</span>
+          <aside
+            className="appointments-side"
+            style={{ display: "grid", gap: "18px" }}
+          >
+            <div
+              className="appt-side-card"
+              style={{
+                background: "rgba(255, 252, 246, 0.96)",
+                border: "1px solid rgba(222, 203, 166, 0.55)",
+                borderRadius: "22px",
+                padding: "20px",
+                boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)",
+              }}
+            >
+              <div
+                className="side-title"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "16px",
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: "18px" }}>
+                  Tóm tắt lịch hẹn
+                </h3>
+                <span style={{ fontSize: "12px", color: "#8b651e" }}>
+                  Thời gian chọn
+                </span>
               </div>
 
-              <div className="summary-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div style={{ background: "#faf4e9", padding: "14px", borderRadius: "14px" }}>
+              <div
+                className="summary-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    background: "#faf4e9",
+                    padding: "14px",
+                    borderRadius: "14px",
+                  }}
+                >
                   <span style={{ fontSize: "20px" }}>📅</span>
-                  <b style={{ display: "block", fontSize: "22px", margin: "6px 0 2px" }}>{s.totalAppointments || 0}</b>
-                  <p style={{ margin: 0, fontSize: "12px", color: "#756a5c" }}>Tổng số lịch hẹn</p>
+                  <b
+                    style={{
+                      display: "block",
+                      fontSize: "22px",
+                      margin: "6px 0 2px",
+                    }}
+                  >
+                    {s.totalAppointments || 0}
+                  </b>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#756a5c" }}>
+                    Tổng số lịch hẹn
+                  </p>
                 </div>
 
-                <div style={{ background: "#faf4e9", padding: "14px", borderRadius: "14px" }}>
+                <div
+                  style={{
+                    background: "#faf4e9",
+                    padding: "14px",
+                    borderRadius: "14px",
+                  }}
+                >
                   <span style={{ fontSize: "20px" }}>🔄</span>
-                  <b style={{ display: "block", fontSize: "22px", margin: "6px 0 2px" }}>{s.inProgress || 0}</b>
-                  <p style={{ margin: 0, fontSize: "12px", color: "#756a5c" }}>Đang thực hiện</p>
+                  <b
+                    style={{
+                      display: "block",
+                      fontSize: "22px",
+                      margin: "6px 0 2px",
+                    }}
+                  >
+                    {s.inProgress || 0}
+                  </b>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#756a5c" }}>
+                    Đang thực hiện
+                  </p>
                 </div>
 
-                <div style={{ background: "#faf4e9", padding: "14px", borderRadius: "14px" }}>
+                <div
+                  style={{
+                    background: "#faf4e9",
+                    padding: "14px",
+                    borderRadius: "14px",
+                  }}
+                >
                   <span style={{ fontSize: "20px" }}>✅</span>
-                  <b style={{ display: "block", fontSize: "22px", margin: "6px 0 2px" }}>{s.completed || 0}</b>
-                  <p style={{ margin: 0, fontSize: "12px", color: "#756a5c" }}>Đã hoàn thành</p>
+                  <b
+                    style={{
+                      display: "block",
+                      fontSize: "22px",
+                      margin: "6px 0 2px",
+                    }}
+                  >
+                    {s.completed || 0}
+                  </b>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#756a5c" }}>
+                    Đã hoàn thành
+                  </p>
                 </div>
 
-                <div style={{ background: "#faf4e9", padding: "14px", borderRadius: "14px" }}>
+                <div
+                  style={{
+                    background: "#faf4e9",
+                    padding: "14px",
+                    borderRadius: "14px",
+                  }}
+                >
                   <span style={{ fontSize: "20px" }}>🚫</span>
-                  <b style={{ display: "block", fontSize: "22px", margin: "6px 0 2px" }}>{s.noShow || 0}</b>
-                  <p style={{ margin: 0, fontSize: "12px", color: "#756a5c" }}>Khách không đến</p>
+                  <b
+                    style={{
+                      display: "block",
+                      fontSize: "22px",
+                      margin: "6px 0 2px",
+                    }}
+                  >
+                    {s.noShow || 0}
+                  </b>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#756a5c" }}>
+                    Khách không đến
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="appt-side-card" style={{ background: "rgba(255, 252, 246, 0.96)", border: "1px solid rgba(222, 203, 166, 0.55)", borderRadius: "22px", padding: "20px", boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)" }}>
-              <div className="side-title" style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
-                <h3 style={{ margin: 0, fontSize: "18px" }}>Trạng thái tổng quan</h3>
-                <span style={{ fontSize: "12px", color: "#8b651e" }}>Biểu đồ</span>
+            <div
+              className="appt-side-card"
+              style={{
+                background: "rgba(255, 252, 246, 0.96)",
+                border: "1px solid rgba(222, 203, 166, 0.55)",
+                borderRadius: "22px",
+                padding: "20px",
+                boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)",
+              }}
+            >
+              <div
+                className="side-title"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "16px",
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: "18px" }}>
+                  Trạng thái tổng quan
+                </h3>
+                <span style={{ fontSize: "12px", color: "#8b651e" }}>
+                  Biểu đồ
+                </span>
               </div>
 
               {pieData.length > 0 ? (
@@ -1051,32 +1429,92 @@ export default function TechnicianAppointments() {
                         />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value, name) => [value, `Lịch hẹn: ${name}`]} />
+                    <Tooltip
+                      formatter={(value, name) => [value, `Lịch hẹn: ${name}`]}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <p style={{ textAlign: "center", color: "#6f665b", padding: "30px 0" }}>Chưa có dữ liệu trạng thái</p>
+                <p
+                  style={{
+                    textAlign: "center",
+                    color: "#6f665b",
+                    padding: "30px 0",
+                  }}
+                >
+                  Chưa có dữ liệu trạng thái
+                </p>
               )}
             </div>
 
-            <div className="appt-side-card" style={{ background: "rgba(255, 252, 246, 0.96)", border: "1px solid rgba(222, 203, 166, 0.55)", borderRadius: "22px", padding: "20px", boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)" }}>
-              <div className="side-title" style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
-                <h3 style={{ margin: 0, fontSize: "18px" }}>Dịch vụ ưa chuộng</h3>
-                <span style={{ fontSize: "12px", color: "#8b651e" }}>Liệu trình hot</span>
+            <div
+              className="appt-side-card"
+              style={{
+                background: "rgba(255, 252, 246, 0.96)",
+                border: "1px solid rgba(222, 203, 166, 0.55)",
+                borderRadius: "22px",
+                padding: "20px",
+                boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)",
+              }}
+            >
+              <div
+                className="side-title"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "16px",
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: "18px" }}>
+                  Dịch vụ ưa chuộng
+                </h3>
+                <span style={{ fontSize: "12px", color: "#8b651e" }}>
+                  Liệu trình hot
+                </span>
               </div>
 
               <div style={{ display: "grid", gap: "12px" }}>
                 {(summaryData.popularServices || []).length === 0 ? (
-                  <p style={{ textAlign: "center", color: "#6f665b", padding: "20px 0" }}>Chưa có số liệu dịch vụ</p>
+                  <p
+                    style={{
+                      textAlign: "center",
+                      color: "#6f665b",
+                      padding: "20px 0",
+                    }}
+                  >
+                    Chưa có số liệu dịch vụ
+                  </p>
                 ) : (
                   (summaryData.popularServices || []).map((item) => (
-                    <div className="popular-service-row" key={item.ServiceName} style={{ display: "grid", gap: "4px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                        <span style={{ color: "#102616", fontWeight: "bold" }}>✿ {item.ServiceName}</span>
-                        <span style={{ color: "#6f665b" }}>{item.Total} lịch hẹn</span>
+                    <div
+                      className="popular-service-row"
+                      key={item.ServiceName}
+                      style={{ display: "grid", gap: "4px" }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <span style={{ color: "#102616", fontWeight: "bold" }}>
+                          ✿ {item.ServiceName}
+                        </span>
+                        <span style={{ color: "#6f665b" }}>
+                          {item.Total} lịch hẹn
+                        </span>
                       </div>
 
-                      <div className="popular-bar" style={{ height: "6px", background: "#eee4d2", borderRadius: "10px", overflow: "hidden" }}>
+                      <div
+                        className="popular-bar"
+                        style={{
+                          height: "6px",
+                          background: "#eee4d2",
+                          borderRadius: "10px",
+                          overflow: "hidden",
+                        }}
+                      >
                         <i
                           style={{
                             display: "block",
@@ -1092,13 +1530,40 @@ export default function TechnicianAppointments() {
               </div>
             </div>
 
-            <div className="appt-side-card" style={{ background: "rgba(255, 252, 246, 0.96)", border: "1px solid rgba(222, 203, 166, 0.55)", borderRadius: "22px", padding: "20px", boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)" }}>
-              <h3 style={{ margin: "0 0 16px", fontSize: "18px" }}>Hành động nhanh</h3>
+            <div
+              className="appt-side-card"
+              style={{
+                background: "rgba(255, 252, 246, 0.96)",
+                border: "1px solid rgba(222, 203, 166, 0.55)",
+                borderRadius: "22px",
+                padding: "20px",
+                boxShadow: "0 16px 35px rgba(95, 72, 35, 0.08)",
+              }}
+            >
+              <h3 style={{ margin: "0 0 16px", fontSize: "18px" }}>
+                Hành động nhanh
+              </h3>
 
-              <div className="appt-quick-actions" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <button 
+              <div
+                className="appt-quick-actions"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "10px",
+                }}
+              >
+                <button
                   onClick={() => navigate("/technician/schedule")}
-                  style={{ border: "none", background: "#f4ead7", color: "#173516", fontWeight: "bold", padding: "14px", borderRadius: "14px", cursor: "pointer", transition: "all 0.2s" }}
+                  style={{
+                    border: "none",
+                    background: "#f4ead7",
+                    color: "#173516",
+                    fontWeight: "bold",
+                    padding: "14px",
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
                 >
                   📅 Lịch làm việc
                 </button>
@@ -1109,7 +1574,16 @@ export default function TechnicianAppointments() {
                     setStatus("CHECKED_IN");
                     setPage(1);
                   }}
-                  style={{ border: "none", background: "#f4ead7", color: "#173516", fontWeight: "bold", padding: "14px", borderRadius: "14px", cursor: "pointer", transition: "all 0.2s" }}
+                  style={{
+                    border: "none",
+                    background: "#f4ead7",
+                    color: "#173516",
+                    fontWeight: "bold",
+                    padding: "14px",
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
                 >
                   ✅ Sẵn sàng làm
                 </button>
@@ -1120,14 +1594,32 @@ export default function TechnicianAppointments() {
                     setStatus("IN_PROGRESS");
                     setPage(1);
                   }}
-                  style={{ border: "none", background: "#f4ead7", color: "#173516", fontWeight: "bold", padding: "14px", borderRadius: "14px", cursor: "pointer", transition: "all 0.2s" }}
+                  style={{
+                    border: "none",
+                    background: "#f4ead7",
+                    color: "#173516",
+                    fontWeight: "bold",
+                    padding: "14px",
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
                 >
                   🔄 Đang làm
                 </button>
 
-                <button 
+                <button
                   onClick={() => navigate("/technician/customers")}
-                  style={{ border: "none", background: "#f4ead7", color: "#173516", fontWeight: "bold", padding: "14px", borderRadius: "14px", cursor: "pointer", transition: "all 0.2s" }}
+                  style={{
+                    border: "none",
+                    background: "#f4ead7",
+                    color: "#173516",
+                    fontWeight: "bold",
+                    padding: "14px",
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
                 >
                   🔎 Tìm khách hàng
                 </button>

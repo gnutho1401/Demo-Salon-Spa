@@ -44,17 +44,22 @@ export default function TechnicianDispatcher() {
           try {
             const wlRes = await axiosClient.get(
               `/receptionist/technicians/${tech.TechnicianId}/workload`,
-              { params: { date } }
+              { params: { date } },
             );
             workloadMap[tech.TechnicianId] = wlRes.data.data || wlRes.data;
           } catch (e) {
-            console.error(`Failed to load workload for tech #${tech.TechnicianId}:`, e);
+            console.error(
+              `Failed to load workload for tech #${tech.TechnicianId}:`,
+              e,
+            );
           }
-        })
+        }),
       );
       setWorkloads(workloadMap);
     } catch (err) {
-      setError(err.response?.data?.message || "Không tải được danh sách kỹ thuật viên");
+      setError(
+        err.response?.data?.message || "Không tải được danh sách kỹ thuật viên",
+      );
     } finally {
       setLoading(false);
     }
@@ -78,7 +83,7 @@ export default function TechnicianDispatcher() {
 
     if (
       !window.confirm(
-        "Bạn có chắc muốn chuyển giao toàn bộ ca hẹn chưa hoàn tất của chuyên viên này ngày hôm nay sang chuyên viên dự phòng?"
+        "Bạn có chắc muốn chuyển giao toàn bộ ca hẹn chưa hoàn tất của chuyên viên này ngày hôm nay sang chuyên viên dự phòng?",
       )
     ) {
       return;
@@ -96,13 +101,13 @@ export default function TechnicianDispatcher() {
           fromTechnicianId: Number(fromTechId),
           toTechnicianId: Number(toTechId),
           date,
-        }
+        },
       );
 
       const report = res.data.data || res.data;
       setTransferReport(report);
       setSuccess(
-        `Đã hoàn tất chuyển giao! Thành công: ${report.successCount} ca, Thất bại: ${report.failedCount} ca.`
+        `Đã hoàn tất chuyển giao! Thành công: ${report.successCount} ca, Thất bại: ${report.failedCount} ca.`,
       );
       // Reload page workloads
       await loadData();
@@ -405,7 +410,10 @@ export default function TechnicianDispatcher() {
         <div className="disp-header">
           <div className="disp-title">
             <h2>Bảng Điều phối Kỹ thuật viên & Tải trọng</h2>
-            <p>Phân công kỹ thuật viên dự phòng khi nghỉ phép hoặc xử lý các ca quá tải.</p>
+            <p>
+              Phân công kỹ thuật viên dự phòng khi nghỉ phép hoặc xử lý các ca
+              quá tải.
+            </p>
           </div>
 
           <div className="disp-controls">
@@ -432,25 +440,56 @@ export default function TechnicianDispatcher() {
 
         {/* Alerts */}
         {error && <div className="disp-status-alert error">❌ {error}</div>}
-        {success && <div className="disp-status-alert success">✅ {success}</div>}
+        {success && (
+          <div className="disp-status-alert success">✅ {success}</div>
+        )}
 
         {/* Report summary if transfer completed */}
         {transferReport && (
-          <div style={{
-            background: "#fff",
-            border: "1px solid #e5e7eb",
-            borderRadius: "12px",
-            padding: "20px",
-            marginBottom: "24px"
-          }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: "1.1rem", fontWeight: "bold" }}>📝 Báo cáo Chuyển giao Lịch hẹn</h3>
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: "12px",
+              padding: "20px",
+              marginBottom: "24px",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 12px",
+                fontSize: "1.1rem",
+                fontWeight: "bold",
+              }}
+            >
+              📝 Báo cáo Chuyển giao Lịch hẹn
+            </h3>
             <div style={{ display: "flex", gap: "24px", marginBottom: "16px" }}>
-              <span>Thành công: <strong style={{ color: "#166534" }}>{transferReport.successCount} ca</strong></span>
-              <span>Bị loại trừ (thất bại): <strong style={{ color: "#991b1b" }}>{transferReport.failedCount} ca</strong></span>
+              <span>
+                Thành công:{" "}
+                <strong style={{ color: "#166534" }}>
+                  {transferReport.successCount} ca
+                </strong>
+              </span>
+              <span>
+                Bị loại trừ (thất bại):{" "}
+                <strong style={{ color: "#991b1b" }}>
+                  {transferReport.failedCount} ca
+                </strong>
+              </span>
             </div>
             {transferReport.failures && transferReport.failures.length > 0 ? (
               <div>
-                <span style={{ fontSize: "0.85rem", fontWeight: "bold", color: "#6b7280" }}>Danh sách các ca gặp lỗi trùng lịch / thiếu kỹ năng chuyên môn:</span>
+                <span
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: "bold",
+                    color: "#6b7280",
+                  }}
+                >
+                  Danh sách các ca gặp lỗi trùng lịch / thiếu kỹ năng chuyên
+                  môn:
+                </span>
                 <table className="disp-table">
                   <thead>
                     <tr>
@@ -462,7 +501,9 @@ export default function TechnicianDispatcher() {
                   <tbody>
                     {transferReport.failures.map((f, idx) => (
                       <tr key={idx}>
-                        <td><strong>#{f.appointmentId}</strong></td>
+                        <td>
+                          <strong>#{f.appointmentId}</strong>
+                        </td>
                         <td className="disp-appt-time">{f.startTime}</td>
                         <td style={{ color: "#ef4444" }}>{f.reason}</td>
                       </tr>
@@ -471,15 +512,22 @@ export default function TechnicianDispatcher() {
                 </table>
               </div>
             ) : (
-              <p style={{ color: "#166534", fontSize: "0.875rem", margin: 0 }}>🎉 Tất cả các ca đã được chuyển giao an toàn không gặp xung đột nào.</p>
+              <p style={{ color: "#166534", fontSize: "0.875rem", margin: 0 }}>
+                🎉 Tất cả các ca đã được chuyển giao an toàn không gặp xung đột
+                nào.
+              </p>
             )}
           </div>
         )}
 
         {/* Grid loading state */}
         {loading ? (
-          <div style={{ padding: "80px 0", textAlign: "center", color: "#6b7280" }}>
-            <span style={{ fontSize: "1.2rem" }}>⏳ Đang quét tải trọng và lịch trực KTV ngày {date}...</span>
+          <div
+            style={{ padding: "80px 0", textAlign: "center", color: "#6b7280" }}
+          >
+            <span style={{ fontSize: "1.2rem" }}>
+              ⏳ Đang quét tải trọng và lịch trực KTV ngày {date}...
+            </span>
           </div>
         ) : (
           <div className="disp-grid">
@@ -510,7 +558,10 @@ export default function TechnicianDispatcher() {
               }
 
               return (
-                <div key={tech.TechnicianId} className={`disp-card ${wl.isDayOff ? "day-off" : ""}`}>
+                <div
+                  key={tech.TechnicianId}
+                  className={`disp-card ${wl.isDayOff ? "day-off" : ""}`}
+                >
                   <div className="disp-card-header">
                     <img
                       className="disp-avatar"
@@ -523,25 +574,41 @@ export default function TechnicianDispatcher() {
                     <div className="disp-tech-info">
                       <b>{tech.FullName}</b>
                       <span>{tech.Specialization || "Kỹ thuật viên"}</span>
-                      <span className={`disp-workload-tag ${tagClass}`}>{tagText}</span>
+                      <span className={`disp-workload-tag ${tagClass}`}>
+                        {tagText}
+                      </span>
                     </div>
                   </div>
 
                   <div className="disp-card-body">
-                    <div className="disp-body-title">Lịch hẹn trong ngày ({wl.totalAppointments})</div>
+                    <div className="disp-body-title">
+                      Lịch hẹn trong ngày ({wl.totalAppointments})
+                    </div>
                     {wl.appointments.length === 0 ? (
                       <div className="disp-empty">
-                        {wl.isDayOff ? "💤 Nghỉ phép trọn ngày" : "📭 Không có lịch hẹn nào"}
+                        {wl.isDayOff
+                          ? "💤 Nghỉ phép trọn ngày"
+                          : "📭 Không có lịch hẹn nào"}
                       </div>
                     ) : (
                       <ul className="disp-appt-list">
                         {wl.appointments.map((appt) => (
-                          <li key={appt.AppointmentId} className="disp-appt-item">
+                          <li
+                            key={appt.AppointmentId}
+                            className="disp-appt-item"
+                          >
                             <div>
                               <span className="disp-appt-time">
-                                {String(appt.StartTime).slice(0, 5)} - {String(appt.EndTime).slice(0, 5)}
+                                {String(appt.StartTime).slice(0, 5)} -{" "}
+                                {String(appt.EndTime).slice(0, 5)}
                               </span>
-                              <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "2px" }}>
+                              <div
+                                style={{
+                                  fontSize: "0.75rem",
+                                  color: "#6b7280",
+                                  marginTop: "2px",
+                                }}
+                              >
                                 Ca hẹn #{appt.AppointmentId}
                               </div>
                             </div>
@@ -566,12 +633,19 @@ export default function TechnicianDispatcher() {
         {showTransferModal && (
           <div className="disp-modal-backdrop">
             <form className="disp-modal" onSubmit={handleBulkTransfer}>
-              <h3 style={{ margin: "0 0 4px", fontSize: "1.25rem", fontWeight: "bold" }}>
+              <h3
+                style={{
+                  margin: "0 0 4px",
+                  fontSize: "1.25rem",
+                  fontWeight: "bold",
+                }}
+              >
                 Chuyển giao lịch làm việc hàng loạt
               </h3>
               <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: 0 }}>
-                Hữu ích khi một kỹ thuật viên nghỉ đột xuất. Hệ thống sẽ cố gắng chuyển tất cả các ca
-                hẹn của họ sang kỹ thuật viên dự phòng khả dụng.
+                Hữu ích khi một kỹ thuật viên nghỉ đột xuất. Hệ thống sẽ cố gắng
+                chuyển tất cả các ca hẹn của họ sang kỹ thuật viên dự phòng khả
+                dụng.
               </p>
 
               <div className="disp-form-group">
@@ -601,7 +675,9 @@ export default function TechnicianDispatcher() {
                 >
                   <option value="">-- Chọn kỹ thuật viên --</option>
                   {technicians
-                    .filter((t) => String(t.TechnicianId) !== String(fromTechId))
+                    .filter(
+                      (t) => String(t.TechnicianId) !== String(fromTechId),
+                    )
                     .map((t) => (
                       <option key={t.TechnicianId} value={t.TechnicianId}>
                         {t.FullName} ({t.Specialization || "Kỹ thuật viên"})
@@ -628,7 +704,9 @@ export default function TechnicianDispatcher() {
                   disabled={transferLoading || !fromTechId || !toTechId}
                   style={{ background: "#d91f68", color: "#fff" }}
                 >
-                  {transferLoading ? "Đang xử lý chuyển giao..." : "Xác nhận chuyển ca"}
+                  {transferLoading
+                    ? "Đang xử lý chuyển giao..."
+                    : "Xác nhận chuyển ca"}
                 </button>
                 <button
                   className="disp-btn light"

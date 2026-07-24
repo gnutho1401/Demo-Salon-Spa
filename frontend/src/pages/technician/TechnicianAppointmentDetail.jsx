@@ -70,10 +70,10 @@ function getPaymentMethodLabel(method) {
 
 const translateNoteType = (type) => {
   const map = {
-    'GENERAL': 'Ghi chú chung',
-    'TREATMENT': 'Ghi chú trị liệu',
-    'PRESCRIPTION': 'Phác đồ điều trị',
-    'FOLLOWUP': 'Theo dõi',
+    GENERAL: "Ghi chú chung",
+    TREATMENT: "Ghi chú trị liệu",
+    PRESCRIPTION: "Phác đồ điều trị",
+    FOLLOWUP: "Theo dõi",
   };
   return map[String(type).toUpperCase()] || type;
 };
@@ -135,12 +135,12 @@ function statusLabel(status, isCombo = false, allCompleted = false) {
     if (key === "CONFIRMED") return "Đã đặt (Gói Combo)";
     if (key === "CHECKED_IN") return "Đã check-in (Gói Combo)";
     if (key === "IN_PROGRESS") return "Đang thực hiện Combo";
-    if (key === "COMPLETED") return allCompleted ? "Hoàn thành Combo" : "Hoàn thành dịch vụ";
+    if (key === "COMPLETED")
+      return allCompleted ? "Hoàn thành Combo" : "Hoàn thành dịch vụ";
     if (key === "CANCELLED") return "Đã hủy lịch Combo";
   }
   return STATUS_LABELS[key] || key.replaceAll("_", " ") || "—";
 }
-
 
 function progressLabel(status) {
   const key = String(status || "").toUpperCase();
@@ -160,11 +160,14 @@ export default function TechnicianAppointmentDetail() {
     requestedDate: "",
     requestedStartTime: "",
     requestedEndTime: "",
-    reason: ""
+    reason: "",
   });
   const [searchParams, setSearchParams] = useSearchParams();
-  const paramServiceId = searchParams.get("serviceId") || searchParams.get("appointmentServiceId");
-  const [selectedServiceId, setSelectedServiceId] = useState(paramServiceId ? Number(paramServiceId) : null);
+  const paramServiceId =
+    searchParams.get("serviceId") || searchParams.get("appointmentServiceId");
+  const [selectedServiceId, setSelectedServiceId] = useState(
+    paramServiceId ? Number(paramServiceId) : null,
+  );
 
   const [slots, setSlots] = useState([]);
   const [slotLoading, setSlotLoading] = useState(false);
@@ -172,13 +175,13 @@ export default function TechnicianAppointmentDetail() {
   const [myProfile, setMyProfile] = useState(null);
 
   useEffect(() => {
-    axiosClient.get("/technician/profile").then(res => {
-      setMyProfile(res.data?.data || null);
-    }).catch(() => {});
+    axiosClient
+      .get("/technician/profile")
+      .then((res) => {
+        setMyProfile(res.data?.data || null);
+      })
+      .catch(() => {});
   }, []);
-
-
-
 
   async function load() {
     try {
@@ -205,37 +208,50 @@ export default function TechnicianAppointmentDetail() {
         setSelectedServiceId((prevSelected) => {
           if (prevSelected && prevSelected !== "ALL") {
             const exists = svcs.find(
-              (s) => Number(s.ServiceId) === Number(prevSelected) || Number(s.AppointmentServiceId) === Number(prevSelected)
+              (s) =>
+                Number(s.ServiceId) === Number(prevSelected) ||
+                Number(s.AppointmentServiceId) === Number(prevSelected),
             );
             if (exists) return prevSelected;
           }
           if (paramServiceId) {
             const paramMatch = svcs.find(
-              (s) => Number(s.ServiceId) === Number(paramServiceId) || Number(s.AppointmentServiceId) === Number(paramServiceId)
+              (s) =>
+                Number(s.ServiceId) === Number(paramServiceId) ||
+                Number(s.AppointmentServiceId) === Number(paramServiceId),
             );
-            if (paramMatch) return paramMatch.AppointmentServiceId || paramMatch.ServiceId;
+            if (paramMatch)
+              return paramMatch.AppointmentServiceId || paramMatch.ServiceId;
           }
           const myEmpId = profile?.EmployeeId;
-          const myStep = myEmpId ? svcs.find((s) => Number(s.EmployeeId) === Number(myEmpId)) : null;
+          const myStep = myEmpId
+            ? svcs.find((s) => Number(s.EmployeeId) === Number(myEmpId))
+            : null;
           if (myStep) {
             return myStep.AppointmentServiceId || myStep.ServiceId;
           }
           const inProg = svcs.find((s) => s.StepStatus === "IN_PROGRESS");
           const pend = svcs.find((s) => s.StepStatus === "PENDING");
-          return (inProg || pend || svcs[0])?.AppointmentServiceId || (inProg || pend || svcs[0])?.ServiceId;
+          return (
+            (inProg || pend || svcs[0])?.AppointmentServiceId ||
+            (inProg || pend || svcs[0])?.ServiceId
+          );
         });
       }
 
-
-
-
-
       try {
-        const resReq = await axiosClient.get("/reschedule/technician/reschedule-requests");
+        const resReq = await axiosClient.get(
+          "/reschedule/technician/reschedule-requests",
+        );
         const list = resReq.data?.data || [];
         // Lấy request mới nhất của appointment này (bất kể trạng thái)
-        const allForAppt = list.filter(r => Number(r.AppointmentId) === Number(id));
-        const latest = allForAppt.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt))[0] || null;
+        const allForAppt = list.filter(
+          (r) => Number(r.AppointmentId) === Number(id),
+        );
+        const latest =
+          allForAppt.sort(
+            (a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt),
+          )[0] || null;
         setRescheduleRequest(latest);
       } catch (errReq) {
         console.warn("Failed to load reschedule requests:", errReq);
@@ -252,7 +268,9 @@ export default function TechnicianAppointmentDetail() {
   async function submitReschedule(e) {
     e.preventDefault();
 
-    const [startH, startM] = rescheduleForm.requestedStartTime.split(":").map(Number);
+    const [startH, startM] = rescheduleForm.requestedStartTime
+      .split(":")
+      .map(Number);
     const [endH, endM] = rescheduleForm.requestedEndTime.split(":").map(Number);
     const startMin = startH * 60 + (startM || 0);
     const endMin = endH * 60 + (endM || 0);
@@ -264,35 +282,59 @@ export default function TechnicianAppointmentDetail() {
 
     try {
       setActionLoading("reschedule");
-      await axiosClient.post(`/reschedule/technician/appointments/${id}/reschedule-request`, rescheduleForm);
+      await axiosClient.post(
+        `/reschedule/technician/appointments/${id}/reschedule-request`,
+        rescheduleForm,
+      );
       alert("Gửi yêu cầu đề xuất đổi lịch thành công!");
       setShowRescheduleModal(false);
-      setRescheduleForm({ requestedDate: "", requestedStartTime: "", requestedEndTime: "", reason: "" });
+      setRescheduleForm({
+        requestedDate: "",
+        requestedStartTime: "",
+        requestedEndTime: "",
+        reason: "",
+      });
       setSlots([]);
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể gửi yêu cầu đề xuất đổi lịch");
+      alert(
+        err.response?.data?.message || "Không thể gửi yêu cầu đề xuất đổi lịch",
+      );
     } finally {
       setActionLoading("");
     }
   }
 
   async function cancelReschedule() {
-    if (!rescheduleRequest || !window.confirm("Bạn có chắc chắn muốn hủy yêu cầu đề xuất đổi lịch này không?")) return;
+    if (
+      !rescheduleRequest ||
+      !window.confirm(
+        "Bạn có chắc chắn muốn hủy yêu cầu đề xuất đổi lịch này không?",
+      )
+    )
+      return;
     try {
       setActionLoading("cancel_reschedule");
-      await axiosClient.put(`/reschedule/technician/reschedule-requests/${rescheduleRequest.RequestId}/cancel`);
+      await axiosClient.put(
+        `/reschedule/technician/reschedule-requests/${rescheduleRequest.RequestId}/cancel`,
+      );
       alert("Đã hủy yêu cầu đề xuất đổi lịch thành công!");
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể hủy yêu cầu đề xuất đổi lịch");
+      alert(
+        err.response?.data?.message || "Không thể hủy yêu cầu đề xuất đổi lịch",
+      );
     } finally {
       setActionLoading("");
     }
   }
 
   async function loadSlots(selectedDate) {
-    if (!selectedDate || !(detail.TechnicianId || detail.EmployeeId) || services.length === 0) {
+    if (
+      !selectedDate ||
+      !(detail.TechnicianId || detail.EmployeeId) ||
+      services.length === 0
+    ) {
       setSlots([]);
       setSlotError("");
       return;
@@ -317,7 +359,9 @@ export default function TechnicianAppointmentDetail() {
       }
     } catch (err) {
       console.error("Failed to load slots:", err);
-      setSlotError(err.response?.data?.message || err.message || "Lỗi tải khung giờ trống");
+      setSlotError(
+        err.response?.data?.message || err.message || "Lỗi tải khung giờ trống",
+      );
       setSlots([]);
     } finally {
       setSlotLoading(false);
@@ -341,14 +385,18 @@ export default function TechnicianAppointmentDetail() {
     if (!services || services.length === 0) return [];
     if (selectedServiceId && selectedServiceId !== "ALL") {
       const found = services.find(
-        (s) => Number(s.ServiceId) === Number(selectedServiceId) || Number(s.AppointmentServiceId) === Number(selectedServiceId)
+        (s) =>
+          Number(s.ServiceId) === Number(selectedServiceId) ||
+          Number(s.AppointmentServiceId) === Number(selectedServiceId),
       );
       if (found) return [found];
     }
     // Default to step assigned to logged in technician
     const myEmpId = myProfile?.EmployeeId;
     if (myEmpId) {
-      const myStep = services.find((s) => Number(s.EmployeeId) === Number(myEmpId));
+      const myStep = services.find(
+        (s) => Number(s.EmployeeId) === Number(myEmpId),
+      );
       if (myStep) return [myStep];
     }
 
@@ -359,7 +407,8 @@ export default function TechnicianAppointmentDetail() {
 
   const getServiceTimeRange = useMemo(() => {
     return (targetSvc) => {
-      if (!targetSvc) return `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`;
+      if (!targetSvc)
+        return `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`;
 
       if (targetSvc.StepStartTime && targetSvc.StepEndTime) {
         return `${targetSvc.StepStartTime.slice(0, 5)} - ${targetSvc.StepEndTime.slice(0, 5)}`;
@@ -371,8 +420,10 @@ export default function TechnicianAppointmentDetail() {
       }
 
       const targetIdx = services.findIndex(
-        s => (targetSvc.AppointmentServiceId && s.AppointmentServiceId === targetSvc.AppointmentServiceId) ||
-             (targetSvc.ServiceId && s.ServiceId === targetSvc.ServiceId)
+        (s) =>
+          (targetSvc.AppointmentServiceId &&
+            s.AppointmentServiceId === targetSvc.AppointmentServiceId) ||
+          (targetSvc.ServiceId && s.ServiceId === targetSvc.ServiceId),
       );
 
       let startMinutes = 0;
@@ -384,7 +435,8 @@ export default function TechnicianAppointmentDetail() {
       }
 
       const stepStartTotal = baseMinutes + startMinutes;
-      const stepEndTotal = stepStartTotal + (Number(targetSvc.DurationMinutes) || 0);
+      const stepEndTotal =
+        stepStartTotal + (Number(targetSvc.DurationMinutes) || 0);
 
       const formatMins = (totalMins) => {
         const hrs = Math.floor(totalMins / 60) % 24;
@@ -409,19 +461,31 @@ export default function TechnicianAppointmentDetail() {
       return "COMPLETED";
     }
     if (detail.CustomerPackageId && currentService) {
-      const stepStat = String(currentService.StepStatus || currentService.Status || "").toUpperCase();
+      const stepStat = String(
+        currentService.StepStatus || currentService.Status || "",
+      ).toUpperCase();
       if (stepStat === "COMPLETED") return "COMPLETED";
       if (stepStat === "IN_PROGRESS") return "IN_PROGRESS";
-      if (stepStat === "PENDING" || stepStat === "CONFIRMED" || stepStat === "CHECKED_IN") {
+      if (
+        stepStat === "PENDING" ||
+        stepStat === "CONFIRMED" ||
+        stepStat === "CHECKED_IN"
+      ) {
         const apptStat = String(detail.Status || "").toUpperCase();
-        return ["CHECKED_IN", "IN_PROGRESS"].includes(apptStat) ? "CHECKED_IN" : "CONFIRMED";
+        return ["CHECKED_IN", "IN_PROGRESS"].includes(apptStat)
+          ? "CHECKED_IN"
+          : "CONFIRMED";
       }
     }
     return String(detail.Status || "PENDING_PAYMENT").toUpperCase();
-  }, [allServicesCompleted, detail.CustomerPackageId, currentService, detail.Status]);
+  }, [
+    allServicesCompleted,
+    detail.CustomerPackageId,
+    currentService,
+    detail.Status,
+  ]);
 
   const paymentStatus = String(detail.PaymentStatus || "UNPAID").toUpperCase();
-
 
   const displaySteps = useMemo(() => {
     if (detail.CustomerPackageId) {
@@ -431,13 +495,19 @@ export default function TechnicianAppointmentDetail() {
         { key: "IN_PROGRESS", label: "Đang thực hiện", icon: "▶" },
         { key: "COMPLETED", label: "Hoàn thành", icon: "✓" },
       ];
-      if (status === "NO_SHOW") steps.push({ key: "NO_SHOW", label: "Khách không đến", icon: "⊗" });
-      if (status === "CANCELLED") steps.push({ key: "CANCELLED", label: "Đã hủy lịch", icon: "🚫" });
+      if (status === "NO_SHOW")
+        steps.push({ key: "NO_SHOW", label: "Khách không đến", icon: "⊗" });
+      if (status === "CANCELLED")
+        steps.push({ key: "CANCELLED", label: "Đã hủy lịch", icon: "🚫" });
       return steps;
     } else {
       const steps = [];
       if (status === "PENDING_PAYMENT" || paymentStatus === "UNPAID") {
-        steps.push({ key: "PENDING_PAYMENT", label: "Chờ thanh toán", icon: "▣" });
+        steps.push({
+          key: "PENDING_PAYMENT",
+          label: "Chờ thanh toán",
+          icon: "▣",
+        });
       } else {
         steps.push({ key: "PAID", label: "Đã thanh toán", icon: "💳" });
       }
@@ -445,10 +515,12 @@ export default function TechnicianAppointmentDetail() {
         { key: "CONFIRMED", label: "Đã xác nhận", icon: "✓" },
         { key: "CHECKED_IN", label: "Đã check-in", icon: "◇" },
         { key: "IN_PROGRESS", label: "Đang thực hiện", icon: "▶" },
-        { key: "COMPLETED", label: "Hoàn thành", icon: "✓" }
+        { key: "COMPLETED", label: "Hoàn thành", icon: "✓" },
       );
-      if (status === "NO_SHOW") steps.push({ key: "NO_SHOW", label: "Khách không đến", icon: "⊗" });
-      if (status === "CANCELLED") steps.push({ key: "CANCELLED", label: "Đã hủy", icon: "🚫" });
+      if (status === "NO_SHOW")
+        steps.push({ key: "NO_SHOW", label: "Khách không đến", icon: "⊗" });
+      if (status === "CANCELLED")
+        steps.push({ key: "CANCELLED", label: "Đã hủy", icon: "🚫" });
       return steps;
     }
   }, [detail.CustomerPackageId, status, paymentStatus]);
@@ -458,12 +530,9 @@ export default function TechnicianAppointmentDetail() {
     return index < 0 ? 0 : index;
   }, [displaySteps, status]);
 
-
-
-
-
-
-  const canStart = ["CHECKED_IN", "CONFIRMED", "PAID", "IN_PROGRESS"].includes(status);
+  const canStart = ["CHECKED_IN", "CONFIRMED", "PAID", "IN_PROGRESS"].includes(
+    status,
+  );
   const canComplete = status === "IN_PROGRESS";
   const canNoShow = ["CONFIRMED", "CHECKED_IN", "PAID"].includes(status);
 
@@ -472,11 +541,11 @@ export default function TechnicianAppointmentDetail() {
   }, [services]);
 
   const nextPendingStep = useMemo(() => {
-    return services.find((s) => s.StepStatus === "PENDING" || (!s.StepStatus && status !== "COMPLETED"));
+    return services.find(
+      (s) =>
+        s.StepStatus === "PENDING" || (!s.StepStatus && status !== "COMPLETED"),
+    );
   }, [services, status]);
-
-
-
 
   async function runAction(type, url, message) {
     const ok = window.confirm(message);
@@ -495,8 +564,6 @@ export default function TechnicianAppointmentDetail() {
       setActionLoading("");
     }
   }
-
-
 
   return (
     <TechnicianLayout>
@@ -555,22 +622,25 @@ export default function TechnicianAppointmentDetail() {
               <div>
                 <span>Trạng thái</span>
                 <b className={`tech-apd-badge ${statusClass(status)}`}>
-                  {statusLabel(status, !!detail.CustomerPackageId, allServicesCompleted)}
+                  {statusLabel(
+                    status,
+                    !!detail.CustomerPackageId,
+                    allServicesCompleted,
+                  )}
                 </b>
               </div>
-
 
               <div>
                 <span>Ngày &amp; giờ</span>
                 <strong>{safeDate(detail.AppointmentDate)}</strong>
                 <small>
                   {detail.CustomerPackageId
-                    ? (selectedServiceId && selectedServiceId !== "ALL" && currentService
-                        ? getServiceTimeRange(currentService)
-                        : `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`
-                      )
-                    : `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`
-                  }
+                    ? selectedServiceId &&
+                      selectedServiceId !== "ALL" &&
+                      currentService
+                      ? getServiceTimeRange(currentService)
+                      : `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`
+                    : `${detail.StartTime || "—"} - ${detail.EndTime || "—"}`}
                 </small>
               </div>
 
@@ -578,12 +648,21 @@ export default function TechnicianAppointmentDetail() {
                 <span>Thời lượng</span>
                 <strong>
                   {detail.CustomerPackageId
-                    ? (selectedServiceId && selectedServiceId !== "ALL" && currentService
-                        ? (Number(currentService.DurationMinutes) || 0)
-                        : services.reduce((sum, s) => sum + (Number(s.DurationMinutes) || 0), 0)
-                      )
-                    : (services.reduce((sum, s) => sum + (Number(s.DurationMinutes) || 0), 0) || (detail.DurationMinutes || 0))
-                  } phút
+                    ? selectedServiceId &&
+                      selectedServiceId !== "ALL" &&
+                      currentService
+                      ? Number(currentService.DurationMinutes) || 0
+                      : services.reduce(
+                          (sum, s) => sum + (Number(s.DurationMinutes) || 0),
+                          0,
+                        )
+                    : services.reduce(
+                        (sum, s) => sum + (Number(s.DurationMinutes) || 0),
+                        0,
+                      ) ||
+                      detail.DurationMinutes ||
+                      0}{" "}
+                  phút
                 </strong>
               </div>
 
@@ -591,9 +670,11 @@ export default function TechnicianAppointmentDetail() {
                 <span>Kỹ thuật viên</span>
                 <strong>
                   {selectedServiceId === "ALL"
-                    ? (detail.TechnicianName || "—")
-                    : (currentService?.AssignedTechnicianName || currentService?.TechnicianName || detail.TechnicianName || "—")
-                  }
+                    ? detail.TechnicianName || "—"
+                    : currentService?.AssignedTechnicianName ||
+                      currentService?.TechnicianName ||
+                      detail.TechnicianName ||
+                      "—"}
                 </strong>
                 <small>Chuyên viên làm đẹp</small>
               </div>
@@ -604,9 +685,33 @@ export default function TechnicianAppointmentDetail() {
                 <div className="tech-apd-card">
                   <div className="tech-apd-card-title">
                     {detail.CustomerPackageId ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", flexWrap: "wrap", gap: 6 }}>
-                        <span>📦 Dịch vụ thuộc Gói Combo: <strong style={{ color: "#be185d" }}>{detail.PackageName || "Gói Combo"}</strong></span>
-                        <span style={{ fontSize: 11, background: "#fdf2f8", color: "#be185d", padding: "2px 8px", borderRadius: 12, border: "1px solid #fbcfe8", fontWeight: 700 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          width: "100%",
+                          flexWrap: "wrap",
+                          gap: 6,
+                        }}
+                      >
+                        <span>
+                          📦 Dịch vụ thuộc Gói Combo:{" "}
+                          <strong style={{ color: "#be185d" }}>
+                            {detail.PackageName || "Gói Combo"}
+                          </strong>
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            background: "#fdf2f8",
+                            color: "#be185d",
+                            padding: "2px 8px",
+                            borderRadius: 12,
+                            border: "1px solid #fbcfe8",
+                            fontWeight: 700,
+                          }}
+                        >
                           Gói Combo #{detail.CustomerPackageId}
                         </span>
                       </div>
@@ -615,23 +720,40 @@ export default function TechnicianAppointmentDetail() {
                     )}
                   </div>
 
-
-
-
                   {services.length > 1 && (
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "16px", marginTop: "12px", flexWrap: "wrap" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        marginBottom: "16px",
+                        marginTop: "12px",
+                        flexWrap: "wrap",
+                      }}
+                    >
                       {services.map((srv) => {
-                        const isSelected = Number(srv.ServiceId) === Number(selectedServiceId) || Number(srv.AppointmentServiceId) === Number(selectedServiceId);
-                        const isMine = myProfile?.EmployeeId && Number(srv.EmployeeId) === Number(myProfile.EmployeeId);
+                        const isSelected =
+                          Number(srv.ServiceId) === Number(selectedServiceId) ||
+                          Number(srv.AppointmentServiceId) ===
+                            Number(selectedServiceId);
+                        const isMine =
+                          myProfile?.EmployeeId &&
+                          Number(srv.EmployeeId) ===
+                            Number(myProfile.EmployeeId);
                         return (
                           <button
                             key={srv.AppointmentServiceId || srv.ServiceId}
                             type="button"
-                            onClick={() => setSelectedServiceId(srv.AppointmentServiceId || srv.ServiceId)}
+                            onClick={() =>
+                              setSelectedServiceId(
+                                srv.AppointmentServiceId || srv.ServiceId,
+                              )
+                            }
                             style={{
                               padding: "8px 14px",
                               borderRadius: "8px",
-                              border: isSelected ? "2px solid #059669" : "1px solid #e2e8f0",
+                              border: isSelected
+                                ? "2px solid #059669"
+                                : "1px solid #e2e8f0",
                               background: isSelected ? "#ecfdf5" : "#f8fafc",
                               color: isSelected ? "#047857" : "#475569",
                               fontWeight: isSelected ? "700" : "500",
@@ -639,12 +761,31 @@ export default function TechnicianAppointmentDetail() {
                               cursor: "pointer",
                               display: "flex",
                               alignItems: "center",
-                              gap: "6px"
+                              gap: "6px",
                             }}
                           >
                             {srv.ServiceName}
-                            {isMine && <span style={{ background: "#d1fae5", color: "#065f46", fontSize: "0.7rem", padding: "1px 5px", borderRadius: "4px", fontWeight: "700" }}>Dịch vụ của bạn</span>}
-                            {srv.StepStatus === "COMPLETED" && <span style={{ color: "#059669", fontWeight: "700" }}>✓</span>}
+                            {isMine && (
+                              <span
+                                style={{
+                                  background: "#d1fae5",
+                                  color: "#065f46",
+                                  fontSize: "0.7rem",
+                                  padding: "1px 5px",
+                                  borderRadius: "4px",
+                                  fontWeight: "700",
+                                }}
+                              >
+                                Dịch vụ của bạn
+                              </span>
+                            )}
+                            {srv.StepStatus === "COMPLETED" && (
+                              <span
+                                style={{ color: "#059669", fontWeight: "700" }}
+                              >
+                                ✓
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -655,7 +796,6 @@ export default function TechnicianAppointmentDetail() {
                     <div className="tech-apd-empty">Chưa có dịch vụ</div>
                   ) : (
                     filteredServices.map((srv, index) => (
-
                       <article
                         className="tech-apd-service"
                         key={`${srv.ServiceId}-${srv.AppointmentServiceId || index}`}
@@ -673,22 +813,72 @@ export default function TechnicianAppointmentDetail() {
 
                           {/* Với Combo: hiển thị KTV phân công và thời gian bước riêng */}
                           {detail.CustomerPackageId && (
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px", flexWrap: "wrap" }}>
-                              <span style={{ background: "#eff6ff", color: "#1d4ed8", borderRadius: "6px", padding: "2px 8px", fontSize: "0.78rem", fontWeight: "700", border: "1px solid #bfdbfe" }}>
-                                👤 KTV: {srv.AssignedTechnicianName || srv.TechnicianName || detail.TechnicianName || "Tự động phân công"}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                marginBottom: "6px",
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  background: "#eff6ff",
+                                  color: "#1d4ed8",
+                                  borderRadius: "6px",
+                                  padding: "2px 8px",
+                                  fontSize: "0.78rem",
+                                  fontWeight: "700",
+                                  border: "1px solid #bfdbfe",
+                                }}
+                              >
+                                👤 KTV:{" "}
+                                {srv.AssignedTechnicianName ||
+                                  srv.TechnicianName ||
+                                  detail.TechnicianName ||
+                                  "Tự động phân công"}
                               </span>
                               {(srv.StepStartTime || srv.StepEndTime) && (
-                                <span style={{ background: "#dbeafe", color: "#1e40af", borderRadius: "6px", padding: "2px 8px", fontSize: "0.78rem", fontWeight: "700" }}>
+                                <span
+                                  style={{
+                                    background: "#dbeafe",
+                                    color: "#1e40af",
+                                    borderRadius: "6px",
+                                    padding: "2px 8px",
+                                    fontSize: "0.78rem",
+                                    fontWeight: "700",
+                                  }}
+                                >
                                   ⏱ {srv.StepStartTime} – {srv.StepEndTime}
                                 </span>
                               )}
                               {srv.StepStatus && (
-                                <span style={{
-                                  background: srv.StepStatus === 'COMPLETED' ? '#dcfce7' : srv.StepStatus === 'IN_PROGRESS' ? '#fef9c3' : '#f1f5f9',
-                                  color: srv.StepStatus === 'COMPLETED' ? '#15803d' : srv.StepStatus === 'IN_PROGRESS' ? '#92400e' : '#64748b',
-                                  borderRadius: "6px", padding: "2px 8px", fontSize: "0.75rem", fontWeight: "700"
-                                }}>
-                                  {srv.StepStatus === 'COMPLETED' ? '✓ Hoàn thành' : srv.StepStatus === 'IN_PROGRESS' ? '▶ Đang thực hiện' : '○ Chờ thực hiện'}
+                                <span
+                                  style={{
+                                    background:
+                                      srv.StepStatus === "COMPLETED"
+                                        ? "#dcfce7"
+                                        : srv.StepStatus === "IN_PROGRESS"
+                                          ? "#fef9c3"
+                                          : "#f1f5f9",
+                                    color:
+                                      srv.StepStatus === "COMPLETED"
+                                        ? "#15803d"
+                                        : srv.StepStatus === "IN_PROGRESS"
+                                          ? "#92400e"
+                                          : "#64748b",
+                                    borderRadius: "6px",
+                                    padding: "2px 8px",
+                                    fontSize: "0.75rem",
+                                    fontWeight: "700",
+                                  }}
+                                >
+                                  {srv.StepStatus === "COMPLETED"
+                                    ? "✓ Hoàn thành"
+                                    : srv.StepStatus === "IN_PROGRESS"
+                                      ? "▶ Đang thực hiện"
+                                      : "○ Chờ thực hiện"}
                                 </span>
                               )}
                             </div>
@@ -699,7 +889,14 @@ export default function TechnicianAppointmentDetail() {
                               "Dịch vụ chăm sóc chuyên nghiệp tại salon."}
                           </p>
 
-                          <div className="tech-apd-service-meta" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div
+                            className="tech-apd-service-meta"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                            }}
+                          >
                             <span>
                               ◷{" "}
                               {srv.DurationMinutes ||
@@ -711,8 +908,14 @@ export default function TechnicianAppointmentDetail() {
                               <button
                                 type="button"
                                 onClick={async () => {
-                                  const curDur = srv.DurationMinutes || detail.DurationMinutes || 60;
-                                  const val = window.prompt("Nhập thời lượng dịch vụ mới (tính theo phút):", curDur);
+                                  const curDur =
+                                    srv.DurationMinutes ||
+                                    detail.DurationMinutes ||
+                                    60;
+                                  const val = window.prompt(
+                                    "Nhập thời lượng dịch vụ mới (tính theo phút):",
+                                    curDur,
+                                  );
                                   if (!val) return;
                                   const num = Number(val);
                                   if (isNaN(num) || num <= 0) {
@@ -721,11 +924,19 @@ export default function TechnicianAppointmentDetail() {
                                   }
                                   try {
                                     setActionLoading("update_duration");
-                                    await axiosClient.patch(`/technician/appointments/${id}/duration`, { durationMinutes: num });
-                                    alert("Đã cập nhật thời gian thực hiện dịch vụ thành công!");
+                                    await axiosClient.patch(
+                                      `/technician/appointments/${id}/duration`,
+                                      { durationMinutes: num },
+                                    );
+                                    alert(
+                                      "Đã cập nhật thời gian thực hiện dịch vụ thành công!",
+                                    );
                                     await load();
                                   } catch (err) {
-                                    alert(err.response?.data?.message || "Không thể đổi thời gian dịch vụ");
+                                    alert(
+                                      err.response?.data?.message ||
+                                        "Không thể đổi thời gian dịch vụ",
+                                    );
                                   } finally {
                                     setActionLoading("");
                                   }
@@ -739,26 +950,49 @@ export default function TechnicianAppointmentDetail() {
                                   fontWeight: "700",
                                   color: "#6b21a8",
                                   cursor: "pointer",
-                                  transition: "all 0.2s"
+                                  transition: "all 0.2s",
                                 }}
                                 title="Thay đổi thời gian thực hiện dịch vụ ca hẹn này"
                               >
                                 ✏️ Đổi thời gian
                               </button>
                             )}
-                             {detail.CustomerPackageId ? (
-                              <span style={{ color: "#059669", fontWeight: "700", fontSize: "0.82rem" }}>📦 Trọn gói Combo</span>
+                            {detail.CustomerPackageId ? (
+                              <span
+                                style={{
+                                  color: "#059669",
+                                  fontWeight: "700",
+                                  fontSize: "0.82rem",
+                                }}
+                              >
+                                📦 Trọn gói Combo
+                              </span>
                             ) : (
                               <span>◉ {money(srv.Price)}</span>
                             )}
-
                           </div>
 
-                          <div className="tech-apd-tags" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                          <div
+                            className="tech-apd-tags"
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginTop: "8px",
+                            }}
+                          >
                             <div style={{ display: "flex", gap: "6px" }}>
                               <span>{srv.CategoryName || "Dịch vụ"}</span>
                               {detail.CustomerPackageId ? (
-                                <small style={{ background: "#fce7f3", color: "#831843", borderRadius: "6px", padding: "1px 6px", fontWeight: "700" }}>
+                                <small
+                                  style={{
+                                    background: "#fce7f3",
+                                    color: "#831843",
+                                    borderRadius: "6px",
+                                    padding: "1px 6px",
+                                    fontWeight: "700",
+                                  }}
+                                >
                                   📦 Gói Combo
                                 </small>
                               ) : (
@@ -770,29 +1004,61 @@ export default function TechnicianAppointmentDetail() {
                             <button
                               type="button"
                               onClick={() => {
-                                const canAccess = ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase());
+                                const canAccess = [
+                                  "IN_PROGRESS",
+                                  "COMPLETED",
+                                ].includes(String(status).toUpperCase());
                                 if (!canAccess) {
-                                  alert("Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.");
+                                  alert(
+                                    "Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.",
+                                  );
                                   return;
                                 }
-                                navigate(`/technician/treatment-notes?appointmentId=${detail.AppointmentId}&serviceId=${srv.ServiceId}`);
+                                navigate(
+                                  `/technician/treatment-notes?appointmentId=${detail.AppointmentId}&serviceId=${srv.ServiceId}`,
+                                );
                               }}
                               style={{
-                                backgroundColor: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "#2f593a" : "#cbd5e0",
-                                color: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "#ffffff" : "#718096",
+                                backgroundColor: [
+                                  "IN_PROGRESS",
+                                  "COMPLETED",
+                                ].includes(String(status).toUpperCase())
+                                  ? "#2f593a"
+                                  : "#cbd5e0",
+                                color: ["IN_PROGRESS", "COMPLETED"].includes(
+                                  String(status).toUpperCase(),
+                                )
+                                  ? "#ffffff"
+                                  : "#718096",
                                 border: "none",
                                 borderRadius: "6px",
                                 padding: "6px 12px",
                                 fontSize: "0.78rem",
                                 fontWeight: "600",
-                                cursor: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "pointer" : "not-allowed",
+                                cursor: ["IN_PROGRESS", "COMPLETED"].includes(
+                                  String(status).toUpperCase(),
+                                )
+                                  ? "pointer"
+                                  : "not-allowed",
                                 outline: "none",
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "4px"
+                                gap: "4px",
                               }}
-                              className={["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "hover-scale" : ""}
-                              title={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
+                              className={
+                                ["IN_PROGRESS", "COMPLETED"].includes(
+                                  String(status).toUpperCase(),
+                                )
+                                  ? "hover-scale"
+                                  : ""
+                              }
+                              title={
+                                !["IN_PROGRESS", "COMPLETED"].includes(
+                                  String(status).toUpperCase(),
+                                )
+                                  ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành"
+                                  : ""
+                              }
                             >
                               📝 Ghi chú &amp; Phác đồ
                             </button>
@@ -801,7 +1067,6 @@ export default function TechnicianAppointmentDetail() {
                       </article>
                     ))
                   )}
-
                 </div>
 
                 <div className="tech-apd-card tech-apd-timeline-card">
@@ -809,7 +1074,6 @@ export default function TechnicianAppointmentDetail() {
 
                   <div className="tech-apd-vertical-timeline">
                     {displaySteps.map((step, index) => (
-
                       <div
                         className={index <= activeStepIndex ? "done" : ""}
                         key={step.key}
@@ -847,42 +1111,99 @@ export default function TechnicianAppointmentDetail() {
                   </div>
                 </div>
 
-                <div className="tech-apd-card" style={{ borderLeft: "4px solid #2f593a" }}>
-                  <div className="tech-apd-card-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div className="tech-apd-card-title" style={{ color: "#2f593a", display: "flex", alignItems: "center", gap: "8px" }}>
+                <div
+                  className="tech-apd-card"
+                  style={{ borderLeft: "4px solid #2f593a" }}
+                >
+                  <div
+                    className="tech-apd-card-head"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div
+                      className="tech-apd-card-title"
+                      style={{
+                        color: "#2f593a",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
                       📝 Ghi chú & Phác đồ Trị liệu ({notes.length})
                     </div>
                   </div>
-                  <div style={{ marginTop: "12px", color: "#4a5568", fontSize: "0.9rem", lineHeight: "1.5" }}>
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      color: "#4a5568",
+                      fontSize: "0.9rem",
+                      lineHeight: "1.5",
+                    }}
+                  >
                     <p style={{ margin: "0 0 16px 0" }}>
-                      Hồ sơ ghi chú chi tiết, hình ảnh chụp da/tóc/móng và hướng dẫn chăm sóc sau điều trị của khách hàng được quản lý đồng bộ và tập trung để tối ưu hóa phác đồ điều trị lâu dài.
+                      Hồ sơ ghi chú chi tiết, hình ảnh chụp da/tóc/móng và hướng
+                      dẫn chăm sóc sau điều trị của khách hàng được quản lý đồng
+                      bộ và tập trung để tối ưu hóa phác đồ điều trị lâu dài.
                     </p>
                     <button
                       type="button"
                       onClick={() => {
-                        const canAccess = ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase());
+                        const canAccess = ["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        );
                         if (!canAccess) {
-                          alert("Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.");
+                          alert(
+                            "Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.",
+                          );
                           return;
                         }
                         const firstSvcId = services[0]?.ServiceId;
-                        navigate(`/technician/treatment-notes?appointmentId=${detail.AppointmentId}${firstSvcId ? `&serviceId=${firstSvcId}` : ""}`);
+                        navigate(
+                          `/technician/treatment-notes?appointmentId=${detail.AppointmentId}${firstSvcId ? `&serviceId=${firstSvcId}` : ""}`,
+                        );
                       }}
                       style={{
-                        backgroundColor: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "#2f593a" : "#cbd5e0",
-                        color: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "#ffffff" : "#718096",
+                        backgroundColor: ["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        )
+                          ? "#2f593a"
+                          : "#cbd5e0",
+                        color: ["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        )
+                          ? "#ffffff"
+                          : "#718096",
                         border: "none",
                         borderRadius: "8px",
                         padding: "10px 18px",
                         fontWeight: "600",
-                        cursor: ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "pointer" : "not-allowed",
+                        cursor: ["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        )
+                          ? "pointer"
+                          : "not-allowed",
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
-                        transition: "all 0.2s"
+                        transition: "all 0.2s",
                       }}
-                      className={["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "hover-scale" : ""}
-                      title={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
+                      className={
+                        ["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        )
+                          ? "hover-scale"
+                          : ""
+                      }
+                      title={
+                        !["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        )
+                          ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành"
+                          : ""
+                      }
                     >
                       Viết & Xem chi tiết phác đồ →
                     </button>
@@ -896,41 +1217,48 @@ export default function TechnicianAppointmentDetail() {
                     ♙ Trạng thái lịch hẹn
                   </div>
 
-                  <div style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "space-between",
-                    position: "relative",
-                    padding: "16px 8px 8px 8px",
-                    margin: "8px 0 16px 0"
-                  }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      position: "relative",
+                      padding: "16px 8px 8px 8px",
+                      margin: "8px 0 16px 0",
+                    }}
+                  >
                     {/* Progress track background line */}
-                    <div style={{
-                      position: "absolute",
-                      top: "35px",
-                      left: "35px",
-                      right: "35px",
-                      height: "4px",
-                      background: "#e2e8f0",
-                      borderRadius: "4px",
-                      zIndex: 1
-                    }} />
-                    
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "35px",
+                        left: "35px",
+                        right: "35px",
+                        height: "4px",
+                        background: "#e2e8f0",
+                        borderRadius: "4px",
+                        zIndex: 1,
+                      }}
+                    />
+
                     {/* Active progress fill line */}
-                    <div style={{
-                      position: "absolute",
-                      top: "35px",
-                      left: "35px",
-                      width: displaySteps.length > 1 
-                        ? `calc(${(activeStepIndex / (displaySteps.length - 1)) * 100}% - ${activeStepIndex === displaySteps.length - 1 ? 0 : 20}px)`
-                        : "0%",
-                      maxWidth: "calc(100% - 70px)",
-                      height: "4px",
-                      background: "linear-gradient(90deg, #10b981, #059669)",
-                      borderRadius: "4px",
-                      zIndex: 2,
-                      transition: "width 0.4s ease"
-                    }} />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "35px",
+                        left: "35px",
+                        width:
+                          displaySteps.length > 1
+                            ? `calc(${(activeStepIndex / (displaySteps.length - 1)) * 100}% - ${activeStepIndex === displaySteps.length - 1 ? 0 : 20}px)`
+                            : "0%",
+                        maxWidth: "calc(100% - 70px)",
+                        height: "4px",
+                        background: "linear-gradient(90deg, #10b981, #059669)",
+                        borderRadius: "4px",
+                        zIndex: 2,
+                        transition: "width 0.4s ease",
+                      }}
+                    />
 
                     {displaySteps.map((step, index) => {
                       const isPast = index < activeStepIndex;
@@ -945,52 +1273,64 @@ export default function TechnicianAppointmentDetail() {
                             alignItems: "center",
                             position: "relative",
                             zIndex: 3,
-                            flex: 1
+                            flex: 1,
                           }}
                         >
                           {/* Step Circle / Icon */}
-                          <div style={{
-                            width: isCurrent ? "42px" : "34px",
-                            height: isCurrent ? "42px" : "34px",
-                            borderRadius: "50%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: "700",
-                            fontSize: isCurrent ? "1.05rem" : "0.85rem",
-                            transition: "all 0.3s ease",
-                            background: isCurrent
-                              ? "linear-gradient(135deg, #059669, #10b981)"
-                              : isPast
-                                ? "#dcfce7"
-                                : "#f1f5f9",
-                            color: isCurrent
-                              ? "#ffffff"
-                              : isPast
-                                ? "#15803d"
-                                : "#94a3b8",
-                            border: isCurrent
-                              ? "3px solid #a7f3d0"
-                              : isPast
-                                ? "2px solid #86efac"
-                                : "2px solid #cbd5e1",
-                            boxShadow: isCurrent
-                              ? "0 0 14px rgba(16, 185, 129, 0.45)"
-                              : "none"
-                          }}>
+                          <div
+                            style={{
+                              width: isCurrent ? "42px" : "34px",
+                              height: isCurrent ? "42px" : "34px",
+                              borderRadius: "50%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: "700",
+                              fontSize: isCurrent ? "1.05rem" : "0.85rem",
+                              transition: "all 0.3s ease",
+                              background: isCurrent
+                                ? "linear-gradient(135deg, #059669, #10b981)"
+                                : isPast
+                                  ? "#dcfce7"
+                                  : "#f1f5f9",
+                              color: isCurrent
+                                ? "#ffffff"
+                                : isPast
+                                  ? "#15803d"
+                                  : "#94a3b8",
+                              border: isCurrent
+                                ? "3px solid #a7f3d0"
+                                : isPast
+                                  ? "2px solid #86efac"
+                                  : "2px solid #cbd5e1",
+                              boxShadow: isCurrent
+                                ? "0 0 14px rgba(16, 185, 129, 0.45)"
+                                : "none",
+                            }}
+                          >
                             {isPast ? "✓" : step.icon}
                           </div>
 
                           {/* Step Label */}
-                          <span style={{
-                            marginTop: "8px",
-                            fontSize: isCurrent ? "0.82rem" : "0.76rem",
-                            fontWeight: isCurrent ? "700" : isPast ? "600" : "500",
-                            color: isCurrent ? "#047857" : isPast ? "#166534" : "#64748b",
-                            textAlign: "center",
-                            lineHeight: "1.25",
-                            padding: "0 2px"
-                          }}>
+                          <span
+                            style={{
+                              marginTop: "8px",
+                              fontSize: isCurrent ? "0.82rem" : "0.76rem",
+                              fontWeight: isCurrent
+                                ? "700"
+                                : isPast
+                                  ? "600"
+                                  : "500",
+                              color: isCurrent
+                                ? "#047857"
+                                : isPast
+                                  ? "#166534"
+                                  : "#64748b",
+                              textAlign: "center",
+                              lineHeight: "1.25",
+                              padding: "0 2px",
+                            }}
+                          >
                             {step.label}
                           </span>
                         </div>
@@ -998,130 +1338,193 @@ export default function TechnicianAppointmentDetail() {
                     })}
                   </div>
 
-
                   <div className="tech-apd-update-box">
                     <h3>Cập nhật trạng thái</h3>
                     <p>Cập nhật trạng thái hiện tại của lịch hẹn này</p>
 
-                    {detail.CustomerPackageId ? (() => {
-                      const targetSvc = filteredServices[0] || services[0];
-                      if (!targetSvc) return <div style={{ color: "#64748b" }}>Chưa chọn dịch vụ</div>;
-
-                      const stepStat = String(targetSvc.StepStatus || targetSvc.Status || "PENDING").toUpperCase();
-                      const targetSvcId = targetSvc.ServiceId;
-                      const targetApptSvcId = targetSvc.AppointmentServiceId;
-
-                      if (stepStat === "COMPLETED") {
-                        return (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "center", background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", padding: "16px", borderRadius: "10px" }}>
-                            <div style={{ fontWeight: "700", fontSize: "0.95rem" }}>
-                              ✓ Dịch vụ "{targetSvc.ServiceName}" đã hoàn thành!
+                    {detail.CustomerPackageId ? (
+                      (() => {
+                        const targetSvc = filteredServices[0] || services[0];
+                        if (!targetSvc)
+                          return (
+                            <div style={{ color: "#64748b" }}>
+                              Chưa chọn dịch vụ
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigate(`/technician/treatment-notes?appointmentId=${id}&serviceId=${targetSvcId}`);
-                              }}
+                          );
+
+                        const stepStat = String(
+                          targetSvc.StepStatus || targetSvc.Status || "PENDING",
+                        ).toUpperCase();
+                        const targetSvcId = targetSvc.ServiceId;
+                        const targetApptSvcId = targetSvc.AppointmentServiceId;
+
+                        if (stepStat === "COMPLETED") {
+                          return (
+                            <div
                               style={{
-                                background: "#2f593a",
-                                color: "#ffffff",
-                                border: "none",
-                                padding: "10px 20px",
-                                borderRadius: "8px",
-                                fontWeight: "700",
-                                fontSize: "0.88rem",
-                                cursor: "pointer",
                                 display: "flex",
+                                flexDirection: "column",
+                                gap: "10px",
                                 alignItems: "center",
-                                gap: "8px",
-                                boxShadow: "0 2px 8px rgba(47,89,58,0.25)",
-                                width: "100%",
-                                justifyContent: "center"
+                                background: "#dcfce7",
+                                color: "#15803d",
+                                border: "1px solid #bbf7d0",
+                                padding: "16px",
+                                borderRadius: "10px",
                               }}
                             >
-                              📝 Viết & Xem Phác Đồ Trị Liệu →
+                              <div
+                                style={{
+                                  fontWeight: "700",
+                                  fontSize: "0.95rem",
+                                }}
+                              >
+                                ✓ Dịch vụ "{targetSvc.ServiceName}" đã hoàn
+                                thành!
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigate(
+                                    `/technician/treatment-notes?appointmentId=${id}&serviceId=${targetSvcId}`,
+                                  );
+                                }}
+                                style={{
+                                  background: "#2f593a",
+                                  color: "#ffffff",
+                                  border: "none",
+                                  padding: "10px 20px",
+                                  borderRadius: "8px",
+                                  fontWeight: "700",
+                                  fontSize: "0.88rem",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  boxShadow: "0 2px 8px rgba(47,89,58,0.25)",
+                                  width: "100%",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                📝 Viết & Xem Phác Đồ Trị Liệu →
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        if (stepStat === "IN_PROGRESS") {
+                          return (
+                            <button
+                              className="tech-apd-action gold"
+                              type="button"
+                              disabled={!!actionLoading}
+                              onClick={async () => {
+                                const ok = window.confirm(
+                                  `Xác nhận hoàn thành bước dịch vụ "${targetSvc.ServiceName}"?`,
+                                );
+                                if (!ok) return;
+                                try {
+                                  setActionLoading("complete-step");
+                                  await axiosClient.patch(
+                                    `/technician/appointments/${id}/complete-step`,
+                                    { appointmentServiceId: targetApptSvcId },
+                                  );
+                                  alert(
+                                    `✅ Đã hoàn thành dịch vụ "${targetSvc.ServiceName}"!`,
+                                  );
+                                  await load();
+                                } catch (err) {
+                                  alert(
+                                    err.response?.data?.message ||
+                                      "Không thể hoàn thành bước dịch vụ",
+                                  );
+                                } finally {
+                                  setActionLoading("");
+                                }
+                              }}
+                            >
+                              ✓{" "}
+                              {actionLoading === "complete-step"
+                                ? "Đang xử lý..."
+                                : `✅ Hoàn thành: ${targetSvc.ServiceName}`}
                             </button>
-                          </div>
-                        );
-                      }
+                          );
+                        }
 
-                      if (stepStat === "IN_PROGRESS") {
-                        return (
-                          <button
-                            className="tech-apd-action gold"
-                            type="button"
-                            disabled={!!actionLoading}
-                            onClick={async () => {
-                              const ok = window.confirm(`Xác nhận hoàn thành bước dịch vụ "${targetSvc.ServiceName}"?`);
-                              if (!ok) return;
-                              try {
-                                setActionLoading("complete-step");
-                                await axiosClient.patch(`/technician/appointments/${id}/complete-step`, { appointmentServiceId: targetApptSvcId });
-                                alert(`✅ Đã hoàn thành dịch vụ "${targetSvc.ServiceName}"!`);
-                                await load();
-
-                              } catch (err) {
-                                alert(err.response?.data?.message || "Không thể hoàn thành bước dịch vụ");
-                              } finally {
-                                setActionLoading("");
-                              }
-                            }}
-                          >
-                            ✓ {actionLoading === "complete-step" ? "Đang xử lý..." : `✅ Hoàn thành: ${targetSvc.ServiceName}`}
-                          </button>
-                        );
-                      }
-
-                      return (
-                        (() => {
-                          const apptStat = String(detail.Status || "").toUpperCase();
-                          const isCheckedIn = ["CHECKED_IN", "IN_PROGRESS"].includes(apptStat);
+                        return (() => {
+                          const apptStat = String(
+                            detail.Status || "",
+                          ).toUpperCase();
+                          const isCheckedIn = [
+                            "CHECKED_IN",
+                            "IN_PROGRESS",
+                          ].includes(apptStat);
 
                           if (!isCheckedIn) {
                             return (
-                              <div style={{
-                                background: "#fffbeb",
-                                border: "1.5px solid #fde68a",
-                                borderRadius: 10,
-                                padding: "14px 16px",
-                                fontSize: "0.85rem",
-                                color: "#b45309",
-                                fontWeight: "700",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "10px"
-                              }}>
+                              <div
+                                style={{
+                                  background: "#fffbeb",
+                                  border: "1.5px solid #fde68a",
+                                  borderRadius: 10,
+                                  padding: "14px 16px",
+                                  fontSize: "0.85rem",
+                                  color: "#b45309",
+                                  fontWeight: "700",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "10px",
+                                }}
+                              >
                                 <span style={{ fontSize: "1.2rem" }}>🔒</span>
-                                <span>Khách hàng chưa Check-in tại Salon. Vui lòng chờ Lễ tân Check-in lịch hẹn trước khi bắt đầu dịch vụ!</span>
+                                <span>
+                                  Khách hàng chưa Check-in tại Salon. Vui lòng
+                                  chờ Lễ tân Check-in lịch hẹn trước khi bắt đầu
+                                  dịch vụ!
+                                </span>
                               </div>
                             );
                           }
 
-                          const targetIdx = services.findIndex(s =>
-                            (targetApptSvcId && s.AppointmentServiceId === targetApptSvcId) ||
-                            (targetSvcId && s.ServiceId === targetSvcId)
+                          const targetIdx = services.findIndex(
+                            (s) =>
+                              (targetApptSvcId &&
+                                s.AppointmentServiceId === targetApptSvcId) ||
+                              (targetSvcId && s.ServiceId === targetSvcId),
                           );
 
                           if (targetIdx > 0) {
                             const prevSteps = services.slice(0, targetIdx);
-                            const uncompletedPrev = prevSteps.filter(s => String(s.StepStatus || s.Status || "").toUpperCase() !== "COMPLETED");
+                            const uncompletedPrev = prevSteps.filter(
+                              (s) =>
+                                String(
+                                  s.StepStatus || s.Status || "",
+                                ).toUpperCase() !== "COMPLETED",
+                            );
                             if (uncompletedPrev.length > 0) {
                               return (
-                                <div style={{
-                                  background: "#eff6ff",
-                                  border: "1.5px solid #bfdbfe",
-                                  borderRadius: 10,
-                                  padding: "14px 16px",
-                                  fontSize: "0.85rem",
-                                  color: "#1e40af",
-                                  fontWeight: "700",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "10px"
-                                }}>
+                                <div
+                                  style={{
+                                    background: "#eff6ff",
+                                    border: "1.5px solid #bfdbfe",
+                                    borderRadius: 10,
+                                    padding: "14px 16px",
+                                    fontSize: "0.85rem",
+                                    color: "#1e40af",
+                                    fontWeight: "700",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "10px",
+                                  }}
+                                >
                                   <span style={{ fontSize: "1.2rem" }}>⏳</span>
                                   <span>
-                                    Vui lòng chờ dịch vụ trước (<strong>{uncompletedPrev[0].ServiceName}</strong>) hoàn thành trước khi bắt đầu dịch vụ "<strong>{targetSvc.ServiceName}</strong>"!
+                                    Vui lòng chờ dịch vụ trước (
+                                    <strong>
+                                      {uncompletedPrev[0].ServiceName}
+                                    </strong>
+                                    ) hoàn thành trước khi bắt đầu dịch vụ "
+                                    <strong>{targetSvc.ServiceName}</strong>"!
                                   </span>
                                 </div>
                               );
@@ -1134,27 +1537,40 @@ export default function TechnicianAppointmentDetail() {
                               type="button"
                               disabled={!!actionLoading}
                               onClick={async () => {
-                                const ok = window.confirm(`Bạn có chắc muốn BẮT ĐẦU thực hiện dịch vụ "${targetSvc.ServiceName}"?`);
+                                const ok = window.confirm(
+                                  `Bạn có chắc muốn BẮT ĐẦU thực hiện dịch vụ "${targetSvc.ServiceName}"?`,
+                                );
                                 if (!ok) return;
                                 try {
                                   setActionLoading("start");
-                                  await axiosClient.patch(`/technician/appointments/${id}/start`, { appointmentServiceId: targetApptSvcId, serviceId: targetSvcId });
+                                  await axiosClient.patch(
+                                    `/technician/appointments/${id}/start`,
+                                    {
+                                      appointmentServiceId: targetApptSvcId,
+                                      serviceId: targetSvcId,
+                                    },
+                                  );
 
                                   await load();
                                 } catch (err) {
-                                  alert(err.response?.data?.message || "Không thể bắt đầu dịch vụ");
+                                  alert(
+                                    err.response?.data?.message ||
+                                      "Không thể bắt đầu dịch vụ",
+                                  );
                                 } finally {
                                   setActionLoading("");
                                 }
                               }}
                             >
-                              ▶ {actionLoading === "start" ? "Đang xử lý..." : `Bắt đầu dịch vụ: ${targetSvc.ServiceName}`}
+                              ▶{" "}
+                              {actionLoading === "start"
+                                ? "Đang xử lý..."
+                                : `Bắt đầu dịch vụ: ${targetSvc.ServiceName}`}
                             </button>
                           );
-                        })()
-                      );
-                    })() : (
-
+                        })();
+                      })()
+                    ) : (
                       <>
                         {canStart && !canComplete && (
                           <button
@@ -1169,7 +1585,10 @@ export default function TechnicianAppointmentDetail() {
                               )
                             }
                           >
-                            ▶ {actionLoading === "start" ? "Đang xử lý..." : "Bắt đầu dịch vụ"}
+                            ▶{" "}
+                            {actionLoading === "start"
+                              ? "Đang xử lý..."
+                              : "Bắt đầu dịch vụ"}
                           </button>
                         )}
 
@@ -1194,7 +1613,6 @@ export default function TechnicianAppointmentDetail() {
                         )}
                       </>
                     )}
-
 
                     {canNoShow && (
                       <button
@@ -1222,28 +1640,85 @@ export default function TechnicianAppointmentDetail() {
                       </div>
                     )}
                   </div>
-
                 </div>
 
                 {/* Reschedule Request Card - chỉ hiện khi status = CONFIRMED hoặc đang có request */}
-                {(status === "CONFIRMED" || (rescheduleRequest && ["PENDING", "AWAITING_CUSTOMER", "APPROVED", "REJECTED", "CUSTOMER_REJECTED"].includes(rescheduleRequest.Status))) && (
-                  <div className="tech-apd-card" style={{ borderLeft: "4px solid #d4a94f" }}>
-                    <div className="tech-apd-card-title" style={{ color: "#7a5e44", display: "flex", alignItems: "center", gap: "8px" }}>
+                {(status === "CONFIRMED" ||
+                  (rescheduleRequest &&
+                    [
+                      "PENDING",
+                      "AWAITING_CUSTOMER",
+                      "APPROVED",
+                      "REJECTED",
+                      "CUSTOMER_REJECTED",
+                    ].includes(rescheduleRequest.Status))) && (
+                  <div
+                    className="tech-apd-card"
+                    style={{ borderLeft: "4px solid #d4a94f" }}
+                  >
+                    <div
+                      className="tech-apd-card-title"
+                      style={{
+                        color: "#7a5e44",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
                       📅 Đề xuất đổi lịch hẹn
                     </div>
-                    <div style={{ marginTop: "12px", color: "#4a5568", fontSize: "0.9rem", lineHeight: "1.45" }}>
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        color: "#4a5568",
+                        fontSize: "0.9rem",
+                        lineHeight: "1.45",
+                      }}
+                    >
                       {status === "CONFIRMED" && (
                         <p style={{ margin: "0 0 16px 0" }}>
-                          Nếu bạn bận đột xuất hoặc khách hàng yêu cầu dời giờ, bạn có thể tạo đề xuất giờ mới để gửi cho Lễ tân duyệt.
+                          Nếu bạn bận đột xuất hoặc khách hàng yêu cầu dời giờ,
+                          bạn có thể tạo đề xuất giờ mới để gửi cho Lễ tân
+                          duyệt.
                         </p>
                       )}
-                      
+
                       {rescheduleRequest ? (
                         rescheduleRequest.Status === "PENDING" ? (
-                          <div style={{ background: "#fcf8e3", border: "1px solid #faebcc", color: "#8a6d3b", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
-                            <b style={{ display: "block", marginBottom: "4px" }}>Đang chờ duyệt đổi lịch:</b>
-                            <div>Đề xuất: <b>{safeDate(rescheduleRequest.RequestedDate)}</b> lúc <b>{String(rescheduleRequest.RequestedStartTime).slice(0, 5)}</b></div>
-                            <div style={{ fontSize: "0.75rem", color: "#8a6d3b", opacity: 0.8, marginTop: "6px", marginBottom: "10px" }}>
+                          <div
+                            style={{
+                              background: "#fcf8e3",
+                              border: "1px solid #faebcc",
+                              color: "#8a6d3b",
+                              padding: "14px",
+                              borderRadius: "10px",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <b
+                              style={{ display: "block", marginBottom: "4px" }}
+                            >
+                              Đang chờ duyệt đổi lịch:
+                            </b>
+                            <div>
+                              Đề xuất:{" "}
+                              <b>{safeDate(rescheduleRequest.RequestedDate)}</b>{" "}
+                              lúc{" "}
+                              <b>
+                                {String(
+                                  rescheduleRequest.RequestedStartTime,
+                                ).slice(0, 5)}
+                              </b>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "#8a6d3b",
+                                opacity: 0.8,
+                                marginTop: "6px",
+                                marginBottom: "10px",
+                              }}
+                            >
                               Lý do: {rescheduleRequest.Reason || "—"}
                             </div>
                             <button
@@ -1262,15 +1737,51 @@ export default function TechnicianAppointmentDetail() {
                                 width: "100%",
                               }}
                             >
-                              {actionLoading === "cancel_reschedule" ? "Đang xử lý..." : "🚫 Hủy đề xuất đổi lịch"}
+                              {actionLoading === "cancel_reschedule"
+                                ? "Đang xử lý..."
+                                : "🚫 Hủy đề xuất đổi lịch"}
                             </button>
                           </div>
                         ) : rescheduleRequest.Status === "AWAITING_CUSTOMER" ? (
-                          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e40af", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
-                            <b style={{ display: "block", marginBottom: "4px" }}>⏳ Lễ tân đã duyệt – Chờ khách hàng xác nhận:</b>
-                            <div>Đề xuất: <b>{safeDate(rescheduleRequest.RequestedDate)}</b> lúc <b>{String(rescheduleRequest.RequestedStartTime).slice(0, 5)} – {String(rescheduleRequest.RequestedEndTime).slice(0, 5)}</b></div>
-                            <div style={{ fontSize: "0.75rem", marginTop: "6px", opacity: 0.8, marginBottom: "10px" }}>
-                              Khách hàng sẽ nhận được thông báo và cần xác nhận trước khi lịch được thay đổi.
+                          <div
+                            style={{
+                              background: "#eff6ff",
+                              border: "1px solid #bfdbfe",
+                              color: "#1e40af",
+                              padding: "14px",
+                              borderRadius: "10px",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <b
+                              style={{ display: "block", marginBottom: "4px" }}
+                            >
+                              ⏳ Lễ tân đã duyệt – Chờ khách hàng xác nhận:
+                            </b>
+                            <div>
+                              Đề xuất:{" "}
+                              <b>{safeDate(rescheduleRequest.RequestedDate)}</b>{" "}
+                              lúc{" "}
+                              <b>
+                                {String(
+                                  rescheduleRequest.RequestedStartTime,
+                                ).slice(0, 5)}{" "}
+                                –{" "}
+                                {String(
+                                  rescheduleRequest.RequestedEndTime,
+                                ).slice(0, 5)}
+                              </b>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.75rem",
+                                marginTop: "6px",
+                                opacity: 0.8,
+                                marginBottom: "10px",
+                              }}
+                            >
+                              Khách hàng sẽ nhận được thông báo và cần xác nhận
+                              trước khi lịch được thay đổi.
                             </div>
                             <button
                               type="button"
@@ -1288,18 +1799,55 @@ export default function TechnicianAppointmentDetail() {
                                 width: "100%",
                               }}
                             >
-                              {actionLoading === "cancel_reschedule" ? "Đang xử lý..." : "🚫 Hủy đề xuất đổi lịch"}
+                              {actionLoading === "cancel_reschedule"
+                                ? "Đang xử lý..."
+                                : "🚫 Hủy đề xuất đổi lịch"}
                             </button>
                           </div>
                         ) : rescheduleRequest.Status === "APPROVED" ? (
-                          <div style={{ background: "#f0fff4", border: "1px solid #9ae6b4", color: "#276749", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
-                            <b style={{ display: "block", marginBottom: "6px" }}>✅ Đề xuất đổi lịch đã được duyệt!</b>
+                          <div
+                            style={{
+                              background: "#f0fff4",
+                              border: "1px solid #9ae6b4",
+                              color: "#276749",
+                              padding: "14px",
+                              borderRadius: "10px",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <b
+                              style={{ display: "block", marginBottom: "6px" }}
+                            >
+                              ✅ Đề xuất đổi lịch đã được duyệt!
+                            </b>
                             <div>Lịch hẹn đã được cập nhật sang:</div>
-                            <div style={{ marginTop: "6px", fontWeight: "700", fontSize: "0.9rem" }}>
-                              📅 {safeDate(rescheduleRequest.RequestedDate)} lúc {String(rescheduleRequest.RequestedStartTime).slice(0, 5)} – {String(rescheduleRequest.RequestedEndTime).slice(0, 5)}
+                            <div
+                              style={{
+                                marginTop: "6px",
+                                fontWeight: "700",
+                                fontSize: "0.9rem",
+                              }}
+                            >
+                              📅 {safeDate(rescheduleRequest.RequestedDate)} lúc{" "}
+                              {String(
+                                rescheduleRequest.RequestedStartTime,
+                              ).slice(0, 5)}{" "}
+                              –{" "}
+                              {String(rescheduleRequest.RequestedEndTime).slice(
+                                0,
+                                5,
+                              )}
                             </div>
                             {rescheduleRequest.Notes && (
-                              <div style={{ marginTop: "8px", fontSize: "0.78rem", opacity: 0.8 }}>Ghi chú lễ tân: {rescheduleRequest.Notes}</div>
+                              <div
+                                style={{
+                                  marginTop: "8px",
+                                  fontSize: "0.78rem",
+                                  opacity: 0.8,
+                                }}
+                              >
+                                Ghi chú lễ tân: {rescheduleRequest.Notes}
+                              </div>
                             )}
                             {status === "CONFIRMED" && (
                               <button
@@ -1323,11 +1871,38 @@ export default function TechnicianAppointmentDetail() {
                             )}
                           </div>
                         ) : rescheduleRequest.Status === "SYSTEM_CANCELLED" ? (
-                          <div style={{ background: "#fff5f5", border: "1px solid #fed7d7", color: "#c53030", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
-                            <b style={{ display: "block", marginBottom: "4px" }}>⚠️ Đề xuất dời lịch đã bị hệ thống tự động hủy!</b>
-                            <div>Lý do: {rescheduleRequest.Notes || "Khung giờ đề xuất đã có khách hàng khác đặt trước."}</div>
-                            <div style={{ fontSize: "0.78rem", opacity: 0.85, marginTop: "6px" }}>
-                              Đề xuất cũ: {safeDate(rescheduleRequest.RequestedDate)} lúc {String(rescheduleRequest.RequestedStartTime).slice(0, 5)}
+                          <div
+                            style={{
+                              background: "#fff5f5",
+                              border: "1px solid #fed7d7",
+                              color: "#c53030",
+                              padding: "14px",
+                              borderRadius: "10px",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <b
+                              style={{ display: "block", marginBottom: "4px" }}
+                            >
+                              ⚠️ Đề xuất dời lịch đã bị hệ thống tự động hủy!
+                            </b>
+                            <div>
+                              Lý do:{" "}
+                              {rescheduleRequest.Notes ||
+                                "Khung giờ đề xuất đã có khách hàng khác đặt trước."}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.78rem",
+                                opacity: 0.85,
+                                marginTop: "6px",
+                              }}
+                            >
+                              Đề xuất cũ:{" "}
+                              {safeDate(rescheduleRequest.RequestedDate)} lúc{" "}
+                              {String(
+                                rescheduleRequest.RequestedStartTime,
+                              ).slice(0, 5)}
                             </div>
                             {status === "CONFIRMED" && (
                               <button
@@ -1351,13 +1926,43 @@ export default function TechnicianAppointmentDetail() {
                             )}
                           </div>
                         ) : (
-                          <div style={{ background: "#fff5f5", border: "1px solid #fed7d7", color: "#c53030", padding: "14px", borderRadius: "10px", fontSize: "0.85rem" }}>
-                            <b style={{ display: "block", marginBottom: "4px" }}>❌ Đề xuất đổi lịch bị từ chối</b>
-                            <div style={{ fontSize: "0.78rem", opacity: 0.85, marginTop: "4px" }}>
-                              Đề xuất: {safeDate(rescheduleRequest.RequestedDate)} lúc {String(rescheduleRequest.RequestedStartTime).slice(0, 5)}
+                          <div
+                            style={{
+                              background: "#fff5f5",
+                              border: "1px solid #fed7d7",
+                              color: "#c53030",
+                              padding: "14px",
+                              borderRadius: "10px",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <b
+                              style={{ display: "block", marginBottom: "4px" }}
+                            >
+                              ❌ Đề xuất đổi lịch bị từ chối
+                            </b>
+                            <div
+                              style={{
+                                fontSize: "0.78rem",
+                                opacity: 0.85,
+                                marginTop: "4px",
+                              }}
+                            >
+                              Đề xuất:{" "}
+                              {safeDate(rescheduleRequest.RequestedDate)} lúc{" "}
+                              {String(
+                                rescheduleRequest.RequestedStartTime,
+                              ).slice(0, 5)}
                             </div>
                             {rescheduleRequest.Notes && (
-                              <div style={{ marginTop: "8px", fontSize: "0.78rem" }}>Lý do từ chối: {rescheduleRequest.Notes}</div>
+                              <div
+                                style={{
+                                  marginTop: "8px",
+                                  fontSize: "0.78rem",
+                                }}
+                              >
+                                Lý do từ chối: {rescheduleRequest.Notes}
+                              </div>
                             )}
                             {status === "CONFIRMED" && (
                               <button
@@ -1395,7 +2000,7 @@ export default function TechnicianAppointmentDetail() {
                             fontSize: "0.85rem",
                             cursor: "pointer",
                             width: "100%",
-                            transition: "all 0.2s"
+                            transition: "all 0.2s",
                           }}
                           className="hover-scale"
                         >
@@ -1432,8 +2037,6 @@ export default function TechnicianAppointmentDetail() {
                     )}
                   </div>
                 </div>
-
-
               </section>
 
               <aside className="tech-apd-side">
@@ -1454,7 +2057,9 @@ export default function TechnicianAppointmentDetail() {
                     <div>
                       <h3>
                         {detail.CustomerName || "Khách hàng"}{" "}
-                        <span>{getMembershipLabel(detail.MembershipLevel)}</span>
+                        <span>
+                          {getMembershipLabel(detail.MembershipLevel)}
+                        </span>
                       </h3>
                       <p>♧ {detail.CustomerPhone || "Chưa có số điện thoại"}</p>
                       <p>✉ {detail.CustomerEmail || "Chưa có email"}</p>
@@ -1485,30 +2090,53 @@ export default function TechnicianAppointmentDetail() {
                     <div>
                       {(() => {
                         const notesStr = detail.Notes;
-                        if (!notesStr) return <p>Khách chưa nhập ghi chú cho lịch hẹn này.</p>;
+                        if (!notesStr)
+                          return (
+                            <p>Khách chưa nhập ghi chú cho lịch hẹn này.</p>
+                          );
                         const tags = notesStr.match(/\[(.*?)\]/g) || [];
                         const uniqueTags = [...new Set(tags)];
                         let cleanStr = notesStr;
-                        tags.forEach(t => { cleanStr = cleanStr.split(t).join(""); });
+                        tags.forEach((t) => {
+                          cleanStr = cleanStr.split(t).join("");
+                        });
                         cleanStr = cleanStr.trim();
                         return (
                           <div>
                             {uniqueTags.length > 0 && (
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: "4px",
+                                  marginBottom: "6px",
+                                }}
+                              >
                                 {uniqueTags.map((tag, i) => (
-                                  <span key={i} style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: "700" }}>
+                                  <span
+                                    key={i}
+                                    style={{
+                                      background: "#fef3c7",
+                                      color: "#92400e",
+                                      padding: "2px 8px",
+                                      borderRadius: "12px",
+                                      fontSize: "0.75rem",
+                                      fontWeight: "700",
+                                    }}
+                                  >
                                     {tag.replace(/^\[|\]$/g, "")}
                                   </span>
                                 ))}
                               </div>
                             )}
-                            <p style={{ margin: 0 }}>{cleanStr || "Khách chưa nhập ghi chú thêm."}</p>
+                            <p style={{ margin: 0 }}>
+                              {cleanStr || "Khách chưa nhập ghi chú thêm."}
+                            </p>
                           </div>
                         );
                       })()}
                     </div>
                   </div>
-
                 </div>
 
                 <div className="tech-apd-card">
@@ -1520,14 +2148,29 @@ export default function TechnicianAppointmentDetail() {
                     <>
                       <div className="tech-apd-payment-row">
                         <span>Trạng thái thanh toán</span>
-                        <b style={{ background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0", padding: "4px 12px", borderRadius: "12px", fontSize: "0.82rem", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <b
+                          style={{
+                            background: "#dcfce7",
+                            color: "#15803d",
+                            border: "1px solid #bbf7d0",
+                            padding: "4px 12px",
+                            borderRadius: "12px",
+                            fontSize: "0.82rem",
+                            fontWeight: "700",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
                           💳 Đã thanh toán thành công (Gói Combo)
                         </b>
                       </div>
 
                       <div className="tech-apd-payment-row">
                         <span>Chi phí ca hẹn</span>
-                        <strong style={{ color: "#059669" }}>📦 Trọn gói Combo</strong>
+                        <strong style={{ color: "#059669" }}>
+                          📦 Trọn gói Combo
+                        </strong>
                       </div>
                       <div className="tech-apd-payment-row">
                         <span>Phương thức thanh toán</span>
@@ -1539,7 +2182,9 @@ export default function TechnicianAppointmentDetail() {
                       </div>
                       <div className="tech-apd-payment-row">
                         <span>Tên gói Combo</span>
-                        <strong>{detail.PackageName || "Gói Combo đã đăng ký"}</strong>
+                        <strong>
+                          {detail.PackageName || "Gói Combo đã đăng ký"}
+                        </strong>
                       </div>
                     </>
                   ) : (
@@ -1570,7 +2215,9 @@ export default function TechnicianAppointmentDetail() {
 
                       <div className="tech-apd-payment-row">
                         <span>Phương thức thanh toán</span>
-                        <strong>{getPaymentMethodLabel(detail.PaymentMethod)}</strong>
+                        <strong>
+                          {getPaymentMethodLabel(detail.PaymentMethod)}
+                        </strong>
                       </div>
 
                       <div className="tech-apd-payment-row">
@@ -1585,7 +2232,6 @@ export default function TechnicianAppointmentDetail() {
                     </>
                   )}
                 </div>
-
 
                 <div className="tech-apd-card">
                   <div className="tech-apd-card-title">Thao tác nhanh</div>
@@ -1618,16 +2264,34 @@ export default function TechnicianAppointmentDetail() {
                     <button
                       type="button"
                       onClick={() => {
-                        const canAccess = ["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase());
+                        const canAccess = ["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        );
                         if (!canAccess) {
-                          alert("Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.");
+                          alert(
+                            "Chỉ được viết và xem phác đồ điều trị khi lịch hẹn ở trạng thái Đang thực hiện hoặc Hoàn thành.",
+                          );
                           return;
                         }
                         const firstSvcId = services[0]?.ServiceId;
-                        navigate(`/technician/treatment-notes?appointmentId=${detail.AppointmentId}${firstSvcId ? `&serviceId=${firstSvcId}` : ""}`);
+                        navigate(
+                          `/technician/treatment-notes?appointmentId=${detail.AppointmentId}${firstSvcId ? `&serviceId=${firstSvcId}` : ""}`,
+                        );
                       }}
-                      style={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? { opacity: 0.5, cursor: "not-allowed" } : {}}
-                      title={!["IN_PROGRESS", "COMPLETED"].includes(String(status).toUpperCase()) ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành" : ""}
+                      style={
+                        !["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        )
+                          ? { opacity: 0.5, cursor: "not-allowed" }
+                          : {}
+                      }
+                      title={
+                        !["IN_PROGRESS", "COMPLETED"].includes(
+                          String(status).toUpperCase(),
+                        )
+                          ? "Chỉ khả dụng khi lịch hẹn Đang thực hiện hoặc Hoàn thành"
+                          : ""
+                      }
                     >
                       ✎ Ghi chú dịch vụ <span>›</span>
                     </button>
@@ -1649,63 +2313,167 @@ export default function TechnicianAppointmentDetail() {
 
         {/* Reschedule Modal */}
         {showRescheduleModal && (
-          <div className="modal-overlay" style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000
-          }}>
-            <div className="modal-content" style={{
-              backgroundColor: "#ffffff",
-              padding: "24px",
-              borderRadius: "20px",
-              width: "100%",
-              maxWidth: "450px",
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.15)"
-            }}>
-              <h3 style={{ margin: "0 0 16px 0", color: "#1e3a29", fontSize: "1.2rem", fontWeight: "bold" }}>
+          <div
+            className="modal-overlay"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              className="modal-content"
+              style={{
+                backgroundColor: "#ffffff",
+                padding: "24px",
+                borderRadius: "20px",
+                width: "100%",
+                maxWidth: "450px",
+                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.15)",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 16px 0",
+                  color: "#1e3a29",
+                  fontSize: "1.2rem",
+                  fontWeight: "bold",
+                }}
+              >
                 📅 Đề xuất đổi lịch hẹn mới
               </h3>
               <form onSubmit={submitReschedule}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "20px" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <label style={{ fontSize: "0.75rem", fontWeight: "700", color: "#4a5568", textTransform: "uppercase" }}>Chọn ngày đề xuất *</label>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "14px",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "6px",
+                    }}
+                  >
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: "700",
+                        color: "#4a5568",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Chọn ngày đề xuất *
+                    </label>
                     <input
                       type="date"
                       value={rescheduleForm.requestedDate}
                       min={new Date().toISOString().slice(0, 10)}
                       onChange={(e) => {
                         const newDate = e.target.value;
-                        setRescheduleForm({ ...rescheduleForm, requestedDate: newDate, requestedStartTime: "", requestedEndTime: "" });
+                        setRescheduleForm({
+                          ...rescheduleForm,
+                          requestedDate: newDate,
+                          requestedStartTime: "",
+                          requestedEndTime: "",
+                        });
                         loadSlots(newDate);
                       }}
                       required
-                      style={{ padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e0", outline: "none" }}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e0",
+                        outline: "none",
+                      }}
                     />
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <label style={{ fontSize: "0.75rem", fontWeight: "700", color: "#4a5568", textTransform: "uppercase" }}>Chọn khung giờ trống *</label>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "6px",
+                    }}
+                  >
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: "700",
+                        color: "#4a5568",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Chọn khung giờ trống *
+                    </label>
                     {slotLoading ? (
-                      <div style={{ fontSize: "0.85rem", color: "#718096", padding: "8px 0" }}>Đang tải danh sách giờ trống...</div>
+                      <div
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "#718096",
+                          padding: "8px 0",
+                        }}
+                      >
+                        Đang tải danh sách giờ trống...
+                      </div>
                     ) : slotError ? (
-                      <div style={{ fontSize: "0.85rem", color: "#e53e3e", padding: "8px 0" }}>Lỗi: {slotError}</div>
+                      <div
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "#e53e3e",
+                          padding: "8px 0",
+                        }}
+                      >
+                        Lỗi: {slotError}
+                      </div>
                     ) : !rescheduleForm.requestedDate ? (
-                      <div style={{ fontSize: "0.85rem", color: "#a0aec0", padding: "8px 0" }}>Vui lòng chọn ngày trước</div>
+                      <div
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "#a0aec0",
+                          padding: "8px 0",
+                        }}
+                      >
+                        Vui lòng chọn ngày trước
+                      </div>
                     ) : slots.length === 0 ? (
-                      <div style={{ fontSize: "0.85rem", color: "#e53e3e", padding: "8px 0" }}>Không có khung giờ nào trống trong ngày này</div>
+                      <div
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "#e53e3e",
+                          padding: "8px 0",
+                        }}
+                      >
+                        Không có khung giờ nào trống trong ngày này
+                      </div>
                     ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: "8px", maxHeight: "150px", overflowY: "auto", padding: "4px" }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fill, minmax(90px, 1fr))",
+                          gap: "8px",
+                          maxHeight: "150px",
+                          overflowY: "auto",
+                          padding: "4px",
+                        }}
+                      >
                         {slots.map((slot) => {
                           const isSlotAvailable = slot.available !== false;
                           const formattedStart = formatTime(slot.startTime);
-                          const isActive = rescheduleForm.requestedStartTime === slot.startTime;
+                          const isActive =
+                            rescheduleForm.requestedStartTime ===
+                            slot.startTime;
 
                           return (
                             <button
@@ -1716,20 +2484,32 @@ export default function TechnicianAppointmentDetail() {
                                 setRescheduleForm({
                                   ...rescheduleForm,
                                   requestedStartTime: slot.startTime,
-                                  requestedEndTime: slot.endTime
+                                  requestedEndTime: slot.endTime,
                                 });
                               }}
                               style={{
                                 padding: "8px",
                                 borderRadius: "8px",
-                                border: isActive ? "2.5px solid #2f593a" : "1.5px solid #edf2f7",
-                                background: isActive ? "#2f593a" : isSlotAvailable ? "#ffffff" : "#f7fafc",
-                                color: isActive ? "#ffffff" : isSlotAvailable ? "#2d3748" : "#a0aec0",
+                                border: isActive
+                                  ? "2.5px solid #2f593a"
+                                  : "1.5px solid #edf2f7",
+                                background: isActive
+                                  ? "#2f593a"
+                                  : isSlotAvailable
+                                    ? "#ffffff"
+                                    : "#f7fafc",
+                                color: isActive
+                                  ? "#ffffff"
+                                  : isSlotAvailable
+                                    ? "#2d3748"
+                                    : "#a0aec0",
                                 fontWeight: isActive ? "700" : "600",
                                 fontSize: "0.8rem",
-                                cursor: isSlotAvailable ? "pointer" : "not-allowed",
+                                cursor: isSlotAvailable
+                                  ? "pointer"
+                                  : "not-allowed",
                                 textAlign: "center",
-                                transition: "all 0.2s"
+                                transition: "all 0.2s",
                               }}
                             >
                               {formattedStart}
@@ -1741,25 +2521,68 @@ export default function TechnicianAppointmentDetail() {
                   </div>
 
                   {rescheduleForm.requestedStartTime && (
-                    <div style={{ background: "#edf7ed", color: "#1e4620", padding: "10px 14px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: "600" }}>
-                      ⏰ Đã chọn: {formatTime(rescheduleForm.requestedStartTime)} - {formatTime(rescheduleForm.requestedEndTime)}
+                    <div
+                      style={{
+                        background: "#edf7ed",
+                        color: "#1e4620",
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        fontSize: "0.85rem",
+                        fontWeight: "600",
+                      }}
+                    >
+                      ⏰ Đã chọn:{" "}
+                      {formatTime(rescheduleForm.requestedStartTime)} -{" "}
+                      {formatTime(rescheduleForm.requestedEndTime)}
                     </div>
                   )}
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <label style={{ fontSize: "0.75rem", fontWeight: "700", color: "#4a5568", textTransform: "uppercase" }}>Lý do đổi lịch *</label>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "6px",
+                    }}
+                  >
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: "700",
+                        color: "#4a5568",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Lý do đổi lịch *
+                    </label>
                     <textarea
                       placeholder="Lý do bận / đổi giờ..."
                       value={rescheduleForm.reason}
-                      onChange={(e) => setRescheduleForm({ ...rescheduleForm, reason: e.target.value })}
+                      onChange={(e) =>
+                        setRescheduleForm({
+                          ...rescheduleForm,
+                          reason: e.target.value,
+                        })
+                      }
                       required
                       rows={3}
-                      style={{ padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e0", outline: "none", resize: "none" }}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e0",
+                        outline: "none",
+                        resize: "none",
+                      }}
                     />
                   </div>
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: "12px",
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => setShowRescheduleModal(false)}
@@ -1770,7 +2593,7 @@ export default function TechnicianAppointmentDetail() {
                       backgroundColor: "#ffffff",
                       cursor: "pointer",
                       fontSize: "0.85rem",
-                      fontWeight: "600"
+                      fontWeight: "600",
                     }}
                   >
                     Hủy
@@ -1786,10 +2609,12 @@ export default function TechnicianAppointmentDetail() {
                       color: "#ffffff",
                       cursor: "pointer",
                       fontSize: "0.85rem",
-                      fontWeight: "600"
+                      fontWeight: "600",
                     }}
                   >
-                    {actionLoading === "reschedule" ? "Đang gửi..." : "Gửi đề xuất"}
+                    {actionLoading === "reschedule"
+                      ? "Đang gửi..."
+                      : "Gửi đề xuất"}
                   </button>
                 </div>
               </form>
