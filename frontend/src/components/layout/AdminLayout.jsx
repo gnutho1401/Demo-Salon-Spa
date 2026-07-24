@@ -6,14 +6,20 @@ import "../../styles/pages/admin.css";
 const navGroups = [
   {
     label: "Tổng quan",
-    items: [{ to: "/admin", label: "Bảng điều khiển", icon: "overview", end: true }],
+    items: [
+      { to: "/admin", label: "Bảng điều khiển", icon: "overview", end: true },
+    ],
   },
   {
     label: "Vận hành",
     items: [
       { to: "/admin/work-shifts", label: "Ca làm việc", icon: "calendar" },
       { to: "/admin/services", label: "Dịch vụ", icon: "service" },
-      { to: "/admin/service-categories", label: "Danh mục dịch vụ", icon: "category" },
+      {
+        to: "/admin/service-categories",
+        label: "Danh mục dịch vụ",
+        icon: "category",
+      },
       { to: "/admin/packages", label: "Gói dịch vụ", icon: "package" },
     ],
   },
@@ -21,7 +27,11 @@ const navGroups = [
     label: "Khách hàng & tăng trưởng",
     items: [
       { to: "/admin/customers", label: "Khách hàng", icon: "customers" },
-      { to: "/admin/memberships", label: "Hạng thành viên", icon: "membership" },
+      {
+        to: "/admin/memberships",
+        label: "Hạng thành viên",
+        icon: "membership",
+      },
       { to: "/admin/vouchers", label: "Voucher", icon: "voucher" },
       { to: "/admin/promotions", label: "Khuyến mãi", icon: "promotion" },
       { to: "/admin/reviews", label: "Đánh giá", icon: "review" },
@@ -37,10 +47,30 @@ const navGroups = [
     label: "Tài chính & kiểm soát",
     items: [
       { to: "/admin/refunds", label: "Hoàn tiền", icon: "refund" },
-      { to: "/admin/reports", label: "Báo cáo", icon: "report", adminOnly: true },
-      { to: "/admin/package-reports", label: "Báo cáo gói", icon: "chart", adminOnly: true },
-      { to: "/admin/system-logs", label: "Nhật ký hệ thống", icon: "log", adminOnly: true },
-      { to: "/admin/ai-monitoring", label: "Giám sát AI", icon: "monitor", adminOnly: true },
+      {
+        to: "/admin/reports",
+        label: "Báo cáo",
+        icon: "report",
+        adminOnly: true,
+      },
+      {
+        to: "/admin/package-reports",
+        label: "Báo cáo gói",
+        icon: "chart",
+        adminOnly: true,
+      },
+      {
+        to: "/admin/system-logs",
+        label: "Nhật ký hệ thống",
+        icon: "log",
+        adminOnly: true,
+      },
+      {
+        to: "/admin/ai-monitoring",
+        label: "Giám sát AI",
+        icon: "monitor",
+        adminOnly: true,
+      },
     ],
   },
 ];
@@ -48,17 +78,24 @@ const navGroups = [
 const iconPaths = {
   overview: "M4 13h6V4H4v9Zm10 7h6v-9h-6v9ZM4 20h6v-3H4v3Zm10-13h6V4h-6v3Z",
   calendar: "M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z",
-  service: "M12 3c3 3 5 5.3 5 8a5 5 0 0 1-10 0c0-2.7 2-5 5-8Zm-7 16c2-2 4.3-3 7-3s5 1 7 3",
+  service:
+    "M12 3c3 3 5 5.3 5 8a5 5 0 0 1-10 0c0-2.7 2-5 5-8Zm-7 16c2-2 4.3-3 7-3s5 1 7 3",
   category: "M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z",
   package: "m4 8 8-4 8 4-8 4-8-4Zm0 0v8l8 4 8-4V8m-8 4v8",
-  customers: "M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9m-2-12a4 4 0 0 1 0 7.8",
-  membership: "m12 3 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8L12 3Z",
+  customers:
+    "M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9m-2-12a4 4 0 0 1 0 7.8",
+  membership:
+    "m12 3 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8L12 3Z",
   voucher: "M4 7a2 2 0 0 0 0 4v6h16v-6a2 2 0 0 0 0-4V5H4v2Zm8-2v12",
-  promotion: "m5 19 14-14M7.5 7.5h.01m8.99 9h.01M9 7.5A1.5 1.5 0 1 1 6 7.5a1.5 1.5 0 0 1 3 0Zm9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z",
-  review: "M12 3 15 9l6 .9-4.5 4.4 1.1 6.2L12 17.6l-5.6 2.9 1.1-6.2L3 9.9 9 9l3-6Z",
+  promotion:
+    "m5 19 14-14M7.5 7.5h.01m8.99 9h.01M9 7.5A1.5 1.5 0 1 1 6 7.5a1.5 1.5 0 0 1 3 0Zm9 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z",
+  review:
+    "M12 3 15 9l6 .9-4.5 4.4 1.1 6.2L12 17.6l-5.6 2.9 1.1-6.2L3 9.9 9 9l3-6Z",
   feedback: "M4 4h16v12H8l-4 4V4Zm4 5h8m-8 3h5",
-  spark: "m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Zm6 11 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z",
-  employees: "M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7-4h6m-3-3v6M2 21v-3a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v3",
+  spark:
+    "m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Zm6 11 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z",
+  employees:
+    "M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7-4h6m-3-3v6M2 21v-3a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v3",
   refund: "M4 10a8 8 0 1 1 2 7m-2 0v-5h5m3-5v10m-3-3 3 3 3-3",
   report: "M5 3h10l4 4v14H5V3Zm10 0v5h4M9 13h6m-6 4h6",
   chart: "M4 20V10m6 10V4m6 16v-7m4 7H2",
@@ -79,7 +116,9 @@ export default function AdminLayout({ children }) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const role = String(user?.RoleName || user?.roleName || user?.Role || user?.role || "").toUpperCase();
+  const role = String(
+    user?.RoleName || user?.roleName || user?.Role || user?.role || "",
+  ).toUpperCase();
   const visibleNavGroups = navGroups
     .map((group) => ({
       ...group,
@@ -91,9 +130,12 @@ export default function AdminLayout({ children }) {
   const currentPage =
     allNavItems
       .filter((item) =>
-        item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
+        item.end
+          ? location.pathname === item.to
+          : location.pathname.startsWith(item.to),
       )
-      .sort((a, b) => b.to.length - a.to.length)[0]?.label || "Quản trị hệ thống";
+      .sort((a, b) => b.to.length - a.to.length)[0]?.label ||
+    "Quản trị hệ thống";
 
   useEffect(() => {
     setMenuOpen(false);
@@ -206,7 +248,10 @@ export default function AdminLayout({ children }) {
             <strong>{currentPage}</strong>
           </div>
           <div className="admin-mobile-avatar" aria-hidden="true">
-            {(user?.FullName || user?.fullName || "A").trim().charAt(0).toUpperCase()}
+            {(user?.FullName || user?.fullName || "A")
+              .trim()
+              .charAt(0)
+              .toUpperCase()}
           </div>
         </header>
         <div className="admin-main-inner">{children}</div>

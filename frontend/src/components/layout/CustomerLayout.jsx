@@ -38,7 +38,11 @@ const menuGroups = [
     title: "Tài khoản",
     items: [
       { to: "/customer/profile", icon: "👤", label: "Hồ sơ cá nhân" },
-      { to: "/customer/profile?tab=password", icon: "🔒", label: "Đổi mật khẩu" },
+      {
+        to: "/customer/profile?tab=password",
+        icon: "🔒",
+        label: "Đổi mật khẩu",
+      },
     ],
   },
 ];
@@ -55,7 +59,9 @@ export default function CustomerLayout({ children }) {
     if (savedScrollTop && sidebarRef.current) {
       sidebarRef.current.scrollTop = Number(savedScrollTop);
     } else {
-      const activeLink = sidebarRef.current?.querySelector(".customer-pink-nav-link.active");
+      const activeLink = sidebarRef.current?.querySelector(
+        ".customer-pink-nav-link.active",
+      );
       if (activeLink) {
         activeLink.scrollIntoView({ block: "nearest", behavior: "auto" });
       }
@@ -91,7 +97,10 @@ export default function CustomerLayout({ children }) {
   }, [menuOpen]);
 
   const handleSidebarScroll = (e) => {
-    sessionStorage.setItem("customer-sidebar-scroll", e.currentTarget.scrollTop);
+    sessionStorage.setItem(
+      "customer-sidebar-scroll",
+      e.currentTarget.scrollTop,
+    );
   };
 
   const [unreadCount, setUnreadCount] = useState(0);
@@ -134,21 +143,26 @@ export default function CustomerLayout({ children }) {
 
   const getPageClass = () => {
     const path = location.pathname;
-    if (path === '/customer') return 'anim-overview';
-    if (path.startsWith('/customer/booking')) return 'anim-booking';
-    if (path.startsWith('/customer/appointments')) return 'anim-appointments';
-    if (path.startsWith('/customer/service-history')) return 'anim-history';
-    if (path.startsWith('/customer/payments')) return 'anim-payments';
-    if (path.startsWith('/customer/packages')) return 'anim-packages';
-    if (path.startsWith('/customer/membership')) return 'anim-membership';
-    if (path.startsWith('/customer/vouchers')) return 'anim-vouchers';
-    if (path.startsWith('/customer/waiting-list')) return 'anim-waiting';
-    if (path.startsWith('/customer/notifications')) return 'anim-notifications';
-    if (path.startsWith('/customer/ai') || path.startsWith('/customer/stylist-advisor') || path.startsWith('/customer/skin-analyzer')) return 'anim-ai';
-    if (path.startsWith('/customer/feedback')) return 'anim-feedback';
-    if (path.startsWith('/customer/reviews')) return 'anim-reviews';
-    if (path.startsWith('/customer/profile')) return 'anim-profile';
-    return 'anim-default';
+    if (path === "/customer") return "anim-overview";
+    if (path.startsWith("/customer/booking")) return "anim-booking";
+    if (path.startsWith("/customer/appointments")) return "anim-appointments";
+    if (path.startsWith("/customer/service-history")) return "anim-history";
+    if (path.startsWith("/customer/payments")) return "anim-payments";
+    if (path.startsWith("/customer/packages")) return "anim-packages";
+    if (path.startsWith("/customer/membership")) return "anim-membership";
+    if (path.startsWith("/customer/vouchers")) return "anim-vouchers";
+    if (path.startsWith("/customer/waiting-list")) return "anim-waiting";
+    if (path.startsWith("/customer/notifications")) return "anim-notifications";
+    if (
+      path.startsWith("/customer/ai") ||
+      path.startsWith("/customer/stylist-advisor") ||
+      path.startsWith("/customer/skin-analyzer")
+    )
+      return "anim-ai";
+    if (path.startsWith("/customer/feedback")) return "anim-feedback";
+    if (path.startsWith("/customer/reviews")) return "anim-reviews";
+    if (path.startsWith("/customer/profile")) return "anim-profile";
+    return "anim-default";
   };
 
   const handleLogout = () => {
@@ -165,7 +179,7 @@ export default function CustomerLayout({ children }) {
           aria-label="Đóng menu và quay lại nội dung"
           onClick={() => setMenuOpen(false)}
         />
-        <aside 
+        <aside
           ref={sidebarRef}
           onScroll={handleSidebarScroll}
           className={`customer-pink-sidebar${menuOpen ? " is-open" : ""}`}
@@ -189,7 +203,11 @@ export default function CustomerLayout({ children }) {
 
           <div className="customer-pink-user">
             <div className="customer-pink-avatar">
-              {avatar ? <img src={resolveFileUrl(avatar)} alt={displayName} /> : initial}
+              {avatar ? (
+                <img src={resolveFileUrl(avatar)} alt={displayName} />
+              ) : (
+                initial
+              )}
             </div>
 
             <div>
@@ -203,14 +221,16 @@ export default function CustomerLayout({ children }) {
               return (
                 <div className="customer-pink-nav-group" key={group.title}>
                   <p>{group.title}</p>
-  
+
                   {group.items.map((item) => {
-                    const isProfileLink = item.to.startsWith("/customer/profile");
-                    
+                    const isProfileLink =
+                      item.to.startsWith("/customer/profile");
+
                     const isLinkActive = isProfileLink
-                      ? (item.to.includes("tab=password")
-                          ? location.search.includes("tab=password")
-                          : !location.search.includes("tab=password") && location.pathname === "/customer/profile")
+                      ? item.to.includes("tab=password")
+                        ? location.search.includes("tab=password")
+                        : !location.search.includes("tab=password") &&
+                          location.pathname === "/customer/profile"
                       : location.pathname === item.to;
 
                     return (
@@ -246,7 +266,10 @@ export default function CustomerLayout({ children }) {
           </div>
         </aside>
 
-        <section className="customer-pink-content" inert={menuOpen ? true : undefined}>
+        <section
+          className="customer-pink-content"
+          inert={menuOpen ? true : undefined}
+        >
           <header className="customer-pink-topbar">
             <div className="customer-pink-topbar-intro">
               <button
@@ -268,10 +291,15 @@ export default function CustomerLayout({ children }) {
             </div>
 
             <div className="customer-pink-top-actions">
-              <Link to="/customer/notifications" className="customer-pink-bell-link">
+              <Link
+                to="/customer/notifications"
+                className="customer-pink-bell-link"
+              >
                 🔔
                 {unreadCount > 0 && (
-                  <span className="customer-pink-bell-badge">{unreadCount}</span>
+                  <span className="customer-pink-bell-badge">
+                    {unreadCount}
+                  </span>
                 )}
               </Link>
               <Link to="/customer/profile" className="customer-pink-profile">
@@ -280,7 +308,12 @@ export default function CustomerLayout({ children }) {
             </div>
           </header>
 
-          <main className={`customer-pink-main ${getPageClass()}`} key={location.pathname}>{children}</main>
+          <main
+            className={`customer-pink-main ${getPageClass()}`}
+            key={location.pathname}
+          >
+            {children}
+          </main>
         </section>
       </div>
     </GuestLayout>
