@@ -11,7 +11,12 @@ async function createNote(req, res) {
   try {
     const data = req.body;
     const noteId = await service.createNote(data);
-    return success(res, { noteId }, "Khởi tạo hồ sơ ghi chú trị liệu thành công.", 201);
+    return success(
+      res,
+      { noteId },
+      "Khởi tạo hồ sơ ghi chú trị liệu thành công.",
+      201,
+    );
   } catch (err) {
     return error(res, err.message, 400);
   }
@@ -23,13 +28,17 @@ async function getCustomerHistory(req, res) {
     const { technicianId, serviceType, startDate, endDate, status } = req.query;
     const isAdmin = checkAdminAccess(req);
 
-    const history = await service.getCustomerHistory(customerId, {
-      technicianId: technicianId ? Number(technicianId) : undefined,
-      serviceType,
-      startDate,
-      endDate,
-      status
-    }, isAdmin);
+    const history = await service.getCustomerHistory(
+      customerId,
+      {
+        technicianId: technicianId ? Number(technicianId) : undefined,
+        serviceType,
+        startDate,
+        endDate,
+        status,
+      },
+      isAdmin,
+    );
 
     return success(res, history);
   } catch (err) {
@@ -43,9 +52,18 @@ async function getNoteByAppointment(req, res) {
     const serviceId = req.query.serviceId ? Number(req.query.serviceId) : null;
     const isAdmin = checkAdminAccess(req);
 
-    const note = await service.getNoteByAppointment(appointmentId, serviceId, isAdmin);
+    const note = await service.getNoteByAppointment(
+      appointmentId,
+      serviceId,
+      isAdmin,
+    );
     if (!note) {
-      return success(res, null, "Không tìm thấy ghi chú trị liệu cho lịch hẹn này.", 200);
+      return success(
+        res,
+        null,
+        "Không tìm thấy ghi chú trị liệu cho lịch hẹn này.",
+        200,
+      );
     }
     return success(res, note);
   } catch (err) {
@@ -75,7 +93,11 @@ async function updateNote(req, res) {
 
     const updated = await service.updateNote(noteId, updateFields, isAdmin);
     if (!updated) {
-      return error(res, "Cập nhật ghi chú thất bại hoặc không có thay đổi.", 400);
+      return error(
+        res,
+        "Cập nhật ghi chú thất bại hoặc không có thay đổi.",
+        400,
+      );
     }
     return success(res, null, "Cập nhật hồ sơ trị liệu thành công.");
   } catch (err) {
@@ -88,9 +110,17 @@ async function finalizeNote(req, res) {
     const noteId = req.params.id;
     const finalized = await service.finalizeNote(noteId);
     if (!finalized) {
-      return error(res, "Không thể khóa hồ sơ trị liệu. Hồ sơ có thể đã khóa hoặc không tồn tại.", 400);
+      return error(
+        res,
+        "Không thể khóa hồ sơ trị liệu. Hồ sơ có thể đã khóa hoặc không tồn tại.",
+        400,
+      );
     }
-    return success(res, null, "Khóa hồ sơ trị liệu thành công. Mọi chỉnh sửa đã bị vô hiệu hóa.");
+    return success(
+      res,
+      null,
+      "Khóa hồ sơ trị liệu thành công. Mọi chỉnh sửa đã bị vô hiệu hóa.",
+    );
   } catch (err) {
     return error(res, err.message, 400);
   }
@@ -101,13 +131,16 @@ async function searchNotes(req, res) {
     const { keyword, technicianId, status, serviceId, customerId } = req.query;
     const isAdmin = checkAdminAccess(req);
 
-    const results = await service.searchNotes({
-      keyword,
-      technicianId: technicianId ? Number(technicianId) : undefined,
-      status,
-      serviceId: serviceId ? Number(serviceId) : undefined,
-      customerId: customerId ? Number(customerId) : undefined
-    }, isAdmin);
+    const results = await service.searchNotes(
+      {
+        keyword,
+        technicianId: technicianId ? Number(technicianId) : undefined,
+        status,
+        serviceId: serviceId ? Number(serviceId) : undefined,
+        customerId: customerId ? Number(customerId) : undefined,
+      },
+      isAdmin,
+    );
 
     return success(res, results);
   } catch (err) {
@@ -132,7 +165,11 @@ async function getAnalytics(req, res) {
 async function generateAINote(req, res) {
   try {
     const { rawText, serviceName, categoryName } = req.body;
-    const result = await service.generateAINote(rawText, serviceName, categoryName);
+    const result = await service.generateAINote(
+      rawText,
+      serviceName,
+      categoryName,
+    );
     return success(res, result, "Sinh ghi chú tự động thành công.");
   } catch (err) {
     return error(res, err.message, 400);
@@ -159,5 +196,5 @@ module.exports = {
   searchNotes,
   getAnalytics,
   generateAINote,
-  getCustomerAIInsights
+  getCustomerAIInsights,
 };

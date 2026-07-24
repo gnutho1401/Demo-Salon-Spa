@@ -13,7 +13,10 @@ async function getMine(req, res) {
     let userId = req.user.userId;
     let customerId = null;
     const userRole = String(req.user?.role || "").toUpperCase();
-    if (["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) && req.query.customerId) {
+    if (
+      ["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) &&
+      req.query.customerId
+    ) {
       customerId = Number(req.query.customerId);
     }
     return success(res, await service.getMine(userId, customerId));
@@ -38,7 +41,10 @@ async function validateVoucher(req, res) {
     let userId = req.user.UserId || req.user.userId || req.user.id;
     let customerId = null;
     const userRole = String(req.user?.role || "").toUpperCase();
-    if (["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) && req.body.customerId) {
+    if (
+      ["RECEPTIONIST", "ADMIN", "MANAGER"].includes(userRole) &&
+      req.body.customerId
+    ) {
       customerId = Number(req.body.customerId);
     }
     const data = await service.validateVoucher(userId, req.body, customerId);
