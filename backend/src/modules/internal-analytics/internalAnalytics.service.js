@@ -28,9 +28,7 @@ function periodExpression(column, granularity) {
 }
 
 async function getUserScope(pool, userId) {
-  const result = await pool
-    .request()
-    .input("UserId", sql.Int, Number(userId))
+  const result = await pool.request().input("UserId", sql.Int, Number(userId))
     .query(`
       SELECT TOP 1 EmployeeId, BranchId
       FROM Employees
@@ -75,7 +73,10 @@ function standardizeSeries(series) {
     const metrics = Object.fromEntries(
       Object.entries(item)
         .filter(([key]) => key !== "label" && key !== "value")
-        .map(([key, value]) => [key, typeof value === "number" ? value : number(value)]),
+        .map(([key, value]) => [
+          key,
+          typeof value === "number" ? value : number(value),
+        ]),
     );
     return {
       id: `point-${index + 1}`,
@@ -94,7 +95,15 @@ function publicScope(group, scope) {
   };
 }
 
-function chartPayload(chartKey, rawSeries, range, group, scope, userRole, generatedAt) {
+function chartPayload(
+  chartKey,
+  rawSeries,
+  range,
+  group,
+  scope,
+  userRole,
+  generatedAt,
+) {
   const series = standardizeSeries(rawSeries);
   return {
     schemaVersion: ANALYTICS_SCHEMA_VERSION,
@@ -159,7 +168,13 @@ async function profitCost(context) {
   return result.recordset.map((row) => {
     const revenue = number(row.Revenue);
     const cost = number(row.Cost);
-    return { label: String(row.Label), value: revenue - cost, revenue, cost, profit: revenue - cost };
+    return {
+      label: String(row.Label),
+      value: revenue - cost,
+      revenue,
+      cost,
+      profit: revenue - cost,
+    };
   });
 }
 
@@ -211,13 +226,20 @@ async function systemActivity(context) {
   return mapSingleSeries(result.recordset);
 }
 
-async function statusDistribution(context, tableName, dateColumn, extraWhere = "") {
-  const scope = tableName === "Appointments"
-    ? appointmentScopeCondition(context.group)
-    : appointmentScopeCondition(context.group, "a");
-  const joins = tableName === "Payments"
-    ? "JOIN Invoices i ON p.InvoiceId = i.InvoiceId JOIN Appointments a ON i.AppointmentId = a.AppointmentId"
-    : "";
+async function statusDistribution(
+  context,
+  tableName,
+  dateColumn,
+  extraWhere = "",
+) {
+  const scope =
+    tableName === "Appointments"
+      ? appointmentScopeCondition(context.group)
+      : appointmentScopeCondition(context.group, "a");
+  const joins =
+    tableName === "Payments"
+      ? "JOIN Invoices i ON p.InvoiceId = i.InvoiceId JOIN Appointments a ON i.AppointmentId = a.AppointmentId"
+      : "";
   const alias = tableName === "Payments" ? "p" : "a";
   const result = await context.request.query(`
     SELECT ${alias}.Status AS Label, COUNT(*) AS Value
@@ -249,9 +271,10 @@ async function servicePerformance(context) {
 }
 
 async function teamKpi(context) {
-  const branchGuard = context.group === "MANAGER"
-    ? "AND @BranchId IS NOT NULL AND e.BranchId = @BranchId"
-    : "";
+  const branchGuard =
+    context.group === "MANAGER"
+      ? "AND @BranchId IS NOT NULL AND e.BranchId = @BranchId"
+      : "";
   const result = await context.request.query(`
     SELECT TOP 10
       u.FullName AS Label,
@@ -286,7 +309,10 @@ async function teamKpi(context) {
 }
 
 async function personalKpi(context) {
-  const period = periodExpression("a.AppointmentDate", context.range.granularity);
+  const period = periodExpression(
+    "a.AppointmentDate",
+    context.range.granularity,
+  );
   const result = await context.request.query(`
     SELECT
       ${period} AS Label,
@@ -328,14 +354,18 @@ const BUILDERS = {
   activeUsers,
   departmentPerformance,
   systemActivity,
-  appointmentStatus: (context) => statusDistribution(context, "Appointments", "AppointmentDate"),
-  paymentStatus: (context) => statusDistribution(context, "Payments", "CreatedAt"),
+  appointmentStatus: (context) =>
+    statusDistribution(context, "Appointments", "AppointmentDate"),
+  paymentStatus: (context) =>
+    statusDistribution(context, "Payments", "CreatedAt"),
   servicePerformance,
   departmentSales: revenueTrend,
   teamKpi,
-  workProgress: (context) => statusDistribution(context, "Appointments", "AppointmentDate"),
+  workProgress: (context) =>
+    statusDistribution(context, "Appointments", "AppointmentDate"),
   personalKpi,
-  personalWorkload: (context) => statusDistribution(context, "Appointments", "AppointmentDate"),
+  personalWorkload: (context) =>
+    statusDistribution(context, "Appointments", "AppointmentDate"),
   personalActivity,
 };
 
@@ -354,27 +384,32 @@ function resolveChartKeys(userRole, requestedKeys) {
   const availableKeys = getCatalogForRole(userRole).map((chart) => chart.key);
   if (!requestedKeys) return availableKeys;
 
-  const keys = Array.from(new Set(
-    String(requestedKeys)
-      .split(",")
-      .map((key) => key.trim())
-      .filter(Boolean),
-  ));
+  const keys = Array.from(
+    new Set(
+      String(requestedKeys)
+        .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean),
+    ),
+  );
   if (!keys.length) return availableKeys;
-  if (keys.length > 12) throw httpError("Chỉ được yêu cầu tối đa 12 biểu đồ", 400);
+  if (keys.length > 12)
+    throw httpError("Chỉ được yêu cầu tối đa 12 biểu đồ", 400);
 
   const invalidKey = keys.find((key) => !CHART_DEFINITIONS[key]);
   if (invalidKey) throw httpError(`Không tìm thấy biểu đồ ${invalidKey}`, 404);
   const forbiddenKey = keys.find((key) => !canAccessChart(userRole, key));
-  if (forbiddenKey) throw httpError(`Bạn không có quyền xem biểu đồ ${forbiddenKey}`, 403);
+  if (forbiddenKey)
+    throw httpError(`Bạn không có quyền xem biểu đồ ${forbiddenKey}`, 403);
   return keys;
 }
 
 async function getQueryScope(pool, user) {
   const group = roleGroup(user.role);
-  const scope = group === "ADMIN"
-    ? { employeeId: null, branchId: null }
-    : await getUserScope(pool, user.userId);
+  const scope =
+    group === "ADMIN"
+      ? { employeeId: null, branchId: null }
+      : await getUserScope(pool, user.userId);
   return { group, scope };
 }
 
@@ -390,8 +425,22 @@ async function getChart(chartKey, filters, user) {
   const pool = await connectDB();
   const { group, scope } = await getQueryScope(pool, user);
   const request = scopedRequest(pool, range, scope, user.userId);
-  const series = await BUILDERS[chartKey]({ request, range, scope, group, user });
-  return chartPayload(chartKey, series, range, group, scope, user.role, new Date().toISOString());
+  const series = await BUILDERS[chartKey]({
+    request,
+    range,
+    scope,
+    group,
+    user,
+  });
+  return chartPayload(
+    chartKey,
+    series,
+    range,
+    group,
+    scope,
+    user.role,
+    new Date().toISOString(),
+  );
 }
 
 async function getDashboard(filters, user, requestedKeys) {
@@ -401,11 +450,30 @@ async function getDashboard(filters, user, requestedKeys) {
   const { group, scope } = await getQueryScope(pool, user);
   const generatedAt = new Date().toISOString();
 
-  const entries = await Promise.all(chartKeys.map(async (chartKey) => {
-    const request = scopedRequest(pool, range, scope, user.userId);
-    const series = await BUILDERS[chartKey]({ request, range, scope, group, user });
-    return [chartKey, chartPayload(chartKey, series, range, group, scope, user.role, generatedAt)];
-  }));
+  const entries = await Promise.all(
+    chartKeys.map(async (chartKey) => {
+      const request = scopedRequest(pool, range, scope, user.userId);
+      const series = await BUILDERS[chartKey]({
+        request,
+        range,
+        scope,
+        group,
+        user,
+      });
+      return [
+        chartKey,
+        chartPayload(
+          chartKey,
+          series,
+          range,
+          group,
+          scope,
+          user.role,
+          generatedAt,
+        ),
+      ];
+    }),
+  );
 
   return {
     schemaVersion: ANALYTICS_SCHEMA_VERSION,

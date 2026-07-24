@@ -22,18 +22,25 @@ function exportRows(report) {
 function spreadsheetXml(report) {
   const rows = exportRows(report);
   const columns = Array.from(
-    rows.reduce((keys, row) => {
-      Object.keys(row).forEach((key) => keys.add(key));
-      return keys;
-    }, new Set(["label", "value"])),
+    rows.reduce(
+      (keys, row) => {
+        Object.keys(row).forEach((key) => keys.add(key));
+        return keys;
+      },
+      new Set(["label", "value"]),
+    ),
   );
   const rowXml = [columns, ...rows]
     .map((row) => {
-      const values = Array.isArray(row) ? row : columns.map((column) => row[column]);
-      return `<Row>${values.map((value) => {
-        const isNumber = typeof value === "number";
-        return `<Cell><Data ss:Type="${isNumber ? "Number" : "String"}">${escapeXml(value)}</Data></Cell>`;
-      }).join("")}</Row>`;
+      const values = Array.isArray(row)
+        ? row
+        : columns.map((column) => row[column]);
+      return `<Row>${values
+        .map((value) => {
+          const isNumber = typeof value === "number";
+          return `<Cell><Data ss:Type="${isNumber ? "Number" : "String"}">${escapeXml(value)}</Data></Cell>`;
+        })
+        .join("")}</Row>`;
     })
     .join("");
   return `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Report"><Table>${rowXml}</Table></Worksheet></Workbook>`;
@@ -58,7 +65,9 @@ function simplePdf(report) {
     `${report.range.startDate} - ${report.range.endDate}`,
     "",
     ...rows.slice(0, 32).map((row) =>
-      Object.entries(row).map(([key, value]) => `${key}: ${value}`).join(" | "),
+      Object.entries(row)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(" | "),
     ),
   ];
   const stream = `BT /F1 11 Tf 46 800 Td ${lines.map((line, index) => `${index ? "0 -18 Td " : ""}(${ascii(line)}) Tj`).join(" ")} ET`;
@@ -77,7 +86,10 @@ function simplePdf(report) {
   });
   const xrefOffset = Buffer.byteLength(body, "ascii");
   body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  body += offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  body += offsets
+    .slice(1)
+    .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
+    .join("");
   body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
   return Buffer.from(body, "ascii");
 }
@@ -88,7 +100,10 @@ async function getCatalog(req, res) {
 
 async function getChart(req, res) {
   try {
-    return success(res, await service.getChart(req.params.chartKey, req.query, req.user));
+    return success(
+      res,
+      await service.getChart(req.params.chartKey, req.query, req.user),
+    );
   } catch (err) {
     return error(res, err.message, err.statusCode || 500);
   }
@@ -96,7 +111,10 @@ async function getChart(req, res) {
 
 async function getDashboard(req, res) {
   try {
-    return success(res, await service.getDashboard(req.query, req.user, req.query.keys));
+    return success(
+      res,
+      await service.getDashboard(req.query, req.user, req.query.keys),
+    );
   } catch (err) {
     return error(res, err.message, err.statusCode || 500);
   }
@@ -107,14 +125,21 @@ async function exportChart(req, res) {
     if (normalizeRole(req.user?.role) !== "ADMIN") {
       return error(res, "Chỉ Admin được xuất báo cáo", 403);
     }
-    const report = await service.getChart(req.params.chartKey, req.query, req.user);
+    const report = await service.getChart(
+      req.params.chartKey,
+      req.query,
+      req.user,
+    );
     const format = String(req.query.format || "excel").toLowerCase();
     const safeName = `${req.params.chartKey}-${report.range.startDate}-${report.range.endDate}`;
 
     if (format === "pdf") {
       const pdf = simplePdf(report);
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${safeName}.pdf"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${safeName}.pdf"`,
+      );
       return res.send(pdf);
     }
 
@@ -123,7 +148,10 @@ async function exportChart(req, res) {
     }
     const workbook = Buffer.from(`\uFEFF${spreadsheetXml(report)}`, "utf8");
     res.setHeader("Content-Type", "application/vnd.ms-excel; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.xls"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${safeName}.xls"`,
+    );
     return res.send(workbook);
   } catch (err) {
     return error(res, err.message, err.statusCode || 500);

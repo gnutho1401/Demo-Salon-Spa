@@ -21,8 +21,7 @@ async function getMine(userId) {
   const pool = await connectDB();
 
   // Expire temporary VIP status if it has exceeded its lifetime
-  await pool.request().input("UserId", sql.Int, userId)
-    .query(`
+  await pool.request().input("UserId", sql.Int, userId).query(`
       UPDATE c
       SET 
         c.MembershipLevelId = lv.MembershipLevelId,
