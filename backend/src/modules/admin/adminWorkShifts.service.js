@@ -52,10 +52,10 @@ async function list(filters = {}) {
   const shiftDate = dateOnly(filters.shiftDate || filters.date);
   const status = text(filters.status); // 'OPEN', 'FULL', 'CLOSED'
 
-  const result = await pool.request()
+  const result = await pool
+    .request()
     .input("ShiftDate", sql.Date, shiftDate)
-    .input("Status", sql.VarChar(20), status)
-    .query(`
+    .input("Status", sql.VarChar(20), status).query(`
       SELECT 
         ws.ShiftId,
         ws.ShiftName,
@@ -99,25 +99,32 @@ async function getById(id) {
 async function create(data) {
   const name = text(data.shiftName || data.ShiftName || data.name);
   const dateStr = dateOnly(data.shiftDate || data.ShiftDate || data.date);
-  const startTime = normalizeTime(data.startTime || data.StartTime || data.start_time);
+  const startTime = normalizeTime(
+    data.startTime || data.StartTime || data.start_time,
+  );
   const endTime = normalizeTime(data.endTime || data.EndTime || data.end_time);
-  const maxTech = toInt(data.maxTechnicians || data.MaxTechnicians || data.max_technicians, 6);
-  const status = text(data.status || data.Status || 'OPEN');
+  const maxTech = toInt(
+    data.maxTechnicians || data.MaxTechnicians || data.max_technicians,
+    6,
+  );
+  const status = text(data.status || data.Status || "OPEN");
 
   if (!name) throw new Error("Vui lòng nhập tên ca làm");
   if (!dateStr) throw new Error("Vui lòng chọn ngày làm");
-  if (!startTime || !endTime) throw new Error("Vui lòng nhập giờ bắt đầu và kết thúc");
-  if (startTime >= endTime) throw new Error("Giờ kết thúc phải lớn hơn giờ bắt đầu");
+  if (!startTime || !endTime)
+    throw new Error("Vui lòng nhập giờ bắt đầu và kết thúc");
+  if (startTime >= endTime)
+    throw new Error("Giờ kết thúc phải lớn hơn giờ bắt đầu");
 
   const pool = await connectDB();
-  const result = await pool.request()
+  const result = await pool
+    .request()
     .input("ShiftName", sql.NVarChar(100), name)
     .input("ShiftDate", sql.Date, dateStr)
     .input("StartTime", sql.VarChar(15), startTime)
     .input("EndTime", sql.VarChar(15), endTime)
     .input("MaxTechnicians", sql.Int, maxTech)
-    .input("Status", sql.NVarChar(20), status)
-    .query(`
+    .input("Status", sql.NVarChar(20), status).query(`
       INSERT INTO WorkShifts (ShiftName, ShiftDate, StartTime, EndTime, MaxTechnicians, Status)
       OUTPUT 
         INSERTED.ShiftId,
@@ -139,23 +146,31 @@ async function update(id, data) {
 
   const name = text(data.shiftName || data.name || current.ShiftName);
   const dateStr = dateOnly(data.shiftDate || data.date || current.ShiftDate);
-  const startTime = normalizeTime(data.startTime || data.start_time || current.StartTime);
-  const endTime = normalizeTime(data.endTime || data.end_time || current.EndTime);
-  const maxTech = toInt(data.maxTechnicians || data.max_technicians, current.MaxTechnicians);
+  const startTime = normalizeTime(
+    data.startTime || data.start_time || current.StartTime,
+  );
+  const endTime = normalizeTime(
+    data.endTime || data.end_time || current.EndTime,
+  );
+  const maxTech = toInt(
+    data.maxTechnicians || data.max_technicians,
+    current.MaxTechnicians,
+  );
   const status = text(data.status || current.Status);
 
-  if (startTime >= endTime) throw new Error("Giờ kết thúc phải lớn hơn giờ bắt đầu");
+  if (startTime >= endTime)
+    throw new Error("Giờ kết thúc phải lớn hơn giờ bắt đầu");
 
   const pool = await connectDB();
-  await pool.request()
+  await pool
+    .request()
     .input("ShiftId", sql.Int, Number(id))
     .input("ShiftName", sql.NVarChar(100), name)
     .input("ShiftDate", sql.Date, dateStr)
     .input("StartTime", sql.VarChar(15), startTime)
     .input("EndTime", sql.VarChar(15), endTime)
     .input("MaxTechnicians", sql.Int, maxTech)
-    .input("Status", sql.NVarChar(20), status)
-    .query(`
+    .input("Status", sql.NVarChar(20), status).query(`
       UPDATE WorkShifts
       SET ShiftName = @ShiftName,
           ShiftDate = @ShiftDate,
@@ -171,7 +186,8 @@ async function update(id, data) {
 
 async function remove(id) {
   const pool = await connectDB();
-  await pool.request()
+  await pool
+    .request()
     .input("ShiftId", sql.Int, Number(id))
     .query(`DELETE FROM WorkShifts WHERE ShiftId = @ShiftId`);
   return { ShiftId: Number(id) };

@@ -14,7 +14,7 @@ function optionalAuthMiddleware(req, res, next) {
     return next();
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
   try {
     req.user = verifyToken(token);
   } catch (err) {
@@ -31,8 +31,16 @@ router.post("/stylist/analyze", authMiddleware, stylistController.analyze);
 router.get("/stylist/styles", authMiddleware, hairController.getStyles);
 router.post("/stylist/tryon", authMiddleware, hairController.tryOn);
 router.get("/stylist/tryon/history", authMiddleware, hairController.getHistory);
-router.get("/stylist/tryon/:id/image/:variant", authMiddleware, hairController.getImage);
-router.patch("/stylist/tryon/:id/favorite", authMiddleware, hairController.setFavorite);
+router.get(
+  "/stylist/tryon/:id/image/:variant",
+  authMiddleware,
+  hairController.getImage,
+);
+router.patch(
+  "/stylist/tryon/:id/favorite",
+  authMiddleware,
+  hairController.setFavorite,
+);
 router.delete("/stylist/tryon/:id", authMiddleware, hairController.remove);
 router.get("/stylist/history", authMiddleware, stylistController.getHistory);
 router.post("/skin/analyze", authMiddleware, skinController.analyze);
@@ -47,37 +55,37 @@ router.get(
   "/customers/churn-prediction",
   authMiddleware,
   allowRoles("Admin", "Manager"),
-  controller.predictChurn
+  controller.predictChurn,
 );
 router.post(
   "/customers/:id/send-voucher",
   authMiddleware,
   allowRoles("Admin", "Manager"),
-  controller.sendVoucherToCustomer
+  controller.sendVoucherToCustomer,
 );
 router.post(
   "/customers/:id/send-reminder",
   authMiddleware,
   allowRoles("Admin", "Manager"),
-  controller.sendReminderToCustomer
+  controller.sendReminderToCustomer,
 );
 router.post(
   "/customers/:id/upgrade-vip",
   authMiddleware,
   allowRoles("Admin", "Manager"),
-  controller.upgradeVipCustomer
+  controller.upgradeVipCustomer,
 );
 router.post(
   "/customers/:id/gift-free-service",
   authMiddleware,
   allowRoles("Admin", "Manager"),
-  controller.giftFreeServiceToCustomer
+  controller.giftFreeServiceToCustomer,
 );
 router.post(
   "/customers/:id/add-points",
   authMiddleware,
   allowRoles("Admin", "Manager"),
-  controller.addPointsToCustomer
+  controller.addPointsToCustomer,
 );
 router.get(
   "/:id",
