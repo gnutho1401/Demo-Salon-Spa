@@ -44,7 +44,14 @@ function renderAvatar(item, size = 42) {
   const url = item?.AvatarUrl ? resolveFileUrl(item.AvatarUrl) : "";
   if (url) {
     return (
-      <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <div
+        style={{
+          position: "relative",
+          width: size,
+          height: size,
+          flexShrink: 0,
+        }}
+      >
         <img
           src={url}
           alt={item?.FullName || "Customer"}
@@ -54,7 +61,7 @@ function renderAvatar(item, size = 42) {
             borderRadius: "50%",
             objectFit: "cover",
             border: "2px solid #d6b57e",
-            boxShadow: "0 2px 8px rgba(120,80,40,0.15)"
+            boxShadow: "0 2px 8px rgba(120,80,40,0.15)",
           }}
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -76,7 +83,10 @@ function renderAvatar(item, size = 42) {
             fontSize: size * 0.42,
           }}
         >
-          {String(item?.FullName || "?").trim().charAt(0).toUpperCase()}
+          {String(item?.FullName || "?")
+            .trim()
+            .charAt(0)
+            .toUpperCase()}
         </div>
       </div>
     );
@@ -93,7 +103,10 @@ function renderAvatar(item, size = 42) {
   ];
   const charCode = item?.FullName ? item.FullName.charCodeAt(0) : 65;
   const background = gradients[charCode % gradients.length];
-  const letter = String(item?.FullName || "?").trim().charAt(0).toUpperCase();
+  const letter = String(item?.FullName || "?")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <div
@@ -111,7 +124,7 @@ function renderAvatar(item, size = 42) {
         boxShadow: "0 3px 10px rgba(120,80,40,0.12)",
         border: "2px solid #ffffff",
         textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-        flexShrink: 0
+        flexShrink: 0,
       }}
     >
       {letter}
@@ -182,8 +195,8 @@ export default function AdminCustomers() {
     } catch (err) {
       setError(
         err?.response?.data?.message ||
-        err?.message ||
-        "Không thể tải dự báo rủi ro churn từ AI"
+          err?.message ||
+          "Không thể tải dự báo rủi ro churn từ AI",
       );
     } finally {
       setLoadingChurn(false);
@@ -196,11 +209,12 @@ export default function AdminCustomers() {
 
   const scrollToGrid = () => {
     if (gridRef.current) {
-      const elementPosition = gridRef.current.getBoundingClientRect().top + window.scrollY;
+      const elementPosition =
+        gridRef.current.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - 180;
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
     }
   };
@@ -209,11 +223,12 @@ export default function AdminCustomers() {
     setTimeout(() => {
       const element = document.getElementById(`customer-card-${id}`);
       if (element) {
-        const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+        const elementPosition =
+          element.getBoundingClientRect().top + window.scrollY;
         const offsetPosition = elementPosition - 180;
         window.scrollTo({
           top: offsetPosition,
-          behavior: "smooth"
+          behavior: "smooth",
         });
         element.style.transition = "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)";
         element.style.borderColor = "#d6b57e";
@@ -306,7 +321,10 @@ export default function AdminCustomers() {
   };
 
   const handleResetFilters = () => {
-    const wasEmpty = filters.membershipLevelId === "" && filters.gender === "" && filters.status === "";
+    const wasEmpty =
+      filters.membershipLevelId === "" &&
+      filters.gender === "" &&
+      filters.status === "";
     setFilters({
       keyword: "",
       membershipLevelId: "",
@@ -364,11 +382,15 @@ export default function AdminCustomers() {
       Phone: customerRow.Phone || "",
       Password: "", // Empty for edit
       Gender: customerRow.Gender || "Khác",
-      DateOfBirth: customerRow.DateOfBirth ? customerRow.DateOfBirth.slice(0, 10) : "",
+      DateOfBirth: customerRow.DateOfBirth
+        ? customerRow.DateOfBirth.slice(0, 10)
+        : "",
       Address: customerRow.Address || "",
       Status: customerRow.Status || "ACTIVE",
       IsVerified: !!customerRow.IsVerified,
-      MembershipLevelId: customerRow.MembershipLevelId ? String(customerRow.MembershipLevelId) : "",
+      MembershipLevelId: customerRow.MembershipLevelId
+        ? String(customerRow.MembershipLevelId)
+        : "",
     });
     setError("");
     setSuccessMsg("");
@@ -380,7 +402,8 @@ export default function AdminCustomers() {
 
     if (!form.FullName.trim()) return setError("Họ tên không được bỏ trống");
     if (!form.Email.trim()) return setError("Email không được bỏ trống");
-    if (!editingId && !form.Password) return setError("Mật khẩu bắt buộc khi tạo tài khoản");
+    if (!editingId && !form.Password)
+      return setError("Mật khẩu bắt buộc khi tạo tài khoản");
 
     const payload = {
       FullName: form.FullName.trim(),
@@ -391,7 +414,9 @@ export default function AdminCustomers() {
       Address: form.Address.trim() || null,
       Status: form.Status,
       IsVerified: form.IsVerified ? 1 : 0,
-      MembershipLevelId: form.MembershipLevelId ? Number(form.MembershipLevelId) : null,
+      MembershipLevelId: form.MembershipLevelId
+        ? Number(form.MembershipLevelId)
+        : null,
     };
 
     if (!editingId) {
@@ -405,7 +430,10 @@ export default function AdminCustomers() {
       let uId = editingId;
 
       if (editingId) {
-        const res = await axiosClient.put(`/admin/customers/${editingId}`, payload);
+        const res = await axiosClient.put(
+          `/admin/customers/${editingId}`,
+          payload,
+        );
         const updated = res.data.data || res.data;
         uId = updated?.profile?.UserId || editingId;
         setSuccessMsg("Cập nhật thông tin khách hàng thành công!");
@@ -453,7 +481,8 @@ export default function AdminCustomers() {
     e.preventDefault();
 
     const delta = Number(pointsForm.points);
-    if (!delta || delta <= 0) return setError("Vui lòng nhập số điểm hợp lệ lớn hơn 0");
+    if (!delta || delta <= 0)
+      return setError("Vui lòng nhập số điểm hợp lệ lớn hơn 0");
 
     const finalDelta = pointsForm.isEarn ? delta : -delta;
 
@@ -500,7 +529,9 @@ export default function AdminCustomers() {
         status: nextStatus,
       });
 
-      setSuccessMsg(`Đã đổi trạng thái tài khoản ${customerRow.FullName} thành ${nextStatus}!`);
+      setSuccessMsg(
+        `Đã đổi trạng thái tài khoản ${customerRow.FullName} thành ${nextStatus}!`,
+      );
       await load();
       scrollToItem(customerRow.UserId);
 
@@ -578,7 +609,9 @@ export default function AdminCustomers() {
   }, [items]);
 
   const selectedML = useMemo(() => {
-    const ml = membershipLevels.find((x) => String(x.MembershipLevelId) === String(form.MembershipLevelId));
+    const ml = membershipLevels.find(
+      (x) => String(x.MembershipLevelId) === String(form.MembershipLevelId),
+    );
     return ml;
   }, [membershipLevels, form.MembershipLevelId]);
 
@@ -599,7 +632,11 @@ export default function AdminCustomers() {
 
   const vipCardTextColor = useMemo(() => {
     const name = selectedML?.LevelName || "";
-    if (name.toUpperCase().includes("GOLD") || name.toUpperCase().includes("DIAMOND") || name.toUpperCase().includes("SILVER")) {
+    if (
+      name.toUpperCase().includes("GOLD") ||
+      name.toUpperCase().includes("DIAMOND") ||
+      name.toUpperCase().includes("SILVER")
+    ) {
       return "#1f140e";
     }
     return "#ffffff";
@@ -1327,13 +1364,18 @@ export default function AdminCustomers() {
           <div className="admin-eyebrow">Customer Members</div>
           <h1>Quản lý Khách hàng & Loyalty</h1>
           <p>
-            Theo dõi hồ sơ trị liệu, doanh thu thực tế, lịch sử sử dụng combo của khách hàng cùng hệ thống tự động thăng hạng Loyalty Points.
+            Theo dõi hồ sơ trị liệu, doanh thu thực tế, lịch sử sử dụng combo
+            của khách hàng cùng hệ thống tự động thăng hạng Loyalty Points.
           </p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
-          <button 
-            className="admin-refresh-btn" 
-            style={{ background: "linear-gradient(135deg, #1f140e, #3a2519)", color: "#fff", border: "1px solid #ebdcc5" }}
+          <button
+            className="admin-refresh-btn"
+            style={{
+              background: "linear-gradient(135deg, #1f140e, #3a2519)",
+              color: "#fff",
+              border: "1px solid #ebdcc5",
+            }}
             onClick={handleOpenChurn}
           >
             <span>🔮 Dự báo Churn (AI)</span>
@@ -1386,7 +1428,9 @@ export default function AdminCustomers() {
         />
         <select
           value={filters.membershipLevelId}
-          onChange={(e) => setFilters({ ...filters, membershipLevelId: e.target.value })}
+          onChange={(e) =>
+            setFilters({ ...filters, membershipLevelId: e.target.value })
+          }
         >
           <option value="">Tất cả hạng VIP</option>
           {membershipLevels.map((lvl) => (
@@ -1422,25 +1466,45 @@ export default function AdminCustomers() {
       </div>
 
       {/* Success/Error Alerts */}
-      {error && <div className="admin-error-card" style={{ marginBottom: 20 }}>{error}</div>}
+      {error && (
+        <div className="admin-error-card" style={{ marginBottom: 20 }}>
+          {error}
+        </div>
+      )}
       {successMsg && (
-        <div className="admin-loading-card" style={{ marginBottom: 20, color: "#107c41", borderColor: "rgba(16, 124, 65, 0.2)", background: "#e8f7ec" }}>
+        <div
+          className="admin-loading-card"
+          style={{
+            marginBottom: 20,
+            color: "#107c41",
+            borderColor: "rgba(16, 124, 65, 0.2)",
+            background: "#e8f7ec",
+          }}
+        >
           {successMsg}
         </div>
       )}
 
       {loading ? (
-        <div className="admin-loading-card">Đang tải danh sách khách hàng spa...</div>
+        <div className="admin-loading-card">
+          Đang tải danh sách khách hàng spa...
+        </div>
       ) : (
         <div ref={gridRef} className="admin-user-grid">
           {items.map((item) => (
-            <div key={item.UserId} id={`customer-card-${item.UserId}`} className="admin-user-card">
+            <div
+              key={item.UserId}
+              id={`customer-card-${item.UserId}`}
+              className="admin-user-card"
+            >
               <div className="admin-user-card-header">
                 {renderAvatar(item, 56)}
                 <div className="admin-user-info">
                   <h4>{item.FullName}</h4>
                   <span>{item.Email}</span>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div
+                    style={{ display: "flex", gap: 6, alignItems: "center" }}
+                  >
                     <span className="admin-role-badge">
                       {item.MembershipLevelName || "Standard Member"}
                     </span>
@@ -1452,27 +1516,56 @@ export default function AdminCustomers() {
               </div>
 
               <div className="admin-user-card-body">
-                <InfoRow label="Số điện thoại" value={item.Phone || "Chưa thiết lập"} />
+                <InfoRow
+                  label="Số điện thoại"
+                  value={item.Phone || "Chưa thiết lập"}
+                />
                 <InfoRow label="Giới tính" value={item.Gender || "Khác"} />
-                <InfoRow label="Điểm tích lũy" value={`${item.LoyaltyPoints || 0} điểm`} valueColor="#b8860b" />
-                <InfoRow label="Lịch hẹn trị liệu" value={`${item.AppointmentCount || 0} cuộc`} />
-                <InfoRow label="Tổng chi tiêu" value={formatMoney(item.TotalPaid)} valueColor="#107c41" />
+                <InfoRow
+                  label="Điểm tích lũy"
+                  value={`${item.LoyaltyPoints || 0} điểm`}
+                  valueColor="#b8860b"
+                />
+                <InfoRow
+                  label="Lịch hẹn trị liệu"
+                  value={`${item.AppointmentCount || 0} cuộc`}
+                />
+                <InfoRow
+                  label="Tổng chi tiêu"
+                  value={formatMoney(item.TotalPaid)}
+                  valueColor="#107c41"
+                />
               </div>
 
               <div className="admin-user-card-footer">
-                <button className="card-btn primary" onClick={() => handleOpenDetail(item.UserId)}>
+                <button
+                  className="card-btn primary"
+                  onClick={() => handleOpenDetail(item.UserId)}
+                >
                   Hồ sơ
                 </button>
-                <button className="card-btn" onClick={() => handleOpenEdit(item)}>
+                <button
+                  className="card-btn"
+                  onClick={() => handleOpenEdit(item)}
+                >
                   Sửa
                 </button>
-                <button className="card-btn" onClick={() => handleOpenPoints(item)}>
+                <button
+                  className="card-btn"
+                  onClick={() => handleOpenPoints(item)}
+                >
                   Điểm 💎
                 </button>
-                <button className="card-btn" onClick={() => handleOpenPassword(item)}>
+                <button
+                  className="card-btn"
+                  onClick={() => handleOpenPassword(item)}
+                >
                   Pass 🔑
                 </button>
-                <button className="card-btn danger" onClick={() => handleChangeStatus(item)}>
+                <button
+                  className="card-btn danger"
+                  onClick={() => handleChangeStatus(item)}
+                >
                   Khóa/Mở
                 </button>
               </div>
@@ -1490,39 +1583,87 @@ export default function AdminCustomers() {
       {/* DETAIL MODAL */}
       {selected && (
         <div className="admin-modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="admin-modal-wrapper" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="admin-modal-wrapper"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="admin-profile-header">
               {renderAvatar(selected.profile, 64)}
               <div>
-                <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1.5px", color: "#d6b57e", fontWeight: "700" }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    letterSpacing: "1.5px",
+                    color: "#d6b57e",
+                    fontWeight: "700",
+                  }}
+                >
                   Mã khách hàng #{selected.profile.CustomerId}
                 </span>
                 <h3>{selected.profile.FullName}</h3>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
-                  <span style={{ fontSize: "13.5px", opacity: 0.85 }}>{selected.profile.Email}</span>
-                  <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#d6b57e" }}></span>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "center",
+                    marginTop: 4,
+                  }}
+                >
+                  <span style={{ fontSize: "13.5px", opacity: 0.85 }}>
+                    {selected.profile.Email}
+                  </span>
+                  <span
+                    style={{
+                      width: 4,
+                      height: 4,
+                      borderRadius: "50%",
+                      background: "#d6b57e",
+                    }}
+                  ></span>
                   <span className="admin-role-badge" style={{ marginTop: 0 }}>
                     {selected.profile.MembershipLevelName || "Standard Member"}
                   </span>
                 </div>
               </div>
-              <button className="admin-modal-close" onClick={() => setSelected(null)} style={{ position: "absolute", top: 20, right: 20, color: "#fff" }}>
+              <button
+                className="admin-modal-close"
+                onClick={() => setSelected(null)}
+                style={{
+                  position: "absolute",
+                  top: 20,
+                  right: 20,
+                  color: "#fff",
+                }}
+              >
                 &times;
               </button>
             </div>
 
             {/* Navigation Tabs */}
             <div className="admin-tabs-nav">
-              <button className={`admin-tab-btn ${activeTab === "profile" ? "active" : ""}`} onClick={() => setActiveTab("profile")}>
+              <button
+                className={`admin-tab-btn ${activeTab === "profile" ? "active" : ""}`}
+                onClick={() => setActiveTab("profile")}
+              >
                 Hồ sơ thông tin
               </button>
-              <button className={`admin-tab-btn ${activeTab === "appointments" ? "active" : ""}`} onClick={() => setActiveTab("appointments")}>
+              <button
+                className={`admin-tab-btn ${activeTab === "appointments" ? "active" : ""}`}
+                onClick={() => setActiveTab("appointments")}
+              >
                 Lịch hẹn ({selected.appointments.length})
               </button>
-              <button className={`admin-tab-btn ${activeTab === "packages" ? "active" : ""}`} onClick={() => setActiveTab("packages")}>
+              <button
+                className={`admin-tab-btn ${activeTab === "packages" ? "active" : ""}`}
+                onClick={() => setActiveTab("packages")}
+              >
                 Gói Combo ({selected.packages.length})
               </button>
-              <button className={`admin-tab-btn ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>
+              <button
+                className={`admin-tab-btn ${activeTab === "history" ? "active" : ""}`}
+                onClick={() => setActiveTab("history")}
+              >
                 Nhận xét & Feedback ({selected.history.length})
               </button>
             </div>
@@ -1532,17 +1673,53 @@ export default function AdminCustomers() {
                 <div className="admin-profile-grid">
                   <div className="admin-profile-section">
                     <h4>👤 Thông tin chung</h4>
-                    <InfoRow label="Số điện thoại" value={selected.profile.Phone || "Chưa cập nhật"} />
-                    <InfoRow label="Giới tính" value={selected.profile.Gender || "Khác"} />
-                    <InfoRow label="Ngày sinh nhật" value={formatDate(selected.profile.DateOfBirth)} />
-                    <InfoRow label="Xác minh email" value={selected.profile.IsVerified ? "Đã xác minh ✓" : "Chưa xác minh ✖"} valueColor={selected.profile.IsVerified ? "#107c41" : "#a80000"} />
+                    <InfoRow
+                      label="Số điện thoại"
+                      value={selected.profile.Phone || "Chưa cập nhật"}
+                    />
+                    <InfoRow
+                      label="Giới tính"
+                      value={selected.profile.Gender || "Khác"}
+                    />
+                    <InfoRow
+                      label="Ngày sinh nhật"
+                      value={formatDate(selected.profile.DateOfBirth)}
+                    />
+                    <InfoRow
+                      label="Xác minh email"
+                      value={
+                        selected.profile.IsVerified
+                          ? "Đã xác minh ✓"
+                          : "Chưa xác minh ✖"
+                      }
+                      valueColor={
+                        selected.profile.IsVerified ? "#107c41" : "#a80000"
+                      }
+                    />
                   </div>
                   <div className="admin-profile-section">
                     <h4>💎 Tình trạng Loyalty</h4>
-                    <InfoRow label="Điểm tích lũy hiện tại" value={`${selected.profile.LoyaltyPoints || 0} điểm`} valueColor="#b8860b" />
-                    <InfoRow label="Tổng chi tiêu đã trả" value={formatMoney(selected.profile.TotalPaid)} valueColor="#107c41" />
-                    <div style={{ fontSize: "13px", color: "#8c7e74", borderTop: "1px solid #ebdcc5", paddingTop: 10, marginTop: 4 }}>
-                      <strong>Địa chỉ giao dịch:</strong> {selected.profile.Address || "Chưa thiết lập"}
+                    <InfoRow
+                      label="Điểm tích lũy hiện tại"
+                      value={`${selected.profile.LoyaltyPoints || 0} điểm`}
+                      valueColor="#b8860b"
+                    />
+                    <InfoRow
+                      label="Tổng chi tiêu đã trả"
+                      value={formatMoney(selected.profile.TotalPaid)}
+                      valueColor="#107c41"
+                    />
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        color: "#8c7e74",
+                        borderTop: "1px solid #ebdcc5",
+                        paddingTop: 10,
+                        marginTop: 4,
+                      }}
+                    >
+                      <strong>Địa chỉ giao dịch:</strong>{" "}
+                      {selected.profile.Address || "Chưa thiết lập"}
                     </div>
                   </div>
                 </div>
@@ -1565,16 +1742,32 @@ export default function AdminCustomers() {
                       {selected.appointments.map((a) => (
                         <tr key={a.AppointmentId}>
                           <td>{formatDate(a.AppointmentDate)}</td>
-                          <td>{a.StartTime.slice(0, 5)} - {a.EndTime.slice(0, 5)}</td>
+                          <td>
+                            {a.StartTime.slice(0, 5)} - {a.EndTime.slice(0, 5)}
+                          </td>
                           <td>{a.EmployeeName || "Chưa gán"}</td>
                           <td>{formatMoney(a.FinalAmount || 0)}</td>
                           <td>
-                            <span className={statusClass(a.Status)} style={{ position: "static", fontSize: "11px", padding: "2px 8px" }}>
+                            <span
+                              className={statusClass(a.Status)}
+                              style={{
+                                position: "static",
+                                fontSize: "11px",
+                                padding: "2px 8px",
+                              }}
+                            >
                               {a.Status}
                             </span>
                           </td>
                           <td>
-                            <span className={statusClass(a.PaymentStatus)} style={{ position: "static", fontSize: "11px", padding: "2px 8px" }}>
+                            <span
+                              className={statusClass(a.PaymentStatus)}
+                              style={{
+                                position: "static",
+                                fontSize: "11px",
+                                padding: "2px 8px",
+                              }}
+                            >
                               {a.PaymentStatus || "PENDING"}
                             </span>
                           </td>
@@ -1582,7 +1775,12 @@ export default function AdminCustomers() {
                       ))}
                       {!selected.appointments.length ? (
                         <tr>
-                          <td colSpan="6" style={{ textAlign: "center", color: "#8c7e74" }}>Khách hàng chưa thực hiện cuộc hẹn nào.</td>
+                          <td
+                            colSpan="6"
+                            style={{ textAlign: "center", color: "#8c7e74" }}
+                          >
+                            Khách hàng chưa thực hiện cuộc hẹn nào.
+                          </td>
                         </tr>
                       ) : null}
                     </tbody>
@@ -1606,13 +1804,31 @@ export default function AdminCustomers() {
                     <tbody>
                       {selected.packages.map((p) => (
                         <tr key={p.CustomerPackageId}>
-                          <td><strong>{p.PackageName}</strong></td>
+                          <td>
+                            <strong>{p.PackageName}</strong>
+                          </td>
                           <td>{p.TotalSessions} buổi</td>
-                          <td><strong style={{ color: p.SessionsLeft > 0 ? "#107c41" : "#8c7e74" }}>{p.SessionsLeft} buổi</strong></td>
+                          <td>
+                            <strong
+                              style={{
+                                color:
+                                  p.SessionsLeft > 0 ? "#107c41" : "#8c7e74",
+                              }}
+                            >
+                              {p.SessionsLeft} buổi
+                            </strong>
+                          </td>
                           <td>{formatDate(p.BoughtAt)}</td>
                           <td>{formatDate(p.ExpiryDate)}</td>
                           <td>
-                            <span className={statusClass(p.PaymentStatus)} style={{ position: "static", fontSize: "11px", padding: "2px 8px" }}>
+                            <span
+                              className={statusClass(p.PaymentStatus)}
+                              style={{
+                                position: "static",
+                                fontSize: "11px",
+                                padding: "2px 8px",
+                              }}
+                            >
                               {p.PaymentStatus || "PAID"}
                             </span>
                           </td>
@@ -1620,7 +1836,12 @@ export default function AdminCustomers() {
                       ))}
                       {!selected.packages.length ? (
                         <tr>
-                          <td colSpan="6" style={{ textAlign: "center", color: "#8c7e74" }}>Khách hàng chưa đăng ký mua gói combo nào.</td>
+                          <td
+                            colSpan="6"
+                            style={{ textAlign: "center", color: "#8c7e74" }}
+                          >
+                            Khách hàng chưa đăng ký mua gói combo nào.
+                          </td>
                         </tr>
                       ) : null}
                     </tbody>
@@ -1643,18 +1864,40 @@ export default function AdminCustomers() {
                       {selected.history.map((h, index) => (
                         <tr key={index}>
                           <td>
-                            <span className="admin-role-badge" style={{ background: h.ItemType === "review" ? "#eef2ff" : "#fff0f0", color: h.ItemType === "review" ? "#4f46e5" : "#d83b01", border: "0" }}>
+                            <span
+                              className="admin-role-badge"
+                              style={{
+                                background:
+                                  h.ItemType === "review"
+                                    ? "#eef2ff"
+                                    : "#fff0f0",
+                                color:
+                                  h.ItemType === "review"
+                                    ? "#4f46e5"
+                                    : "#d83b01",
+                                border: "0",
+                              }}
+                            >
                               {h.ItemType.toUpperCase()}
                             </span>
                           </td>
                           <td>
-                            <div style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis" }}>
-                              <strong>{h.TargetName}</strong>: {h.Comment || "Không nhập comment"}
+                            <div
+                              style={{
+                                maxWidth: 300,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              <strong>{h.TargetName}</strong>:{" "}
+                              {h.Comment || "Không nhập comment"}
                             </div>
                           </td>
                           <td>
                             {h.Score !== null ? (
-                              <strong style={{ color: "#b8860b" }}>{h.Score} ⭐</strong>
+                              <strong style={{ color: "#b8860b" }}>
+                                {h.Score} ⭐
+                              </strong>
                             ) : (
                               <span style={{ color: "#8c7e74" }}>-</span>
                             )}
@@ -1664,7 +1907,12 @@ export default function AdminCustomers() {
                       ))}
                       {!selected.history.length ? (
                         <tr>
-                          <td colSpan="4" style={{ textAlign: "center", color: "#8c7e74" }}>Khách hàng chưa có nhận xét hay feedback nào.</td>
+                          <td
+                            colSpan="4"
+                            style={{ textAlign: "center", color: "#8c7e74" }}
+                          >
+                            Khách hàng chưa có nhận xét hay feedback nào.
+                          </td>
                         </tr>
                       ) : null}
                     </tbody>
@@ -1673,8 +1921,20 @@ export default function AdminCustomers() {
               )}
             </div>
 
-            <div style={{ padding: "16px 32px", background: "#faf8f5", borderTop: "1px solid #ebdcc5", display: "flex", justifyContent: "flex-end" }}>
-              <button className="card-btn primary" style={{ maxWidth: 120 }} onClick={() => setSelected(null)}>
+            <div
+              style={{
+                padding: "16px 32px",
+                background: "#faf8f5",
+                borderTop: "1px solid #ebdcc5",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                className="card-btn primary"
+                style={{ maxWidth: 120 }}
+                onClick={() => setSelected(null)}
+              >
                 Đóng hồ sơ
               </button>
             </div>
@@ -1684,16 +1944,42 @@ export default function AdminCustomers() {
 
       {/* CREATE/EDIT MODAL */}
       {showFormModal && (
-        <div className="admin-modal-backdrop" onClick={() => setShowFormModal(false)}>
-          <div className="admin-modal-wrapper" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header" style={{ background: "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)", color: "#fff" }}>
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setShowFormModal(false)}
+        >
+          <div
+            className="admin-modal-wrapper"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="admin-modal-header"
+              style={{
+                background: "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)",
+                color: "#fff",
+              }}
+            >
               <div>
-                <span style={{ color: "#d6b57e", textTransform: "uppercase", fontSize: "11px", fontWeight: "700", letterSpacing: "1px" }}>
+                <span
+                  style={{
+                    color: "#d6b57e",
+                    textTransform: "uppercase",
+                    fontSize: "11px",
+                    fontWeight: "700",
+                    letterSpacing: "1px",
+                  }}
+                >
                   {editingId ? "Cập nhật hồ sơ" : "Thành viên mới"}
                 </span>
-                <h3 style={{ color: "#ffffff", marginTop: 4 }}>{editingId ? "Chỉnh sửa tài khoản" : "Tạo tài khoản mới"}</h3>
+                <h3 style={{ color: "#ffffff", marginTop: 4 }}>
+                  {editingId ? "Chỉnh sửa tài khoản" : "Tạo tài khoản mới"}
+                </h3>
               </div>
-              <button className="admin-modal-close" onClick={() => setShowFormModal(false)} style={{ color: "#fff" }}>
+              <button
+                className="admin-modal-close"
+                onClick={() => setShowFormModal(false)}
+                style={{ color: "#fff" }}
+              >
                 &times;
               </button>
             </div>
@@ -1704,7 +1990,9 @@ export default function AdminCustomers() {
                   Họ và tên *
                   <input
                     value={form.FullName}
-                    onChange={(e) => setForm({ ...form, FullName: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, FullName: e.target.value })
+                    }
                     placeholder="Nguyễn Thị B"
                     required
                   />
@@ -1714,7 +2002,9 @@ export default function AdminCustomers() {
                   <input
                     type="email"
                     value={form.Email}
-                    onChange={(e) => setForm({ ...form, Email: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, Email: e.target.value })
+                    }
                     placeholder="nguyenthib@gmail.com"
                     required
                   />
@@ -1723,7 +2013,9 @@ export default function AdminCustomers() {
                   Số điện thoại
                   <input
                     value={form.Phone}
-                    onChange={(e) => setForm({ ...form, Phone: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, Phone: e.target.value })
+                    }
                     placeholder="0932145678"
                   />
                 </label>
@@ -1733,7 +2025,9 @@ export default function AdminCustomers() {
                     <input
                       type="password"
                       value={form.Password}
-                      onChange={(e) => setForm({ ...form, Password: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, Password: e.target.value })
+                      }
                       placeholder="Mật khẩu từ 6 ký tự..."
                       required
                     />
@@ -1741,7 +2035,12 @@ export default function AdminCustomers() {
                 ) : null}
                 <label>
                   Giới tính
-                  <select value={form.Gender} onChange={(e) => setForm({ ...form, Gender: e.target.value })}>
+                  <select
+                    value={form.Gender}
+                    onChange={(e) =>
+                      setForm({ ...form, Gender: e.target.value })
+                    }
+                  >
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                     <option value="Khác">Khác</option>
@@ -1752,15 +2051,25 @@ export default function AdminCustomers() {
                   <input
                     type="date"
                     value={form.DateOfBirth}
-                    onChange={(e) => setForm({ ...form, DateOfBirth: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, DateOfBirth: e.target.value })
+                    }
                   />
                 </label>
                 <label>
                   Hạng VIP Loyalty
-                  <select value={form.MembershipLevelId} onChange={(e) => setForm({ ...form, MembershipLevelId: e.target.value })}>
+                  <select
+                    value={form.MembershipLevelId}
+                    onChange={(e) =>
+                      setForm({ ...form, MembershipLevelId: e.target.value })
+                    }
+                  >
                     <option value="">Standard (Mặc định)</option>
                     {membershipLevels.map((lvl) => (
-                      <option key={lvl.MembershipLevelId} value={lvl.MembershipLevelId}>
+                      <option
+                        key={lvl.MembershipLevelId}
+                        value={lvl.MembershipLevelId}
+                      >
                         {lvl.LevelName}
                       </option>
                     ))}
@@ -1768,7 +2077,12 @@ export default function AdminCustomers() {
                 </label>
                 <label>
                   Trạng thái hoạt động
-                  <select value={form.Status} onChange={(e) => setForm({ ...form, Status: e.target.value })}>
+                  <select
+                    value={form.Status}
+                    onChange={(e) =>
+                      setForm({ ...form, Status: e.target.value })
+                    }
+                  >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="INACTIVE">INACTIVE</option>
                     <option value="BANNED">BANNED</option>
@@ -1776,7 +2090,12 @@ export default function AdminCustomers() {
                 </label>
                 <label>
                   Xác minh Email
-                  <select value={form.IsVerified ? "1" : "0"} onChange={(e) => setForm({ ...form, IsVerified: e.target.value === "1" })}>
+                  <select
+                    value={form.IsVerified ? "1" : "0"}
+                    onChange={(e) =>
+                      setForm({ ...form, IsVerified: e.target.value === "1" })
+                    }
+                  >
                     <option value="1">Đã xác minh</option>
                     <option value="0">Chưa xác minh</option>
                   </select>
@@ -1786,7 +2105,9 @@ export default function AdminCustomers() {
                   <textarea
                     rows={2}
                     value={form.Address}
-                    onChange={(e) => setForm({ ...form, Address: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, Address: e.target.value })
+                    }
                     placeholder="Số 88, Đường Võ Văn Kiệt, Q.1, TP.HCM"
                   />
                 </label>
@@ -1794,17 +2115,41 @@ export default function AdminCustomers() {
 
               {/* Real-time VIP Card Preview */}
               <div className="admin-editor-preview-column">
-                <span className="admin-preview-title">Thẻ VIP Live Preview</span>
+                <span className="admin-preview-title">
+                  Thẻ VIP Live Preview
+                </span>
                 <div
                   className="vip-preview-card"
-                  style={{ background: vipCardBackground, color: vipCardTextColor }}
+                  style={{
+                    background: vipCardBackground,
+                    color: vipCardTextColor,
+                  }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                    }}
+                  >
                     <div>
-                      <small style={{ fontSize: "9px", textTransform: "uppercase", letterSpacing: "1px", opacity: 0.8 }}>
+                      <small
+                        style={{
+                          fontSize: "9px",
+                          textTransform: "uppercase",
+                          letterSpacing: "1px",
+                          opacity: 0.8,
+                        }}
+                      >
                         Spa Member VIP Card
                       </small>
-                      <h4 style={{ margin: "2px 0 0 0", fontSize: "16px", fontWeight: "800" }}>
+                      <h4
+                        style={{
+                          margin: "2px 0 0 0",
+                          fontSize: "16px",
+                          fontWeight: "800",
+                        }}
+                      >
                         {selectedML?.LevelName || "Standard Member"}
                       </h4>
                     </div>
@@ -1813,15 +2158,37 @@ export default function AdminCustomers() {
 
                   <div className="vip-card-chip"></div>
 
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-end",
+                    }}
+                  >
                     <div>
-                      <strong style={{ display: "block", fontSize: "14px", letterSpacing: "0.5px" }}>
+                      <strong
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
                         {form.FullName || "HỌ VÀ TÊN KHÁCH"}
                       </strong>
-                      <span style={{ fontSize: "11px", opacity: 0.85 }}>{form.Email || "customer@example.com"}</span>
+                      <span style={{ fontSize: "11px", opacity: 0.85 }}>
+                        {form.Email || "customer@example.com"}
+                      </span>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <span style={{ fontSize: "9px", display: "block", opacity: 0.8 }}>LOYALTY POINTS</span>
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          display: "block",
+                          opacity: 0.8,
+                        }}
+                      >
+                        LOYALTY POINTS
+                      </span>
                       <strong style={{ fontSize: "14px" }}>0 pts</strong>
                     </div>
                   </div>
@@ -1830,11 +2197,24 @@ export default function AdminCustomers() {
             </div>
 
             <div className="admin-modal-footer">
-              <button className="card-btn" type="button" onClick={() => setShowFormModal(false)}>
+              <button
+                className="card-btn"
+                type="button"
+                onClick={() => setShowFormModal(false)}
+              >
                 Hủy
               </button>
-              <button className="card-btn primary" type="button" onClick={handleFormSubmit} disabled={saving}>
-                {saving ? "Đang lưu..." : editingId ? "Cập nhật" : "Tạo tài khoản"}
+              <button
+                className="card-btn primary"
+                type="button"
+                onClick={handleFormSubmit}
+                disabled={saving}
+              >
+                {saving
+                  ? "Đang lưu..."
+                  : editingId
+                    ? "Cập nhật"
+                    : "Tạo tài khoản"}
               </button>
             </div>
           </div>
@@ -1843,55 +2223,125 @@ export default function AdminCustomers() {
 
       {/* ADJUST LOYALTY POINTS MODAL */}
       {showPointsModal && (
-        <div className="admin-modal-backdrop" onClick={() => setShowPointsModal(false)}>
-          <div className="admin-modal-wrapper" style={{ maxWidth: 450 }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setShowPointsModal(false)}
+        >
+          <div
+            className="admin-modal-wrapper"
+            style={{ maxWidth: 450 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <form onSubmit={handlePointsSubmit}>
-              <div className="admin-modal-header" style={{ background: "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)", color: "#fff" }}>
+              <div
+                className="admin-modal-header"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)",
+                  color: "#fff",
+                }}
+              >
                 <h3>Điều chỉnh điểm Loyalty</h3>
-                <button type="button" className="admin-modal-close" onClick={() => setShowPointsModal(false)} style={{ color: "#fff" }}>
+                <button
+                  type="button"
+                  className="admin-modal-close"
+                  onClick={() => setShowPointsModal(false)}
+                  style={{ color: "#fff" }}
+                >
                   &times;
                 </button>
               </div>
 
-              <div style={{ padding: "24px 32px", display: "flex", flexDirection: "column", gap: 16 }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "13.5px", fontWeight: "700", color: "#5c4a3c" }}>
+              <div
+                style={{
+                  padding: "24px 32px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: "13.5px",
+                    fontWeight: "700",
+                    color: "#5c4a3c",
+                  }}
+                >
                   Loại điều chỉnh
                   <select
                     value={pointsForm.isEarn ? "1" : "0"}
-                    onChange={(e) => setPointsForm({ ...pointsForm, isEarn: e.target.value === "1" })}
+                    onChange={(e) =>
+                      setPointsForm({
+                        ...pointsForm,
+                        isEarn: e.target.value === "1",
+                      })
+                    }
                   >
                     <option value="1">Cộng thêm điểm (+)</option>
                     <option value="0">Khấu trừ điểm (-)</option>
                   </select>
                 </label>
 
-                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "13.5px", fontWeight: "700", color: "#5c4a3c" }}>
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: "13.5px",
+                    fontWeight: "700",
+                    color: "#5c4a3c",
+                  }}
+                >
                   Số điểm điều chỉnh *
                   <input
                     type="number"
                     min="1"
                     value={pointsForm.points}
-                    onChange={(e) => setPointsForm({ ...pointsForm, points: e.target.value })}
+                    onChange={(e) =>
+                      setPointsForm({ ...pointsForm, points: e.target.value })
+                    }
                     required
                   />
                 </label>
 
-                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "13.5px", fontWeight: "700", color: "#5c4a3c" }}>
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: "13.5px",
+                    fontWeight: "700",
+                    color: "#5c4a3c",
+                  }}
+                >
                   Lý do ghi nhận
                   <textarea
                     rows={3}
                     value={pointsForm.note}
-                    onChange={(e) => setPointsForm({ ...pointsForm, note: e.target.value })}
+                    onChange={(e) =>
+                      setPointsForm({ ...pointsForm, note: e.target.value })
+                    }
                     placeholder="Nhập lý do thay đổi điểm thưởng của khách..."
                   />
                 </label>
               </div>
 
               <div className="admin-modal-footer">
-                <button className="card-btn" type="button" onClick={() => setShowPointsModal(false)}>
+                <button
+                  className="card-btn"
+                  type="button"
+                  onClick={() => setShowPointsModal(false)}
+                >
                   Hủy
                 </button>
-                <button className="card-btn primary" type="submit" disabled={saving}>
+                <button
+                  className="card-btn primary"
+                  type="submit"
+                  disabled={saving}
+                >
                   {saving ? "Đang lưu..." : "Xác nhận đổi điểm"}
                 </button>
               </div>
@@ -1902,18 +2352,46 @@ export default function AdminCustomers() {
 
       {/* RESET PASSWORD MODAL */}
       {showPasswordModal && (
-        <div className="admin-modal-backdrop" onClick={() => setShowPasswordModal(false)}>
-          <div className="admin-modal-wrapper" style={{ maxWidth: 450 }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setShowPasswordModal(false)}
+        >
+          <div
+            className="admin-modal-wrapper"
+            style={{ maxWidth: 450 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <form onSubmit={handlePasswordSubmit}>
-              <div className="admin-modal-header" style={{ background: "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)", color: "#fff" }}>
+              <div
+                className="admin-modal-header"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #1f140e 0%, #3a2519 100%)",
+                  color: "#fff",
+                }}
+              >
                 <h3>Đặt lại mật khẩu</h3>
-                <button type="button" className="admin-modal-close" onClick={() => setShowPasswordModal(false)} style={{ color: "#fff" }}>
+                <button
+                  type="button"
+                  className="admin-modal-close"
+                  onClick={() => setShowPasswordModal(false)}
+                  style={{ color: "#fff" }}
+                >
                   &times;
                 </button>
               </div>
 
               <div style={{ padding: "24px 32px" }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "13.5px", fontWeight: "700", color: "#5c4a3c" }}>
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: "13.5px",
+                    fontWeight: "700",
+                    color: "#5c4a3c",
+                  }}
+                >
                   Mật khẩu mới *
                   <input
                     type="password"
@@ -1926,10 +2404,18 @@ export default function AdminCustomers() {
               </div>
 
               <div className="admin-modal-footer">
-                <button className="card-btn" type="button" onClick={() => setShowPasswordModal(false)}>
+                <button
+                  className="card-btn"
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                >
                   Hủy
                 </button>
-                <button className="card-btn primary" type="submit" disabled={saving}>
+                <button
+                  className="card-btn primary"
+                  type="submit"
+                  disabled={saving}
+                >
                   {saving ? "Đang cập nhật..." : "Xác nhận đặt lại"}
                 </button>
               </div>
@@ -1940,69 +2426,155 @@ export default function AdminCustomers() {
 
       {/* CHURN PREDICTION MODAL */}
       {showChurnModal && (
-        <div className="admin-modal-backdrop" onClick={() => setShowChurnModal(false)}>
-          <div className="admin-modal-wrapper" style={{ maxWidth: 950, width: "95%" }} onClick={(e) => e.stopPropagation()}>
-            <div className="admin-profile-header" style={{ background: "linear-gradient(135deg, #1b130f 0%, #2f1d13 100%)" }}>
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => setShowChurnModal(false)}
+        >
+          <div
+            className="admin-modal-wrapper"
+            style={{ maxWidth: 950, width: "95%" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="admin-profile-header"
+              style={{
+                background: "linear-gradient(135deg, #1b130f 0%, #2f1d13 100%)",
+              }}
+            >
               <div>
-                <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1.5px", color: "#d6b57e", fontWeight: "700" }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    letterSpacing: "1.5px",
+                    color: "#d6b57e",
+                    fontWeight: "700",
+                  }}
+                >
                   Hệ thống phân tích & cảnh báo
                 </span>
                 <h3>🔮 AI Customer Churn Analyzer</h3>
               </div>
-              <button className="admin-modal-close" onClick={() => setShowChurnModal(false)} style={{ position: "absolute", top: 20, right: 20, color: "#fff" }}>
+              <button
+                className="admin-modal-close"
+                onClick={() => setShowChurnModal(false)}
+                style={{
+                  position: "absolute",
+                  top: 20,
+                  right: 20,
+                  color: "#fff",
+                }}
+              >
                 &times;
               </button>
             </div>
 
             {loadingChurn ? (
-              <div style={{ padding: 40, textAlign: "center", color: "#8c7e74" }}>
+              <div
+                style={{ padding: 40, textAlign: "center", color: "#8c7e74" }}
+              >
                 <div style={{ fontSize: 24, marginBottom: 12 }}>🤖</div>
-                <div style={{ fontWeight: 700 }}>AI đang phân tích hành vi khách hàng và tính toán rủi ro...</div>
-                <div style={{ fontSize: 13, marginTop: 4, opacity: 0.8 }}>Vui lòng đợi trong giây lát</div>
+                <div style={{ fontWeight: 700 }}>
+                  AI đang phân tích hành vi khách hàng và tính toán rủi ro...
+                </div>
+                <div style={{ fontSize: 13, marginTop: 4, opacity: 0.8 }}>
+                  Vui lòng đợi trong giây lát
+                </div>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", height: "70vh" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  height: "70vh",
+                }}
+              >
                 {/* Summary banner */}
-                <div style={{ padding: "16px 28px", background: "#fcfaf7", borderBottom: "1px solid #ebdcc5", fontSize: "13.5px", color: "#5c4a3c", lineHeight: "1.5" }}>
-                  <strong>Tổng quan từ AI:</strong> {churnData?.summary || "Không có tóm tắt phân tích."}
+                <div
+                  style={{
+                    padding: "16px 28px",
+                    background: "#fcfaf7",
+                    borderBottom: "1px solid #ebdcc5",
+                    fontSize: "13.5px",
+                    color: "#5c4a3c",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  <strong>Tổng quan từ AI:</strong>{" "}
+                  {churnData?.summary || "Không có tóm tắt phân tích."}
                 </div>
 
                 <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
                   {/* Left Column - Customer List */}
-                  <div style={{ width: "42%", borderRight: "1px solid #ebdcc5", display: "flex", flexDirection: "column", background: "#faf8f5" }}>
+                  <div
+                    style={{
+                      width: "42%",
+                      borderRight: "1px solid #ebdcc5",
+                      display: "flex",
+                      flexDirection: "column",
+                      background: "#faf8f5",
+                    }}
+                  >
                     {/* Filter tabs */}
-                    <div style={{ display: "flex", padding: 8, gap: 4, background: "#f5ece1", borderBottom: "1px solid #ebdcc5" }}>
-                      {["ALL", "HIGH_RISK", "MEDIUM_RISK", "LOW_RISK"].map(lvl => (
-                        <button
-                          key={lvl}
-                          type="button"
-                          onClick={() => {
-                            setChurnFilter(lvl === "ALL" ? "" : lvl);
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: "6px 2px",
-                            fontSize: "11px",
-                            fontWeight: "700",
-                            borderRadius: "6px",
-                            border: "none",
-                            cursor: "pointer",
-                            background: (churnFilter === lvl || (lvl === "ALL" && !churnFilter)) ? "#3a2519" : "transparent",
-                            color: (churnFilter === lvl || (lvl === "ALL" && !churnFilter)) ? "#fff" : "#8c7e74",
-                            transition: "all 0.2s"
-                          }}
-                        >
-                          {lvl === "ALL" ? "Tất cả" : lvl === "HIGH_RISK" ? "Cao" : lvl === "MEDIUM_RISK" ? "Vừa" : "Thấp"}
-                        </button>
-                      ))}
+                    <div
+                      style={{
+                        display: "flex",
+                        padding: 8,
+                        gap: 4,
+                        background: "#f5ece1",
+                        borderBottom: "1px solid #ebdcc5",
+                      }}
+                    >
+                      {["ALL", "HIGH_RISK", "MEDIUM_RISK", "LOW_RISK"].map(
+                        (lvl) => (
+                          <button
+                            key={lvl}
+                            type="button"
+                            onClick={() => {
+                              setChurnFilter(lvl === "ALL" ? "" : lvl);
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: "6px 2px",
+                              fontSize: "11px",
+                              fontWeight: "700",
+                              borderRadius: "6px",
+                              border: "none",
+                              cursor: "pointer",
+                              background:
+                                churnFilter === lvl ||
+                                (lvl === "ALL" && !churnFilter)
+                                  ? "#3a2519"
+                                  : "transparent",
+                              color:
+                                churnFilter === lvl ||
+                                (lvl === "ALL" && !churnFilter)
+                                  ? "#fff"
+                                  : "#8c7e74",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            {lvl === "ALL"
+                              ? "Tất cả"
+                              : lvl === "HIGH_RISK"
+                                ? "Cao"
+                                : lvl === "MEDIUM_RISK"
+                                  ? "Vừa"
+                                  : "Thấp"}
+                          </button>
+                        ),
+                      )}
                     </div>
 
                     {/* Scrollable list */}
                     <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
                       {(churnData?.customers || [])
-                        .filter(c => !churnFilter || c.risk_level === churnFilter)
-                        .map(c => {
-                          const isSelected = selectedChurnCust?.customer_id === c.customer_id;
+                        .filter(
+                          (c) => !churnFilter || c.risk_level === churnFilter,
+                        )
+                        .map((c) => {
+                          const isSelected =
+                            selectedChurnCust?.customer_id === c.customer_id;
                           return (
                             <div
                               key={c.customer_id}
@@ -2016,42 +2588,105 @@ export default function AdminCustomers() {
                                 marginBottom: 8,
                                 cursor: "pointer",
                                 transition: "all 0.2s",
-                                boxShadow: isSelected ? "0 4px 12px rgba(214,181,126,0.15)" : "none"
+                                boxShadow: isSelected
+                                  ? "0 4px 12px rgba(214,181,126,0.15)"
+                                  : "none",
                               }}
                             >
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                                <strong style={{ fontSize: "14px", color: "#1f140e" }}>{c.name}</strong>
-                                <span style={{
-                                  fontSize: "9px",
-                                  fontWeight: "800",
-                                  padding: "3px 8px",
-                                  borderRadius: "50px",
-                                  background: c.risk_level === "HIGH_RISK" ? "#fdf0f0" : c.risk_level === "MEDIUM_RISK" ? "#fff4e6" : "#e8f7ec",
-                                  color: c.risk_level === "HIGH_RISK" ? "#a80000" : c.risk_level === "MEDIUM_RISK" ? "#b86a00" : "#107c41",
-                                  border: "1px solid",
-                                  borderColor: c.risk_level === "HIGH_RISK" ? "rgba(168,0,0,0.15)" : c.risk_level === "MEDIUM_RISK" ? "rgba(184,106,0,0.15)" : "rgba(16,124,65,0.15)"
-                                }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  marginBottom: 6,
+                                }}
+                              >
+                                <strong
+                                  style={{ fontSize: "14px", color: "#1f140e" }}
+                                >
+                                  {c.name}
+                                </strong>
+                                <span
+                                  style={{
+                                    fontSize: "9px",
+                                    fontWeight: "800",
+                                    padding: "3px 8px",
+                                    borderRadius: "50px",
+                                    background:
+                                      c.risk_level === "HIGH_RISK"
+                                        ? "#fdf0f0"
+                                        : c.risk_level === "MEDIUM_RISK"
+                                          ? "#fff4e6"
+                                          : "#e8f7ec",
+                                    color:
+                                      c.risk_level === "HIGH_RISK"
+                                        ? "#a80000"
+                                        : c.risk_level === "MEDIUM_RISK"
+                                          ? "#b86a00"
+                                          : "#107c41",
+                                    border: "1px solid",
+                                    borderColor:
+                                      c.risk_level === "HIGH_RISK"
+                                        ? "rgba(168,0,0,0.15)"
+                                        : c.risk_level === "MEDIUM_RISK"
+                                          ? "rgba(184,106,0,0.15)"
+                                          : "rgba(16,124,65,0.15)",
+                                  }}
+                                >
                                   {c.risk_level}
                                 </span>
                               </div>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#8c7e74" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  fontSize: "12px",
+                                  color: "#8c7e74",
+                                }}
+                              >
                                 <span>Mã KH #{c.customer_id}</span>
                                 <strong>Điểm rủi ro: {c.risk_score}/100</strong>
                               </div>
                               {/* Risk bar */}
-                              <div style={{ width: "100%", height: 5, background: "#f0ece6", borderRadius: 3, marginTop: 6, overflow: "hidden" }}>
-                                <div style={{
-                                  width: `${c.risk_score}%`,
-                                  height: "100%",
-                                  background: c.risk_level === "HIGH_RISK" ? "#d83b01" : c.risk_level === "MEDIUM_RISK" ? "#ff8c00" : "#107c41"
-                                }}></div>
+                              <div
+                                style={{
+                                  width: "100%",
+                                  height: 5,
+                                  background: "#f0ece6",
+                                  borderRadius: 3,
+                                  marginTop: 6,
+                                  overflow: "hidden",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: `${c.risk_score}%`,
+                                    height: "100%",
+                                    background:
+                                      c.risk_level === "HIGH_RISK"
+                                        ? "#d83b01"
+                                        : c.risk_level === "MEDIUM_RISK"
+                                          ? "#ff8c00"
+                                          : "#107c41",
+                                  }}
+                                ></div>
                               </div>
                             </div>
                           );
                         })}
 
-                      {!(churnData?.customers || []).filter(c => !churnFilter || c.risk_level === churnFilter).length && (
-                        <div style={{ textAlign: "center", padding: 24, fontSize: "13px", color: "#8c7e74" }}>
+                      {!(churnData?.customers || []).filter(
+                        (c) => !churnFilter || c.risk_level === churnFilter,
+                      ).length && (
+                        <div
+                          style={{
+                            textAlign: "center",
+                            padding: 24,
+                            fontSize: "13px",
+                            color: "#8c7e74",
+                          }}
+                        >
                           Không có khách hàng nào thuộc bộ lọc này.
                         </div>
                       )}
@@ -2059,38 +2694,170 @@ export default function AdminCustomers() {
                   </div>
 
                   {/* Right Column - AI Insights Details */}
-                  <div style={{ width: "58%", padding: 24, overflowY: "auto", display: "flex", flexDirection: "column", background: "#ffffff" }}>
+                  <div
+                    style={{
+                      width: "58%",
+                      padding: 24,
+                      overflowY: "auto",
+                      display: "flex",
+                      flexDirection: "column",
+                      background: "#ffffff",
+                    }}
+                  >
                     {selectedChurnCust ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 20,
+                        }}
+                      >
                         {/* Selected Customer Header */}
-                        <div style={{ borderBottom: "2px solid #ecd8b8", paddingBottom: 12 }}>
-                          <span style={{ fontSize: "11px", fontWeight: "700", color: "#d6b57e", textTransform: "uppercase" }}>
+                        <div
+                          style={{
+                            borderBottom: "2px solid #ecd8b8",
+                            paddingBottom: 12,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: "700",
+                              color: "#d6b57e",
+                              textTransform: "uppercase",
+                            }}
+                          >
                             Phân tích chi tiết hành vi
                           </span>
-                          <h3 style={{ margin: "4px 0", fontSize: "20px", color: "#1f140e" }}>{selectedChurnCust.name}</h3>
-                          <p style={{ margin: 0, fontSize: "13px", color: "#8c7e74" }}>
-                            Mã khách hàng: #{selectedChurnCust.customer_id} {selectedChurnCust.phone ? `| SĐT: ${selectedChurnCust.phone}` : ""}
+                          <h3
+                            style={{
+                              margin: "4px 0",
+                              fontSize: "20px",
+                              color: "#1f140e",
+                            }}
+                          >
+                            {selectedChurnCust.name}
+                          </h3>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "13px",
+                              color: "#8c7e74",
+                            }}
+                          >
+                            Mã khách hàng: #{selectedChurnCust.customer_id}{" "}
+                            {selectedChurnCust.phone
+                              ? `| SĐT: ${selectedChurnCust.phone}`
+                              : ""}
                           </p>
                         </div>
 
                         {/* Score stats */}
                         <div style={{ display: "flex", gap: 16 }}>
-                          <div style={{ flex: 1, padding: 14, borderRadius: 16, background: selectedChurnCust.risk_level === "HIGH_RISK" ? "#fff0f0" : selectedChurnCust.risk_level === "MEDIUM_RISK" ? "#fff9f2" : "#f2faf4", border: "1px solid", borderColor: selectedChurnCust.risk_level === "HIGH_RISK" ? "#fcd4d4" : selectedChurnCust.risk_level === "MEDIUM_RISK" ? "#ffe5cc" : "#d4ecd9", textAlign: "center" }}>
-                            <div style={{ fontSize: "12px", color: "#8c7e74", fontWeight: "600", textTransform: "uppercase" }}>Mức độ rủi ro</div>
-                            <strong style={{ fontSize: "18px", color: selectedChurnCust.risk_level === "HIGH_RISK" ? "#a80000" : selectedChurnCust.risk_level === "MEDIUM_RISK" ? "#b86a00" : "#107c41" }}>
-                              {selectedChurnCust.risk_level === "HIGH_RISK" ? "⚠️ HIGH RISK" : selectedChurnCust.risk_level === "MEDIUM_RISK" ? "⚡ MEDIUM RISK" : "✅ LOW RISK"}
+                          <div
+                            style={{
+                              flex: 1,
+                              padding: 14,
+                              borderRadius: 16,
+                              background:
+                                selectedChurnCust.risk_level === "HIGH_RISK"
+                                  ? "#fff0f0"
+                                  : selectedChurnCust.risk_level ===
+                                      "MEDIUM_RISK"
+                                    ? "#fff9f2"
+                                    : "#f2faf4",
+                              border: "1px solid",
+                              borderColor:
+                                selectedChurnCust.risk_level === "HIGH_RISK"
+                                  ? "#fcd4d4"
+                                  : selectedChurnCust.risk_level ===
+                                      "MEDIUM_RISK"
+                                    ? "#ffe5cc"
+                                    : "#d4ecd9",
+                              textAlign: "center",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#8c7e74",
+                                fontWeight: "600",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Mức độ rủi ro
+                            </div>
+                            <strong
+                              style={{
+                                fontSize: "18px",
+                                color:
+                                  selectedChurnCust.risk_level === "HIGH_RISK"
+                                    ? "#a80000"
+                                    : selectedChurnCust.risk_level ===
+                                        "MEDIUM_RISK"
+                                      ? "#b86a00"
+                                      : "#107c41",
+                              }}
+                            >
+                              {selectedChurnCust.risk_level === "HIGH_RISK"
+                                ? "⚠️ HIGH RISK"
+                                : selectedChurnCust.risk_level === "MEDIUM_RISK"
+                                  ? "⚡ MEDIUM RISK"
+                                  : "✅ LOW RISK"}
                             </strong>
                           </div>
-                          <div style={{ flex: 1, padding: 14, borderRadius: 16, background: "#fcfaf7", border: "1px solid #ebdcc5", textAlign: "center" }}>
-                            <div style={{ fontSize: "12px", color: "#8c7e74", fontWeight: "600", textTransform: "uppercase" }}>Điểm rủi ro (Risk Score)</div>
-                            <strong style={{ fontSize: "18px", color: "#1f140e" }}>{selectedChurnCust.risk_score} / 100</strong>
+                          <div
+                            style={{
+                              flex: 1,
+                              padding: 14,
+                              borderRadius: 16,
+                              background: "#fcfaf7",
+                              border: "1px solid #ebdcc5",
+                              textAlign: "center",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#8c7e74",
+                                fontWeight: "600",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Điểm rủi ro (Risk Score)
+                            </div>
+                            <strong
+                              style={{ fontSize: "18px", color: "#1f140e" }}
+                            >
+                              {selectedChurnCust.risk_score} / 100
+                            </strong>
                           </div>
                         </div>
 
                         {/* Reasons block */}
                         <div>
-                          <h4 style={{ fontSize: "14.5px", color: "#3f2817", margin: "0 0 10px 0", fontWeight: "700" }}>⚠️ Dấu hiệu rủi ro phát hiện:</h4>
-                          <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8, fontSize: "13.5px", color: "#5c4a3c", lineHeight: "1.4" }}>
+                          <h4
+                            style={{
+                              fontSize: "14.5px",
+                              color: "#3f2817",
+                              margin: "0 0 10px 0",
+                              fontWeight: "700",
+                            }}
+                          >
+                            ⚠️ Dấu hiệu rủi ro phát hiện:
+                          </h4>
+                          <ul
+                            style={{
+                              margin: 0,
+                              paddingLeft: 20,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 8,
+                              fontSize: "13.5px",
+                              color: "#5c4a3c",
+                              lineHeight: "1.4",
+                            }}
+                          >
                             {(selectedChurnCust.reason || []).map((r, i) => (
                               <li key={i}>{r}</li>
                             ))}
@@ -2098,22 +2865,65 @@ export default function AdminCustomers() {
                         </div>
 
                         {/* Recommendations block */}
-                        <div style={{ background: "#fdfcfb", border: "1px solid #ebdcc5", borderRadius: 16, padding: 18 }}>
-                          <h4 style={{ fontSize: "14.5px", color: "#8a653a", margin: "0 0 10px 0", fontWeight: "700" }}>💡 Khuyến nghị giữ chân (AI Suggested):</h4>
-                          <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8, fontSize: "13.5px", color: "#5c4a3c", lineHeight: "1.4" }}>
-                            {(selectedChurnCust.recommended_action || []).map((a, i) => (
-                              <li key={i} style={{ color: "#5c4a3c" }}>{a}</li>
-                            ))}
+                        <div
+                          style={{
+                            background: "#fdfcfb",
+                            border: "1px solid #ebdcc5",
+                            borderRadius: 16,
+                            padding: 18,
+                          }}
+                        >
+                          <h4
+                            style={{
+                              fontSize: "14.5px",
+                              color: "#8a653a",
+                              margin: "0 0 10px 0",
+                              fontWeight: "700",
+                            }}
+                          >
+                            💡 Khuyến nghị giữ chân (AI Suggested):
+                          </h4>
+                          <ul
+                            style={{
+                              margin: 0,
+                              paddingLeft: 20,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 8,
+                              fontSize: "13.5px",
+                              color: "#5c4a3c",
+                              lineHeight: "1.4",
+                            }}
+                          >
+                            {(selectedChurnCust.recommended_action || []).map(
+                              (a, i) => (
+                                <li key={i} style={{ color: "#5c4a3c" }}>
+                                  {a}
+                                </li>
+                              ),
+                            )}
                           </ul>
                         </div>
 
                         {/* Call to action buttons */}
-                        <div style={{ display: "flex", gap: 12, marginTop: 10, borderTop: "1px solid #ebdcc5", paddingTop: 16 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 12,
+                            marginTop: 10,
+                            borderTop: "1px solid #ebdcc5",
+                            paddingTop: 16,
+                          }}
+                        >
                           {selectedChurnCust.phone && (
                             <a
                               href={`tel:${selectedChurnCust.phone}`}
                               className="card-btn primary"
-                              style={{ textDecoration: "none", flex: 1, textAlign: "center" }}
+                              style={{
+                                textDecoration: "none",
+                                flex: 1,
+                                textAlign: "center",
+                              }}
                             >
                               📞 Gọi điện chăm sóc
                             </a>
@@ -2122,24 +2932,50 @@ export default function AdminCustomers() {
                             href="/admin/vouchers"
                             onClick={() => setShowChurnModal(false)}
                             className="card-btn"
-                            style={{ textDecoration: "none", flex: 1, textAlign: "center" }}
+                            style={{
+                              textDecoration: "none",
+                              flex: 1,
+                              textAlign: "center",
+                            }}
                           >
                             🎁 Gửi tặng Voucher
                           </a>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, color: "#8c7e74" }}>
-                        <span style={{ fontSize: 48, marginBottom: 12 }}>🔮</span>
-                        <div style={{ fontWeight: 700 }}>AI Churn Analyzer Dashboard</div>
-                        <div style={{ fontSize: 13, marginTop: 4, opacity: 0.8 }}>Vui lòng chọn một khách hàng ở danh sách bên trái để xem phân tích hành vi và gợi ý giữ chân từ AI.</div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flex: 1,
+                          color: "#8c7e74",
+                        }}
+                      >
+                        <span style={{ fontSize: 48, marginBottom: 12 }}>
+                          🔮
+                        </span>
+                        <div style={{ fontWeight: 700 }}>
+                          AI Churn Analyzer Dashboard
+                        </div>
+                        <div
+                          style={{ fontSize: 13, marginTop: 4, opacity: 0.8 }}
+                        >
+                          Vui lòng chọn một khách hàng ở danh sách bên trái để
+                          xem phân tích hành vi và gợi ý giữ chân từ AI.
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="admin-modal-footer">
-                  <button className="admin-clear-btn" type="button" onClick={() => setShowChurnModal(false)}>
+                  <button
+                    className="admin-clear-btn"
+                    type="button"
+                    onClick={() => setShowChurnModal(false)}
+                  >
                     Đóng báo cáo
                   </button>
                 </div>
@@ -2161,11 +2997,19 @@ export default function AdminCustomers() {
           confirmAction ? (
             <>
               <strong>{confirmAction.item.FullName}</strong>
-              <span> · {confirmAction.item.Email} · Trạng thái mới: {confirmAction.nextStatus}</span>
+              <span>
+                {" "}
+                · {confirmAction.item.Email} · Trạng thái mới:{" "}
+                {confirmAction.nextStatus}
+              </span>
             </>
           ) : null
         }
-        confirmLabel={confirmAction?.nextStatus === "INACTIVE" ? "Ngừng hoạt động" : "Kích hoạt lại"}
+        confirmLabel={
+          confirmAction?.nextStatus === "INACTIVE"
+            ? "Ngừng hoạt động"
+            : "Kích hoạt lại"
+        }
         tone={confirmAction?.nextStatus === "INACTIVE" ? "danger" : "warning"}
         busy={confirmBusy}
         onCancel={() => setConfirmAction(null)}

@@ -4,7 +4,10 @@ import axiosClient, { resolveFileUrl } from "../../api/axiosClient";
 import { useAuth } from "../../context/AuthContext";
 import GlobalAnalyticsToolbar from "../../components/reports/GlobalAnalyticsToolbar";
 import RoleAnalyticsDashboard from "../../components/reports/RoleAnalyticsDashboard";
-import { ChartExportActions, ChartWidgetState } from "../../components/reports/InteractiveChartCard";
+import {
+  ChartExportActions,
+  ChartWidgetState,
+} from "../../components/reports/InteractiveChartCard";
 import { useAnalyticsDashboard } from "../../components/reports/useInteractiveChart";
 import {
   AreaChart,
@@ -110,10 +113,19 @@ function StatCard({ label, value, note, icon, colorClass, onClick }) {
       <h3 className="card-value">{value}</h3>
       {note && <div className="card-note">{note}</div>}
       {onClick && (
-        <span style={{
-          position: "absolute", bottom: 14, right: 16,
-          fontSize: "11px", fontWeight: "700", color: "#e8396c", opacity: 0.7
-        }}>Xem chi tiết →</span>
+        <span
+          style={{
+            position: "absolute",
+            bottom: 14,
+            right: 16,
+            fontSize: "11px",
+            fontWeight: "700",
+            color: "#e8396c",
+            opacity: 0.7,
+          }}
+        >
+          Xem chi tiết →
+        </span>
       )}
     </CardElement>
   );
@@ -200,8 +212,8 @@ function MiniPanel({
               cursor: "pointer",
               transition: "background 0.2s",
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = "#fdf0f4"}
-            onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#fdf0f4")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
           >
             {linkLabel} →
           </button>
@@ -237,7 +249,9 @@ function AdminDashboardContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
-  const [analyticsFilter, setAnalyticsFilter] = useState({ filterType: "last30Days" });
+  const [analyticsFilter, setAnalyticsFilter] = useState({
+    filterType: "last30Days",
+  });
   const navigate = useNavigate();
   const analytics = useAnalyticsDashboard(ADMIN_CHART_KEYS, analyticsFilter);
   const chartController = (chartKey) => ({
@@ -278,7 +292,7 @@ function AdminDashboardContent() {
       setError(
         err?.response?.data?.message ||
           err?.message ||
-          "Không tải được dữ liệu dashboard"
+          "Không tải được dữ liệu dashboard",
       );
     } finally {
       setLoading(false);
@@ -343,9 +357,7 @@ function AdminDashboardContent() {
       .slice(0, 6)
       .map((item) => ({
         name:
-          item.label.length > 22
-            ? item.label.slice(0, 22) + "…"
-            : item.label,
+          item.label.length > 22 ? item.label.slice(0, 22) + "…" : item.label,
         "Lượt đặt": item.value,
       }));
   }, [servicePerformanceChart.data]);
@@ -392,11 +404,7 @@ function AdminDashboardContent() {
           <p>Đang đồng bộ số liệu và dựng biểu đồ...</p>
         </div>
       )}
-      {error && (
-        <div className="dashboard-error-banner">
-          ⚠️ {error}
-        </div>
-      )}
+      {error && <div className="dashboard-error-banner">⚠️ {error}</div>}
 
       {!loading && data && (
         <>
@@ -475,9 +483,14 @@ function AdminDashboardContent() {
             summary.pendingFeedbacks > 0 ||
             summary.pendingRefunds > 0 ||
             summary.pendingPayouts > 0) && (
-            <section className="dashboard-action-rail" aria-labelledby="operations-pulse-title">
+            <section
+              className="dashboard-action-rail"
+              aria-labelledby="operations-pulse-title"
+            >
               <div className="dashboard-action-heading">
-                <span className="dashboard-action-symbol" aria-hidden="true">!</span>
+                <span className="dashboard-action-symbol" aria-hidden="true">
+                  !
+                </span>
                 <div>
                   <p>Nhịp vận hành</p>
                   <h2 id="operations-pulse-title">Việc cần xử lý</h2>
@@ -510,7 +523,10 @@ function AdminDashboardContent() {
                   </ActionChip>
                 )}
                 {summary.pendingPayouts > 0 && (
-                  <ActionChip urgent onClick={() => navigate("/admin/employees")}>
+                  <ActionChip
+                    urgent
+                    onClick={() => navigate("/admin/employees")}
+                  >
                     {summary.pendingPayouts} payout chờ duyệt
                   </ActionChip>
                 )}
@@ -550,18 +566,43 @@ function AdminDashboardContent() {
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               {/* Biểu đồ doanh thu và trạng thái dùng chung khoảng phân tích */}
               <div className="overview-tab-layout">
-                <article className="chart-card interactive-chart-card" aria-busy={revenueDayChart.loading}>
-                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <h3>Doanh thu theo thời gian</h3>
-                    <p>Tổng thu từ các giao dịch đã thanh toán trong kỳ được chọn</p>
+                <article
+                  className="chart-card interactive-chart-card"
+                  aria-busy={revenueDayChart.loading}
+                >
+                  <div
+                    className="chart-header"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <div>
+                      <h3>Doanh thu theo thời gian</h3>
+                      <p>
+                        Tổng thu từ các giao dịch đã thanh toán trong kỳ được
+                        chọn
+                      </p>
+                    </div>
+                    <div className="interactive-chart-actions">
+                      <ChartExportActions
+                        chartKey="revenueTrend"
+                        filter={revenueDayChart.filter}
+                      />
+                      <button
+                        onClick={() => navigate("/admin/reports")}
+                        style={quickLinkStyle}
+                      >
+                        Báo cáo chi tiết →
+                      </button>
+                    </div>
                   </div>
-                  <div className="interactive-chart-actions">
-                    <ChartExportActions chartKey="revenueTrend" filter={revenueDayChart.filter} />
-                    <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Báo cáo chi tiết →</button>
-                  </div>
-                </div>
-                  <ChartWidgetState loading={revenueDayChart.loading} error={revenueDayChart.error} onRetry={revenueDayChart.reload} />
+                  <ChartWidgetState
+                    loading={revenueDayChart.loading}
+                    error={revenueDayChart.error}
+                    onRetry={revenueDayChart.reload}
+                  />
                   <ResponsiveContainer width="100%" height={270}>
                     <AreaChart
                       data={revenueByDayData}
@@ -622,18 +663,40 @@ function AdminDashboardContent() {
                 </article>
 
                 <div className="donut-charts-row">
-                  <article className="chart-card interactive-chart-card" aria-busy={appointmentStatusChart.loading}>
-                    <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <article
+                    className="chart-card interactive-chart-card"
+                    aria-busy={appointmentStatusChart.loading}
+                  >
+                    <div
+                      className="chart-header"
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
                       <div>
                         <h3>Trạng thái Lịch hẹn</h3>
                         <p>Toàn hệ thống trong kỳ được chọn</p>
                       </div>
                       <div className="interactive-chart-actions">
-                        <ChartExportActions chartKey="appointmentStatus" filter={appointmentStatusChart.filter} />
-                        <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Quản lý →</button>
+                        <ChartExportActions
+                          chartKey="appointmentStatus"
+                          filter={appointmentStatusChart.filter}
+                        />
+                        <button
+                          onClick={() => navigate("/admin/reports")}
+                          style={quickLinkStyle}
+                        >
+                          Quản lý →
+                        </button>
                       </div>
                     </div>
-                    <ChartWidgetState loading={appointmentStatusChart.loading} error={appointmentStatusChart.error} onRetry={appointmentStatusChart.reload} />
+                    <ChartWidgetState
+                      loading={appointmentStatusChart.loading}
+                      error={appointmentStatusChart.error}
+                      onRetry={appointmentStatusChart.reload}
+                    />
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
                         <Pie
@@ -649,9 +712,7 @@ function AdminDashboardContent() {
                             <Cell key={i} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip
-                          formatter={(v) => [`${v} lịch`, "Số lượng"]}
-                        />
+                        <Tooltip formatter={(v) => [`${v} lịch`, "Số lượng"]} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="chart-custom-legend">
@@ -669,18 +730,40 @@ function AdminDashboardContent() {
                     </div>
                   </article>
 
-                  <article className="chart-card interactive-chart-card" aria-busy={paymentStatusChart.loading}>
-                    <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <article
+                    className="chart-card interactive-chart-card"
+                    aria-busy={paymentStatusChart.loading}
+                  >
+                    <div
+                      className="chart-header"
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
                       <div>
                         <h3>Trạng thái Thanh toán</h3>
                         <p>Giao dịch phát sinh trong kỳ được chọn</p>
                       </div>
                       <div className="interactive-chart-actions">
-                        <ChartExportActions chartKey="paymentStatus" filter={paymentStatusChart.filter} />
-                        <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Xem hóa đơn →</button>
+                        <ChartExportActions
+                          chartKey="paymentStatus"
+                          filter={paymentStatusChart.filter}
+                        />
+                        <button
+                          onClick={() => navigate("/admin/reports")}
+                          style={quickLinkStyle}
+                        >
+                          Xem hóa đơn →
+                        </button>
                       </div>
                     </div>
-                    <ChartWidgetState loading={paymentStatusChart.loading} error={paymentStatusChart.error} onRetry={paymentStatusChart.reload} />
+                    <ChartWidgetState
+                      loading={paymentStatusChart.loading}
+                      error={paymentStatusChart.error}
+                      onRetry={paymentStatusChart.reload}
+                    />
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
                         <Pie
@@ -720,13 +803,29 @@ function AdminDashboardContent() {
 
               {/* Bảng phân tích vận hành chi tiết */}
               <article className="chart-card">
-                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div
+                  className="chart-header"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
                   <div>
                     <h3>📊 Bảng phân tích vận hành chi tiết</h3>
-                    <p>Toàn bộ trạng thái các phân hệ trong cơ sở dữ liệu hệ thống</p>
+                    <p>
+                      Toàn bộ trạng thái các phân hệ trong cơ sở dữ liệu hệ
+                      thống
+                    </p>
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 16 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+                    gap: 16,
+                  }}
+                >
                   <MiniPanel
                     title="Nhân sự & khách hàng"
                     icon="👥"
@@ -735,38 +834,146 @@ function AdminDashboardContent() {
                     secondaryLinkLabel="Quản lý khách hàng"
                     onSecondaryLink={() => navigate("/admin/customers")}
                   >
-                    <InfoRow label="Đang hoạt động" value={summary.activeUsers ?? 0} valueColor="#10b981" />
-                    <InfoRow label="Không hoạt động" value={summary.inactiveUsers ?? 0} />
-                    <InfoRow label="Bị khóa (Banned)" value={summary.bannedUsers ?? 0} valueColor="#ef4444" />
+                    <InfoRow
+                      label="Đang hoạt động"
+                      value={summary.activeUsers ?? 0}
+                      valueColor="#10b981"
+                    />
+                    <InfoRow
+                      label="Không hoạt động"
+                      value={summary.inactiveUsers ?? 0}
+                    />
+                    <InfoRow
+                      label="Bị khóa (Banned)"
+                      value={summary.bannedUsers ?? 0}
+                      valueColor="#ef4444"
+                    />
                   </MiniPanel>
-                  <MiniPanel title="Chi Tiết Lịch Hẹn" icon="📅" linkLabel="Xem lịch hẹn" onLink={() => navigate("/admin/reports")}>
-                    <InfoRow label="Chờ duyệt" value={summary.pendingAppointments ?? 0} valueColor="#f59e0b" />
-                    <InfoRow label="Đã xác nhận" value={summary.confirmedAppointments ?? 0} valueColor="#3b82f6" />
-                    <InfoRow label="Hoàn thành" value={summary.completedAppointments ?? 0} valueColor="#10b981" />
-                    <InfoRow label="Đã hủy" value={summary.cancelledAppointments ?? 0} valueColor="#ef4444" />
+                  <MiniPanel
+                    title="Chi Tiết Lịch Hẹn"
+                    icon="📅"
+                    linkLabel="Xem lịch hẹn"
+                    onLink={() => navigate("/admin/reports")}
+                  >
+                    <InfoRow
+                      label="Chờ duyệt"
+                      value={summary.pendingAppointments ?? 0}
+                      valueColor="#f59e0b"
+                    />
+                    <InfoRow
+                      label="Đã xác nhận"
+                      value={summary.confirmedAppointments ?? 0}
+                      valueColor="#3b82f6"
+                    />
+                    <InfoRow
+                      label="Hoàn thành"
+                      value={summary.completedAppointments ?? 0}
+                      valueColor="#10b981"
+                    />
+                    <InfoRow
+                      label="Đã hủy"
+                      value={summary.cancelledAppointments ?? 0}
+                      valueColor="#ef4444"
+                    />
                   </MiniPanel>
-                  <MiniPanel title="Gói Liệu Trình" icon="📦" linkLabel="Quản lý gói" onLink={() => navigate("/admin/packages")}>
-                    <InfoRow label="Đang sử dụng (Active)" value={summary.activePackages ?? 0} valueColor="#8b5cf6" />
-                    <InfoRow label="Đã hết hạn" value={summary.expiredPackages ?? 0} />
-                    <InfoRow label="Doanh thu gói tháng này" value={formatMoney(summary.packageRevenueThisMonth)} valueColor="#10b981" />
+                  <MiniPanel
+                    title="Gói Liệu Trình"
+                    icon="📦"
+                    linkLabel="Quản lý gói"
+                    onLink={() => navigate("/admin/packages")}
+                  >
+                    <InfoRow
+                      label="Đang sử dụng (Active)"
+                      value={summary.activePackages ?? 0}
+                      valueColor="#8b5cf6"
+                    />
+                    <InfoRow
+                      label="Đã hết hạn"
+                      value={summary.expiredPackages ?? 0}
+                    />
+                    <InfoRow
+                      label="Doanh thu gói tháng này"
+                      value={formatMoney(summary.packageRevenueThisMonth)}
+                      valueColor="#10b981"
+                    />
                   </MiniPanel>
-                  <MiniPanel title="Hoàn Tiền & Payout" icon="💳" linkLabel="Xem hoàn tiền" onLink={() => navigate("/admin/refunds")}>
-                    <InfoRow label="Hoàn tiền chờ xử lý" value={summary.pendingRefunds ?? 0} valueColor="#f59e0b" />
-                    <InfoRow label="Hoàn tiền hoàn tất" value={summary.completedRefunds ?? 0} valueColor="#10b981" />
-                    <InfoRow label="Payout KTV chờ duyệt" value={summary.pendingPayouts ?? 0} valueColor="#f59e0b" />
-                    <InfoRow label="Đã chi trả (Approved)" value={formatMoney(summary.totalPaidOut)} />
+                  <MiniPanel
+                    title="Hoàn Tiền & Payout"
+                    icon="💳"
+                    linkLabel="Xem hoàn tiền"
+                    onLink={() => navigate("/admin/refunds")}
+                  >
+                    <InfoRow
+                      label="Hoàn tiền chờ xử lý"
+                      value={summary.pendingRefunds ?? 0}
+                      valueColor="#f59e0b"
+                    />
+                    <InfoRow
+                      label="Hoàn tiền hoàn tất"
+                      value={summary.completedRefunds ?? 0}
+                      valueColor="#10b981"
+                    />
+                    <InfoRow
+                      label="Payout KTV chờ duyệt"
+                      value={summary.pendingPayouts ?? 0}
+                      valueColor="#f59e0b"
+                    />
+                    <InfoRow
+                      label="Đã chi trả (Approved)"
+                      value={formatMoney(summary.totalPaidOut)}
+                    />
                   </MiniPanel>
-                  <MiniPanel title="Hàng Chờ (Waiting List)" icon="⏳" linkLabel="Xem hàng chờ" onLink={() => navigate("/admin/reports")}>
-                    <InfoRow label="Tổng đăng ký" value={summary.totalWaitingCount ?? 0} />
-                    <InfoRow label="Đã match / booked" value={summary.matchedWaitingCount ?? 0} valueColor="#10b981" />
-                    <InfoRow label="Đã đặt lịch thành công" value={summary.bookedWaitingCount ?? 0} valueColor="#3b82f6" />
-                    <InfoRow label="Hết hạn / Bỏ qua" value={summary.expiredWaitingCount ?? 0} valueColor="#ef4444" />
+                  <MiniPanel
+                    title="Hàng Chờ (Waiting List)"
+                    icon="⏳"
+                    linkLabel="Xem hàng chờ"
+                    onLink={() => navigate("/admin/reports")}
+                  >
+                    <InfoRow
+                      label="Tổng đăng ký"
+                      value={summary.totalWaitingCount ?? 0}
+                    />
+                    <InfoRow
+                      label="Đã match / booked"
+                      value={summary.matchedWaitingCount ?? 0}
+                      valueColor="#10b981"
+                    />
+                    <InfoRow
+                      label="Đã đặt lịch thành công"
+                      value={summary.bookedWaitingCount ?? 0}
+                      valueColor="#3b82f6"
+                    />
+                    <InfoRow
+                      label="Hết hạn / Bỏ qua"
+                      value={summary.expiredWaitingCount ?? 0}
+                      valueColor="#ef4444"
+                    />
                   </MiniPanel>
-                  <MiniPanel title="Điểm Danh Hôm Nay" icon="🧑‍💼" linkLabel="Xem nhân viên" onLink={() => navigate("/admin/employees")}>
-                    <InfoRow label="Đã check-in" value={data.todayAttendance?.totalCheckedIn ?? 0} />
-                    <InfoRow label="Đúng giờ" value={data.todayAttendance?.present ?? 0} valueColor="#10b981" />
-                    <InfoRow label="Đến muộn" value={data.todayAttendance?.late ?? 0} valueColor="#f59e0b" />
-                    <InfoRow label="Vắng mặt" value={data.todayAttendance?.absent ?? 0} valueColor="#ef4444" />
+                  <MiniPanel
+                    title="Điểm Danh Hôm Nay"
+                    icon="🧑‍💼"
+                    linkLabel="Xem nhân viên"
+                    onLink={() => navigate("/admin/employees")}
+                  >
+                    <InfoRow
+                      label="Đã check-in"
+                      value={data.todayAttendance?.totalCheckedIn ?? 0}
+                    />
+                    <InfoRow
+                      label="Đúng giờ"
+                      value={data.todayAttendance?.present ?? 0}
+                      valueColor="#10b981"
+                    />
+                    <InfoRow
+                      label="Đến muộn"
+                      value={data.todayAttendance?.late ?? 0}
+                      valueColor="#f59e0b"
+                    />
+                    <InfoRow
+                      label="Vắng mặt"
+                      value={data.todayAttendance?.absent ?? 0}
+                      valueColor="#ef4444"
+                    />
                   </MiniPanel>
                 </div>
               </article>
@@ -844,18 +1051,43 @@ function AdminDashboardContent() {
               </div>
 
               {/* Biểu đồ doanh thu theo khoảng phân tích */}
-              <article className="chart-card interactive-chart-card" aria-busy={revenueMonthChart.loading}>
-                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <article
+                className="chart-card interactive-chart-card"
+                aria-busy={revenueMonthChart.loading}
+              >
+                <div
+                  className="chart-header"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
                   <div>
                     <h3>📊 Doanh thu theo khoảng phân tích</h3>
-                    <p>Tổng thu từ các giao dịch đã thanh toán trong năm được chọn</p>
+                    <p>
+                      Tổng thu từ các giao dịch đã thanh toán trong năm được
+                      chọn
+                    </p>
                   </div>
                   <div className="interactive-chart-actions">
-                    <ChartExportActions chartKey="revenueTrend" filter={revenueMonthChart.filter} />
-                    <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Báo cáo →</button>
+                    <ChartExportActions
+                      chartKey="revenueTrend"
+                      filter={revenueMonthChart.filter}
+                    />
+                    <button
+                      onClick={() => navigate("/admin/reports")}
+                      style={quickLinkStyle}
+                    >
+                      Báo cáo →
+                    </button>
                   </div>
                 </div>
-                <ChartWidgetState loading={revenueMonthChart.loading} error={revenueMonthChart.error} onRetry={revenueMonthChart.reload} />
+                <ChartWidgetState
+                  loading={revenueMonthChart.loading}
+                  error={revenueMonthChart.error}
+                  onRetry={revenueMonthChart.reload}
+                />
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart
                     data={revenueByMonthData}
@@ -880,9 +1112,7 @@ function AdminDashboardContent() {
                       axisLine={false}
                       style={{ fontSize: 11 }}
                     />
-                    <Tooltip
-                      formatter={(v) => [formatMoney(v), "Doanh thu"]}
-                    />
+                    <Tooltip formatter={(v) => [formatMoney(v), "Doanh thu"]} />
                     <Bar
                       dataKey="Doanh thu"
                       fill="#e8396c"
@@ -906,12 +1136,24 @@ function AdminDashboardContent() {
 
               {/* Bảng doanh thu gói liệu trình */}
               <article className="chart-card">
-                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div
+                  className="chart-header"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
                   <div>
                     <h3>📦 Bảng doanh thu theo Gói Liệu Trình</h3>
                     <p>Top gói bán chạy nhất theo tổng số lượt mua</p>
                   </div>
-                  <button onClick={() => navigate("/admin/packages")} style={quickLinkStyle}>Quản lý gói →</button>
+                  <button
+                    onClick={() => navigate("/admin/packages")}
+                    style={quickLinkStyle}
+                  >
+                    Quản lý gói →
+                  </button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
@@ -996,17 +1238,34 @@ function AdminDashboardContent() {
           {activeTab === "staff" && (
             <div className="staff-services-tab-layout">
               {/* Biểu đồ cột ngang dịch vụ */}
-              <article className="chart-card interactive-chart-card" aria-busy={servicePerformanceChart.loading}>
-                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <article
+                className="chart-card interactive-chart-card"
+                aria-busy={servicePerformanceChart.loading}
+              >
+                <div
+                  className="chart-header"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
                   <div>
                     <h3>Top 6 dịch vụ được đặt nhiều nhất</h3>
                     <p>Theo số lượng lịch hẹn trong kỳ được chọn</p>
                   </div>
                   <div className="interactive-chart-actions">
-                    <ChartExportActions chartKey="servicePerformance" filter={servicePerformanceChart.filter} />
+                    <ChartExportActions
+                      chartKey="servicePerformance"
+                      filter={servicePerformanceChart.filter}
+                    />
                   </div>
                 </div>
-                <ChartWidgetState loading={servicePerformanceChart.loading} error={servicePerformanceChart.error} onRetry={servicePerformanceChart.reload} />
+                <ChartWidgetState
+                  loading={servicePerformanceChart.loading}
+                  error={servicePerformanceChart.error}
+                  onRetry={servicePerformanceChart.reload}
+                />
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart
                     data={topServicesData}
@@ -1114,21 +1373,14 @@ function AdminDashboardContent() {
               </article>
 
               {/* Phễu chuyển đổi Waiting List */}
-              <article
-                className="chart-card"
-                style={{ gridColumn: "span 2" }}
-              >
+              <article className="chart-card" style={{ gridColumn: "span 2" }}>
                 <div className="chart-header">
                   <h3>⏳ Phễu chuyển đổi Hàng Chờ (Waiting List)</h3>
-                  <p>
-                    Theo dõi tỷ lệ từ đăng ký chờ đến đặt lịch thành công
-                  </p>
+                  <p>Theo dõi tỷ lệ từ đăng ký chờ đến đặt lịch thành công</p>
                 </div>
                 <div className="funnel-metrics-grid">
                   <div className="funnel-card">
-                    <div className="val">
-                      {summary.totalWaitingCount ?? 0}
-                    </div>
+                    <div className="val">{summary.totalWaitingCount ?? 0}</div>
                     <h4>Tổng đăng ký</h4>
                   </div>
                   <div className="funnel-card active">
@@ -1138,9 +1390,7 @@ function AdminDashboardContent() {
                     <h4>Đã được match</h4>
                   </div>
                   <div className="funnel-card success">
-                    <div className="val">
-                      {summary.bookedWaitingCount ?? 0}
-                    </div>
+                    <div className="val">{summary.bookedWaitingCount ?? 0}</div>
                     <h4>Đặt thành công</h4>
                   </div>
                   <div className="funnel-card fail">
@@ -1160,7 +1410,7 @@ function AdminDashboardContent() {
                         {Math.round(
                           ((summary.bookedWaitingCount ?? 0) /
                             summary.totalWaitingCount) *
-                            100
+                            100,
                         )}
                         %
                       </span>
@@ -1168,13 +1418,12 @@ function AdminDashboardContent() {
                     </div>
                     <div className="funnel-text-summary">
                       <p>
-                        Tỷ lệ chuyển đổi từ hàng chờ sang đặt lịch thành công
-                        là{" "}
+                        Tỷ lệ chuyển đổi từ hàng chờ sang đặt lịch thành công là{" "}
                         <strong>
                           {Math.round(
                             ((summary.bookedWaitingCount ?? 0) /
                               summary.totalWaitingCount) *
-                              100
+                              100,
                           )}
                           %
                         </strong>
@@ -1257,12 +1506,24 @@ function AdminDashboardContent() {
 
               {/* Bảng lịch hẹn mới nhất */}
               <article className="chart-card">
-                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div
+                  className="chart-header"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
                   <div>
                     <h3>📋 Nhật ký Lịch hẹn mới nhất</h3>
                     <p>8 lịch hẹn gần đây nhất trong hệ thống</p>
                   </div>
-                  <button onClick={() => navigate("/admin/reports")} style={quickLinkStyle}>Xem tất cả →</button>
+                  <button
+                    onClick={() => navigate("/admin/reports")}
+                    style={quickLinkStyle}
+                  >
+                    Xem tất cả →
+                  </button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
@@ -1308,9 +1569,7 @@ function AdminDashboardContent() {
                             </span>
                           </td>
                           <td style={{ textAlign: "right" }}>
-                            <span
-                              className={statusClass(appt.paymentStatus)}
-                            >
+                            <span className={statusClass(appt.paymentStatus)}>
                               {statusLabel(appt.paymentStatus)}
                             </span>
                           </td>
@@ -1465,7 +1724,14 @@ function AdminDashboardContent() {
 
               {/* Bảng hoàn tiền */}
               <article className="chart-card">
-                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div
+                  className="chart-header"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
                   <div>
                     <h3>💸 Danh sách Hoàn tiền gần đây</h3>
                     <p>
@@ -1479,7 +1745,12 @@ function AdminDashboardContent() {
                       </strong>
                     </p>
                   </div>
-                  <button onClick={() => navigate("/admin/refunds")} style={quickLinkStyle}>Quản lý hoàn tiền →</button>
+                  <button
+                    onClick={() => navigate("/admin/refunds")}
+                    style={quickLinkStyle}
+                  >
+                    Quản lý hoàn tiền →
+                  </button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
@@ -1556,7 +1827,14 @@ function AdminDashboardContent() {
 
               {/* Bảng payout kỹ thuật viên */}
               <article className="chart-card">
-                <div className="chart-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div
+                  className="chart-header"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
                   <div>
                     <h3>🏦 Yêu cầu Chi trả Kỹ thuật viên (Payout)</h3>
                     <p>
@@ -1570,7 +1848,12 @@ function AdminDashboardContent() {
                       </strong>
                     </p>
                   </div>
-                  <button onClick={() => navigate("/admin/employees")} style={quickLinkStyle}>Xem nhân viên →</button>
+                  <button
+                    onClick={() => navigate("/admin/employees")}
+                    style={quickLinkStyle}
+                  >
+                    Xem nhân viên →
+                  </button>
                 </div>
                 <div className="table-responsive-new">
                   <table className="premium-admin-table">
@@ -1643,7 +1926,9 @@ function AdminDashboardContent() {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const role = String(user?.RoleName || user?.roleName || user?.Role || user?.role || "").toUpperCase();
+  const role = String(
+    user?.RoleName || user?.roleName || user?.Role || user?.role || "",
+  ).toUpperCase();
 
   if (role === "MANAGER") {
     return (
@@ -1655,4 +1940,3 @@ export default function AdminDashboard() {
 
   return <AdminDashboardContent />;
 }
-

@@ -3,7 +3,12 @@ import axiosClient from "../../api/axiosClient";
 
 export default function AdminAIMonitoring() {
   const [items, setItems] = useState([]);
-  const [metrics, setMetrics] = useState({ requestCount: 0, tokenUsage: 0, errorRate: 0, avgLatency: 0 });
+  const [metrics, setMetrics] = useState({
+    requestCount: 0,
+    tokenUsage: 0,
+    errorRate: 0,
+    avgLatency: 0,
+  });
   const [dailyTrend, setDailyTrend] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -14,7 +19,7 @@ export default function AdminAIMonitoring() {
     fromDate: "",
     toDate: "",
     feature: "",
-    errorOnly: "0"
+    errorOnly: "0",
   });
 
   const [selected, setSelected] = useState(null);
@@ -23,10 +28,19 @@ export default function AdminAIMonitoring() {
   const load = async (activeFilters = filters) => {
     setLoading(true);
     try {
-      const res = await axiosClient.get("/admin/ai-monitoring", { params: activeFilters });
+      const res = await axiosClient.get("/admin/ai-monitoring", {
+        params: activeFilters,
+      });
       const resData = res.data.data || res.data || {};
       setItems(resData.items || []);
-      setMetrics(resData.metrics || { requestCount: 0, tokenUsage: 0, errorRate: 0, avgLatency: 0 });
+      setMetrics(
+        resData.metrics || {
+          requestCount: 0,
+          tokenUsage: 0,
+          errorRate: 0,
+          avgLatency: 0,
+        },
+      );
       setDailyTrend(resData.dailyTrend || []);
     } catch (err) {
       console.error("Error loading AI monitoring logs", err);
@@ -63,7 +77,7 @@ export default function AdminAIMonitoring() {
       fromDate: "",
       toDate: "",
       feature: "",
-      errorOnly: "0"
+      errorOnly: "0",
     };
     setFilters(defaultFilters);
     load(defaultFilters);
@@ -72,7 +86,9 @@ export default function AdminAIMonitoring() {
 
   const openDetail = async (item) => {
     try {
-      const res = await axiosClient.get(`/admin/ai-monitoring/${item.ItemType}/${item.ItemId}`);
+      const res = await axiosClient.get(
+        `/admin/ai-monitoring/${item.ItemType}/${item.ItemId}`,
+      );
       const detail = res.data.data || res.data || item;
       setSelected(detail);
       setCheckResult(detail.CheckResult || "");
@@ -84,10 +100,13 @@ export default function AdminAIMonitoring() {
   };
 
   const markChecked = async () => {
-    await axiosClient.patch(`/admin/ai-monitoring/${selected.ItemType}/${selected.ItemId}/checked`, {
-      checked: true,
-      checkResult
-    });
+    await axiosClient.patch(
+      `/admin/ai-monitoring/${selected.ItemType}/${selected.ItemId}/checked`,
+      {
+        checked: true,
+        checkResult,
+      },
+    );
     await load();
     await openDetail({ ItemType: selected.ItemType, ItemId: selected.ItemId });
   };
@@ -95,14 +114,19 @@ export default function AdminAIMonitoring() {
   // SVG Chart points calculation for Usage Trend (AI Request Count)
   const usageChartPath = useMemo(() => {
     if (!dailyTrend || dailyTrend.length === 0) return "";
-    const maxVal = Math.max(...dailyTrend.map(item => item.RequestCount), 5);
+    const maxVal = Math.max(...dailyTrend.map((item) => item.RequestCount), 5);
     const width = 450;
     const height = 120;
     const padding = 20;
 
     const points = dailyTrend.map((item, idx) => {
-      const x = padding + (idx * (width - padding * 2)) / Math.max(dailyTrend.length - 1, 1);
-      const y = height - padding - (item.RequestCount * (height - padding * 2)) / maxVal;
+      const x =
+        padding +
+        (idx * (width - padding * 2)) / Math.max(dailyTrend.length - 1, 1);
+      const y =
+        height -
+        padding -
+        (item.RequestCount * (height - padding * 2)) / maxVal;
       return `${x},${y}`;
     });
 
@@ -112,14 +136,17 @@ export default function AdminAIMonitoring() {
   // SVG Chart points calculation for Error count Trend
   const errorChartPath = useMemo(() => {
     if (!dailyTrend || dailyTrend.length === 0) return "";
-    const maxVal = Math.max(...dailyTrend.map(item => item.ErrorCount), 2);
+    const maxVal = Math.max(...dailyTrend.map((item) => item.ErrorCount), 2);
     const width = 450;
     const height = 120;
     const padding = 20;
 
     const points = dailyTrend.map((item, idx) => {
-      const x = padding + (idx * (width - padding * 2)) / Math.max(dailyTrend.length - 1, 1);
-      const y = height - padding - (item.ErrorCount * (height - padding * 2)) / maxVal;
+      const x =
+        padding +
+        (idx * (width - padding * 2)) / Math.max(dailyTrend.length - 1, 1);
+      const y =
+        height - padding - (item.ErrorCount * (height - padding * 2)) / maxVal;
       return `${x},${y}`;
     });
 
@@ -128,18 +155,18 @@ export default function AdminAIMonitoring() {
 
   const maxRequests = useMemo(() => {
     if (!dailyTrend || dailyTrend.length === 0) return 0;
-    return Math.max(...dailyTrend.map(item => item.RequestCount), 0);
+    return Math.max(...dailyTrend.map((item) => item.RequestCount), 0);
   }, [dailyTrend]);
 
   const maxErrors = useMemo(() => {
     if (!dailyTrend || dailyTrend.length === 0) return 0;
-    return Math.max(...dailyTrend.map(item => item.ErrorCount), 0);
+    return Math.max(...dailyTrend.map((item) => item.ErrorCount), 0);
   }, [dailyTrend]);
 
   const formatDateString = (dateStr) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
-    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+    return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
   };
 
   return (
@@ -385,7 +412,17 @@ export default function AdminAIMonitoring() {
 
       <div className="header-container">
         <div>
-          <div className="eyebrow" style={{ color: "#a0573a", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: "11px", marginBottom: "4px" }}>
+          <div
+            className="eyebrow"
+            style={{
+              color: "#a0573a",
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              fontSize: "11px",
+              marginBottom: "4px",
+            }}
+          >
             Trí tuệ nhân tạo
           </div>
           <h2 className="dashboard-title">Bảng Giám Sát AI (AI Monitoring)</h2>
@@ -406,7 +443,13 @@ export default function AdminAIMonitoring() {
         </article>
         <article className="metric-card metric-errors">
           <div className="eyebrow">Tỷ lệ lỗi (Error Rate)</div>
-          <h3 style={{ color: Number(metrics.errorRate) > 5 ? "#ef4444" : "#1e293b" }}>{metrics.errorRate}%</h3>
+          <h3
+            style={{
+              color: Number(metrics.errorRate) > 5 ? "#ef4444" : "#1e293b",
+            }}
+          >
+            {metrics.errorRate}%
+          </h3>
           <p>Yêu cầu thất bại hoặc trống</p>
         </article>
         <article className="metric-card metric-latency">
@@ -423,31 +466,92 @@ export default function AdminAIMonitoring() {
           <div className="svg-chart-wrapper">
             {dailyTrend && dailyTrend.length > 0 ? (
               <svg className="svg-chart" viewBox="0 0 450 120">
-                <line x1="20" y1="20" x2="430" y2="20" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="20" y1="60" x2="430" y2="60" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="20" y1="100" x2="430" y2="100" stroke="#e2e8f0" strokeWidth="1.5" />
-                <polyline points={usageChartPath} className="chart-line-usage" />
+                <line
+                  x1="20"
+                  y1="20"
+                  x2="430"
+                  y2="20"
+                  stroke="#f1f5f9"
+                  strokeWidth="1"
+                />
+                <line
+                  x1="20"
+                  y1="60"
+                  x2="430"
+                  y2="60"
+                  stroke="#f1f5f9"
+                  strokeWidth="1"
+                />
+                <line
+                  x1="20"
+                  y1="100"
+                  x2="430"
+                  y2="100"
+                  stroke="#e2e8f0"
+                  strokeWidth="1.5"
+                />
+                <polyline
+                  points={usageChartPath}
+                  className="chart-line-usage"
+                />
                 {dailyTrend.map((item, idx) => {
                   const width = 450;
                   const height = 120;
                   const padding = 20;
                   const maxVal = Math.max(maxRequests, 5);
-                  const x = padding + (idx * (width - padding * 2)) / Math.max(dailyTrend.length - 1, 1);
-                  const y = height - padding - (item.RequestCount * (height - padding * 2)) / maxVal;
+                  const x =
+                    padding +
+                    (idx * (width - padding * 2)) /
+                      Math.max(dailyTrend.length - 1, 1);
+                  const y =
+                    height -
+                    padding -
+                    (item.RequestCount * (height - padding * 2)) / maxVal;
                   return (
-                    <circle key={idx} cx={x} cy={y} className="chart-circle circle-usage" title={`Ngày: ${formatDateString(item.LogDate)}: ${item.RequestCount} lượt`} />
+                    <circle
+                      key={idx}
+                      cx={x}
+                      cy={y}
+                      className="chart-circle circle-usage"
+                      title={`Ngày: ${formatDateString(item.LogDate)}: ${item.RequestCount} lượt`}
+                    />
                   );
                 })}
               </svg>
             ) : (
-              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  height: "100%",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#94a3b8",
+                  fontSize: "13px",
+                }}
+              >
                 Chưa có dữ liệu vẽ biểu đồ
               </div>
             )}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#94a3b8", marginTop: "6px" }}>
-            <span>{dailyTrend && dailyTrend[0] ? formatDateString(dailyTrend[0].LogDate) : ""}</span>
-            <span>{dailyTrend && dailyTrend[dailyTrend.length - 1] ? formatDateString(dailyTrend[dailyTrend.length - 1]?.LogDate) : ""}</span>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "11px",
+              color: "#94a3b8",
+              marginTop: "6px",
+            }}
+          >
+            <span>
+              {dailyTrend && dailyTrend[0]
+                ? formatDateString(dailyTrend[0].LogDate)
+                : ""}
+            </span>
+            <span>
+              {dailyTrend && dailyTrend[dailyTrend.length - 1]
+                ? formatDateString(dailyTrend[dailyTrend.length - 1]?.LogDate)
+                : ""}
+            </span>
           </div>
         </div>
 
@@ -456,31 +560,92 @@ export default function AdminAIMonitoring() {
           <div className="svg-chart-wrapper">
             {dailyTrend && dailyTrend.length > 0 ? (
               <svg className="svg-chart" viewBox="0 0 450 120">
-                <line x1="20" y1="20" x2="430" y2="20" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="20" y1="60" x2="430" y2="60" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="20" y1="100" x2="430" y2="100" stroke="#e2e8f0" strokeWidth="1.5" />
-                <polyline points={errorChartPath} className="chart-line-error" />
+                <line
+                  x1="20"
+                  y1="20"
+                  x2="430"
+                  y2="20"
+                  stroke="#f1f5f9"
+                  strokeWidth="1"
+                />
+                <line
+                  x1="20"
+                  y1="60"
+                  x2="430"
+                  y2="60"
+                  stroke="#f1f5f9"
+                  strokeWidth="1"
+                />
+                <line
+                  x1="20"
+                  y1="100"
+                  x2="430"
+                  y2="100"
+                  stroke="#e2e8f0"
+                  strokeWidth="1.5"
+                />
+                <polyline
+                  points={errorChartPath}
+                  className="chart-line-error"
+                />
                 {dailyTrend.map((item, idx) => {
                   const width = 450;
                   const height = 120;
                   const padding = 20;
                   const maxVal = Math.max(maxErrors, 2);
-                  const x = padding + (idx * (width - padding * 2)) / Math.max(dailyTrend.length - 1, 1);
-                  const y = height - padding - (item.ErrorCount * (height - padding * 2)) / maxVal;
+                  const x =
+                    padding +
+                    (idx * (width - padding * 2)) /
+                      Math.max(dailyTrend.length - 1, 1);
+                  const y =
+                    height -
+                    padding -
+                    (item.ErrorCount * (height - padding * 2)) / maxVal;
                   return (
-                    <circle key={idx} cx={x} cy={y} className="chart-circle circle-error" title={`Lỗi ngày ${formatDateString(item.LogDate)}: ${item.ErrorCount} lượt`} />
+                    <circle
+                      key={idx}
+                      cx={x}
+                      cy={y}
+                      className="chart-circle circle-error"
+                      title={`Lỗi ngày ${formatDateString(item.LogDate)}: ${item.ErrorCount} lượt`}
+                    />
                   );
                 })}
               </svg>
             ) : (
-              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: "13px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  height: "100%",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#94a3b8",
+                  fontSize: "13px",
+                }}
+              >
                 Chưa có dữ liệu vẽ biểu đồ
               </div>
             )}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#94a3b8", marginTop: "6px" }}>
-            <span>{dailyTrend && dailyTrend[0] ? formatDateString(dailyTrend[0].LogDate) : ""}</span>
-            <span>{dailyTrend && dailyTrend[dailyTrend.length - 1] ? formatDateString(dailyTrend[dailyTrend.length - 1]?.LogDate) : ""}</span>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "11px",
+              color: "#94a3b8",
+              marginTop: "6px",
+            }}
+          >
+            <span>
+              {dailyTrend && dailyTrend[0]
+                ? formatDateString(dailyTrend[0].LogDate)
+                : ""}
+            </span>
+            <span>
+              {dailyTrend && dailyTrend[dailyTrend.length - 1]
+                ? formatDateString(dailyTrend[dailyTrend.length - 1]?.LogDate)
+                : ""}
+            </span>
           </div>
         </div>
       </div>
@@ -496,7 +661,9 @@ export default function AdminAIMonitoring() {
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
             >
               <option value="">Tất cả</option>
-              <option value="recommendation">Gợi ý dịch vụ (recommendation)</option>
+              <option value="recommendation">
+                Gợi ý dịch vụ (recommendation)
+              </option>
               <option value="prediction">Dự báo (prediction)</option>
               <option value="chat">Hội thoại AI (chat)</option>
               <option value="audit">Kiểm định nội dung (audit)</option>
@@ -508,7 +675,9 @@ export default function AdminAIMonitoring() {
               type="text"
               className="filter-input"
               value={filters.feature}
-              onChange={(e) => setFilters({ ...filters, feature: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, feature: e.target.value })
+              }
               placeholder="VD: Chat, Recommendation, Audit..."
             />
           </div>
@@ -517,7 +686,9 @@ export default function AdminAIMonitoring() {
             <select
               className="filter-input"
               value={filters.checked}
-              onChange={(e) => setFilters({ ...filters, checked: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, checked: e.target.value })
+              }
             >
               <option value="">Tất cả</option>
               <option value="1">Đã duyệt</option>
@@ -529,7 +700,9 @@ export default function AdminAIMonitoring() {
             <select
               className="filter-input"
               value={filters.errorOnly}
-              onChange={(e) => setFilters({ ...filters, errorOnly: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, errorOnly: e.target.value })
+              }
             >
               <option value="0">Tất cả cuộc gọi</option>
               <option value="1">Chỉ các cuộc gọi lỗi</option>
@@ -541,7 +714,9 @@ export default function AdminAIMonitoring() {
               type="text"
               className="filter-input"
               value={filters.keyword}
-              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, keyword: e.target.value })
+              }
               placeholder="Nội dung, kết quả..."
             />
           </div>
@@ -551,7 +726,9 @@ export default function AdminAIMonitoring() {
               type="date"
               className="filter-input"
               value={filters.fromDate}
-              onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, fromDate: e.target.value })
+              }
             />
           </div>
           <div className="filter-item">
@@ -560,24 +737,42 @@ export default function AdminAIMonitoring() {
               type="date"
               className="filter-input"
               value={filters.toDate}
-              onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, toDate: e.target.value })
+              }
             />
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-          <button className="btn-outline" onClick={handleReset}>Đặt lại</button>
-          <button className="btn-primary" onClick={handleApply}>Áp dụng bộ lọc</button>
+        <div
+          style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}
+        >
+          <button className="btn-outline" onClick={handleReset}>
+            Đặt lại
+          </button>
+          <button className="btn-primary" onClick={handleApply}>
+            Áp dụng bộ lọc
+          </button>
         </div>
       </div>
 
       {/* Logs Table */}
       <div className="logs-card" id="ai-logs-card-section">
         {loading ? (
-          <div style={{ padding: "60px", textAlign: "center", color: "#64748b" }}>
+          <div
+            style={{ padding: "60px", textAlign: "center", color: "#64748b" }}
+          >
             Đang tải dữ liệu nhật ký AI...
           </div>
         ) : (
-          <div id="ai-logs-table-wrapper" style={{ overflowX: "auto", maxHeight: "550px", overflowY: "auto", position: "relative" }}>
+          <div
+            id="ai-logs-table-wrapper"
+            style={{
+              overflowX: "auto",
+              maxHeight: "550px",
+              overflowY: "auto",
+              position: "relative",
+            }}
+          >
             <table className="logs-table">
               <thead>
                 <tr>
@@ -585,39 +780,79 @@ export default function AdminAIMonitoring() {
                   <th>Tiêu đề / Tính năng</th>
                   <th>Nội dung (Prompt / Question / Input)</th>
                   <th>Kết quả (AI Response / Answer)</th>
-                  <th style={{ width: "100px", textAlign: "center" }}>Độ trễ</th>
+                  <th style={{ width: "100px", textAlign: "center" }}>
+                    Độ trễ
+                  </th>
                   <th style={{ width: "160px" }}>Thời gian tạo</th>
-                  <th style={{ width: "90px", textAlign: "center" }}>Thao tác</th>
+                  <th style={{ width: "90px", textAlign: "center" }}>
+                    Thao tác
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, idx) => (
                   <tr key={`${item.ItemType}-${item.ItemId}-${idx}`}>
                     <td>
-                      <span className={`log-type-badge badge-${(item.ItemType || '').toLowerCase()}`}>
+                      <span
+                        className={`log-type-badge badge-${(item.ItemType || "").toLowerCase()}`}
+                      >
                         {item.ItemType}
                       </span>
                     </td>
                     <td style={{ fontWeight: 700 }}>
                       {item.Title}
-                      {Number(item.IsError) === 1 && <span className="error-pill">LỖI</span>}
+                      {Number(item.IsError) === 1 && (
+                        <span className="error-pill">LỖI</span>
+                      )}
                     </td>
-                    <td style={{ fontSize: "13px", color: "#475569", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <td
+                      style={{
+                        fontSize: "13px",
+                        color: "#475569",
+                        maxWidth: "250px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {item.Content}
                     </td>
-                    <td style={{ fontSize: "13px", color: "#475569", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <td
+                      style={{
+                        fontSize: "13px",
+                        color: "#475569",
+                        maxWidth: "250px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {item.Detail || "N/A"}
                     </td>
-                    <td style={{ textAlign: "center", fontFamily: "monospace", fontSize: "13px", fontWeight: 600, color: item.LatencyMs > 1500 ? "#ef4444" : "#10b981" }}>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        fontFamily: "monospace",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: item.LatencyMs > 1500 ? "#ef4444" : "#10b981",
+                      }}
+                    >
                       {item.LatencyMs}ms
                     </td>
                     <td style={{ fontSize: "13px", color: "#64748b" }}>
-                      {item.CreatedAt ? new Date(item.CreatedAt).toLocaleString("vi-VN") : ""}
+                      {item.CreatedAt
+                        ? new Date(item.CreatedAt).toLocaleString("vi-VN")
+                        : ""}
                     </td>
                     <td style={{ textAlign: "center" }}>
                       <button
                         className="btn-outline"
-                        style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "6px" }}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          borderRadius: "6px",
+                        }}
                         onClick={() => openDetail(item)}
                       >
                         Chi tiết
@@ -627,7 +862,14 @@ export default function AdminAIMonitoring() {
                 ))}
                 {items.length === 0 && (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: "center", color: "#94a3b8", padding: "40px" }}>
+                    <td
+                      colSpan="7"
+                      style={{
+                        textAlign: "center",
+                        color: "#94a3b8",
+                        padding: "40px",
+                      }}
+                    >
                       Không tìm thấy bản ghi dữ liệu AI nào phù hợp
                     </td>
                   </tr>
@@ -644,67 +886,164 @@ export default function AdminAIMonitoring() {
           <div className="ai-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <span className={`log-type-badge badge-${(selected.ItemType || '').toLowerCase()}`} style={{ marginRight: "10px" }}>
+                <span
+                  className={`log-type-badge badge-${(selected.ItemType || "").toLowerCase()}`}
+                  style={{ marginRight: "10px" }}
+                >
                   {selected.ItemType}
                 </span>
-                <strong style={{ fontSize: "16px", color: "#1e293b" }}>{selected.Title || "Chi tiết log AI"}</strong>
+                <strong style={{ fontSize: "16px", color: "#1e293b" }}>
+                  {selected.Title || "Chi tiết log AI"}
+                </strong>
               </div>
-              <button onClick={() => setSelected(null)} style={{ background: "transparent", border: "none", fontSize: "20px", color: "#94a3b8", cursor: "pointer" }}>
+              <button
+                onClick={() => setSelected(null)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  fontSize: "20px",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                }}
+              >
                 &times;
               </button>
             </div>
             <div className="modal-body">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px", fontSize: "13px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "16px",
+                  marginBottom: "16px",
+                  fontSize: "13px",
+                }}
+              >
                 <div>
-                  <div style={{ color: "#64748b" }}>Người gọi / Khách hàng:</div>
-                  <strong style={{ color: "#334155" }}>{selected.UserName || "Hệ thống"} (ID: {selected.UserId || "N/A"})</strong>
+                  <div style={{ color: "#64748b" }}>
+                    Người gọi / Khách hàng:
+                  </div>
+                  <strong style={{ color: "#334155" }}>
+                    {selected.UserName || "Hệ thống"} (ID:{" "}
+                    {selected.UserId || "N/A"})
+                  </strong>
                 </div>
                 <div>
                   <div style={{ color: "#64748b" }}>Thời gian:</div>
-                  <strong style={{ color: "#334155" }}>{selected.CreatedAt ? new Date(selected.CreatedAt).toLocaleString("vi-VN") : ""}</strong>
+                  <strong style={{ color: "#334155" }}>
+                    {selected.CreatedAt
+                      ? new Date(selected.CreatedAt).toLocaleString("vi-VN")
+                      : ""}
+                  </strong>
                 </div>
                 {selected.ModelName && (
                   <div>
                     <div style={{ color: "#64748b" }}>Mô hình AI:</div>
-                    <strong style={{ color: "#334155" }}>{selected.ModelName}</strong>
+                    <strong style={{ color: "#334155" }}>
+                      {selected.ModelName}
+                    </strong>
                   </div>
                 )}
                 {selected.InputToken !== undefined && (
                   <div>
                     <div style={{ color: "#64748b" }}>Tokens / Chi phí:</div>
                     <strong style={{ color: "#334155" }}>
-                      In: {selected.InputToken} | Out: {selected.OutputToken} | Cost: ${selected.Cost}
+                      In: {selected.InputToken} | Out: {selected.OutputToken} |
+                      Cost: ${selected.Cost}
                     </strong>
                   </div>
                 )}
               </div>
 
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "12px", marginBottom: "16px" }}>
-                <div style={{ color: "#64748b", fontSize: "13px", fontWeight: 700, marginBottom: "4px" }}>YÊU CẦU / PROMPT / CÂU HỎI:</div>
-                <div className="json-box" style={{ background: "#f8fafc", color: "#334155", border: "1px solid #e2e8f0" }}>
+              <div
+                style={{
+                  borderTop: "1px solid #f1f5f9",
+                  paddingTop: "12px",
+                  marginBottom: "16px",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    marginBottom: "4px",
+                  }}
+                >
+                  YÊU CẦU / PROMPT / CÂU HỎI:
+                </div>
+                <div
+                  className="json-box"
+                  style={{
+                    background: "#f8fafc",
+                    color: "#334155",
+                    border: "1px solid #e2e8f0",
+                  }}
+                >
                   {selected.Content || selected.Prompt || selected.Question}
                 </div>
               </div>
 
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "12px", marginBottom: "16px" }}>
-                <div style={{ color: "#64748b", fontSize: "13px", fontWeight: 700, marginBottom: "4px" }}>PHẢN HỒI CỦA AI:</div>
+              <div
+                style={{
+                  borderTop: "1px solid #f1f5f9",
+                  paddingTop: "12px",
+                  marginBottom: "16px",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    marginBottom: "4px",
+                  }}
+                >
+                  PHẢN HỒI CỦA AI:
+                </div>
                 <div className="json-box">
-                  {selected.Detail || selected.AIResponse || selected.Answer || "Không có kết quả"}
+                  {selected.Detail ||
+                    selected.AIResponse ||
+                    selected.Answer ||
+                    "Không có kết quả"}
                 </div>
               </div>
 
               {selected.ItemType === "audit" && (
-                <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "16px" }}>
-                  <div style={{ color: "#64748b", fontSize: "13px", fontWeight: 700, marginBottom: "8px" }}>KIỂM DUYỆT (AUDIT CHECK):</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div
+                  style={{ borderTop: "1px solid #f1f5f9", paddingTop: "16px" }}
+                >
+                  <div
+                    style={{
+                      color: "#64748b",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      marginBottom: "8px",
+                    }}
+                  >
+                    KIỂM DUYỆT (AUDIT CHECK):
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                    }}
+                  >
                     <textarea
                       className="filter-input"
-                      style={{ width: "100%", height: "80px", background: "#ffffff" }}
+                      style={{
+                        width: "100%",
+                        height: "80px",
+                        background: "#ffffff",
+                      }}
                       value={checkResult}
                       onChange={(e) => setCheckResult(e.target.value)}
                       placeholder="Nhập ghi chú kết quả kiểm duyệt..."
                     />
-                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <div
+                      style={{ display: "flex", justifyContent: "flex-end" }}
+                    >
                       <button className="btn-primary" onClick={markChecked}>
                         Xác nhận đã kiểm duyệt
                       </button>

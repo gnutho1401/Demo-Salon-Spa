@@ -9,35 +9,35 @@ const DEFAULT_AVATAR = "/images/avatars/default-avatar.png";
 const menuGroups = [
   {
     title: "",
-    items: [
-      { to: "/technician", icon: "🏠", label: "Trang chủ", end: true },
-    ]
+    items: [{ to: "/technician", icon: "🏠", label: "Trang chủ", end: true }],
   },
   {
     title: "LỊCH LÀM VIỆC",
     items: [
       { to: "/technician/schedule", icon: "📅", label: "Lịch làm việc" },
       { to: "/technician/appointments", icon: "🧾", label: "Lịch hẹn của tôi" },
-    ]
+    ],
   },
   {
     title: "KHÁCH HÀNG",
     items: [
       { to: "/technician/customers", icon: "👥", label: "Khách hàng" },
       { to: "/technician/reviews", icon: "⭐", label: "Đánh giá" },
-    ]
+    ],
   },
   {
     title: "THU NHẬP",
-    items: [
-      { to: "/technician/earnings", icon: "💰", label: "Doanh thu" },
-    ]
+    items: [{ to: "/technician/earnings", icon: "💰", label: "Doanh thu" }],
   },
   {
     title: "PHÁC ĐỒ & GHI CHÚ",
     items: [
-      { to: "/technician/treatment-notes", icon: "📝", label: "Ghi chú trị liệu" },
-    ]
+      {
+        to: "/technician/treatment-notes",
+        icon: "📝",
+        label: "Ghi chú trị liệu",
+      },
+    ],
   },
   {
     title: "THIẾT LẬP",
@@ -45,8 +45,8 @@ const menuGroups = [
       { to: "/technician/profile", icon: "👤", label: "Hồ sơ cá nhân" },
       { to: "/technician/settings", icon: "⚙️", label: "Cài đặt" },
       { to: "/technician/notifications", icon: "🔔", label: "Thông báo" },
-    ]
-  }
+    ],
+  },
 ];
 
 export default function TechnicianLayout({ children }) {
@@ -61,7 +61,7 @@ export default function TechnicianLayout({ children }) {
     try {
       const res = await axiosClient.get("/notifications/my");
       const list = res.data?.data || [];
-      const count = list.filter(n => !n.IsRead).length;
+      const count = list.filter((n) => !n.IsRead).length;
       setUnreadCount(count);
     } catch (_) {}
   }
@@ -83,7 +83,9 @@ export default function TechnicianLayout({ children }) {
     if (savedScrollTop && sidebarRef.current) {
       sidebarRef.current.scrollTop = Number(savedScrollTop);
     } else {
-      const activeLink = sidebarRef.current?.querySelector(".tech-nav-link.active");
+      const activeLink = sidebarRef.current?.querySelector(
+        ".tech-nav-link.active",
+      );
       if (activeLink) {
         activeLink.scrollIntoView({ block: "nearest", behavior: "auto" });
       }
@@ -172,19 +174,22 @@ export default function TechnicianLayout({ children }) {
                     <span className="tech-nav-icon">{item.icon}</span>
                     <b className="tech-nav-label">
                       {item.label}
-                      {item.to === "/technician/notifications" && unreadCount > 0 && (
-                        <span style={{
-                          backgroundColor: "#e53e3e",
-                          color: "white",
-                          padding: "2px 6px",
-                          borderRadius: "10px",
-                          fontSize: "11px",
-                          marginLeft: "8px",
-                          fontWeight: "bold"
-                        }}>
-                          {unreadCount}
-                        </span>
-                      )}
+                      {item.to === "/technician/notifications" &&
+                        unreadCount > 0 && (
+                          <span
+                            style={{
+                              backgroundColor: "#e53e3e",
+                              color: "white",
+                              padding: "2px 6px",
+                              borderRadius: "10px",
+                              fontSize: "11px",
+                              marginLeft: "8px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {unreadCount}
+                          </span>
+                        )}
                     </b>
                   </NavLink>
                 ))}
