@@ -16,7 +16,11 @@ async function list(filters = {}) {
 
   const request = pool.request();
   request.input("Type", sql.NVarChar, type || null);
-  request.input("Checked", sql.Bit, checked !== undefined && checked !== "" ? (Number(checked) ? 1 : 0) : null);
+  request.input(
+    "Checked",
+    sql.Bit,
+    checked !== undefined && checked !== "" ? (Number(checked) ? 1 : 0) : null,
+  );
   request.input("FromDate", sql.Date, fromDate);
   request.input("ToDate", sql.Date, toDate);
   request.input("Keyword", sql.NVarChar, keyword ? `%${keyword}%` : null);
@@ -200,9 +204,9 @@ async function list(filters = {}) {
       requestCount: stats.RequestCount || 0,
       tokenUsage: stats.TokenUsage || 0,
       errorRate: Number(stats.ErrorRate || 0).toFixed(1),
-      avgLatency: Math.round(stats.AvgLatencyMs || 0)
+      avgLatency: Math.round(stats.AvgLatencyMs || 0),
     },
-    dailyTrend: trendResult.recordset
+    dailyTrend: trendResult.recordset,
   };
 }
 
@@ -210,10 +214,12 @@ async function getById(type, id) {
   const pool = await connectDB();
   const normalizedType = normalizeText(type);
   const normalizedId = Number(id);
-  if (!normalizedType || !normalizedId) throw new Error("Thiếu dữ liệu cần xem");
+  if (!normalizedType || !normalizedId)
+    throw new Error("Thiếu dữ liệu cần xem");
 
   if (normalizedType === "recommendation") {
-    const result = await pool.request().input("Id", sql.Int, normalizedId).query(`
+    const result = await pool.request().input("Id", sql.Int, normalizedId)
+      .query(`
       SELECT
         r.RecommendationId AS ItemId,
         'recommendation' AS ItemType,
@@ -235,7 +241,8 @@ async function getById(type, id) {
   }
 
   if (normalizedType === "prediction") {
-    const result = await pool.request().input("Id", sql.Int, normalizedId).query(`
+    const result = await pool.request().input("Id", sql.Int, normalizedId)
+      .query(`
       SELECT
         p.PredictionId AS ItemId,
         'prediction' AS ItemType,
@@ -252,7 +259,8 @@ async function getById(type, id) {
   }
 
   if (normalizedType === "chat") {
-    const result = await pool.request().input("Id", sql.Int, normalizedId).query(`
+    const result = await pool.request().input("Id", sql.Int, normalizedId)
+      .query(`
       SELECT
         c.ChatId AS ItemId,
         'chat' AS ItemType,
@@ -270,7 +278,8 @@ async function getById(type, id) {
   }
 
   if (normalizedType === "audit") {
-    const result = await pool.request().input("Id", sql.Int, normalizedId).query(`
+    const result = await pool.request().input("Id", sql.Int, normalizedId)
+      .query(`
       SELECT
         a.AuditId AS ItemId,
         'audit' AS ItemType,
@@ -298,17 +307,20 @@ async function getById(type, id) {
 
 async function markChecked(type, id, data = {}) {
   const pool = await connectDB();
-  const checked = data.checked !== undefined ? Number(data.checked) ? 1 : 0 : 1;
-  const checkResult = normalizeText(data.checkResult || data.CheckResult || null);
+  const checked =
+    data.checked !== undefined ? (Number(data.checked) ? 1 : 0) : 1;
+  const checkResult = normalizeText(
+    data.checkResult || data.CheckResult || null,
+  );
   const normalizedType = normalizeText(type);
   const normalizedId = Number(id);
 
   if (normalizedType === "audit") {
-    await pool.request()
+    await pool
+      .request()
       .input("Id", sql.Int, normalizedId)
       .input("IsChecked", sql.Bit, checked)
-      .input("CheckResult", sql.NVarChar, checkResult || null)
-      .query(`
+      .input("CheckResult", sql.NVarChar, checkResult || null).query(`
         UPDATE AIAuditLogs
         SET IsChecked = @IsChecked,
             CheckResult = COALESCE(@CheckResult, CheckResult)

@@ -114,4 +114,3 @@ async function toggleActive(req, res) {
 }
 
 module.exports = { list, getById, create, update, remove, toggleActive };
-
